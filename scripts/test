@@ -46,19 +46,21 @@ else
   fail "AGENTS.md is missing '## Code Review Rules'"
 fi
 
-# The output style the project selects must exist under that exact name.
+# The plugin's output style is named Mentat and applies wherever the plugin is
+# on, and this repository turns the plugin on.
+if grep -qx 'name: Mentat' output-styles/mentat.md && grep -qx 'force-for-plugin: true' output-styles/mentat.md; then
+  pass "output-styles/mentat.md is the forced Mentat style"
+else
+  fail "output-styles/mentat.md must set name: Mentat and force-for-plugin: true"
+fi
 if command -v jq >/dev/null 2>&1; then
-  # jq returns the name only if it is a non-empty string with no line breaks,
-  # so the shell never trims or splits it before the exact match.
-  style=$(jq -r '.outputStyle | select(type == "string" and length > 0 and (test("[\\r\\n]") | not))' \
-    .claude/settings.json 2>/dev/null)
-  if [ -n "$style" ] && grep -qxF "name: $style" .claude/output-styles/*.md 2>/dev/null; then
-    pass "output style '$style' exists"
+  if [ "$(jq -r '.enabledPlugins["mentat@mentat"]' .claude/settings.json)" = true ]; then
+    pass ".claude/settings.json turns the plugin on"
   else
-    fail "no output style named '$style' in .claude/output-styles"
+    fail ".claude/settings.json does not turn on mentat@mentat"
   fi
 else
-  skip "jq not installed, output style setting not checked"
+  skip "jq not installed, plugin setting not checked"
 fi
 
 # The SessionStart hook prints rules.md unchanged, within Claude Code's
@@ -75,24 +77,21 @@ else
   fail "hooks/session-start exited non-zero"
 fi
 
-# mentat review behaves as specified (stub gh and codex).
+# mentat review and wait behave as specified (stub gh and codex).
 if command -v jq >/dev/null 2>&1; then
-  if review_out=$(tests/review.sh 2>&1); then
-    printf '%s\n' "$review_out"
-  else
-    printf '%s\n' "$review_out"
-    fail "tests/review.sh"
-  fi
+  for t in tests/review.sh tests/wait.sh; do
+    if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
+  done
 else
-  skip "jq not installed, mentat review not tested"
+  skip "jq not installed, mentat review and wait not tested"
 fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh; then
-    pass "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh"
+  if shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh; then
+    pass "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh"
   else
-    fail "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh"
+    fail "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh"
   fi
 else
   skip "shellcheck not installed, shell scripts not checked"

@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-# mentat: Mentat's command line.
+# mentat: Mentat's command line. Usage errors exit 64.
 #   mentat review <PR>  Runs a local Codex review of a pull request and posts it.
-# Exit codes: 0 review posted (findings may exist; read them), 1 not reviewed,
-# 2 usage error, 3 review posted but the pull request head moved meanwhile.
+#     0 review posted (findings may exist; read them), 1 not reviewed,
+#     3 review posted but the pull request head moved meanwhile.
+#   mentat wait <PR>    Waits for the maintainer after the pull request is marked ready.
+#     0 approved at the current head, 1 needs attention (reason printed),
+#     2 no response within the time limit.
 set -uo pipefail
 
 # The Codex model and reasoning effort every review uses. Change them here, by PR.
 CODEX_MODEL="gpt-6.1-sol"
 CODEX_EFFORT="high"
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
+WAIT_INTERVAL_SECONDS="${MENTAT_WAIT_INTERVAL_SECONDS:-60}"
+WAIT_LIMIT_SECONDS="${MENTAT_WAIT_LIMIT_SECONDS:-14400}"
 
 die() { printf 'mentat: %s\n' "$1" >&2; exit "${2:-1}"; }
 not_reviewed() { die "not reviewed: $1" 1; }
 
 review() {
   local pr="${1:-}"
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review <pull request number>" 2 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review <pull request number>" 64 ;; esac
   local tool
   for tool in gh git jq codex; do
     command -v "$tool" >/dev/null 2>&1 || not_reviewed "$tool is not installed"
@@ -129,7 +134,56 @@ review() {
   fi
 }
 
+# The maintainer is the repository owner. Run this right after `gh pr ready`:
+# a comment from the maintainer counts only if it arrives after the wait starts.
+wait_for_approval() {
+  local pr="${1:-}" repo owner start head0 info inline state latest feedback problem=""
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat wait <pull request number>" 64 ;; esac
+  repo=$(gh repo view --json nameWithOwner | jq -r .nameWithOwner)
+  owner=${repo%%/*}
+  [ -n "$owner" ] || die "could not read the repository with gh"
+  start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  head0=$(gh pr view "$pr" --json headRefOid | jq -r .headRefOid)
+  [ -n "$head0" ] || die "could not read pull request #$pr"
+  SECONDS=0
+  while [ "$SECONDS" -lt "$WAIT_LIMIT_SECONDS" ]; do
+    problem=""
+    if info=$(gh pr view "$pr" --json state,headRefOid,reviews,comments); then
+      state=$(jq -r .state <<<"$info")
+      [ "$state" = OPEN ] || die "pull request #$pr is $state"
+      [ "$(jq -r .headRefOid <<<"$info")" = "$head0" ] || die "the head moved from $head0"
+      latest=$(jq -c --arg o "$owner" '[.reviews[] | select(.author.login == $o and .state != "COMMENTED")] | last // {}' <<<"$info")
+      [ "$(jq -r .state <<<"$latest")" != CHANGES_REQUESTED ] || die "$owner requested changes"
+      # New feedback wins over an approval: a comment review, pull request comment
+      # or inline review comment (gh pr view omits these) from the maintainer since
+      # the wait began, same second included. If this cannot be checked, the
+      # approval is not accepted on this poll.
+      feedback=unknown
+      if inline=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -s 'add // []'); then
+        feedback=$(printf '%s\n%s\n' "$info" "$inline" | jq -rs --arg o "$owner" --arg t "$start" \
+          '.[0] as $p | .[1] as $inline
+           | [(($p.reviews[] | select(.state == "COMMENTED")), $p.comments[])
+              | select(.author.login == $o and ((.submittedAt // .createdAt) >= $t))]
+             + [$inline[] | select(.user.login == $o and .created_at >= $t)]
+           | if length > 0 then "new" else "none" end') || feedback=unknown
+      fi
+      [ "$feedback" != new ] || die "$owner commented; read and answer it"
+      if [ "$feedback" = none ] && [ "$(jq -r .state <<<"$latest")" = APPROVED ] &&
+        [ "$(jq -r .commit.oid <<<"$latest")" = "$head0" ]; then
+        printf 'Approved by %s at %s\n' "$owner" "$head0"
+        exit 0
+      fi
+      [ "$feedback" != unknown ] || problem="could not read the pull request's comments"
+    else
+      problem="could not read pull request #$pr"
+    fi
+    sleep "$WAIT_INTERVAL_SECONDS"
+  done
+  die "no response from $owner within $WAIT_LIMIT_SECONDS seconds${problem:+ (last check: $problem)}" 2
+}
+
 case "${1:-}" in
   review) shift; review "$@" ;;
-  *) die "usage: mentat review <pull request number>" 2 ;;
+  wait) shift; wait_for_approval "$@" ;;
+  *) die "usage: mentat review|wait <pull request number>" 64 ;;
 esac
