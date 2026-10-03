@@ -48,10 +48,11 @@ fi
 
 # The output style the project selects must exist under that exact name.
 if command -v jq >/dev/null 2>&1; then
-  style=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
-  nl=$'\n'
-  if [ -n "$style" ] && [ "${style#*"$nl"}" = "$style" ] &&
-    grep -qxF "name: $style" .claude/output-styles/*.md 2>/dev/null; then
+  # jq returns the name only if it is a non-empty string with no line breaks,
+  # so the shell never trims or splits it before the exact match.
+  style=$(jq -r '.outputStyle | select(type == "string" and length > 0 and (test("[\\r\\n]") | not))' \
+    .claude/settings.json 2>/dev/null)
+  if [ -n "$style" ] && grep -qxF "name: $style" .claude/output-styles/*.md 2>/dev/null; then
     pass "output style '$style' exists"
   else
     fail "no output style named '$style' in .claude/output-styles"
