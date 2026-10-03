@@ -54,7 +54,7 @@ echo change >file && git add file && git commit -q -m change
 head_sha=$(git rev-parse HEAD)
 git push -q origin "HEAD:refs/pull/7/head" && git checkout -q --detach
 
-pr_json() { printf '{"headRefOid":"%s","baseRefName":"trunk","title":"Add file","body":"PR requirement","isCrossRepository":%s,"closingIssuesReferences":[{"url":"https://example.test/issues/1"}]}\n' "$head_sha" "$1" >"$STUB/pr.json"; }
+pr_json() { printf '{"headRefOid":"%s","baseRefName":"trunk","baseRefOid":"%s","title":"Add file","body":"PR requirement","isCrossRepository":%s,"closingIssuesReferences":[{"url":"https://example.test/issues/1"}]}\n' "$head_sha" "$base_sha" "$1" >"$STUB/pr.json"; }
 reset() { rm -f "$STUB"/*; pr_json false; printf 'One finding.\n\nREVIEW STATUS: COMPLETE\n' >"$STUB/codex_out"; }
 run() { "$mentat" review 7 >/dev/null 2>&1; echo $?; }
 
@@ -85,9 +85,12 @@ git config remote.origin.fetch '+refs/heads/none:refs/remotes/origin/none'
 reset; rc=$(run)
 check "uses the fetched base, not a stale origin/<base>" '[ "$rc" = 0 ] && grep -q "Base: trunk @ $base_sha" "$STUB/posted.md"'
 git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
-git remote set-url origin "$root/fork/repo.git"
+# A mirror at the same owner/repo path elsewhere, with a different base, is refused.
+git clone -q --bare "$root/owner/repo.git" "$root/elsewhere/owner/repo.git"
+git -C "$root/work" commit -q --allow-empty -m other && git push -q "$root/elsewhere/owner/repo.git" HEAD:trunk
+git remote set-url origin "$root/elsewhere/owner/repo.git"
 reset; rc=$(run)
-check "refuses when origin is not the gh repository" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
+check "refuses a base that is not GitHub's" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
 git remote set-url origin "$root/owner/repo.git"
 reset; pr_json true; rc=$(run)
 check "fork pull request is refused" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'

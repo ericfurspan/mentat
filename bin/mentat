@@ -24,15 +24,7 @@ review() {
   local repo info head base cross
   repo=$(gh repo view --json nameWithOwner | jq -r .nameWithOwner)
   [ -n "$repo" ] || not_reviewed "could not read the repository with gh"
-  # gh reads the pull request from $repo; git must fetch from the same place.
-  # The URL is not printed: it can carry a token.
-  local origin_url
-  origin_url=$(git remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]')
-  case "$origin_url" in
-    *[/:]"$(tr '[:upper:]' '[:lower:]' <<<"$repo")" | *[/:]"$(tr '[:upper:]' '[:lower:]' <<<"$repo")".git) ;;
-    *) not_reviewed "the origin remote is not $repo, the repository gh reads pull requests from" ;;
-  esac
-  info=$(gh pr view "$pr" --json headRefOid,baseRefName,title,body,isCrossRepository,closingIssuesReferences) ||
+  info=$(gh pr view "$pr" --json headRefOid,baseRefName,baseRefOid,title,body,isCrossRepository,closingIssuesReferences) ||
     not_reviewed "could not read pull request #$pr"
   head=$(jq -r .headRefOid <<<"$info")
   base=$(jq -r .baseRefName <<<"$info")
@@ -44,6 +36,9 @@ review() {
   local base_sha merge_base
   git fetch -q origin "refs/heads/$base" || not_reviewed "could not fetch base branch $base"
   base_sha=$(git rev-parse FETCH_HEAD) || not_reviewed "could not resolve base branch $base"
+  # The fetched base must be the one GitHub reports, whatever origin points at.
+  [ "$base_sha" = "$(jq -r .baseRefOid <<<"$info")" ] ||
+    not_reviewed "origin's $base ($base_sha) is not GitHub's base for #$pr; check that origin is $repo, or retry if $base just moved"
   git fetch -q origin "pull/$pr/head" || not_reviewed "could not fetch the pull request head"
   git cat-file -e "$head^{commit}" 2>/dev/null || not_reviewed "head $head was not fetched"
   merge_base=$(git merge-base "$base_sha" "$head") || not_reviewed "no merge-base between $base and $head"
