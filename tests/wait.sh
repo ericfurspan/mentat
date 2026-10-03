@@ -18,7 +18,8 @@ check() { if eval "$2"; then printf 'PASS: wait %s\n' "$1"; else printf 'FAIL: w
 cat >"$root/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 case "$1 $2" in
-  "repo view") echo '{"owner":{"login":"maint"}}' ;;
+  "repo view") echo '{"nameWithOwner":"maint/repo"}' ;;
+  "api --paginate") cat "$STUB/inline.json" 2>/dev/null || echo '[]' ;;
   "pr view")
     n=$(($(cat "$STUB/calls" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/calls"
     if [ "$n" -ge 3 ] && [ -f "$STUB/later.json" ]; then cat "$STUB/later.json"; else cat "$STUB/pr.json"; fi ;;
@@ -26,7 +27,7 @@ case "$1 $2" in
 esac
 EOF
 chmod +x "$root/bin/gh"
-export PATH="$root/bin:$PATH" MENTAT_WAIT_INTERVAL_SECONDS=1 MENTAT_WAIT_LIMIT_SECONDS=2
+export PATH="$root/bin:$PATH" MENTAT_WAIT_INTERVAL_SECONDS=1 MENTAT_WAIT_LIMIT_SECONDS=3
 
 H=1111111111111111111111111111111111111111
 OLD=2222222222222222222222222222222222222222
@@ -53,6 +54,12 @@ case_with "$(review maint APPROVED "$H" "$EARLY")" "$(comment maint "$LATE")"; r
 check "an approval followed by a maintainer comment exits 1" '[ "$rc" = 1 ]'
 case_with "$(review maint APPROVED "$H" "$EARLY"),$(review maint COMMENTED "$H" "$LATE")" ""; rc=$(run)
 check "an approval followed by a maintainer comment review exits 1" '[ "$rc" = 1 ]'
+case_with "$(review maint APPROVED "$H" "$EARLY")" ""
+printf '[{"user":{"login":"maint"},"created_at":"%s"}]\n' "$LATE" >"$STUB/inline.json"; rc=$(run)
+check "an approval followed by a maintainer inline reply exits 1" '[ "$rc" = 1 ]'
+case_with "$(review maint APPROVED "$H" "$EARLY")" ""
+printf '[{"user":{"login":"maint"},"created_at":"%s"}]\n' "$EARLY" >"$STUB/inline.json"; rc=$(run)
+check "an inline comment from before the start is ignored" '[ "$rc" = 0 ]'
 case_with "$(review maint CHANGES_REQUESTED "$H" "$LATE")" ""; rc=$(run)
 check "requested changes exit 1" '[ "$rc" = 1 ]'
 case_with "" "$(comment maint "$LATE")"; rc=$(run)

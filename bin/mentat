@@ -137,15 +137,20 @@ review() {
 # The maintainer is the repository owner. Run this right after `gh pr ready`:
 # a comment from the maintainer counts only if it arrives after the wait starts.
 wait_for_approval() {
-  local pr="${1:-}" owner start head0 info state latest waited=0
+  local pr="${1:-}" repo owner start head0 info inline state latest
   case "$pr" in '' | *[!0-9]*) die "usage: mentat wait <pull request number>" 64 ;; esac
-  owner=$(gh repo view --json owner | jq -r .owner.login)
-  [ -n "$owner" ] || die "could not read the repository owner with gh"
+  repo=$(gh repo view --json nameWithOwner | jq -r .nameWithOwner)
+  owner=${repo%%/*}
+  [ -n "$owner" ] || die "could not read the repository with gh"
   start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   head0=$(gh pr view "$pr" --json headRefOid | jq -r .headRefOid)
   [ -n "$head0" ] || die "could not read pull request #$pr"
-  while [ "$waited" -lt "$WAIT_LIMIT_SECONDS" ]; do
-    if info=$(gh pr view "$pr" --json state,headRefOid,reviews,comments); then
+  SECONDS=0
+  while [ "$SECONDS" -lt "$WAIT_LIMIT_SECONDS" ]; do
+    # Inline review comments, including replies in existing threads, are not
+    # in gh pr view's output, so they are read separately.
+    if info=$(gh pr view "$pr" --json state,headRefOid,reviews,comments) &&
+      inline=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -s 'add // []'); then
       state=$(jq -r .state <<<"$info")
       [ "$state" = OPEN ] || die "pull request #$pr is $state"
       [ "$(jq -r .headRefOid <<<"$info")" = "$head0" ] || die "the head moved from $head0"
@@ -153,9 +158,10 @@ wait_for_approval() {
       [ "$(jq -r .state <<<"$latest")" != CHANGES_REQUESTED ] || die "$owner requested changes"
       # New feedback wins over an approval: a comment review or pull request
       # comment from the maintainer since the wait began (same second included).
-      jq -e --arg o "$owner" --arg t "$start" \
-        '[(.reviews[] | select(.state == "COMMENTED")), .comments[]]
-         | map(select(.author.login == $o and ((.submittedAt // .createdAt) >= $t))) | length > 0' \
+      jq -e --arg o "$owner" --arg t "$start" --argjson inline "$inline" \
+        '[(.reviews[] | select(.state == "COMMENTED")), .comments[]
+          | select(.author.login == $o and ((.submittedAt // .createdAt) >= $t))]
+         + [$inline[] | select(.user.login == $o and .created_at >= $t)] | length > 0' \
         <<<"$info" >/dev/null && die "$owner commented; read and answer it"
       if [ "$(jq -r .state <<<"$latest")" = APPROVED ] && [ "$(jq -r .commit.oid <<<"$latest")" = "$head0" ]; then
         printf 'Approved by %s at %s\n' "$owner" "$head0"
@@ -163,7 +169,6 @@ wait_for_approval() {
       fi
     fi
     sleep "$WAIT_INTERVAL_SECONDS"
-    waited=$((waited + WAIT_INTERVAL_SECONDS))
   done
   die "no response from $owner within $WAIT_LIMIT_SECONDS seconds" 2
 }
