@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016,SC2034
+# (File-wide: each check is a string evaluated after its case runs, so single-
+# quoted variables and assignments read only inside those strings are intended.)
 # Behavior tests for `mentat review`, using stub gh and codex commands and a
 # local origin repository. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
-# Each check is a string evaluated after its case runs, so variables in single
-# quotes and assignments read only inside those strings are intended.
-# shellcheck disable=SC2016,SC2034
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
 root=$(mktemp -d)
