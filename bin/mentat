@@ -22,8 +22,16 @@ review() {
   done
 
   local repo info head base cross
-  repo=$(gh repo view --json nameWithOwner | jq -r .nameWithOwner) && [ -n "$repo" ] ||
-    not_reviewed "could not read the repository with gh"
+  repo=$(gh repo view --json nameWithOwner | jq -r .nameWithOwner)
+  [ -n "$repo" ] || not_reviewed "could not read the repository with gh"
+  # gh reads the pull request from $repo; git must fetch from the same place.
+  # The URL is not printed: it can carry a token.
+  local origin_url
+  origin_url=$(git remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]')
+  case "$origin_url" in
+    *[/:]"$(tr '[:upper:]' '[:lower:]' <<<"$repo")" | *[/:]"$(tr '[:upper:]' '[:lower:]' <<<"$repo")".git) ;;
+    *) not_reviewed "the origin remote is not $repo, the repository gh reads pull requests from" ;;
+  esac
   info=$(gh pr view "$pr" --json headRefOid,baseRefName,title,body,isCrossRepository,closingIssuesReferences) ||
     not_reviewed "could not read pull request #$pr"
   head=$(jq -r .headRefOid <<<"$info")
@@ -45,11 +53,13 @@ review() {
   tmp=$(mktemp -d) || not_reviewed "could not create a temporary directory"
   wt="$tmp/worktree"
   # Paths are expanded now: the trap runs after this function's locals are gone.
+  # shellcheck disable=SC2064
   trap "git worktree remove --force $(printf %q "$wt") >/dev/null 2>&1; rm -rf $(printf %q "$tmp")" EXIT
   git worktree add -q --detach "$wt" "$head" || not_reviewed "could not check out $head"
 
   {
     printf 'Review pull request #%s in %s.\n\n' "$pr" "$repo"
+    # shellcheck disable=SC2016 # the backticks are literal Markdown
     printf 'The change is `git diff %s %s` (merge-base of base branch %s at %s, and the pull request head). ' \
       "$merge_base" "$head" "$base" "$base_sha"
     printf 'The working directory is a clean checkout of the head commit. Do not modify files.\n\n'

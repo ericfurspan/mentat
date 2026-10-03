@@ -2,6 +2,9 @@
 # Behavior tests for `mentat review`, using stub gh and codex commands and a
 # local origin repository. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
+# Each check is a string evaluated after its case runs, so variables in single
+# quotes and assignments read only inside those strings are intended.
+# shellcheck disable=SC2016,SC2034
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
 root=$(mktemp -d)
@@ -41,11 +44,11 @@ chmod +x "$root/bin/gh" "$root/bin/codex"
 export PATH="$root/bin:$PATH"
 
 # A local origin with base branch trunk (not main, so machine-wide git hooks guarding main never apply) and a pull request head at refs/pull/7/head.
-git init -q --bare "$root/origin.git"
+git init -q --bare "$root/owner/repo.git"
 git init -q -b trunk "$root/work" && cd "$root/work" || exit 1
 git config user.email t@example.test && git config user.name test
 git commit -q --allow-empty -m base
-git remote add origin "$root/origin.git" && git push -q origin trunk
+git remote add origin "$root/owner/repo.git" && git push -q origin trunk
 base_sha=$(git rev-parse HEAD)
 echo change >file && git add file && git commit -q -m change
 head_sha=$(git rev-parse HEAD)
@@ -82,6 +85,10 @@ git config remote.origin.fetch '+refs/heads/none:refs/remotes/origin/none'
 reset; rc=$(run)
 check "uses the fetched base, not a stale origin/<base>" '[ "$rc" = 0 ] && grep -q "Base: trunk @ $base_sha" "$STUB/posted.md"'
 git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+git remote set-url origin "$root/fork/repo.git"
+reset; rc=$(run)
+check "refuses when origin is not the gh repository" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
+git remote set-url origin "$root/owner/repo.git"
 reset; pr_json true; rc=$(run)
 check "fork pull request is refused" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
 reset; echo 0000000000000000000000000000000000000000 >"$STUB/head_after"; rc=$(run)
