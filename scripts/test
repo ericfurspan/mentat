@@ -61,9 +61,39 @@ else
   skip "jq not installed, output style setting not checked"
 fi
 
+# The SessionStart hook prints rules.md unchanged, within Claude Code's
+# 10,000-character limit for context a hook adds.
+if hook_out=$(hooks/session-start); then
+  if [ "$hook_out" != "$(cat rules.md)" ]; then
+    fail "hooks/session-start output differs from rules.md"
+  elif [ "${#hook_out}" -ge 10000 ]; then
+    fail "hooks/session-start prints ${#hook_out} characters (limit 10000)"
+  else
+    pass "hooks/session-start prints rules.md (${#hook_out} characters)"
+  fi
+else
+  fail "hooks/session-start exited non-zero"
+fi
+
+# mentat review behaves as specified (stub gh and codex).
+if command -v jq >/dev/null 2>&1; then
+  if review_out=$(tests/review.sh 2>&1); then
+    printf '%s\n' "$review_out"
+  else
+    printf '%s\n' "$review_out"
+    fail "tests/review.sh"
+  fi
+else
+  skip "jq not installed, mentat review not tested"
+fi
+
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck bin/*; then pass "shellcheck bin/"; else fail "shellcheck bin/"; fi
+  if shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh; then
+    pass "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh"
+  else
+    fail "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh"
+  fi
 else
   skip "shellcheck not installed, shell scripts not checked"
 fi
