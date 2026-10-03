@@ -18,22 +18,32 @@ skip() {
 
 # JSON files parse.
 if command -v jq >/dev/null 2>&1; then
-  while IFS= read -r f; do
-    if jq empty "$f" >/dev/null 2>&1; then pass "$f parses"; else fail "$f is not valid JSON"; fi
-  done < <(git ls-files --cached --others --exclude-standard '*.json')
+  if ! json_files=$(git ls-files --cached --others --exclude-standard '*.json'); then
+    fail "could not list JSON files"
+  else
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      if jq empty "$f" >/dev/null 2>&1; then pass "$f parses"; else fail "$f is not valid JSON"; fi
+    done <<< "$json_files"
+  fi
 else
   skip "jq not installed, JSON not checked"
 fi
 
 # YAML files (issue form, workflows) parse.
 if command -v ruby >/dev/null 2>&1; then
-  while IFS= read -r f; do
-    if ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" >/dev/null 2>&1; then
-      pass "$f parses"
-    else
-      fail "$f is not valid YAML"
-    fi
-  done < <(git ls-files --cached --others --exclude-standard '*.yml' '*.yaml')
+  if ! yaml_files=$(git ls-files --cached --others --exclude-standard '*.yml' '*.yaml'); then
+    fail "could not list YAML files"
+  else
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      if ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" >/dev/null 2>&1; then
+        pass "$f parses"
+      else
+        fail "$f is not valid YAML"
+      fi
+    done <<< "$yaml_files"
+  fi
 else
   skip "ruby not installed, YAML not checked"
 fi
@@ -46,11 +56,15 @@ else
 fi
 
 # The output style the project selects must exist under that exact name.
-style=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
-if [ -n "$style" ] && grep -qx "name: $style" .claude/output-styles/*.md 2>/dev/null; then
-  pass "output style '$style' exists"
+if command -v jq >/dev/null 2>&1; then
+  style=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
+  if [ -n "$style" ] && grep -qx "name: $style" .claude/output-styles/*.md 2>/dev/null; then
+    pass "output style '$style' exists"
+  else
+    fail "no output style named '$style' in .claude/output-styles"
+  fi
 else
-  fail "no output style named '$style' in .claude/output-styles"
+  skip "jq not installed, output style setting not checked"
 fi
 
 # Shell scripts pass shellcheck.
