@@ -98,6 +98,6 @@ check "fork pull request is refused" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && 
 reset; echo 0000000000000000000000000000000000000000 >"$STUB/head_after"; rc=$(run)
 check "moved head posts with a note (exit 3)" '[ "$rc" = 3 ] && grep -q "head moved" "$STUB/posted.md"'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
-check "bad pull request number is a usage error (exit 2)" '[ "$rc" = 2 ]'
+check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 [ "$failures" -eq 0 ]

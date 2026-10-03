@@ -1,33 +1,10 @@
-# Agent rules
+# This repository
 
-One developer, the maintainer, runs coding agents on this repository. Claude Code plans, builds and merges. Codex reviews each pull request through `mentat review`. The maintainer decides what matters.
+This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its output style (`output-styles/`), its builder subagent (`agents/`) and the `mentat` command (`bin/mentat`). Its committed `.claude/settings.json` turns the plugin on here, so sessions in this repository follow `rules.md`.
 
-## How a change moves
-1. Work starts from a chat request or an issue.
-2. Read the code first. Write down what you will build and how the result will be checked, in the issue or the pull request. Write a separate plan only when the approach is uncertain or the decision matters.
-3. One builder, one branch, one checkout per change. Use subagents mostly for read-only investigation.
-4. Run `scripts/test` before opening the pull request and after every fix. The pull request shows the result on the final commit. If a check is missing or could not run, say so.
-5. Open every pull request as a draft, with the template. Link the issue with `Closes #N` when there is one.
-6. While it is a draft, run `mentat review <N>`: a local Codex review of the exact head commit, posted to the pull request. Exit 0 means posted, not clean; exit 1 means not reviewed; exit 3 means the head moved, so run it again. Sort each finding: fix what affects correctness, the stated requirements, security or a guardrail, and answer the rest with a reason. Lower-priority points become cheap fixes or follow-up issues. Batch the fixes, push them, then run one final `mentat review` so the final commit is reviewed. Bring a blocking finding to the maintainer only when you disagree with it.
-7. Mark the pull request ready for review (`gh pr ready`) only when the final review of the latest commit is clean and CI passes. Marking it ready is what requests the maintainer's review.
-8. A review that fails, times out or returns nothing is not a pass. After ten review rounds, stop and tell the maintainer why.
-9. Merge with `gh pr merge --squash --match-head-commit <sha>`, where `<sha>` is the commit the final review covered, once required checks and approvals pass.
-
-## Approval
-- Changes to Mentat's own files and guardrails wait for the maintainer's Approve on GitHub. The code owners file enforces this.
-- Approving a pull request approves the code, not running it.
-
-## Never
-- Create releases, deploy, publish, change secrets, run production migrations or run destructive operations on outside systems. Prepare them; the maintainer runs them.
-- Commit secrets. If one is exposed, tell the maintainer it must be rotated; deleting it is not enough.
-- Push to main, force-push to a shared branch, or change repository settings.
-- Bring production credentials into an agent session.
-
-## Records
-- Issues are the backlog. The pinned issue holds the maintainer's order. Labels mark state: `idea`, `ready`.
-- Pull request titles follow Conventional Commits. Merges squash, so the title becomes the commit.
-- Refer to work as `#N` inside a repository and `owner/repo#N` across repositories.
-- Use plain words and common industry terms. No project glossary.
+- The one test command is `scripts/test`. It runs on macOS and in CI on Linux.
+- Every file here is Mentat's own, so every pull request waits for the maintainer's Approve (`.github/CODEOWNERS`).
+- Keep scripts plain bash that also runs on macOS's bash 3.2.
 
 ## Code Review Rules
 - The requirements are in the pull request description and any linked issue. Flag code that does not do what they say, or a test result that does not match the final commit.
