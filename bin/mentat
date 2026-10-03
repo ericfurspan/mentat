@@ -66,10 +66,11 @@ review() {
   } >"$tmp/prompt" || exit 1
 
   local out="$tmp/review.md" rc secs=0 pid
-  (cd "$wt" && exec codex exec review --ephemeral --ignore-user-config \
+  # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
+  # final reply, so it cannot end with the status line checked below.
+  (cd "$wt" && exec codex exec --ephemeral --ignore-user-config --sandbox read-only \
     -c "model=\"$CODEX_MODEL\"" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
-    -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' \
-    -o "$out" - <"$tmp/prompt") >"$tmp/codex.log" 2>&1 &
+    -c 'approval_policy="never"' -o "$out" - <"$tmp/prompt") >"$tmp/codex.log" 2>&1 &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$secs" -ge "$REVIEW_TIMEOUT_SECONDS" ]; then
