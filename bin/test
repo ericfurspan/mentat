@@ -23,7 +23,8 @@ if command -v jq >/dev/null 2>&1; then
   else
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      if jq empty "$f" >/dev/null 2>&1; then pass "$f parses"; else fail "$f is not valid JSON"; fi
+      # Exactly one JSON value: rejects empty files and concatenated documents.
+      if [ "$(jq -s length "$f" 2>/dev/null)" = 1 ]; then pass "$f parses"; else fail "$f is not one valid JSON document"; fi
     done <<< "$json_files"
   fi
 else
@@ -58,7 +59,7 @@ fi
 # The output style the project selects must exist under that exact name.
 if command -v jq >/dev/null 2>&1; then
   style=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
-  if [ -n "$style" ] && grep -qx "name: $style" .claude/output-styles/*.md 2>/dev/null; then
+  if [ -n "$style" ] && grep -qxF "name: $style" .claude/output-styles/*.md 2>/dev/null; then
     pass "output style '$style' exists"
   else
     fail "no output style named '$style' in .claude/output-styles"
