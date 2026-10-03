@@ -16,37 +16,27 @@ skip() {
   fi
 }
 
-# JSON files parse.
-if command -v jq >/dev/null 2>&1; then
-  if ! json_files=$(git ls-files --cached --others --exclude-standard '*.json'); then
-    fail "could not list JSON files"
-  else
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      # Exactly one JSON value: rejects empty files and concatenated documents.
-      if [ "$(jq -s length "$f" 2>/dev/null)" = 1 ]; then pass "$f parses"; else fail "$f is not one valid JSON document"; fi
-    done <<< "$json_files"
-  fi
-else
-  skip "jq not installed, JSON not checked"
-fi
-
-# YAML files (issue form, workflows) parse.
+# JSON and YAML files parse with strict parsers. JSON must be exactly one
+# standard value (no NaN, Infinity or leading zeros); every YAML document counts.
 if command -v ruby >/dev/null 2>&1; then
-  if ! yaml_files=$(git ls-files --cached --others --exclude-standard '*.yml' '*.yaml'); then
-    fail "could not list YAML files"
+  if ! data_files=$(git ls-files --cached --others --exclude-standard '*.json' '*.yml' '*.yaml'); then
+    fail "could not list JSON and YAML files"
   else
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      if ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" >/dev/null 2>&1; then
+      case "$f" in
+        *.json) parse='JSON.parse(File.read(ARGV[0]))' ;;
+        *) parse='YAML.load_stream(File.read(ARGV[0]))' ;;
+      esac
+      if ruby -rjson -ryaml -e "$parse" "$f" >/dev/null 2>&1; then
         pass "$f parses"
       else
-        fail "$f is not valid YAML"
+        fail "$f does not parse"
       fi
-    done <<< "$yaml_files"
+    done <<< "$data_files"
   fi
 else
-  skip "ruby not installed, YAML not checked"
+  skip "ruby not installed, JSON and YAML not checked"
 fi
 
 # Codex reads review rules from this heading in AGENTS.md.

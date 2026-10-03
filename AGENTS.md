@@ -8,7 +8,7 @@ One developer, the maintainer, runs coding agents on this repository. Claude Cod
 3. One builder, one branch, one checkout per change. Use subagents mostly for read-only investigation.
 4. Run `bin/test` before opening the pull request and after every fix. The pull request shows the result on the final commit. If a check is missing or could not run, say so.
 5. Open the pull request with the template. Link the issue with `Closes #N` when there is one.
-6. Codex reviews every push. Sort each finding: fix what is real, answer the rest with a reason. Lower-priority points become cheap fixes or follow-up issues. Bring a blocking finding to the maintainer only when you disagree with it.
+6. Codex reviews the pull request once when it opens. Sort each finding: fix what is real, answer the rest with a reason. Lower-priority points become cheap fixes or follow-up issues. Batch the fixes, push them, then request one final review with `@codex review` so the final commit is always reviewed. Bring a blocking finding to the maintainer only when you disagree with it.
 7. A review that fails, times out or returns nothing is not a pass. After ten review rounds, stop and tell the maintainer why.
 8. Merge with `gh pr merge --squash --match-head-commit <sha>` once required checks and reviews pass on the latest commit.
 
