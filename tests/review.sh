@@ -87,6 +87,7 @@ check "uses the fetched base, not a stale origin/<base>" '[ "$rc" = 0 ] && grep 
 git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
 # A mirror at the same owner/repo path elsewhere, with a different base, is refused.
 git clone -q --bare "$root/owner/repo.git" "$root/elsewhere/owner/repo.git"
+git push -q "$root/elsewhere/owner/repo.git" "$head_sha:refs/pull/7/head"
 git -C "$root/work" commit -q --allow-empty -m other && git push -q "$root/elsewhere/owner/repo.git" HEAD:trunk
 git remote set-url origin "$root/elsewhere/owner/repo.git"
 reset; rc=$(run)
