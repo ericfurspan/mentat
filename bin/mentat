@@ -235,7 +235,7 @@ challenge() {
   run_codex "$top" "$tmp/prompt" "$out" not_challenged
   verdict=$(last_line "$out")
   case "$verdict" in
-    "CHALLENGE VERDICT: PROCEED" | "CHALLENGE VERDICT: RETHINK" | "CHALLENGE VERDICT: PROCEED WITH CHANGES - "?*) ;;
+    "CHALLENGE VERDICT: PROCEED" | "CHALLENGE VERDICT: RETHINK" | "CHALLENGE VERDICT: PROCEED WITH CHANGES - "*[![:space:]]*) ;;
     *) not_challenged "Codex's reply has no final CHALLENGE VERDICT line" ;;
   esac
   printf '## Plan challenge by local Codex, run by the agent\n\n'

@@ -76,6 +76,8 @@ reset; printf 'Looks fine.\n' >"$STUB/codex_out"; rc=$(run "$plan")
 check "missing verdict line is not challenged" '[ "$rc" = 1 ] && [ ! -s "$STUB/stdout" ]'
 reset; printf 'CHALLENGE VERDICT: PROCEED WITH CHANGES - \n' >"$STUB/codex_out"; rc=$(run "$plan")
 check "changes verdict without the changes is not challenged" '[ "$rc" = 1 ]'
+reset; printf 'CHALLENGE VERDICT: PROCEED WITH CHANGES -    \n' >"$STUB/codex_out"; rc=$(run "$plan")
+check "changes verdict with only spaces is not challenged" '[ "$rc" = 1 ]'
 reset; echo 3 >"$STUB/codex_sleep"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run "$plan")
 check "timeout is not challenged" '[ "$rc" = 1 ] && [ ! -s "$STUB/stdout" ]'
 
