@@ -32,6 +32,7 @@ if [ "$1" = --version ]; then echo "codex-cli 0.0-stub"; exit 0; fi
 printf '%s\n' "$@" >"$STUB/args"
 out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
 cat >"$STUB/prompt"
+[ -f "$STUB/codex_ignore_term" ] && trap '' TERM
 [ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
 [ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
@@ -73,6 +74,14 @@ reset; printf 'REVIEW STATUS: INCOMPLETE - could not inspect\n' >"$STUB/codex_ou
 check "INCOMPLETE is not reviewed" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
 reset; echo 3 >"$STUB/codex_sleep"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run)
 check "timeout is not reviewed" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
+reset; echo 30 >"$STUB/codex_sleep"; touch "$STUB/codex_ignore_term"; start=$(date +%s); rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run)
+check "timeout ends a reviewer that ignores SIGTERM" '[ "$rc" = 1 ] && [ $(($(date +%s) - start)) -lt 15 ]'
+# A narrowed fetch mapping and a stale origin/trunk must not change the base.
+git update-ref refs/remotes/origin/trunk "$head_sha"
+git config remote.origin.fetch '+refs/heads/none:refs/remotes/origin/none'
+reset; rc=$(run)
+check "uses the fetched base, not a stale origin/<base>" '[ "$rc" = 0 ] && grep -q "Base: trunk @ $base_sha" "$STUB/posted.md"'
+git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
 reset; pr_json true; rc=$(run)
 check "fork pull request is refused" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
 reset; echo 0000000000000000000000000000000000000000 >"$STUB/head_after"; rc=$(run)
