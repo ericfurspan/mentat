@@ -7,10 +7,11 @@ One developer, the maintainer, runs coding agents on this repository. Claude Cod
 2. Read the code first. Write down what you will build and how the result will be checked, in the issue or the pull request. Write a separate plan only when the approach is uncertain or the decision matters.
 3. One builder, one branch, one checkout per change. Use subagents mostly for read-only investigation.
 4. Run `bin/test` before opening the pull request and after every fix. The pull request shows the result on the final commit. If a check is missing or could not run, say so.
-5. Open the pull request with the template. Link the issue with `Closes #N` when there is one.
-6. Codex reviews the pull request once when it opens. Sort each finding: fix what is real, answer the rest with a reason. Lower-priority points become cheap fixes or follow-up issues. Batch the fixes, push them, then request one final review with `@codex review` so the final commit is always reviewed. Bring a blocking finding to the maintainer only when you disagree with it.
-7. A review that fails, times out or returns nothing is not a pass. After ten review rounds, stop and tell the maintainer why.
-8. Merge with `gh pr merge --squash --match-head-commit <sha>` once required checks and reviews pass on the latest commit.
+5. Open every pull request as a draft, with the template. Link the issue with `Closes #N` when there is one.
+6. While it is a draft, request a Codex review with `@codex review`. Sort each finding: fix what is real, answer the rest with a reason. Lower-priority points become cheap fixes or follow-up issues. Batch the fixes, push them, then request the final review with `@codex review` so the final commit is always reviewed. Bring a blocking finding to the maintainer only when you disagree with it.
+7. Mark the pull request ready for review (`gh pr ready`) only when Codex's final review of the latest commit is clean and CI passes. Marking it ready is what requests the maintainer's review.
+8. A review that fails, times out or returns nothing is not a pass. After ten review rounds, stop and tell the maintainer why.
+9. Merge with `gh pr merge --squash --match-head-commit <sha>` once required checks and reviews pass on the latest commit.
 
 ## Approval
 - Changes to Mentat's own files and guardrails wait for the maintainer's Approve on GitHub. The code owners file enforces this.

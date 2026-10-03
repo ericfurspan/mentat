@@ -49,7 +49,9 @@ fi
 # The output style the project selects must exist under that exact name.
 if command -v jq >/dev/null 2>&1; then
   style=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
-  if [ -n "$style" ] && grep -qxF "name: $style" .claude/output-styles/*.md 2>/dev/null; then
+  nl=$'\n'
+  if [ -n "$style" ] && [ "${style#*"$nl"}" = "$style" ] &&
+    grep -qxF "name: $style" .claude/output-styles/*.md 2>/dev/null; then
     pass "output style '$style' exists"
   else
     fail "no output style named '$style' in .claude/output-styles"
