@@ -19,7 +19,7 @@ cat >"$root/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 case "$1 $2" in
   "repo view") echo '{"nameWithOwner":"maint/repo"}' ;;
-  "api --paginate") cat "$STUB/inline.json" 2>/dev/null || echo '[]' ;;
+  "api --paginate") [ -f "$STUB/api_fail" ] && exit 1; cat "$STUB/inline.json" 2>/dev/null || echo '[]' ;;
   "pr view")
     n=$(($(cat "$STUB/calls" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/calls"
     if [ "$n" -ge 3 ] && [ -f "$STUB/later.json" ]; then cat "$STUB/later.json"; else cat "$STUB/pr.json"; fi ;;
@@ -60,6 +60,14 @@ check "an approval followed by a maintainer inline reply exits 1" '[ "$rc" = 1 ]
 case_with "$(review maint APPROVED "$H" "$EARLY")" ""
 printf '[{"user":{"login":"maint"},"created_at":"%s"}]\n' "$EARLY" >"$STUB/inline.json"; rc=$(run)
 check "an inline comment from before the start is ignored" '[ "$rc" = 0 ]'
+case_with "$(review maint APPROVED "$H" "$EARLY")" ""
+big=$(head -c 40000 /dev/zero | tr '\0' x)
+jq -n --arg b "$big" --arg t "$LATE" '[range(30) | {user: {login: "maint"}, created_at: $t, body: $b}]' >"$STUB/inline.json"; rc=$(run)
+check "a large set of new inline comments still stops an approval" '[ "$rc" = 1 ]'
+case_with "$(review maint APPROVED "$H" "$EARLY")" ""; touch "$STUB/api_fail"; rc=$(run)
+check "an approval is not accepted when comments cannot be read" '[ "$rc" = 2 ]'
+case_with "" ""; touch "$STUB/api_fail"; pr_json CLOSED "$H" "" "" >"$STUB/later.json"; rc=$(run)
+check "a closed pull request is reported even when comments cannot be read" '[ "$rc" = 1 ]'
 case_with "$(review maint CHANGES_REQUESTED "$H" "$LATE")" ""; rc=$(run)
 check "requested changes exit 1" '[ "$rc" = 1 ]'
 case_with "" "$(comment maint "$LATE")"; rc=$(run)
