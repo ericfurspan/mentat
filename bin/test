@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# The repository's one test command. Runs locally on macOS and in CI on Linux.
+# A tool missing locally is reported as SKIP; in CI (CI=true) it fails the run.
+set -uo pipefail
+
+cd "$(dirname "$0")/.." || exit 1
+
+failures=0
+pass() { printf 'PASS: %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
+skip() {
+  if [ "${CI:-}" = "true" ]; then
+    fail "$1 (required in CI)"
+  else
+    printf 'SKIP: %s\n' "$1"
+  fi
+}
+
+# JSON files parse.
+if command -v jq >/dev/null 2>&1; then
+  while IFS= read -r f; do
+    if jq empty "$f" >/dev/null 2>&1; then pass "$f parses"; else fail "$f is not valid JSON"; fi
+  done < <(git ls-files --cached --others --exclude-standard '*.json')
+else
+  skip "jq not installed, JSON not checked"
+fi
+
+# YAML files (issue form, workflows) parse.
+if command -v ruby >/dev/null 2>&1; then
+  while IFS= read -r f; do
+    if ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" >/dev/null 2>&1; then
+      pass "$f parses"
+    else
+      fail "$f is not valid YAML"
+    fi
+  done < <(git ls-files --cached --others --exclude-standard '*.yml' '*.yaml')
+else
+  skip "ruby not installed, YAML not checked"
+fi
+
+# Codex reads review rules from this heading in AGENTS.md.
+if grep -qx '## Code Review Rules' AGENTS.md; then
+  pass "AGENTS.md has a Code Review Rules section"
+else
+  fail "AGENTS.md is missing '## Code Review Rules'"
+fi
+
+# The output style the project selects must exist under that exact name.
+style=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
+if [ -n "$style" ] && grep -qx "name: $style" .claude/output-styles/*.md 2>/dev/null; then
+  pass "output style '$style' exists"
+else
+  fail "no output style named '$style' in .claude/output-styles"
+fi
+
+# Shell scripts pass shellcheck.
+if command -v shellcheck >/dev/null 2>&1; then
+  if shellcheck bin/*; then pass "shellcheck bin/"; else fail "shellcheck bin/"; fi
+else
+  skip "shellcheck not installed, shell scripts not checked"
+fi
+
+if [ "$failures" -gt 0 ]; then
+  printf '%d check(s) failed\n' "$failures"
+  exit 1
+fi
+printf 'All checks passed\n'

@@ -1,0 +1,25 @@
+name: Change
+description: Something to build, fix or decide.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What should change.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it solves or what it makes possible.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: How we will know it is done
+      description: What you will be able to see or run when it works.
+    validations:
+      required: true
