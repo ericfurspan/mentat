@@ -1,9 +1,6 @@
 {
   "model": "opus",
   "effortLevel": "high",
-  "env": {
-    "FORCE_AUTOUPDATE_PLUGINS": "1"
-  },
   "enabledPlugins": {
     "mentat@mentat": true
   },
