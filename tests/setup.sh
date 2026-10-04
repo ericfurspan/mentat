@@ -126,9 +126,11 @@ check "a repository Actions secret is refused" '[ "$rc" = 1 ] && last | grep -q 
 good; put "$R/dependabot/secrets" '{"total_count":1}'; rc=$(run owner/repo)
 check "a Dependabot secret is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: owner/repo has 1 dependabot secret"'
 good; put "$R/environments" '{"environments":[{"name":"prod env","deployment_branch_policy":null}]}'; put "$R/environments/prod%20env/secrets" '{"total_count":1}'; rc=$(run owner/repo)
-check "an environment secret open to any branch is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod%20env has 1 secret"'
-good; put "$R/environments" '{"environments":[{"name":"prod","deployment_branch_policy":{"protected_branches":true}}]}'; rc=$(run owner/repo)
-check "an environment limited to protected branches is allowed" '[ "$rc" = 0 ] && ! grep -q "environments/prod/secrets" "$STUB/calls"'
+check "an environment secret is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod%20env has 1 secret"'
+good; put "$R/environments" '{"environments":[{"name":"prod","deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}]}'; put "$R/environments/prod/secrets" '{"total_count":1}'; rc=$(run owner/repo)
+check "an environment secret limited to protected branches is still refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod has 1 secret"'
+good; put "$R/environments" ''; rc=$(run owner/repo)
+check "an empty environments response is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read environments" "$STUB/out"'
 good; put "$R/environments" '{"environments":[{"name":"preview","deployment_branch_policy":null}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'; rc=$(run owner/repo)
 check "an environment without secrets is allowed" '[ "$rc" = 0 ]'
 good; put "$R/environments" '{"environments":[{"name":"preview","deployment_branch_policy":null}]}'; rc=$(run owner/repo)
@@ -178,8 +180,12 @@ CODEOWNERS error list|repos/owner/repo/codeowners/errors?ref=trunk|{"errors":nul
 environment list|repos/owner/repo/environments|{"environments":null}
 repository without a default branch|repos/owner/repo|{"owner":{"login":"owner","type":"User"},"permissions":{"admin":false,"push":true}}
 CODEOWNERS without content|repos/owner/repo/contents/.github/CODEOWNERS?ref=trunk|{}
-rule with a non-numeric ruleset id|repos/owner/repo/rules/branches/trunk|[{"type":"deletion","ruleset_id":"1/../2"}]
 CASES
+# Complete rules whose ruleset ids are bad: only the id is wrong.
+for f in '.[0].ruleset_id = "1/../2"' '.[1] |= del(.ruleset_id)' '.[2].ruleset_id = null'; do
+  good; mut "$RULES" "$f"; rc=$(run owner/repo)
+  check "complete rules with a bad ruleset id ($f) are a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: a rule on trunk names no valid ruleset" "$STUB/out" && ! grep -q "rulesets/" "$STUB/calls"'
+done
 good; rm "$A/repos_owner_repo.json"; rc=$(run owner/repo)
 check "an early failure still lists what was not checked" '[ "$rc" = 1 ] && [ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ]'
 good; put "$RULES" '{"message":"oops"}'; rc=$(run owner/repo)
