@@ -12,7 +12,7 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an output sty
 
 1. Work starts from a chat request or an issue. Claude Code reads the code, then writes down what it will build and how it will be checked. Uncertain or consequential plans get a Codex challenge first (`mentat challenge`).
 2. One builder, one branch, one checkout per change. The repository's one test command runs before the pull request opens and after every fix.
-3. Every pull request opens as a draft. When it is built and CI passes, Claude Code marks it ready, which starts OpenAI's Codex GitHub app review, and `mentat review` waits for the app's result on that commit. Claude Code fixes findings that have a realistic trigger and answers the rest with a reason; for a new review it moves the pull request back to draft, pushes the fixes and marks it ready again. After three review rounds it checks in with you; ten is a hard stop.
+3. Every pull request opens as a draft. When it is built and CI passes, `mentat review` marks it ready, which starts OpenAI's Codex GitHub app review of that exact commit, and waits for the result. Claude Code fixes findings that have a realistic trigger and answers the rest with a reason, then runs `mentat review` again for the new commit. After three review rounds it checks in with you; ten is a hard stop.
 4. When the app's latest review is clean, Claude Code answers any comments you left, requests your review and runs `mentat wait`.
 5. On your Approve at the current head, it merges with `gh pr merge --squash --match-head-commit <sha>`.
 
@@ -87,7 +87,7 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`)
 
 | Command | What it does | Exit codes |
 |---|---|---|
-| `mentat review <PR>` | Waits for the Codex app's result on a ready pull request's current head | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved |
+| `mentat review <PR>` | Marks the pull request ready, which starts the Codex app's review of the current head, and waits for the result | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved |
 | `mentat wait <PR>` | Waits for your response after the pull request is marked ready | 0 approved at the current head, 1 needs attention, 2 no response in four hours |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |

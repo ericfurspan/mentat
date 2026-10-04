@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # mentat: Mentat's command line. Usage errors exit 64.
-#   mentat review <PR>  Waits for the Codex GitHub app's review of a ready pull request.
-#     0 no findings on the current head, 2 findings posted (printed), 1 not reviewed
-#     (draft, error or no result in time), 3 the head moved.
+#   mentat review <PR>  Marks the pull request ready, which starts the Codex GitHub
+#     app's review of the current head, and waits for the result. 0 no findings,
+#     2 findings posted (printed), 1 not reviewed (app busy, error or no result in
+#     time), 3 the head moved.
 #   mentat wait <PR>    Waits for the maintainer after the pull request is marked ready.
 #     0 approved at the current head, 1 needs attention (reason printed),
 #     2 no response within the time limit.
@@ -18,6 +19,7 @@ CODEX_MODEL="Codex default model"
 CODEX_EFFORT="high"
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 REVIEW_INTERVAL_SECONDS="${MENTAT_REVIEW_INTERVAL_SECONDS:-15}"
+READY_TRIES="${MENTAT_READY_TRIES:-10}"
 WAIT_INTERVAL_SECONDS="${MENTAT_WAIT_INTERVAL_SECONDS:-60}"
 WAIT_LIMIT_SECONDS="${MENTAT_WAIT_LIMIT_SECONDS:-14400}"
 
@@ -59,39 +61,59 @@ run_codex() {
 
 # The Codex GitHub app reviews a pull request when it is marked ready. It reacts
 # 👀 while working, then either posts a review tied to the commit it read or
-# reacts 👍 for no findings. A 👍 is not tied to a commit, so it counts only if
-# it is newer than the latest time the pull request was marked ready.
+# reacts 👍 for no findings. A 👍 names no commit, so review starts the run
+# itself: it marks the head ready (or re-readies it), and trusts a 👍 only if it
+# came after that and the head never moved. It never starts while a run is going.
 CODEX_APP="chatgpt-codex-connector[bot]"
+latest_ready() { # $1 repo, $2 pr: prints the time of the latest ready_for_review, or nothing
+  gh api --paginate "repos/$1/issues/$2/timeline" | jq -rs '[.[][] | select(.event == "ready_for_review") | .created_at] | max // empty'
+}
+app_reaction() { # $1 repo, $2 pr, $3 content, $4 since: prints the count
+  gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" --arg c "$3" --arg t "$4" \
+    '[.[][] | select(.user.login == $a and .content == $c and .created_at >= $t)] | length'
+}
 review() {
-  local pr="${1:-}" repo info head ready secs=0 found
+  local pr="${1:-}" repo head draft before ready="" secs=0 found n
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review <pull request number>" 64 ;; esac
   if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
     not_reviewed "could not read the repository with gh"
   fi
-  info=$(gh pr view "$pr" --json headRefOid,isDraft,createdAt) || not_reviewed "could not read pull request #$pr"
-  [ "$(jq -r .isDraft <<<"$info")" = false ] || not_reviewed "#$pr is a draft; the Codex app reviews when it is marked ready"
-  head=$(jq -r .headRefOid <<<"$info")
-  ready=$(gh api --paginate "repos/$repo/issues/$pr/timeline" | jq -rs --arg c "$(jq -r .createdAt <<<"$info")" \
-    '[.[][] | select(.event == "ready_for_review") | .created_at] | max // $c') || not_reviewed "could not read the timeline of #$pr"
-  while [ "$secs" -lt "$REVIEW_TIMEOUT_SECONDS" ]; do
-    [ "$(gh pr view "$pr" --json headRefOid --jq .headRefOid)" = "$head" ] ||
-      die "the head moved from $head; mark the pull request ready again for a new review" 3
+  head_now() { gh pr view "$pr" --json headRefOid --jq .headRefOid; }
+  if ! head=$(head_now) || [ -z "$head" ]; then not_reviewed "could not read pull request #$pr"; fi
+  n=$(app_reaction "$repo" "$pr" eyes "") || not_reviewed "could not read the reactions on #$pr"
+  [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
+  draft=$(gh pr view "$pr" --json isDraft --jq .isDraft) || not_reviewed "could not read pull request #$pr"
+  before=$(latest_ready "$repo" "$pr") || not_reviewed "could not read the timeline of #$pr"
+  if [ "$draft" = false ]; then gh pr ready "$pr" --undo >/dev/null || not_reviewed "could not move #$pr back to draft"; fi
+  gh pr ready "$pr" >/dev/null || not_reviewed "could not mark #$pr ready"
+  # Use GitHub's own time for this ready event, once the timeline shows it.
+  n=0
+  while [ "$n" -lt "$READY_TRIES" ]; do
+    ready=$(latest_ready "$repo" "$pr") || ready=""
+    [ -z "$ready" ] || [ "$ready" = "$before" ] || break
+    ready=""; n=$((n + 1)); sleep 2
+  done
+  [ -n "$ready" ] || not_reviewed "could not see #$pr's new ready event on GitHub"
+  while :; do
+    [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
     if found=$(gh api --paginate "repos/$repo/pulls/$pr/reviews" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
       '[.[][] | select(.user.login == $a and .commit_id == $h)] | last | .html_url // empty') && [ -n "$found" ]; then
+      [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
       printf 'The Codex app posted findings on %s: %s\n' "$head" "$found"
       gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
         '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"'
       exit 2
     fi
-    if found=$(gh api --paginate "repos/$repo/issues/$pr/reactions" | jq -rs --arg a "$CODEX_APP" --arg t "$ready" \
-      '[.[][] | select(.user.login == $a and .content == "+1" and .created_at >= $t)] | length') && [ "$found" -gt 0 ]; then
+    if n=$(app_reaction "$repo" "$pr" +1 "$ready") && [ "$n" -gt 0 ]; then
+      [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
       printf 'The Codex app found nothing on %s\n' "$head"
       exit 0
     fi
+    [ "$secs" -lt "$REVIEW_TIMEOUT_SECONDS" ] ||
+      not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds; tell the maintainer"
     sleep "$REVIEW_INTERVAL_SECONDS"
     secs=$((secs + REVIEW_INTERVAL_SECONDS))
   done
-  not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds"
 }
 
 # The maintainer is the repository owner. Run this right after `gh pr ready`:
