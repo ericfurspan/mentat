@@ -63,7 +63,7 @@ check "posts a complete review (exit 0)" '[ "$rc" = 0 ] && [ -f "$STUB/posted.md
 check "header is one line naming the reviewed head and model" '[ "$(head -n 1 "$STUB/posted.md")" = "**Local Codex review of $head_sha** (gpt-6.1-sol, effort high)" ] && [ "$(wc -l <"$STUB/posted.md")" -eq $(($(wc -l <"$STUB/codex_out") + 2)) ]'
 check "posts Codex's message unedited" 'tail -n 3 "$STUB/posted.md" | diff - "$STUB/codex_out" >/dev/null'
 check "runs plain codex exec, not review mode" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args"'
-check "pins model, effort and read-only sandbox" 'grep -qx "model=\"gpt-6.1-sol\"" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only'
+check "names no model, pins effort, read-only sandbox" '! grep -q "^model=" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only'
 check "prompt names the commits and requirements" 'grep -q "git diff $base_sha $head_sha" "$STUB/prompt" && grep -q "PR requirement" "$STUB/prompt" && grep -q "Issue requirement" "$STUB/prompt"'
 check "removes its worktree" '[ "$(git worktree list | wc -l)" -eq 1 ]'
 

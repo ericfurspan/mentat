@@ -52,7 +52,7 @@ They draw on:
 These are design choices, not proven results:
 
 - A different model family reviews the builder's work: Codex reviews what Claude Code builds.
-- Reviews run locally (`mentat review`) with a pinned model and effort, posted by the agent account, so a posted review is evidence, not proof. Whether to switch back to OpenAI's Codex GitHub integration is open in [issue 3](https://github.com/ericfurspan/mentat/issues/3).
+- Reviews run locally (`mentat review`) with Codex's default model at pinned effort, posted by the agent account, so a posted review is evidence, not proof. Whether to switch back to OpenAI's Codex GitHub integration is open in [issue 3](https://github.com/ericfurspan/mentat/issues/3).
 - A repository with any Actions, Dependabot or environment secret is refused: with write access, the agent could run a workflow on a branch before any review.
 - Review findings are fixed only when they have a realistic trigger; gates stay small.
 - macOS only, with scripts in plain bash that also runs on macOS's bash 3.2.

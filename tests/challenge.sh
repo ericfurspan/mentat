@@ -42,9 +42,9 @@ run() { (cd "$top/sub" && "$mentat" challenge "$@" >"$STUB/stdout" 2>/dev/null <
 reset; rc=$(run "$plan")
 check "delivers a challenge (exit 0)" '[ "$rc" = 0 ]'
 check "prints Codex's message unedited" 'tail -n 3 "$STUB/stdout" | diff - "$STUB/codex_out" >/dev/null'
-check "header names plan, commit, model and effort" 'grep -qF -- "- Plan: $plan" "$STUB/stdout" && grep -q "Started at commit: $head_sha (uncommitted changes: no)" "$STUB/stdout" && grep -q "Model: gpt-6.1-sol, reasoning effort high" "$STUB/stdout"'
+check "header names plan, commit, model and effort" 'grep -qF -- "- Plan: $plan" "$STUB/stdout" && grep -q "Started at commit: $head_sha (uncommitted changes: no)" "$STUB/stdout" && grep -q "Model: Codex default model, reasoning effort high" "$STUB/stdout"'
 check "says it is not a review" 'grep -q "This is a plan challenge, not a review." "$STUB/stdout"'
-check "runs plain codex exec, read-only, pinned model and effort" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only && grep -qx "model=\"gpt-6.1-sol\"" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args"'
+check "runs plain codex exec, read-only, no model name, pinned effort" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only && ! grep -q "^model=" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args"'
 check "pins ephemeral, no user config, no approvals, cached search" 'grep -qx -- --ephemeral "$STUB/args" && grep -qx -- --ignore-user-config "$STUB/args" && grep -qx "approval_policy=\"never\"" "$STUB/args" && grep -qx "web_search=\"cached\"" "$STUB/args"'
 check "runs in the repository top level" '[ "$(cat "$STUB/cwd")" = "$top" ]'
 check "prompt holds exactly the plan inside the data markers" 'sed -n "/^--- BEGIN PLAN DATA ---$/,/^--- END PLAN DATA ---$/p" "$STUB/prompt" | sed "1d;\$d" | grep -v "^$" | diff - "$plan" >/dev/null'
