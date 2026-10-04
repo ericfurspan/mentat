@@ -163,7 +163,7 @@ wait_for_approval() {
   [ -n "$head0" ] || die "could not read pull request #$pr"
   # Answered means: an inline comment has a later reply from the agent in its
   # thread; any other comment has a later agent comment on the pull request
-  # that is not a posted `mentat review`.
+  # that is not a posted `mentat review`. The same second counts as unanswered.
   inline=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -s 'add // []') ||
     die "could not read the pull request's comments"
   open=$(printf '%s\n%s\n' "$info" "$inline" | jq -rs --arg o "$owner" --arg me "$me" \
@@ -172,7 +172,7 @@ wait_for_approval() {
          | .createdAt] | max // "") as $replied
      | ([$p.comments[] | select(.author.login == $o)]
         + [$p.reviews[] | select(.author.login == $o and .state == "COMMENTED" and (.body // "") != "")]
-        | map(select((.submittedAt // .createdAt) > $replied)) | length)
+        | map(select((.submittedAt // .createdAt) >= $replied)) | length)
        + ([$inline[] | select(.user.login == $o) | . as $c
            | select([$inline[] | select(.user.login == $me and .created_at > $c.created_at
                and (.in_reply_to_id // .id) == ($c.in_reply_to_id // $c.id))] | length == 0)] | length)') ||
