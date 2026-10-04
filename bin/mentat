@@ -12,8 +12,9 @@
 #     0 ready (some things are never checkable; they are listed), 1 incomplete or refused.
 set -uo pipefail
 
-# The Codex model and reasoning effort every review and challenge uses. Change them here, by PR.
-CODEX_MODEL="gpt-6.1-sol"
+# Codex runs its own default model, so no model name lives here and a new release
+# needs no change. CODEX_MODEL is only the label shown on reviews. Effort is pinned.
+CODEX_MODEL="Codex default model"
 CODEX_EFFORT="high"
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 WAIT_INTERVAL_SECONDS="${MENTAT_WAIT_INTERVAL_SECONDS:-60}"
@@ -33,7 +34,7 @@ run_codex() {
   # final reply, so it cannot end with the status line the callers check.
   # Web search stays on Codex's default, "cached": OpenAI's index, no live fetches.
   (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --sandbox read-only \
-    -c "model=\"$CODEX_MODEL\"" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
+    -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c 'web_search="cached"' -o "$out" - <"$prompt") >"$log" 2>&1 &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do

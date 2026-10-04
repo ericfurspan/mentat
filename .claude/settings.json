@@ -1,5 +1,6 @@
 {
-  "model": "claude-opus-5-5",
+  "model": "opus",
+  "effortLevel": "high",
   "enabledPlugins": {
     "mentat@mentat": true
   },
@@ -10,11 +11,6 @@
         "repo": "ericfurspan/mentat"
       },
       "autoUpdate": true
-    }
-  },
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "high"
     }
   }
 }

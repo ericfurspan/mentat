@@ -1,7 +1,7 @@
 ---
 name: builder
 description: Builds one change that the main session has already planned, on the current branch, then runs the repository's test command and reports. Use when the plan is written down and the remaining work is mostly editing.
-model: claude-sonnet-5-5
+model: sonnet
 effort: high
 ---
 You build one change the main session has already planned.
