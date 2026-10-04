@@ -22,7 +22,7 @@ out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
 cat >"$STUB/prompt"
 [ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
 [ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
-printf '\033[2mtokens used\033[0m\n12,001\n'
+printf '\033[2mtokens used\033[0m\n12,001\n' >&2
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
 EOF
 chmod +x "$root/bin/codex"

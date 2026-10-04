@@ -38,9 +38,9 @@ cat >"$STUB/prompt"
 [ -f "$STUB/codex_ignore_term" ] && trap '' TERM
 [ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
 [ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
-[ -f "$STUB/no_tokens" ] || printf '\033[2mtokens used\033[0m\n3,352\n'
-# The real CLI then prints the reply on stdout, into the same log.
-printf 'The header shows tokens used\ntokens used\n7 more words\n'
+# Like the real CLI: transcript, then the usage footer, on stderr; the reply on stdout.
+[ -f "$STUB/no_tokens" ] || printf 'exec: probe\ntokens used\n999\n\033[2mtokens used\033[0m\n3,352\n' >&2
+printf 'The header shows tokens used\ntokens used\n7\n'
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
 EOF
 chmod +x "$root/bin/gh" "$root/bin/codex"

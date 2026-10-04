@@ -36,7 +36,7 @@ run_codex() {
   # Web search stays on Codex's default, "cached": OpenAI's index, no live fetches.
   (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --sandbox read-only \
     -c "model=\"$CODEX_MODEL\"" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
-    -c 'approval_policy="never"' -c 'web_search="cached"' -o "$out" - <"$prompt") >"$log" 2>&1 &
+    -c 'approval_policy="never"' -c 'web_search="cached"' -o "$out" - <"$prompt") >"$log.stdout" 2>"$log" &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$secs" -ge "$REVIEW_TIMEOUT_SECONDS" ]; then
@@ -55,9 +55,10 @@ run_codex() {
     "$fail" "codex exited with status $rc (log above)"
   fi
   [ -s "$out" ] || "$fail" "Codex returned no final message"
-  # The usage footer is a line that is exactly "tokens used" (after colour codes),
-  # then the count. Codex's reply is in the same log, so match nothing looser.
-  codex_tokens=$(awk '{ gsub(/\033\[[0-9;]*m/, "") } seen { if ($0 ~ /^[0-9,]+$/) print; exit } $0 == "tokens used" { seen = 1 }' "$log")
+  # Codex prints its transcript and then its usage footer to stderr (the log),
+  # and its reply to stdout. The footer is the last line that is exactly
+  # "tokens used" (after colour codes), followed by the count.
+  codex_tokens=$(awk '{ gsub(/\033\[[0-9;]*m/, "") } seen { n = ($0 ~ /^[0-9,]+$/) ? $0 : ""; seen = 0 } $0 == "tokens used" { seen = 1 } END { print n }' "$log")
   [ -n "$codex_tokens" ] || codex_tokens=unknown
 }
 
