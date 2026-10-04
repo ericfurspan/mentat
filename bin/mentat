@@ -8,7 +8,7 @@
 #     2 no response within the time limit.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
-#   mentat setup [owner/repo] [--check <name>]  Checks a repository is ready for agents.
+#   mentat setup <owner/repo> [--check <name>]  Checks a repository is ready for agents.
 #     0 ready (some things are never checkable; they are listed), 1 incomplete or refused.
 set -uo pipefail
 
@@ -278,7 +278,7 @@ s_get() { gh api -X GET "$@"; }
 s_count() { local n; n=$(s_get "$1" --jq "$2") && case "$n" in '' | *[!0-9]*) return 1 ;; esac && printf '%s' "$n"; }
 
 setup() {
-  local repo="" check="test" usage="usage: mentat setup [owner/repo] [--check <required check name>]"
+  local repo="" check="test" usage="usage: mentat setup <owner/repo> [--check <required check name>]"
   while [ $# -gt 0 ]; do
     case "$1" in
       --check) [ -n "${2:-}" ] || die "$usage" 64; check="$2"; shift 2 ;;
@@ -288,25 +288,11 @@ setup() {
       *) die "$usage" 64 ;;
     esac
   done
+  [ -n "$repo" ] || die "$usage" 64
   local tool
   for tool in gh jq; do
     command -v "$tool" >/dev/null 2>&1 || { s_problem "$tool is not installed"; s_finish; }
   done
-  if [ -z "$repo" ]; then
-    local url
-    url=$(git remote get-url origin 2>/dev/null) || url=""
-    case "$url" in
-      https://github.com/*) repo=${url#https://github.com/} ;;
-      git@github.com:*) repo=${url#git@github.com:} ;;
-      ssh://git@github.com/*) repo=${url#ssh://git@github.com/} ;;
-    esac
-    repo=${repo%/}; repo=${repo%.git}
-    case "$repo" in
-      '' | *[!A-Za-z0-9._/-]* | */*/* | /* | */) s_problem "could not tell which GitHub repository this is from origin; pass owner/repo"; s_finish ;;
-      */*) ;;
-      *) s_problem "could not tell which GitHub repository this is from origin; pass owner/repo"; s_finish ;;
-    esac
-  fi
 
   # 1. Account and owner.
   local info owner type branch admin push me
@@ -440,5 +426,5 @@ case "${1:-}" in
   wait) shift; wait_for_approval "$@" ;;
   challenge) shift; challenge "$@" ;;
   setup) shift; setup "$@" ;;
-  *) die "usage: mentat review|wait <pull request number> | mentat challenge <plan file> | mentat setup [owner/repo]" 64 ;;
+  *) die "usage: mentat review|wait <pull request number> | mentat challenge <plan file> | mentat setup <owner/repo>" 64 ;;
 esac

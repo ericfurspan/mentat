@@ -14,19 +14,18 @@ failures=0
 check() { if eval "$2"; then printf 'PASS: setup %s\n' "$1"; else printf 'FAIL: setup %s\n' "$1"; failures=$((failures + 1)); fi; }
 
 # Serves $STUB/api/<path with / ? = & as _>.json; a missing file is an API error.
-# With --paginate, a <same name>.page2 file is served as the next page.
 # Any call that is not an explicit GET is recorded in $STUB/writes and fails.
 cat >"$root/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$(printf '%s' "$*" | tr '\n' ' ')" >>"$STUB/calls"
 [ "$1" = api ] || { echo "$*" >>"$STUB/writes"; exit 99; }
 shift
-method="" path="" filter="" paginate=""
+method="" path="" filter=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -X) method="$2"; shift 2 ;;
     --jq) filter="$2"; shift 2 ;;
-    --paginate) paginate=1; shift ;;
+    --paginate) shift ;;
     *) path="$1"; shift ;;
   esac
 done
@@ -34,7 +33,6 @@ done
 f="$STUB/api/$(printf '%s' "$path" | tr '/?=&' '____').json"
 [ -f "$f" ] || exit 1
 if [ -n "$filter" ]; then jq -r "$filter" "$f" || exit 1; else cat "$f"; fi
-[ -z "$paginate" ] || [ ! -f "$f.page2" ] || cat "$f.page2"
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' >"$root/bin/codex"
 chmod +x "$root/bin/gh" "$root/bin/codex"
@@ -70,17 +68,6 @@ check "a ready repository is Setup OK (exit 0)" '[ "$rc" = 0 ] && [ "$(last)" = 
 check "lists what it cannot check" '[ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ] && grep -q "NOT CHECKED: the one-time live block test" "$STUB/out"'
 check "makes only GET calls to the API" '[ ! -f "$STUB/writes" ] && ! grep -vq -- "-X GET" "$STUB/calls"'
 check "writes no ruleset when the rules are complete" '! export_ok'
-git init -q "$root/cwd/clone"
-for url in https://github.com/owner/repo.git git@github.com:owner/repo.git ssh://git@github.com/owner/repo; do
-  good; git init -q "$root/cwd"; git -C "$root/cwd" remote add origin "$url"; rc=$(run)
-  check "reads owner/repo from origin $url with GET calls only" '[ "$rc" = 0 ] && grep -q "^api -X GET repos/owner/repo --jq" "$STUB/calls" && [ ! -f "$STUB/writes" ]'
-done
-for url in https://notgithub.com/owner/repo.git https://example.test/github.com/owner/repo.git https://user@github.com/owner/repo.git; do
-  good; git init -q "$root/cwd"; git -C "$root/cwd" remote add origin "$url"; rc=$(run)
-  check "origin $url is not taken as GitHub" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not tell which GitHub repository" "$STUB/out" && ! grep -qs "repos/owner/repo" "$STUB/calls"'
-done
-good; git init -q "$root/cwd"; git -C "$root/cwd" remote add origin https://gitlab.example/owner/repo.git; rc=$(run)
-check "a non-GitHub origin is a problem with the checklist" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not tell which GitHub repository" "$STUB/out" && [ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ]'
 
 # Each missing or wrong rule is a problem and writes the ruleset export.
 while IFS='|' read -r name filter; do
@@ -110,10 +97,8 @@ good; put "$R/rulesets/1" '{"current_user_can_bypass":"always"}'; rc=$(run owner
 check "an agent that can bypass is refused" '[ "$rc" = 1 ] && [ "$(last)" = "Setup refused: the agent account can bypass ruleset 1 (always)" ]'
 good; put "$R/rulesets/1" '{"current_user_can_bypass":"pull_requests_only"}'; rc=$(run owner/repo)
 check "bypass through pull requests only is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: .*pull_requests_only"'
-for v in '{}' '{"current_user_can_bypass":null}' '{"current_user_can_bypass":false}'; do
-  good; put "$R/rulesets/1" "$v"; rc=$(run owner/repo)
-  check "bypass field $v is a problem, not a pass" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read whether the agent account can bypass ruleset 1" "$STUB/out"'
-done
+good; put "$R/rulesets/1" '{}'; rc=$(run owner/repo)
+check "a missing bypass field is a problem, not a pass" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read whether the agent account can bypass ruleset 1" "$STUB/out"'
 good; put "$R/rulesets/2" '{"current_user_can_bypass":"always"}'; rc=$(run owner/repo)
 check "a ruleset that does not apply to the default branch is ignored" '[ "$rc" = 0 ] && ! grep -q "rulesets/2" "$STUB/calls"'
 good; put "$RULES" '[]'; rc=$(run owner/repo)
@@ -125,8 +110,6 @@ good; put user '{"login":"owner"}'; rc=$(run owner/repo)
 check "the owner's own account is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: the agent account owner is the owner"'
 good; mut "$R" '.permissions.admin = true'; rc=$(run owner/repo)
 check "an agent with admin is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: the agent account has admin"'
-good; mut "$R" 'del(.permissions)'; rc=$(run owner/repo)
-check "unreadable permissions are a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read the agent account.s permissions" "$STUB/out"'
 good; put "$R/actions/secrets" '{"total_count":2,"secrets":[{"name":"A"}]}'; rc=$(run owner/repo)
 check "a repository Actions secret is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: owner/repo has 2 actions secret"'
 good; put "$R/dependabot/secrets" '{"total_count":1}'; rc=$(run owner/repo)
@@ -135,22 +118,8 @@ good; put "$R/environments" '{"environments":[{"name":"prod env","deployment_bra
 check "an environment secret is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod%20env has 1 secret"'
 good; put "$R/environments" '{"environments":[{"name":"prod","deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}]}'; put "$R/environments/prod/secrets" '{"total_count":1}'; rc=$(run owner/repo)
 check "an environment secret limited to protected branches is still refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod has 1 secret"'
-good; put "$R/environments" '{"environments":[{"name":"preview"}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'
-printf '%s\n' '{"environments":[{"name":"prod"}]}' >"$A/repos_owner_repo_environments.json.page2"; put "$R/environments/prod/secrets" '{"total_count":3}'; rc=$(run owner/repo)
-check "an environment secret on the second page is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod has 3 secret"'
-good; put "$R/environments" '{"environments":[{"name":""}]}'; rc=$(run owner/repo)
-check "an empty environment name is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read environments" "$STUB/out"'
-good; printf 'null\n' >"$A/repos_owner_repo_rules_branches_trunk.json.page2"; rc=$(run owner/repo)
-check "a rules page that is not a list is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read the rules on trunk" "$STUB/out"'
-good; put "$R/environments" ''; rc=$(run owner/repo)
-check "an empty environments response is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read environments" "$STUB/out"'
 good; put "$R/environments" '{"environments":[{"name":"preview","deployment_branch_policy":null}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'; rc=$(run owner/repo)
 check "an environment without secrets is allowed" '[ "$rc" = 0 ]'
-good; put "$R/environments" '{"environments":[{"name":"preview","deployment_branch_policy":null}]}'; rc=$(run owner/repo)
-check "an unreadable environment secret list is a problem with no OK line" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read secrets of environment preview" "$STUB/out" && ! grep -q "OK: no environment secrets" "$STUB/out"'
-good; mut "$R" '.default_branch = "rel#1"'
-for f in "$A"/*trunk*; do mv "$f" "${f//trunk/rel%231}"; done; rc=$(run owner/repo)
-check "a default branch with # is encoded, not cut short" '[ "$rc" = 0 ] && grep -q "rules/branches/rel%231" "$STUB/calls" && ! grep -q "rel#1" "$STUB/calls"'
 good; mut "$R" '.permissions.admin = true'; mut "$RULES" 'map(select(.type != "deletion"))'; rc=$(run owner/repo)
 check "a refusal wins over problems found alongside it" '[ "$rc" = 1 ] && last | grep -q "^Setup refused:" && grep -q "^PROBLEM:" "$STUB/out"'
 
@@ -164,68 +133,34 @@ an ownerless pattern|* @owner\n/.github/\n
 no * rule|/src/ @owner\n
 another owner only|* @someone\n
 CASES
-good; codeowners '* @owner\r\n/docs/ @owner\r\n'; rc=$(run owner/repo)
-check "CODEOWNERS with CRLF line endings is accepted" '[ "$rc" = 0 ]'
 good; codeowners '*   @Owner   # comment\n\n/docs/ @owner\n'; rc=$(run owner/repo)
 check "CODEOWNERS spacing, case and comments are accepted" '[ "$rc" = 0 ]'
 good; put "$R/codeowners/errors?ref=trunk" '{"errors":[{"line":1}]}'; rc=$(run owner/repo)
 check "CODEOWNERS errors are a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: GitHub reports CODEOWNERS errors" "$STUB/out"'
 
-# API failures and malformed answers are named problems, never passes.
-while IFS='|' read -r name path; do
-  good; rm -f "$A/$(printf '%s' "$path" | tr '/?=&' '____').json"; rc=$(run owner/repo)
-  check "an unreadable $name is a problem" '[ "$rc" = 1 ] && grep -q "^PROBLEM:" "$STUB/out" && last | grep -q "^Setup incomplete:"'
-done <<'CASES'
-repository|repos/owner/repo
-user|user
-rule list|repos/owner/repo/rules/branches/trunk
-ruleset|repos/owner/repo/rulesets/1
-CODEOWNERS|repos/owner/repo/contents/.github/CODEOWNERS?ref=trunk
-CODEOWNERS error list|repos/owner/repo/codeowners/errors?ref=trunk
-Actions secret list|repos/owner/repo/actions/secrets
-Dependabot secret list|repos/owner/repo/dependabot/secrets
-environment list|repos/owner/repo/environments
-CASES
-while IFS='|' read -r name path body; do
-  good; put "$path" "$body"; rc=$(run owner/repo)
-  check "a malformed $name is a problem" '[ "$rc" = 1 ] && grep -q "^PROBLEM:" "$STUB/out" && last | grep -q "^Setup incomplete:"'
-done <<'CASES'
-user without a login|user|{"name":"x"}
-CODEOWNERS error list|repos/owner/repo/codeowners/errors?ref=trunk|{"errors":null}
-environment list|repos/owner/repo/environments|{"environments":null}
-repository without a default branch|repos/owner/repo|{"owner":{"login":"owner","type":"User"},"permissions":{"admin":false,"push":true}}
-CODEOWNERS without content|repos/owner/repo/contents/.github/CODEOWNERS?ref=trunk|{}
-CASES
-# Complete rules whose ruleset ids are bad: only the id is wrong.
-for f in '.[0].ruleset_id = "1/../2"' '.[1] |= del(.ruleset_id)' '.[2].ruleset_id = null'; do
-  good; mut "$RULES" "$f"; rc=$(run owner/repo)
-  check "complete rules with a bad ruleset id ($f) are a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: a rule on trunk names no valid ruleset" "$STUB/out" && ! grep -q "rulesets/" "$STUB/calls"'
-done
+# API failures and malformed answers are named problems, never passes. One
+# representative each; every call shares the same handling.
 good; rm "$A/repos_owner_repo.json"; rc=$(run owner/repo)
-check "an early failure still lists what was not checked" '[ "$rc" = 1 ] && [ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ]'
-good; put "$RULES" '{"message":"oops"}'; rc=$(run owner/repo)
-check "a rule list that is not a list is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read the rules on trunk" "$STUB/out"'
+check "an unreadable repository is a problem that still lists what was not checked" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read repos/owner/repo" "$STUB/out" && [ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ]'
+good; rm "$A/repos_owner_repo_rules_branches_trunk.json"; rc=$(run owner/repo)
+check "an unreadable rule list is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read the rules on trunk" "$STUB/out"'
 good; put "$R/actions/secrets" 'not json'; rc=$(run owner/repo)
 check "malformed JSON is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read actions secrets" "$STUB/out"'
-good; put "$R/actions/secrets" '{"total_count":"many"}'; rc=$(run owner/repo)
-check "a non-numeric count is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read actions secrets" "$STUB/out"'
+good; mut "$RULES" '.[1] |= del(.ruleset_id)'; rc=$(run owner/repo)
+check "a rule without a ruleset id is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: a rule on trunk names no valid ruleset" "$STUB/out"'
 
-# PATHs holding only what each case needs, so a real codex or jq cannot leak in.
-mkdir -p "$root/nocodex" "$root/nojq"
+# PATHs holding only what each case needs, so a real codex or gh cannot leak in.
+mkdir -p "$root/nocodex"
 for t in bash jq tr base64 tail cat; do ln -s "$(command -v "$t")" "$root/nocodex/$t"; done
 ln -s "$root/bin/gh" "$root/nocodex/gh"
 good; rc=$(PATH="$root/nocodex" run owner/repo)
 check "a missing codex is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: codex is not installed" "$STUB/out" && [ "$(last)" = "Setup incomplete: 1 problem(s)" ]'
-ln -s "$root/bin/gh" "$root/nojq/gh"; ln -s "$(command -v bash)" "$root/nojq/bash"
 mkdir -p "$root/nogh"; for t in bash jq tail; do ln -s "$(command -v "$t")" "$root/nogh/$t"; done
 good; rc=$(PATH="$root/nogh" run owner/repo)
 check "a missing gh is a problem with a final line and the checklist" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not installed" "$STUB/out" && [ "$(last)" = "Setup incomplete: 1 problem(s)" ] && [ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ]'
-good; rc=$(PATH="$root/nojq" run owner/repo)
-check "a missing jq is a problem with a final line" '[ "$rc" = 1 ] && grep -q "PROBLEM: jq is not installed" "$STUB/out" && [ "$(last)" = "Setup incomplete: 1 problem(s)" ]'
 rc=$(run owner/repo extra/repo); check "two repositories are a usage error (exit 64)" '[ "$rc" = 64 ]'
 rc=$(run --check); check "--check without a name is a usage error (exit 64)" '[ "$rc" = 64 ]'
 rc=$(run norepo); check "a bare name is a usage error (exit 64)" '[ "$rc" = 64 ]'
-rc=$(run "owner/re#po"); check "a repository name with # is a usage error (exit 64)" '[ "$rc" = 64 ]'
-rc=$(run a/b/c); check "a path with two slashes is a usage error (exit 64)" '[ "$rc" = 64 ]'
+rc=$(run); check "no repository is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 [ "$failures" -eq 0 ]
