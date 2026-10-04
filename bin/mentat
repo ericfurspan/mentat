@@ -370,6 +370,7 @@ RULES
   local owners errors line pat who star=0 bad=0
   if owners=$(s_get "repos/$repo/contents/.github/CODEOWNERS?ref=$b" --jq '.content | if type == "string" then gsub("\n"; "") | @base64d else error("malformed") end'); then
     while IFS= read -r line; do
+      line=${line%$'\r'}
       line=${line%%#*}
       read -r pat who <<<"$line"
       [ -n "$pat" ] || continue

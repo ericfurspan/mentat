@@ -14,6 +14,7 @@ failures=0
 check() { if eval "$2"; then printf 'PASS: setup %s\n' "$1"; else printf 'FAIL: setup %s\n' "$1"; failures=$((failures + 1)); fi; }
 
 # Serves $STUB/api/<path with / ? = & as _>.json; a missing file is an API error.
+# With --paginate, a <same name>.page2 file is served as the next page.
 # Any call that is not an explicit GET is recorded in $STUB/writes and fails.
 cat >"$root/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -33,6 +34,7 @@ done
 f="$STUB/api/$(printf '%s' "$path" | tr '/?=&' '____').json"
 [ -f "$f" ] || exit 1
 if [ -n "$filter" ]; then jq -r "$filter" "$f"; else cat "$f"; fi
+[ -z "$paginate" ] || [ ! -f "$f.page2" ] || cat "$f.page2"
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' >"$root/bin/codex"
 chmod +x "$root/bin/gh" "$root/bin/codex"
@@ -129,6 +131,9 @@ good; put "$R/environments" '{"environments":[{"name":"prod env","deployment_bra
 check "an environment secret is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod%20env has 1 secret"'
 good; put "$R/environments" '{"environments":[{"name":"prod","deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}]}'; put "$R/environments/prod/secrets" '{"total_count":1}'; rc=$(run owner/repo)
 check "an environment secret limited to protected branches is still refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod has 1 secret"'
+good; put "$R/environments" '{"environments":[{"name":"preview"}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'
+printf '%s\n' '{"environments":[{"name":"prod"}]}' >"$A/repos_owner_repo_environments.json.page2"; put "$R/environments/prod/secrets" '{"total_count":3}'; rc=$(run owner/repo)
+check "an environment secret on the second page is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod has 3 secret"'
 good; put "$R/environments" ''; rc=$(run owner/repo)
 check "an empty environments response is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read environments" "$STUB/out"'
 good; put "$R/environments" '{"environments":[{"name":"preview","deployment_branch_policy":null}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'; rc=$(run owner/repo)
@@ -151,6 +156,8 @@ an ownerless pattern|* @owner\n/.github/\n
 no * rule|/src/ @owner\n
 another owner only|* @someone\n
 CASES
+good; codeowners '* @owner\r\n/docs/ @owner\r\n'; rc=$(run owner/repo)
+check "CODEOWNERS with CRLF line endings is accepted" '[ "$rc" = 0 ]'
 good; codeowners '*   @Owner   # comment\n\n/docs/ @owner\n'; rc=$(run owner/repo)
 check "CODEOWNERS spacing, case and comments are accepted" '[ "$rc" = 0 ]'
 good; put "$R/codeowners/errors?ref=trunk" '{"errors":[{"line":1}]}'; rc=$(run owner/repo)
