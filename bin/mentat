@@ -31,7 +31,7 @@ last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 # Runs read-only Codex in directory $1 on prompt file $2 and writes its final
 # message to $3. On any failure it calls $4 with the reason, which exits.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" log rc secs=0 pid
+  local dir="$1" prompt="$2" out="$3" fail="$4" log rc secs=0 pid kept
   log="${out%/*}/codex.log"
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
   # final reply, so it cannot end with the status line the callers check.
@@ -53,8 +53,12 @@ run_codex() {
   wait "$pid"
   rc=$?
   if [ "$rc" -ne 0 ]; then
-    tail -n 20 "$log" >&2
-    "$fail" "codex exited with status $rc (log above)"
+    # The log is Codex's raw output and may hold a credential, so it is not
+    # printed into the agent's session. A copy is kept for the maintainer.
+    if kept=$(mktemp "${TMPDIR:-/tmp}/mentat-codex-log.XXXXXX") && cp "$log" "$kept"; then
+      "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed. The maintainer can read it at $kept"
+    fi
+    "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed, and it could not be kept"
   fi
   [ -s "$out" ] || "$fail" "Codex returned no final message"
 }
