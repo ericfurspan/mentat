@@ -4,8 +4,8 @@
 #     0 review posted (findings may exist; read them), 1 not reviewed,
 #     3 review posted but the pull request head moved meanwhile.
 #   mentat wait <PR>    Waits for the maintainer after the pull request is marked ready.
-#     0 approved at the current head, 1 needs attention (reason printed),
-#     2 no response within the time limit.
+#     0 approved at the current head, 1 needs attention (reason printed, including
+#     maintainer comments still unanswered when it starts), 2 no response within the time limit.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 set -uo pipefail
@@ -147,17 +147,37 @@ review() {
   fi
 }
 
-# The maintainer is the repository owner. Run this right after `gh pr ready`:
-# a comment from the maintainer counts only if it arrives after the wait starts.
+# The maintainer is the repository owner. Run this right after `gh pr ready`.
+# A maintainer comment from before the wait counts until the agent has answered
+# it; one that arrives during the wait always counts.
 wait_for_approval() {
-  local pr="${1:-}" repo owner start head0 info inline state latest feedback problem=""
+  local pr="${1:-}" repo owner me start head0 info inline state latest feedback open problem=""
   case "$pr" in '' | *[!0-9]*) die "usage: mentat wait <pull request number>" 64 ;; esac
   repo=$(gh repo view --json nameWithOwner | jq -r .nameWithOwner)
   owner=${repo%%/*}
   [ -n "$owner" ] || die "could not read the repository with gh"
   start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  head0=$(gh pr view "$pr" --json headRefOid | jq -r .headRefOid)
+  me=$(gh api user --jq .login) || die "could not read the signed-in GitHub user"
+  info=$(gh pr view "$pr" --json headRefOid,reviews,comments) || die "could not read pull request #$pr"
+  head0=$(jq -r .headRefOid <<<"$info")
   [ -n "$head0" ] || die "could not read pull request #$pr"
+  # Answered means: an inline comment has a later reply from the agent in its
+  # thread; any other comment has a later agent comment on the pull request
+  # that is not a posted `mentat review`.
+  inline=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -s 'add // []') ||
+    die "could not read the pull request's comments"
+  open=$(printf '%s\n%s\n' "$info" "$inline" | jq -rs --arg o "$owner" --arg me "$me" \
+    '.[0] as $p | .[1] as $inline
+     | ([$p.comments[] | select(.author.login == $me and ((.body // "") | startswith("## Local Codex review") | not))
+         | .createdAt] | max // "") as $replied
+     | ([$p.comments[] | select(.author.login == $o)]
+        + [$p.reviews[] | select(.author.login == $o and .state == "COMMENTED" and (.body // "") != "")]
+        | map(select((.submittedAt // .createdAt) > $replied)) | length)
+       + ([$inline[] | select(.user.login == $o) | . as $c
+           | select([$inline[] | select(.user.login == $me and .created_at > $c.created_at
+               and (.in_reply_to_id // .id) == ($c.in_reply_to_id // $c.id))] | length == 0)] | length)') ||
+    die "could not check for unanswered comments"
+  [ "$open" = 0 ] || die "$owner has $open unanswered comment(s) from before the wait; read and answer them"
   SECONDS=0
   while [ "$SECONDS" -lt "$WAIT_LIMIT_SECONDS" ]; do
     problem=""
