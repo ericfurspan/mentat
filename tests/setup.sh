@@ -33,7 +33,7 @@ done
 [ "$method" = GET ] || { echo "$path" >>"$STUB/writes"; exit 98; }
 f="$STUB/api/$(printf '%s' "$path" | tr '/?=&' '____').json"
 [ -f "$f" ] || exit 1
-if [ -n "$filter" ]; then jq -r "$filter" "$f"; else cat "$f"; fi
+if [ -n "$filter" ]; then jq -r "$filter" "$f" || exit 1; else cat "$f"; fi
 [ -z "$paginate" ] || [ ! -f "$f.page2" ] || cat "$f.page2"
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' >"$root/bin/codex"
@@ -74,6 +74,10 @@ git init -q "$root/cwd/clone"
 for url in https://github.com/owner/repo.git git@github.com:owner/repo.git ssh://git@github.com/owner/repo; do
   good; git init -q "$root/cwd"; git -C "$root/cwd" remote add origin "$url"; rc=$(run)
   check "reads owner/repo from origin $url with GET calls only" '[ "$rc" = 0 ] && grep -q "^api -X GET repos/owner/repo --jq" "$STUB/calls" && [ ! -f "$STUB/writes" ]'
+done
+for url in https://notgithub.com/owner/repo.git https://example.test/github.com/owner/repo.git https://user@github.com/owner/repo.git; do
+  good; git init -q "$root/cwd"; git -C "$root/cwd" remote add origin "$url"; rc=$(run)
+  check "origin $url is not taken as GitHub" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not tell which GitHub repository" "$STUB/out" && ! grep -qs "repos/owner/repo" "$STUB/calls"'
 done
 good; git init -q "$root/cwd"; git -C "$root/cwd" remote add origin https://gitlab.example/owner/repo.git; rc=$(run)
 check "a non-GitHub origin is a problem with the checklist" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not tell which GitHub repository" "$STUB/out" && [ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ]'
@@ -134,6 +138,10 @@ check "an environment secret limited to protected branches is still refused" '[ 
 good; put "$R/environments" '{"environments":[{"name":"preview"}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'
 printf '%s\n' '{"environments":[{"name":"prod"}]}' >"$A/repos_owner_repo_environments.json.page2"; put "$R/environments/prod/secrets" '{"total_count":3}'; rc=$(run owner/repo)
 check "an environment secret on the second page is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: environment prod has 3 secret"'
+good; put "$R/environments" '{"environments":[{"name":""}]}'; rc=$(run owner/repo)
+check "an empty environment name is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read environments" "$STUB/out"'
+good; printf 'null\n' >"$A/repos_owner_repo_rules_branches_trunk.json.page2"; rc=$(run owner/repo)
+check "a rules page that is not a list is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read the rules on trunk" "$STUB/out"'
 good; put "$R/environments" ''; rc=$(run owner/repo)
 check "an empty environments response is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read environments" "$STUB/out"'
 good; put "$R/environments" '{"environments":[{"name":"preview","deployment_branch_policy":null}]}'; put "$R/environments/preview/secrets" '{"total_count":0}'; rc=$(run owner/repo)

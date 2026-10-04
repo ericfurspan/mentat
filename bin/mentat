@@ -296,8 +296,11 @@ setup() {
     local url
     url=$(git remote get-url origin 2>/dev/null) || url=""
     case "$url" in
-      *github.com[:/]*/*) repo=${url#*github.com[:/]}; repo=${repo%.git}; repo=${repo%/} ;;
+      https://github.com/*) repo=${url#https://github.com/} ;;
+      git@github.com:*) repo=${url#git@github.com:} ;;
+      ssh://git@github.com/*) repo=${url#ssh://git@github.com/} ;;
     esac
+    repo=${repo%/}; repo=${repo%.git}
     case "$repo" in
       '' | *[!A-Za-z0-9._/-]* | */*/* | /* | */) s_problem "could not tell which GitHub repository this is from origin; pass owner/repo"; s_finish ;;
       */*) ;;
@@ -335,7 +338,7 @@ setup() {
 
   # 2. Rules on the default branch, and who can bypass them.
   local rules want=0 ids id bypass
-  if rules=$(s_get --paginate "repos/$repo/rules/branches/$b" | jq -cs 'add // [] | if type == "array" then . else error("not a list") end'); then
+  if rules=$(s_get --paginate "repos/$repo/rules/branches/$b" | jq -cs 'if all(.[]; type == "array") then add // [] else error("not a list") end'); then
     while IFS='|' read -r name test; do
       if jq -e --arg c "$check" "$test" <<<"$rules" >/dev/null; then s_ok "$name"; else s_problem "missing on $branch: $name"; want=1; fi
     done <<'RULES'
@@ -399,7 +402,7 @@ RULES
   done
   if envs=$(s_get --paginate "repos/$repo/environments" | jq -rs 'if length == 0 then error("empty") else . end
       | map(.environments | if type == "array" then . else error("malformed") end) | add
-      | map(.name | if type == "string" then @uri else error("malformed") end) | .[]'); then
+      | map(.name | if type == "string" and length > 0 then @uri else error("malformed") end) | .[]'); then
     for env in $envs; do
       if ! n=$(s_count "repos/$repo/environments/$env/secrets" .total_count); then s_problem "could not read secrets of environment $env"; envfail=1
       elif [ "$n" -gt 0 ]; then s_refuse "environment $env has $n secret(s) that a branch workflow could read"; exposed=1; fi
