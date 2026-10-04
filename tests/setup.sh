@@ -90,7 +90,7 @@ check "writes nothing locally" '[ -z "$(ls -A "$root/cwd")" ]'
 # ruleset.json, imported as is, satisfies every rule setup checks.
 good; jq '[.rules[] | . + {ruleset_id: 1}]' "$(dirname "$mentat")/../ruleset.json" >"$A/repos_owner_repo_rules_branches_trunk.json"; rc=$(run owner/repo)
 check "ruleset.json passes every rule check" '[ "$rc" = 0 ] && ! grep -q "^PROBLEM" "$STUB/out"'
-check "ruleset.json is an active default-branch ruleset with no bypass" 'jq -e ".enforcement == \"active\" and .target == \"branch\" and .conditions.ref_name.include == [\"~DEFAULT_BRANCH\"] and .bypass_actors == []" "$(dirname "$mentat")/../ruleset.json" >/dev/null'
+check "ruleset.json is an active default-branch ruleset with no bypass that requires one approval" 'jq -e ".enforcement == \"active\" and .target == \"branch\" and .conditions.ref_name.include == [\"~DEFAULT_BRANCH\"] and .bypass_actors == [] and (.rules[] | select(.type == \"pull_request\") | .parameters.required_approving_review_count) == 1" "$(dirname "$mentat")/../ruleset.json" >/dev/null'
 
 good; put "$R/rulesets/1" '{"current_user_can_bypass":"always"}'; rc=$(run owner/repo)
 check "an agent that can bypass is refused" '[ "$rc" = 1 ] && [ "$(last)" = "Setup refused: the agent account can bypass ruleset 1 (always)" ]'

@@ -24,7 +24,7 @@ Mentat separates what is enforced from what is only asked of the agent.
 
 These hold whatever the agent does. `mentat setup` checks each one it can observe.
 
-- A ruleset on the default branch: pull requests required, deletions and force pushes blocked, code owner review required, stale approvals dismissed on push, approval of the most recent push required, squash merges only, and a required `test` check from GitHub Actions.
+- A ruleset on the default branch: pull requests required with one approval, deletions and force pushes blocked, code owner review required, stale approvals dismissed on push, approval of the most recent push required, squash merges only, and a required `test` check from GitHub Actions.
 - `.github/CODEOWNERS` gives every path to you alone, so changes to guarded files wait for your Approve.
 - The agent account has write access, not admin, and cannot bypass the ruleset.
 
@@ -78,7 +78,7 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a
    }
    ```
 
-   You review and merge this one yourself: until CODEOWNERS is on the default branch, GitHub cannot require your approval.
+   The ruleset requires one approval, and the agent cannot approve its own pull request, so this one already waits for your Approve, before CODEOWNERS exists.
 4. The agent runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK".
 5. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
 
