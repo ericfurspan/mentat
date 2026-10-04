@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Stop hook: checks the reply Claude Code is about to end its turn with. A reply
+# over the word limit, or with an em dash or a blockquote, gets one request to
+# rewrite it. Fenced code blocks are left out of every check. The hook asks once
+# per turn and never cuts text itself, so failure details can stay in full.
+# When it cannot read its input, it lets the turn end.
+set -uo pipefail
+export LC_ALL=C # count bytes, so the result is the same on macOS and Linux
+
+limit=100
+
+command -v jq >/dev/null 2>&1 || exit 0
+input=$(cat)
+active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null) || exit 0
+[ "$active" = false ] || exit 0
+reply=$(printf '%s' "$input" | jq -r '.last_assistant_message // empty' 2>/dev/null) || exit 0
+
+prose=$(printf '%s\n' "$reply" | awk '/^[ \t]*(```|~~~)/ { fence = !fence; next } !fence')
+# A word is anything between spaces that is not only punctuation, so list
+# markers and table borders are not counted.
+words=$(printf '%s\n' "$prose" | tr -s '[:space:]' '\n' | grep -c '[^[:punct:]]')
+
+problems=""
+add() { problems="${problems:+$problems; }$1"; }
+[ "$words" -le "$limit" ] || add "it has $words words outside fenced code blocks and the limit is $limit"
+if printf '%s\n' "$prose" | grep -q "$(printf '\342\200\224')"; then add "it has an em dash"; fi
+if printf '%s\n' "$prose" | grep -Eq '^ {0,3}>'; then add "it has a blockquote"; fi
+[ -n "$problems" ] || exit 0
+
+jq -n --arg r "Your reply does not fit the Mentat style: $problems. Send it again, rewritten to fit: the result or the ask first, then only what the maintainer needs to act on it. Keep warnings, errors and failure details in full. Command output and copy-ready text go in fenced code blocks, which are not counted. If the maintainer asked for a longer reply in this turn, say that in one line instead of rewriting." \
+  '{hookSpecificOutput: {hookEventName: "Stop", additionalContext: $r}}'
