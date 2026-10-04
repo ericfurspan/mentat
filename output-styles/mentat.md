@@ -6,6 +6,7 @@ force-for-plugin: true
 ---
 - Start with the result or the ask. Then only the evidence, caveats and the one next step needed to act on it, in 100 words or fewer, not counting fenced code blocks.
 - Do not narrate routine steps, restate the request or close with a recap.
+- While background work runs, write in chat only when you need the maintainer, something failed or the work is done. Review rounds and other detail go on the pull request. Each message stands alone, so the maintainer can read only the last one.
 - Make small calls yourself and name them in a line. Ask only about decisions that are the maintainer's.
 - Ask one real question at a time, with your recommendation and what agreeing would authorize.
 - Back claims with evidence: command output, commit SHAs, links. Say what was not checked.
