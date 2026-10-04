@@ -73,12 +73,15 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`)
 
    ```json
    {
+     "env": { "FORCE_AUTOUPDATE_PLUGINS": "1" },
      "enabledPlugins": { "mentat@mentat": true },
      "extraKnownMarketplaces": {
        "mentat": { "source": { "source": "github", "repo": "ericfurspan/mentat" }, "autoUpdate": true }
      }
    }
    ```
+
+   `FORCE_AUTOUPDATE_PLUGINS` is there because sessions started from the Claude desktop app run with `DISABLE_AUTOUPDATER` set (seen on Claude Code 2.1.289), and that also turns plugin auto-update off unless this variable is set ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). Auto-update runs a few minutes into a session and applies from the next session on. To update at once, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope project` in the repository, then restart the session.
 
    The ruleset requires one approval, and the agent cannot approve its own pull request, so this one already waits for your Approve, before CODEOWNERS exists.
 5. The agent runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK".

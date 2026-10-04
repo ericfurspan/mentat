@@ -59,6 +59,12 @@ if command -v jq >/dev/null 2>&1; then
   else
     fail ".claude/settings.json does not turn on mentat@mentat"
   fi
+  # The desktop app turns plugin auto-update off; this variable turns it back on.
+  if [ "$(jq -r '.env.FORCE_AUTOUPDATE_PLUGINS' .claude/settings.json)" = 1 ]; then
+    pass ".claude/settings.json keeps plugin auto-update on"
+  else
+    fail ".claude/settings.json does not set FORCE_AUTOUPDATE_PLUGINS to 1"
+  fi
 else
   skip "jq not installed, plugin setting not checked"
 fi
