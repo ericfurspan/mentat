@@ -129,15 +129,11 @@ review() {
 
   local now moved=""
   now=$(gh pr view "$pr" --json headRefOid | jq -r .headRefOid) || not_reviewed "could not recheck the pull request head"
-  [ "$now" = "$head" ] || moved="- Note: the head moved to $now during the review; this review covers $head only."
+  [ "$now" = "$head" ] || moved="Note: the head moved to $now during the review; this review covers $head only."
+  # The head is the one fact the agent needs: the review must cover the commit it merges.
   {
-    printf '## Local Codex review, posted by the agent\n\n'
-    printf -- '- Repository: %s\n- Pull request: #%s\n- Head: %s\n- Base: %s @ %s\n- Merge-base: %s\n' \
-      "$repo" "$pr" "$head" "$base" "$base_sha" "$merge_base"
-    printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
-      "$(codex --version 2>/dev/null)" "$CODEX_MODEL" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    [ -z "$moved" ] || printf '%s\n' "$moved"
-    printf '\n---\n\n'
+    printf '**Local Codex review of %s** (%s, effort %s)\n\n' "$head" "$CODEX_MODEL" "$CODEX_EFFORT"
+    [ -z "$moved" ] || printf '%s\n\n' "$moved"
     cat "$out"
   } >"$tmp/comment.md"
   local url
