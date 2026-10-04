@@ -22,6 +22,7 @@ out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
 cat >"$STUB/prompt"
 [ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
 [ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
+printf '\033[2mtokens used\033[0m\n12,001\n'
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
 EOF
 chmod +x "$root/bin/codex"
@@ -43,6 +44,7 @@ reset; rc=$(run "$plan")
 check "delivers a challenge (exit 0)" '[ "$rc" = 0 ]'
 check "prints Codex's message unedited" 'tail -n 3 "$STUB/stdout" | diff - "$STUB/codex_out" >/dev/null'
 check "header names plan, commit, model and effort" 'grep -qF -- "- Plan: $plan" "$STUB/stdout" && grep -q "Started at commit: $head_sha (uncommitted changes: no)" "$STUB/stdout" && grep -q "Model: gpt-6.1-sol, reasoning effort high" "$STUB/stdout"'
+check "header shows the tokens Codex used" 'grep -qx -- "- Tokens used: 12,001" "$STUB/stdout"'
 check "says it is not a review" 'grep -q "This is a plan challenge, not a review." "$STUB/stdout"'
 check "runs plain codex exec, read-only, pinned model and effort" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only && grep -qx "model=\"gpt-6.1-sol\"" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args"'
 check "pins ephemeral, no user config, no approvals, cached search" 'grep -qx -- --ephemeral "$STUB/args" && grep -qx -- --ignore-user-config "$STUB/args" && grep -qx "approval_policy=\"never\"" "$STUB/args" && grep -qx "web_search=\"cached\"" "$STUB/args"'

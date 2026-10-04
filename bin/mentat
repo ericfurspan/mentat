@@ -26,6 +26,8 @@ last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
 # Runs read-only Codex in directory $1 on prompt file $2 and writes its final
 # message to $3. On any failure it calls $4 with the reason, which exits.
+# Sets codex_tokens from the "tokens used" line Codex prints last, or "unknown".
+codex_tokens=unknown
 run_codex() {
   local dir="$1" prompt="$2" out="$3" fail="$4" log rc secs=0 pid
   log="${out%/*}/codex.log"
@@ -53,6 +55,8 @@ run_codex() {
     "$fail" "codex exited with status $rc (log above)"
   fi
   [ -s "$out" ] || "$fail" "Codex returned no final message"
+  codex_tokens=$(grep -A1 'tokens used' "$log" | tail -n 1 | tr -dc '0-9,')
+  [ -n "$codex_tokens" ] || codex_tokens=unknown
 }
 
 review() {
@@ -133,8 +137,8 @@ review() {
     printf '## Local Codex review, posted by the agent\n\n'
     printf -- '- Repository: %s\n- Pull request: #%s\n- Head: %s\n- Base: %s @ %s\n- Merge-base: %s\n' \
       "$repo" "$pr" "$head" "$base" "$base_sha" "$merge_base"
-    printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
-      "$(codex --version 2>/dev/null)" "$CODEX_MODEL" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Tokens used: %s\n- Time: %s\n' \
+      "$(codex --version 2>/dev/null)" "$CODEX_MODEL" "$CODEX_EFFORT" "$codex_tokens" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     [ -z "$moved" ] || printf '%s\n' "$moved"
     printf '\n---\n\n'
     cat "$out"
@@ -242,8 +246,8 @@ challenge() {
   esac
   printf '## Plan challenge by local Codex, run by the agent\n\n'
   printf -- '- Plan: %s\n- Started at commit: %s (uncommitted changes: %s)\n' "$plan" "$head" "$dirty"
-  printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
-    "$(codex --version 2>/dev/null)" "$CODEX_MODEL" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Tokens used: %s\n- Time: %s\n' \
+    "$(codex --version 2>/dev/null)" "$CODEX_MODEL" "$CODEX_EFFORT" "$codex_tokens" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf -- '- This is a plan challenge, not a review.\n\n---\n\n'
   cat "$out"
 }
