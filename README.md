@@ -12,8 +12,8 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an output sty
 
 1. Work starts from a chat request or an issue. Claude Code reads the code, then writes down what it will build and how it will be checked. Uncertain or consequential plans get a Codex challenge first (`mentat challenge`).
 2. One builder, one branch, one checkout per change. The repository's one test command runs before the pull request opens and after every fix.
-3. Every pull request opens as a draft. `mentat review` has Codex review the exact head commit. Claude Code fixes findings that have a realistic trigger and answers the rest with a reason. After three review rounds it checks in with you; ten is a hard stop.
-4. When the final review is clean and CI passes, Claude Code answers any comments you left, marks the pull request ready, requests your review and runs `mentat wait`.
+3. Every pull request opens as a draft. When it is built and CI passes, Claude Code marks it ready, which starts OpenAI's Codex GitHub app review, and `mentat review` waits for the app's result on that commit. Claude Code fixes findings that have a realistic trigger and answers the rest with a reason; for a new review it moves the pull request back to draft, pushes the fixes and marks it ready again. After three review rounds it checks in with you; ten is a hard stop.
+4. When the app's latest review is clean, Claude Code answers any comments you left, requests your review and runs `mentat wait`.
 5. On your Approve at the current head, it merges with `gh pr merge --squash --match-head-commit <sha>`.
 
 ## What enforces what
@@ -52,18 +52,19 @@ They draw on:
 These are design choices, not proven results:
 
 - A different model family reviews the builder's work: Codex reviews what Claude Code builds.
-- Reviews run locally (`mentat review`) with Codex's default model at pinned effort, posted by the agent account, so a posted review is evidence, not proof. Whether to switch back to OpenAI's Codex GitHub integration is open in [issue 3](https://github.com/ericfurspan/mentat/issues/3).
+- Reviews come from OpenAI's Codex GitHub app, which posts under its own identity with comments on specific lines. It was chosen over a local review after a five-pull-request comparison ([issue 3](https://github.com/ericfurspan/mentat/issues/3)). It reviews only when a pull request is marked ready, so a draft is never reviewed.
 - A repository with any Actions, Dependabot or environment secret is refused: with write access, the agent could run a workflow on a branch before any review.
 - Review findings are fixed only when they have a realistic trigger; gates stay small.
 - macOS only, with scripts in plain bash that also runs on macOS's bash 3.2.
 
 ## Using Mentat in a repository
 
-You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a separate agent account. Protected branches and code owners on a private repository need GitHub Pro or above ([GitHub's plans](https://docs.github.com/en/get-started/learning-about-github/githubs-plans)).
+You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`), a ChatGPT plan with Codex code review, and `gh` signed in as a separate agent account. Protected branches and code owners on a private repository need GitHub Pro or above ([GitHub's plans](https://docs.github.com/en/get-started/learning-about-github/githubs-plans)).
 
 1. Before the agent has any access, import [`ruleset.json`](ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset, open the file, review it and click Create. If your CI check is not named `test`, change it while reviewing. A personal repository cannot give a collaborator read-only access, so protection must exist before the agent can write.
 2. Invite the agent account as a collaborator. It gets write access, never admin.
-3. The agent opens a pull request with the repository's files:
+3. Install OpenAI's Codex GitHub app on the repository, and in Codex's code review settings for it turn on automatic review for all pull requests, triggered on PR open. Leave exhaustive review and credit use off.
+4. The agent opens a pull request with the repository's files:
    - `.github/CODEOWNERS` with `* @<you>`
    - a CI workflow that runs the one test command as a check named `test`
    - `AGENTS.md` naming that test command, with a `## Code Review Rules` section
@@ -79,14 +80,14 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a
    ```
 
    The ruleset requires one approval, and the agent cannot approve its own pull request, so this one already waits for your Approve, before CODEOWNERS exists.
-4. The agent runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK".
-5. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
+5. The agent runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK".
+6. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
 
 ## Commands
 
 | Command | What it does | Exit codes |
 |---|---|---|
-| `mentat review <PR>` | Codex reviews the pull request's head commit, read-only, and the agent posts the reply | 0 posted (read the findings), 1 not reviewed, 3 head moved |
+| `mentat review <PR>` | Waits for the Codex app's result on a ready pull request's current head | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved |
 | `mentat wait <PR>` | Waits for your response after the pull request is marked ready | 0 approved at the current head, 1 needs attention, 2 no response in four hours |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |

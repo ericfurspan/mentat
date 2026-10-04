@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
-# (File-wide: each check is a string evaluated after its case runs, so single-
-# quoted variables and assignments read only inside those strings are intended.)
-# Behavior tests for `mentat review`, using stub gh and codex commands and a
-# local origin repository. Prints PASS/FAIL per case; exits 1 on any FAIL.
+# (File-wide: each check is a string evaluated after its case runs.)
+# Behavior tests for `mentat review`, which waits for the Codex GitHub app's
+# result, using a stub gh. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
@@ -14,89 +13,67 @@ mkdir -p "$STUB" "$root/bin"
 failures=0
 check() { if eval "$2"; then printf 'PASS: review %s\n' "$1"; else printf 'FAIL: review %s\n' "$1"; failures=$((failures + 1)); fi; }
 
-cat >"$root/bin/gh" <<'EOF'
+# gh pr view serves pr.json; from the second call on, later.json when it exists.
+# gh api serves timeline.json, reviews.json, reactions.json and comments.json.
+cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
+printf '%s\n' "$*" >>"$STUB/calls"
 case "$1 $2" in
-  "repo view") echo '{"nameWithOwner":"owner/repo"}' ;;
+  "repo view") echo owner/repo ;;
   "pr view")
     n=$(($(cat "$STUB/pr_calls" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/pr_calls"
-    if [ "$n" -gt 1 ] && [ -f "$STUB/head_after" ]; then
-      jq --arg h "$(cat "$STUB/head_after")" '.headRefOid = $h' "$STUB/pr.json"
-    else cat "$STUB/pr.json"; fi ;;
-  "issue view") echo '{"title":"Issue title","body":"Issue requirement"}' ;;
-  "pr comment") while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$STUB/posted.md"; shift; done
-    echo "https://example.test/comment" ;;
+    f="$STUB/pr.json"; [ "$n" -ge 2 ] && [ -f "$STUB/later.json" ] && f="$STUB/later.json"
+    for a in "$@"; do [ "$a" = .headRefOid ] && { jq -r .headRefOid "$f"; exit 0; }; done
+    cat "$f" ;;
+  "api --paginate")
+    case "$3" in
+      */timeline) cat "$STUB/timeline.json" 2>/dev/null || echo '[]' ;;
+      */reviews) cat "$STUB/reviews.json" 2>/dev/null || echo '[]' ;;
+      */reactions) cat "$STUB/reactions.json" 2>/dev/null || echo '[]' ;;
+      */comments) cat "$STUB/comments.json" 2>/dev/null || echo '[]' ;;
+      *) exit 99 ;;
+    esac ;;
   *) exit 99 ;;
 esac
-EOF
-cat >"$root/bin/codex" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = --version ]; then echo "codex-cli 0.0-stub"; exit 0; fi
-printf '%s\n' "$@" >"$STUB/args"
-out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
-cat >"$STUB/prompt"
-[ -f "$STUB/codex_ignore_term" ] && trap '' TERM
-[ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
-[ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
-exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
-EOF
-chmod +x "$root/bin/gh" "$root/bin/codex"
-export PATH="$root/bin:$PATH"
+STUBEOF
+chmod +x "$root/bin/gh"
+export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_REVIEW_TIMEOUT_SECONDS=2
 
-# A local origin with base branch trunk (not main, so machine-wide git hooks guarding main never apply) and a pull request head at refs/pull/7/head.
-git init -q --bare "$root/owner/repo.git"
-git init -q -b trunk "$root/work" && cd "$root/work" || exit 1
-git config user.email t@example.test && git config user.name test
-git commit -q --allow-empty -m base
-git remote add origin "$root/owner/repo.git" && git push -q origin trunk
-base_sha=$(git rev-parse HEAD)
-echo change >file && git add file && git commit -q -m change
-head_sha=$(git rev-parse HEAD)
-git push -q origin "HEAD:refs/pull/7/head" && git checkout -q --detach
+APP='chatgpt-codex-connector[bot]'
+H=1111111111111111111111111111111111111111
+OLD=2222222222222222222222222222222222222222
+READY=2026-01-01T00:10:00Z
+reset() {
+  rm -f "$STUB"/*
+  printf '{"headRefOid":"%s","isDraft":false,"createdAt":"2026-01-01T00:00:00Z"}\n' "$H" >"$STUB/pr.json"
+  printf '[{"event":"ready_for_review","created_at":"2026-01-01T00:05:00Z"},{"event":"ready_for_review","created_at":"%s"}]\n' "$READY" >"$STUB/timeline.json"
+}
+review() { printf '{"user":{"login":"%s"},"commit_id":"%s","html_url":"https://example.test/review"}' "$1" "$2"; }
+thumbs() { printf '{"user":{"login":"%s"},"content":"+1","created_at":"%s"}' "$1" "$2"; }
+run() { "$mentat" review 7 >"$STUB/out" 2>&1; echo $?; }
 
-pr_json() { printf '{"headRefOid":"%s","baseRefName":"trunk","baseRefOid":"%s","title":"Add file","body":"PR requirement","isCrossRepository":%s,"closingIssuesReferences":[{"url":"https://example.test/issues/1"}]}\n' "$head_sha" "$base_sha" "$1" >"$STUB/pr.json"; }
-reset() { rm -f "$STUB"/*; pr_json false; printf 'One finding.\n\nREVIEW STATUS: COMPLETE\n' >"$STUB/codex_out"; }
-run() { "$mentat" review 7 >/dev/null 2>&1; echo $?; }
-
+reset; printf '[%s]\n' "$(thumbs "$APP" 2026-01-01T00:11:00Z)" >"$STUB/reactions.json"; rc=$(run)
+check "a 👍 after the latest ready is clean (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H" "$STUB/out"'
+reset; printf '[%s]\n' "$(thumbs "$APP" 2026-01-01T00:06:00Z)" >"$STUB/reactions.json"; rc=$(run)
+check "a 👍 from before the latest ready does not count" '[ "$rc" = 1 ] && grep -q "no result from the Codex app" "$STUB/out"'
+reset; printf '[%s]\n' "$(thumbs someone 2026-01-01T00:11:00Z)" >"$STUB/reactions.json"; rc=$(run)
+check "a 👍 from someone else does not count" '[ "$rc" = 1 ]'
+reset; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"
+printf '[{"user":{"login":"%s"},"commit_id":"%s","path":"README.md","line":12,"html_url":"https://example.test/c1"}]\n' "$APP" "$H" >"$STUB/comments.json"; rc=$(run)
+check "a review of the head reports findings (exit 2)" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/review" "$STUB/out" && grep -q "README.md:12 https://example.test/c1" "$STUB/out"'
+reset; printf '[%s]\n' "$(review "$APP" "$OLD")" >"$STUB/reviews.json"; rc=$(run)
+check "a review of an older commit does not count" '[ "$rc" = 1 ]'
+reset; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"; printf '[%s]\n' "$(thumbs "$APP" 2026-01-01T00:11:00Z)" >"$STUB/reactions.json"; rc=$(run)
+check "findings on the head win over a 👍" '[ "$rc" = 2 ]'
 reset; rc=$(run)
-check "posts a complete review (exit 0)" '[ "$rc" = 0 ] && [ -f "$STUB/posted.md" ]'
-check "header is one line naming the reviewed head and model" '[ "$(head -n 1 "$STUB/posted.md")" = "**Local Codex review of $head_sha** (gpt-6.1-sol, effort high)" ] && [ "$(wc -l <"$STUB/posted.md")" -eq $(($(wc -l <"$STUB/codex_out") + 2)) ]'
-check "posts Codex's message unedited" 'tail -n 3 "$STUB/posted.md" | diff - "$STUB/codex_out" >/dev/null'
-check "runs plain codex exec, not review mode" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args"'
-check "names no model, pins effort, read-only sandbox" '! grep -q "^model=" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only'
-check "prompt names the commits and requirements" 'grep -q "git diff $base_sha $head_sha" "$STUB/prompt" && grep -q "PR requirement" "$STUB/prompt" && grep -q "Issue requirement" "$STUB/prompt"'
-check "removes its worktree" '[ "$(git worktree list | wc -l)" -eq 1 ]'
-
-reset; echo 1 >"$STUB/codex_exit"; rc=$(run)
-check "codex failure is not reviewed (exit 1)" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
-reset; rm "$STUB/codex_out"; rc=$(run)
-check "no final message is not reviewed" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
-reset; printf 'Looks fine.\n' >"$STUB/codex_out"; rc=$(run)
-check "missing status line is not reviewed" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
-reset; printf 'REVIEW STATUS: INCOMPLETE - could not inspect\n' >"$STUB/codex_out"; rc=$(run)
-check "INCOMPLETE is not reviewed" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
-reset; echo 3 >"$STUB/codex_sleep"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run)
-check "timeout is not reviewed" '[ "$rc" = 1 ] && [ ! -f "$STUB/posted.md" ]'
-reset; echo 30 >"$STUB/codex_sleep"; touch "$STUB/codex_ignore_term"; start=$(date +%s); rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run)
-check "timeout ends a reviewer that ignores SIGTERM" '[ "$rc" = 1 ] && [ $(($(date +%s) - start)) -lt 15 ]'
-# A narrowed fetch mapping and a stale origin/trunk must not change the base.
-git update-ref refs/remotes/origin/trunk "$head_sha"
-git config remote.origin.fetch '+refs/heads/none:refs/remotes/origin/none'
-reset; rc=$(run)
-check "uses the fetched base, not a stale origin/<base>" '[ "$rc" = 0 ] && grep -q "git diff $base_sha $head_sha" "$STUB/prompt"'
-git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
-# A mirror at the same owner/repo path elsewhere, with a different base, is refused.
-git clone -q --bare "$root/owner/repo.git" "$root/elsewhere/owner/repo.git"
-git push -q "$root/elsewhere/owner/repo.git" "$head_sha:refs/pull/7/head"
-git -C "$root/work" commit -q --allow-empty -m other && git push -q "$root/elsewhere/owner/repo.git" HEAD:trunk
-git remote set-url origin "$root/elsewhere/owner/repo.git"
-reset; rc=$(run)
-check "refuses a base that is not GitHub's" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
-git remote set-url origin "$root/owner/repo.git"
-reset; pr_json true; rc=$(run)
-check "fork pull request is refused" '[ "$rc" = 1 ] && [ ! -f "$STUB/args" ] && [ ! -f "$STUB/posted.md" ]'
-reset; echo 0000000000000000000000000000000000000000 >"$STUB/head_after"; rc=$(run)
-check "moved head posts with a note (exit 3)" '[ "$rc" = 3 ] && grep -q "head moved" "$STUB/posted.md"'
+check "no result in time is not reviewed (exit 1)" '[ "$rc" = 1 ] && grep -q "no result from the Codex app on $H" "$STUB/out"'
+reset; printf '{"headRefOid":"%s","isDraft":true,"createdAt":"2026-01-01T00:00:00Z"}\n' "$H" >"$STUB/pr.json"; rc=$(run)
+check "a draft is not reviewed" '[ "$rc" = 1 ] && grep -q "is a draft" "$STUB/out" && ! grep -q reactions "$STUB/calls"'
+reset; printf '{"headRefOid":"%s","isDraft":false}\n' "$OLD" >"$STUB/later.json"; rc=$(run)
+check "a moved head exits 3" '[ "$rc" = 3 ]'
+reset; echo '[]' >"$STUB/timeline.json"; printf '[%s]\n' "$(thumbs "$APP" 2026-01-01T00:01:00Z)" >"$STUB/reactions.json"; rc=$(run)
+check "without a ready event, a 👍 after creation counts" '[ "$rc" = 0 ]'
+check "makes no writes" '! grep -q -- "-X\|--method\|-f \|pr ready\|pr comment" "$STUB/calls"'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
