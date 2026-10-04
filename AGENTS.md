@@ -13,3 +13,4 @@ This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its 
 - Flag changes that weaken a guardrail: removing or narrowing `.github/CODEOWNERS`, skipping or loosening `scripts/test`, or instructions that let an agent deploy, publish, release or merge without required review.
 - Flag shell scripts that break on paths with spaces, ignore a failing command, or behave differently on macOS and Linux without saying so.
 - Do not flag wording or style in Markdown instructions unless it changes what an agent is told to do.
+- Flag only problems with a realistic trigger. A check that fails closed is not a finding, and neither is input that needs a broken or hostile setup on the maintainer's own machine. Prefer removing code to adding guards.
