@@ -61,18 +61,18 @@ good() {
 }
 run() { (cd "$root/cwd" && "$mentat" setup "$@" >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
-export_ok() { [ -f "$root/cwd/mentat-ruleset.json" ]; }
+points() { grep -q "imports ruleset.json from the Mentat repository" "$STUB/out"; }
 
 good; rc=$(run owner/repo)
 check "a ready repository is Setup OK (exit 0)" '[ "$rc" = 0 ] && [ "$(last)" = "Setup OK (7 not checked)" ] && ! grep -q "^PROBLEM\|^REFUSED" "$STUB/out"'
 check "lists what it cannot check" '[ "$(grep -c "^NOT CHECKED:" "$STUB/out")" = 7 ] && grep -q "NOT CHECKED: the one-time live block test" "$STUB/out"'
 check "makes only GET calls to the API" '[ ! -f "$STUB/writes" ] && ! grep -vq -- "-X GET" "$STUB/calls"'
-check "writes no ruleset when the rules are complete" '! export_ok'
+check "does not point to ruleset.json when the rules are complete" '! points && [ -z "$(ls -A "$root/cwd")" ]'
 
 # Each missing or wrong rule is a problem and writes the ruleset export.
 while IFS='|' read -r name filter; do
   good; mut "$RULES" "$filter"; rc=$(run owner/repo)
-  check "$name is a problem" '[ "$rc" = 1 ] && [ "$(last)" = "Setup incomplete: 1 problem(s)" ] && export_ok'
+  check "$name is a problem" '[ "$rc" = 1 ] && [ "$(last)" = "Setup incomplete: 1 problem(s)" ] && points'
 done <<'CASES'
 no deletion rule|map(select(.type != "deletion"))
 no force-push rule|map(select(.type != "non_fast_forward"))
@@ -85,13 +85,12 @@ required check from another source|map(if .type == "required_status_checks" then
 required check with another name|map(if .type == "required_status_checks" then .parameters.required_status_checks[0].context = "lint" else . end)
 CASES
 good; rc=$(run owner/repo --check lint)
-check "--check names the required check" '[ "$rc" = 1 ] && grep -q "PROBLEM: missing on trunk: required check" "$STUB/out" && jq -e ".rules[3].parameters.required_status_checks == [{\"context\":\"lint\",\"integration_id\":15368}]" "$root/cwd/mentat-ruleset.json" >/dev/null'
-check "the export is an active default-branch ruleset with no bypass" 'jq -e ".enforcement == \"active\" and .target == \"branch\" and .conditions.ref_name.include == [\"~DEFAULT_BRANCH\"] and .bypass_actors == [] and ([.rules[].type] == [\"deletion\",\"non_fast_forward\",\"pull_request\",\"required_status_checks\"]) and .rules[2].parameters.allowed_merge_methods == [\"squash\"] and .rules[2].parameters.require_code_owner_review and .rules[2].parameters.dismiss_stale_reviews_on_push and .rules[2].parameters.require_last_push_approval" "$root/cwd/mentat-ruleset.json" >/dev/null'
-check "prints the import path" 'grep -q "Settings > Rules > Rulesets > New ruleset > Import a ruleset" "$STUB/out"'
-good; mut "$RULES" 'map(select(.type != "deletion"))'; echo keep >"$root/cwd/mentat-ruleset.json"; rc=$(run owner/repo)
-check "an existing export is not overwritten" '[ "$rc" = 1 ] && [ "$(cat "$root/cwd/mentat-ruleset.json")" = keep ] && grep -q "already exists here; not overwritten" "$STUB/out"'
-good; mut "$RULES" 'map(select(.type != "deletion"))'; chmod a-w "$root/cwd"; rc=$(run owner/repo); chmod u+w "$root/cwd"
-check "a failed export write is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not write mentat-ruleset.json" "$STUB/out" && [ "$(last)" = "Setup incomplete: 2 problem(s)" ]'
+check "--check names the required check, and says ruleset.json uses test" '[ "$rc" = 1 ] && grep -q "PROBLEM: missing on trunk: required check" "$STUB/out" && grep -q "change it to lint" "$STUB/out"'
+check "writes nothing locally" '[ -z "$(ls -A "$root/cwd")" ]'
+# ruleset.json, imported as is, satisfies every rule setup checks.
+good; jq '[.rules[] | . + {ruleset_id: 1}]' "$(dirname "$mentat")/../ruleset.json" >"$A/repos_owner_repo_rules_branches_trunk.json"; rc=$(run owner/repo)
+check "ruleset.json passes every rule check" '[ "$rc" = 0 ] && ! grep -q "^PROBLEM" "$STUB/out"'
+check "ruleset.json is an active default-branch ruleset with no bypass" 'jq -e ".enforcement == \"active\" and .target == \"branch\" and .conditions.ref_name.include == [\"~DEFAULT_BRANCH\"] and .bypass_actors == []" "$(dirname "$mentat")/../ruleset.json" >/dev/null'
 
 good; put "$R/rulesets/1" '{"current_user_can_bypass":"always"}'; rc=$(run owner/repo)
 check "an agent that can bypass is refused" '[ "$rc" = 1 ] && [ "$(last)" = "Setup refused: the agent account can bypass ruleset 1 (always)" ]'
@@ -102,7 +101,7 @@ check "a missing bypass field is a problem, not a pass" '[ "$rc" = 1 ] && grep -
 good; put "$R/rulesets/2" '{"current_user_can_bypass":"always"}'; rc=$(run owner/repo)
 check "a ruleset that does not apply to the default branch is ignored" '[ "$rc" = 0 ] && ! grep -q "rulesets/2" "$STUB/calls"'
 good; put "$RULES" '[]'; rc=$(run owner/repo)
-check "no rules at all is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: no ruleset applies to trunk" "$STUB/out" && export_ok'
+check "no rules at all is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: no ruleset applies to trunk" "$STUB/out" && points'
 
 good; put "$R" '{"owner":{"login":"owner","type":"Organization"},"default_branch":"trunk","permissions":{"admin":false,"push":true}}'; rc=$(run owner/repo)
 check "an organization repository is refused" '[ "$rc" = 1 ] && last | grep -q "^Setup refused: owner/repo is owned by an organization"'

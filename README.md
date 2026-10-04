@@ -59,10 +59,11 @@ These are design choices, not proven results:
 
 ## Using Mentat in a repository
 
-You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a separate agent account.
+You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a separate agent account. Protected branches and code owners on a private repository need GitHub Pro or above ([GitHub's plans](https://docs.github.com/en/get-started/learning-about-github/githubs-plans)).
 
-1. Invite the agent account to the repository with write access, not admin.
-2. The agent opens a pull request with the repository's files:
+1. Before the agent has any access, import [`ruleset.json`](ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset, open the file, review it and click Create. If your CI check is not named `test`, change it while reviewing. A personal repository cannot give a collaborator read-only access, so protection must exist before the agent can write.
+2. Invite the agent account as a collaborator. It gets write access, never admin.
+3. The agent opens a pull request with the repository's files:
    - `.github/CODEOWNERS` with `* @<you>`
    - a CI workflow that runs the one test command as a check named `test`
    - `AGENTS.md` naming that test command, with a `## Code Review Rules` section
@@ -77,8 +78,9 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a
    }
    ```
 
-3. The agent runs `mentat setup <owner/repo>`. If a rule is missing, it writes `mentat-ruleset.json`; you import it under Settings > Rules > Rulesets > New ruleset > Import a ruleset, review it and click Create. Agents start work only on "Setup OK".
-4. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
+   You review and merge this one yourself: until CODEOWNERS is on the default branch, GitHub cannot require your approval.
+4. The agent runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK".
+5. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
 
 ## Commands
 
@@ -87,7 +89,7 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI, and `gh` signed in as a
 | `mentat review <PR>` | Codex reviews the pull request's head commit, read-only, and the agent posts the reply | 0 posted (read the findings), 1 not reviewed, 3 head moved |
 | `mentat wait <PR>` | Waits for your response after the pull request is marked ready | 0 approved at the current head, 1 needs attention, 2 no response in four hours |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
-| `mentat setup <owner/repo> [--check <name>]` | Checks that a repository is ready for agents, reading GitHub only. If a rule is missing, it writes `mentat-ruleset.json` in the current directory, never over an existing file | 0 ready, 1 incomplete or refused |
+| `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |
 
 Usage errors exit 64.
 
