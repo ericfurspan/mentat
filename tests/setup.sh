@@ -50,7 +50,7 @@ good() {
   put "$R" '{"owner":{"login":"owner","type":"User"},"default_branch":"trunk","permissions":{"admin":false,"push":true}}'
   put user '{"login":"agent"}'
   put "$RULES" '[{"type":"deletion","ruleset_id":1},{"type":"non_fast_forward","ruleset_id":1},
-    {"type":"pull_request","ruleset_id":1,"parameters":{"allowed_merge_methods":["squash"],"dismiss_stale_reviews_on_push":true,"require_code_owner_review":true,"require_last_push_approval":true}},
+    {"type":"pull_request","ruleset_id":1,"parameters":{"allowed_merge_methods":["squash"],"dismiss_stale_reviews_on_push":true,"require_code_owner_review":true,"require_last_push_approval":true,"required_approving_review_count":1}},
     {"type":"required_status_checks","ruleset_id":1,"parameters":{"required_status_checks":[{"context":"test","integration_id":15368}]}}]'
   put "$R/rulesets/1" '{"current_user_can_bypass":"never"}'
   codeowners '# The owner approves everything.\n* @owner\n'
@@ -76,6 +76,7 @@ while IFS='|' read -r name filter; do
 done <<'CASES'
 no deletion rule|map(select(.type != "deletion"))
 no force-push rule|map(select(.type != "non_fast_forward"))
+no approval required|map(if .type == "pull_request" then .parameters.required_approving_review_count = 0 else . end)
 code owner review false|map(if .type == "pull_request" then .parameters.require_code_owner_review = false else . end)
 stale dismissal null|map(if .type == "pull_request" then .parameters.dismiss_stale_reviews_on_push = null else . end)
 no last-push approval|map(if .type == "pull_request" then del(.parameters.require_last_push_approval) else . end)

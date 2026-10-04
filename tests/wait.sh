@@ -70,6 +70,10 @@ case_with "" ""; touch "$STUB/api_fail"; pr_json CLOSED "$H" "" "" >"$STUB/later
 check "a closed pull request is reported even when comments cannot be read" '[ "$rc" = 1 ]'
 case_with "$(review maint CHANGES_REQUESTED "$H" "$LATE")" ""; rc=$(run)
 check "requested changes exit 1" '[ "$rc" = 1 ]'
+case_with "$(review maint CHANGES_REQUESTED "$OLD" "$EARLY")" ""; rc=$(run)
+check "requested changes from before the start do not end the wait" '[ "$rc" = 2 ]'
+case_with "$(review maint CHANGES_REQUESTED "$OLD" "$EARLY"),$(review maint APPROVED "$H" "$LATE")" ""; rc=$(run)
+check "an approval after old requested changes exits 0" '[ "$rc" = 0 ]'
 case_with "" "$(comment maint "$LATE")"; rc=$(run)
 check "a maintainer comment after the start exits 1" '[ "$rc" = 1 ]'
 case_with "$(review maint COMMENTED "$H" "$LATE")" ""; rc=$(run)

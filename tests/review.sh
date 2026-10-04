@@ -24,7 +24,10 @@ case "$1 $2" in
   "repo view") echo owner/repo ;;
   "pr view")
     case "$*" in
-      *headRefOid*) cat "$STUB/head" ;;
+      *headRefOid*)
+        n=$(($(cat "$STUB/head_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/head_reads"
+        [ "$n" = "$(cat "$STUB/head_fails_at" 2>/dev/null)" ] && exit 1
+        cat "$STUB/head" ;;
       *isDraft*) cat "$STUB/draft" ;;
       *) exit 99 ;;
     esac ;;
@@ -88,6 +91,11 @@ reset; touch "$STUB/no_ready_event"; rc=$(MENTAT_READY_TRIES=1 run)
 check "no new ready event on GitHub is not reviewed" '[ "$rc" = 1 ] && grep -q "new ready event" "$STUB/out"'
 reset; touch "$STUB/ready_fails"; rc=$(run)
 check "a failed ready is not reviewed" '[ "$rc" = 1 ] && grep -q "could not mark #7 ready" "$STUB/out"'
+# One failed read of the head is a missed poll, not a moved head.
+reset; echo 2 >"$STUB/head_fails_at"; printf '[%s]\n' "$(reaction "$APP" +1 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_ready"; rc=$(run)
+check "a failed head read in the loop is not a moved head" '[ "$rc" = 0 ] && ! grep -q "head moved" "$STUB/out"'
+reset; echo 3 >"$STUB/head_fails_at"; printf '[%s]\n' "$(reaction "$APP" +1 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_ready"; rc=$(run)
+check "a result is accepted only after the head is read again" '[ "$rc" = 0 ] && [ "$(cat "$STUB/head_reads")" -ge 5 ]'
 reset; rc=$(run)
 check "no result in time is not reviewed (exit 1)" '[ "$rc" = 1 ] && grep -q "no result from the Codex app on $H" "$STUB/out"'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
