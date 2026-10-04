@@ -98,10 +98,10 @@ review() {
     [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
     if found=$(gh api --paginate "repos/$repo/pulls/$pr/reviews" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
       '[.[][] | select(.user.login == $a and .commit_id == $h)] | last | .html_url // empty') && [ -n "$found" ]; then
+      n=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
+        '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"') || n=""
       [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
-      printf 'The Codex app posted findings on %s: %s\n' "$head" "$found"
-      gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
-        '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"'
+      printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
       exit 2
     fi
     if n=$(app_reaction "$repo" "$pr" +1 "$ready") && [ "$n" -gt 0 ]; then
