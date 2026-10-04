@@ -34,6 +34,7 @@ A Codex review is a comment, not a check, so GitHub does not block a merge on it
 
 - The plugin's SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear and compact.
 - The Mentat output style applies whenever the plugin is enabled (`force-for-plugin`), unless another enabled plugin also forces its own style and loads first. It is still an instruction, not a guarantee.
+- The plugin's Stop hook checks each final reply. Over 100 words outside fenced code blocks, an em dash or a blockquote gets one request to rewrite it. It asks once per turn and never cuts text itself, so the first reply still shows above its rewrite.
 - `bin/mentat` is on the Bash tool's PATH while the plugin is enabled.
 - Claude Code's permission modes are the local control. Mentat does not sandbox the agent; it runs on your Mac with your Mac's access.
 
