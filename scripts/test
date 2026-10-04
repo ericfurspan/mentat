@@ -77,21 +77,21 @@ else
   fail "hooks/session-start exited non-zero"
 fi
 
-# mentat review, wait and challenge behave as specified (stub gh and codex).
+# mentat review, wait, challenge and setup behave as specified (stub gh and codex).
 if command -v jq >/dev/null 2>&1; then
-  for t in tests/review.sh tests/wait.sh tests/challenge.sh; do
+  for t in tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh; do
     if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
   done
 else
-  skip "jq not installed, mentat review, wait and challenge not tested"
+  skip "jq not installed, mentat review, wait, challenge and setup not tested"
 fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh; then
-    pass "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh"
+  if shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh; then
+    pass "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh"
   else
-    fail "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh"
+    fail "shellcheck scripts/test hooks/session-start bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh"
   fi
 else
   skip "shellcheck not installed, shell scripts not checked"

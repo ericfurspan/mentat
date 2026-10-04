@@ -2,6 +2,8 @@
 
 The maintainer owns this repository. Claude Code plans, builds and merges. Codex reviews pull requests through `mentat review`, run on the maintainer's Mac. The maintainer decides what matters. The repository's AGENTS.md names its one test command and anything specific to it.
 
+Before agents first work in a repository, and after its GitHub settings change, Claude Code runs `mentat setup`. A refused or incomplete result goes to the maintainer with the lines that caused it, and agents do not start work there until it reads "Setup OK". The maintainer assesses the items it lists as not checked once, before agents first work there.
+
 ## A change
 1. Work starts from a chat request or an issue.
 2. Claude Code reads the code first, then writes down what it will build and how the result will be checked, in the issue or the pull request. A separate plan is written only when the approach is uncertain or the decision matters. Before handing off such a plan, Claude Code runs `mentat challenge <plan-file>`, and the maintainer can ask for one at any time. Codex checks the plan against the repository and ends with a verdict; exit 1 means not challenged, and the handoff says so. Claude Code sorts the findings as it sorts review findings. The maintainer sees the plan with what changed, and any objection Claude Code did not adopt, with the reason. A challenge never counts as a review.
