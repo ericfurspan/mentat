@@ -21,6 +21,7 @@ pwd >"$STUB/cwd"
 out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
 cat >"$STUB/prompt"
 [ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
+[ -f "$STUB/codex_log" ] && cat "$STUB/codex_log"
 [ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
 EOF
@@ -70,6 +71,11 @@ check "reports uncommitted changes" '[ "$rc" = 0 ] && grep -q "uncommitted chang
 
 reset; echo 1 >"$STUB/codex_exit"; rc=$(run "$plan")
 check "codex failure is not challenged (exit 1)" '[ "$rc" = 1 ] && [ ! -s "$STUB/stdout" ]'
+# A failing Codex leaves a log that may hold a credential: kept, never printed.
+reset; echo 1 >"$STUB/codex_exit"; echo 'auth failed for token FAKE-TOKEN-123' >"$STUB/codex_log"; mkdir -p "$root/kept"
+(cd "$top/sub" && TMPDIR="$root/kept" "$mentat" challenge "$plan" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); rc=$?
+check "a failing Codex's log is not printed" '[ "$rc" = 1 ] && ! grep -q FAKE-TOKEN-123 "$STUB/stdout" "$STUB/stderr"'
+check "the log is kept and its path is printed" 'kept=$(ls "$root/kept"/mentat-codex-log.*) && grep -q FAKE-TOKEN-123 "$kept" && grep -qF "$kept" "$STUB/stderr"'
 reset; rm "$STUB/codex_out"; rc=$(run "$plan")
 check "no final message is not challenged" '[ "$rc" = 1 ] && [ ! -s "$STUB/stdout" ]'
 reset; printf 'Looks fine.\n' >"$STUB/codex_out"; rc=$(run "$plan")
