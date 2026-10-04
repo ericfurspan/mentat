@@ -39,6 +39,8 @@ cat >"$STUB/prompt"
 [ -f "$STUB/codex_sleep" ] && sleep "$(cat "$STUB/codex_sleep")"
 [ -f "$STUB/codex_out" ] && cp "$STUB/codex_out" "$out"
 [ -f "$STUB/no_tokens" ] || printf '\033[2mtokens used\033[0m\n3,352\n'
+# The real CLI then prints the reply on stdout, into the same log.
+printf 'The header shows tokens used\ntokens used\n7 more words\n'
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
 EOF
 chmod +x "$root/bin/gh" "$root/bin/codex"
@@ -63,7 +65,7 @@ reset; rc=$(run)
 check "posts a complete review (exit 0)" '[ "$rc" = 0 ] && [ -f "$STUB/posted.md" ]'
 check "header shows the tokens Codex used" 'grep -qx -- "- Tokens used: 3,352" "$STUB/posted.md"'
 reset; touch "$STUB/no_tokens"; rc=$(run)
-check "missing token count is shown as unknown" '[ "$rc" = 0 ] && grep -qx -- "- Tokens used: unknown" "$STUB/posted.md"'
+check "missing token count is shown as unknown, even when the reply mentions it" '[ "$rc" = 0 ] && grep -qx -- "- Tokens used: unknown" "$STUB/posted.md"'
 reset; rc=$(run)
 check "header names head, base and merge-base" 'grep -q "Head: $head_sha" "$STUB/posted.md" && grep -q "Base: trunk @ $base_sha" "$STUB/posted.md" && grep -q "Merge-base: $base_sha" "$STUB/posted.md"'
 check "posts Codex's message unedited" 'tail -n 3 "$STUB/posted.md" | diff - "$STUB/codex_out" >/dev/null'

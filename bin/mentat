@@ -55,7 +55,9 @@ run_codex() {
     "$fail" "codex exited with status $rc (log above)"
   fi
   [ -s "$out" ] || "$fail" "Codex returned no final message"
-  codex_tokens=$(grep -A1 'tokens used' "$log" | tail -n 1 | tr -dc '0-9,')
+  # The usage footer is a line that is exactly "tokens used" (after colour codes),
+  # then the count. Codex's reply is in the same log, so match nothing looser.
+  codex_tokens=$(awk '{ gsub(/\033\[[0-9;]*m/, "") } seen { if ($0 ~ /^[0-9,]+$/) print; exit } $0 == "tokens used" { seen = 1 }' "$log")
   [ -n "$codex_tokens" ] || codex_tokens=unknown
 }
 
