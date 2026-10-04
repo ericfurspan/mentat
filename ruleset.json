@@ -1,5 +1,5 @@
 {
-  "name": "protect default branch",
+  "name": "Mentat rules for the default branch",
   "target": "branch",
   "enforcement": "active",
   "conditions": {

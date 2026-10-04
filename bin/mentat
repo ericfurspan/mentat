@@ -114,7 +114,7 @@ review() {
       exit 0
     fi
     [ "$secs" -lt "$REVIEW_TIMEOUT_SECONDS" ] ||
-      not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds; tell the maintainer"
+      not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds; tell the maintainer. If the app has never reviewed here on its own, automatic review is probably off in Codex's code review settings"
     sleep "$REVIEW_INTERVAL_SECONDS"
     secs=$((secs + REVIEW_INTERVAL_SECONDS))
   done
