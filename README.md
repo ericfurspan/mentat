@@ -80,6 +80,8 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`)
    }
    ```
 
+   Plugin updates: the Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), and that turns plugin auto-update off, whatever `autoUpdate` says ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope project` in the repository, then restart the session.
+
    The ruleset requires one approval, and the agent cannot approve its own pull request, so this one already waits for your Approve, before CODEOWNERS exists.
 5. The agent runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK".
 6. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
