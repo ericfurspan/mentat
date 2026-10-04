@@ -13,7 +13,7 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an output sty
 1. Work starts from a chat request or an issue. Claude Code reads the code, then writes down what it will build and how it will be checked. Uncertain or consequential plans get a Codex challenge first (`mentat challenge`).
 2. One builder, one branch, one checkout per change. The repository's one test command runs before the pull request opens and after every fix.
 3. Every pull request opens as a draft. When it is built and CI passes, `mentat review` marks it ready, which starts OpenAI's Codex GitHub app review of that exact commit, and waits for the result. Claude Code fixes findings that have a realistic trigger and answers the rest with a reason, then runs `mentat review` again for the new commit. After three review rounds it checks in with you; ten is a hard stop.
-4. When the app's latest review is clean, Claude Code answers any comments you left, requests your review and runs `mentat wait`.
+4. When the app's latest review is clean, Claude Code answers any comments you left and posts a final check of that commit as one comment: what was asked and where the diff does it, test and CI results, what was not checked, and what most deserves your eyes. It is the author's own check, not an approval. Then it requests your review and runs `mentat wait`.
 5. On your Approve at the current head, it merges with `gh pr merge --squash --match-head-commit <sha>`.
 
 ## What enforces what
