@@ -238,7 +238,8 @@ challenge() {
 }
 
 # Setup reads GitHub as the agent account and changes nothing, there or locally.
-# When the default branch's rules fall short, it points the owner to ruleset.json.
+# When the default branch's rules fall short, it points the owner to ruleset.json;
+# when CODEOWNERS is missing or wrong, it points to the setup pull request.
 setup_problems=0 setup_refused="" setup_unchecked=0
 s_ok() { printf 'OK: %s\n' "$1"; }
 s_problem() { printf 'PROBLEM: %s\n' "$1"; setup_problems=$((setup_problems + 1)); }
@@ -346,7 +347,7 @@ RULES
   fi
 
   # 3. Code owners: every rule names the owner alone, and * is covered.
-  local owners errors line pat who star=0 bad=0
+  local owners errors line pat who star=0 bad=0 owners_missing=0
   if owners=$(s_get "repos/$repo/contents/.github/CODEOWNERS?ref=$b" --jq '.content | if type == "string" then gsub("\n"; "") | @base64d else error("malformed") end'); then
     while IFS= read -r line; do
       line=${line%$'\r'}
@@ -357,9 +358,9 @@ RULES
       [ "$(printf '%s' "$who" | tr '[:upper:]' '[:lower:]')" = "@$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]')" ] || bad=1
     done <<<"$owners"
     if [ "$bad" = 0 ] && [ "$star" = 1 ]; then s_ok "CODEOWNERS names $owner alone for every path"
-    else s_problem ".github/CODEOWNERS must give every path to @$owner alone, including a * rule"; fi
+    else s_problem ".github/CODEOWNERS must give every path to @$owner alone, including a * rule"; owners_missing=1; fi
   else
-    s_problem "could not read .github/CODEOWNERS on $branch"
+    s_problem "could not read .github/CODEOWNERS on $branch"; owners_missing=1
   fi
   if errors=$(s_count "repos/$repo/codeowners/errors?ref=$b" '.errors | if type == "array" then length else error("malformed") end') && [ "$errors" = 0 ]; then
     s_ok "GitHub reports no CODEOWNERS errors"
@@ -395,6 +396,12 @@ RULES
     printf 'The owner imports ruleset.json from the Mentat repository (%s, or https://github.com/ericfurspan/mentat/blob/main/ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset > open the file > review > Create.\n' \
       "$(cd "$(dirname "$0")/.." && pwd)/ruleset.json"
     [ -z "$check" ] || [ "$check" = test ] || printf 'ruleset.json requires a check named test; change it to %s while reviewing the import.\n' "$check"
+  fi
+  if [ "$owners_missing" = 1 ]; then
+    local after=""
+    [ "$want" = 0 ] || after=", once the ruleset is in place"
+    printf 'Claude Code opens the setup pull request%s: .github/CODEOWNERS with "* @%s", a CI workflow that runs the test command as the required check, AGENTS.md and .claude/settings.json. The owner approves it; nobody pushes to %s. Steps: https://github.com/ericfurspan/mentat/blob/main/docs/setup.md\n' \
+      "$after" "$owner" "$branch"
   fi
   s_finish
 }

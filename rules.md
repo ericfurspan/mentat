@@ -4,7 +4,7 @@
 
 The maintainer owns this repository. Claude Code plans, builds and merges. Codex reviews pull requests through OpenAI's Codex GitHub app. The maintainer decides what matters. The repository's AGENTS.md names its one test command and anything specific to it.
 
-Before agents first work in a repository, and after its GitHub settings change, Claude Code runs `mentat setup <owner/repo>`. A refused or incomplete result goes to the maintainer with the lines that caused it, and agents do not start work there until it reads "Setup OK". The maintainer assesses the items it lists as not checked once, before agents first work there.
+Before agents first work in a repository, and after its GitHub settings change, Claude Code runs `mentat setup <owner/repo>`. A refused or incomplete result goes to the maintainer with the lines that caused it, and agents do not start work there until it reads "Setup OK". The one exception is the setup pull request, opened when every remaining problem is about `.github/CODEOWNERS`: it adds `.github/CODEOWNERS` with `* @<owner>`, a CI workflow that runs the test command as the required check, `AGENTS.md` naming that command with a `## Code Review Rules` section, and `.claude/settings.json` turning the plugin on, and it moves like any other change. Before it, the maintainer imports `ruleset.json` and invites the agent account; after it merges, Claude Code runs `claude plugin install mentat@mentat --scope project` in a checkout on the default branch, then `mentat setup` again. Nobody pushes to the default branch for this. The maintainer assesses the items it lists as not checked once, before agents first work there.
 
 ## A change
 1. Work starts from a chat request or an issue.

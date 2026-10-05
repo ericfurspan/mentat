@@ -139,6 +139,17 @@ an ownerless pattern|* @owner\n/.github/\n
 no * rule|/src/ @owner\n
 another owner only|* @someone\n
 CASES
+# Missing or wrong CODEOWNERS points to the setup pull request, after the
+# ruleset when rules are missing too; complete rules and CODEOWNERS do not.
+setup_pr() { grep -q "Claude Code opens the setup pull request" "$STUB/out"; }
+good; rm "$A/repos_owner_repo_contents_.github_CODEOWNERS_ref_trunk.json"; rc=$(run owner/repo)
+check "missing CODEOWNERS points to the setup pull request" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read .github/CODEOWNERS" "$STUB/out" && grep -q "setup pull request: .github/CODEOWNERS with \"\* @owner\"" "$STUB/out" && ! points'
+mut "$RULES" '[]'; rc=$(run owner/repo)
+check "with no ruleset, the ruleset comes before the setup pull request" '[ "$rc" = 1 ] && points && grep -q "setup pull request, once the ruleset is in place" "$STUB/out" && [ "$(grep -n "imports ruleset.json" "$STUB/out" | cut -d: -f1)" -lt "$(grep -n "setup pull request" "$STUB/out" | cut -d: -f1)" ]'
+good; codeowners '* @someone\n'; rc=$(run owner/repo)
+check "wrong CODEOWNERS points to the setup pull request" '[ "$rc" = 1 ] && setup_pr'
+good; rc=$(run owner/repo)
+check "a ready repository does not point to the setup pull request" '! setup_pr'
 good; codeowners '*   @Owner   # comment\n\n/docs/ @owner\n'; rc=$(run owner/repo)
 check "CODEOWNERS spacing, case and comments are accepted" '[ "$rc" = 0 ]'
 good; put "$R/codeowners/errors?ref=trunk" '{"errors":[{"line":1}]}'; rc=$(run owner/repo)
