@@ -83,10 +83,16 @@ no last-push approval|map(if .type == "pull_request" then del(.parameters.requir
 merge commits allowed|map(if .type == "pull_request" then .parameters.allowed_merge_methods = ["squash","merge"] else . end)
 required check missing|map(select(.type != "required_status_checks"))
 required check from another source|map(if .type == "required_status_checks" then .parameters.required_status_checks[0].integration_id = 1 else . end)
-required check with another name|map(if .type == "required_status_checks" then .parameters.required_status_checks[0].context = "lint" else . end)
 CASES
 good; rc=$(run owner/repo --check lint)
 check "--check names the required check, and says ruleset.json uses test" '[ "$rc" = 1 ] && grep -q "PROBLEM: missing on trunk: required check" "$STUB/out" && grep -q "change it to lint" "$STUB/out"'
+# Without --check, any required GitHub Actions check counts, whatever its name.
+good; mut "$RULES" 'map(if .type == "required_status_checks" then .parameters.required_status_checks[0].context = "Swift" else . end)'; rc=$(run owner/repo)
+check "a required check with another name passes without --check" '[ "$rc" = 0 ] && [ "$(last)" = "Setup OK (7 not checked)" ]'
+rc=$(run owner/repo --check Swift)
+check "--check with that name passes" '[ "$rc" = 0 ]'
+rc=$(run owner/repo --check test)
+check "--check with a different name is a problem" '[ "$rc" = 1 ] && grep -q "PROBLEM: missing on trunk: required check" "$STUB/out"'
 check "writes nothing locally" '[ -z "$(ls -A "$root/cwd")" ]'
 # ruleset.json, imported as is, satisfies every rule setup checks.
 good; jq '[.rules[] | . + {ruleset_id: 1}]' "$(dirname "$mentat")/../ruleset.json" >"$A/repos_owner_repo_rules_branches_trunk.json"; rc=$(run owner/repo)

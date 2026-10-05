@@ -24,7 +24,7 @@ Mentat separates what is enforced from what is only asked of the agent.
 
 These hold whatever the agent does. `mentat setup` checks each one it can observe.
 
-- A ruleset on the default branch: pull requests required with one approval, deletions and force pushes blocked, code owner review required, stale approvals dismissed on push, approval of the most recent push required, squash merges only, and a required `test` check from GitHub Actions.
+- A ruleset on the default branch: pull requests required with one approval, deletions and force pushes blocked, code owner review required, stale approvals dismissed on push, approval of the most recent push required, squash merges only, and a required check from GitHub Actions (named `test` in `ruleset.json`; any name counts).
 - `.github/CODEOWNERS` gives every path to you alone, so changes to guarded files wait for your Approve.
 - The agent account has write access, not admin, and cannot bypass the ruleset.
 
@@ -62,12 +62,12 @@ These are design choices, not proven results:
 
 You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`), a ChatGPT plan with Codex code review, and `gh` signed in as a separate agent account. Protected branches and code owners on a private repository need GitHub Pro or above ([GitHub's plans](https://docs.github.com/en/get-started/learning-about-github/githubs-plans)).
 
-1. Before the agent has any access, import [`ruleset.json`](ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset, open the file, review it and click Create. If your CI check is not named `test`, change it while reviewing. A ruleset the repository already has can stay: rulesets add up and the stricter rule wins. GitHub refuses the import if a ruleset with the same name exists, so the file uses a name of its own. A personal repository cannot give a collaborator read-only access, so protection must exist before the agent can write.
+1. Before the agent has any access, import [`ruleset.json`](ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset, open the file, review it and click Create. The file requires a check named `test`; if your CI check has another name, put that name in while reviewing, or the ruleset will wait for a check that never runs. `mentat setup` accepts a required GitHub Actions check of any name. A ruleset the repository already has can stay: rulesets add up and the stricter rule wins. GitHub refuses the import if a ruleset with the same name exists, so the file uses a name of its own. A personal repository cannot give a collaborator read-only access, so protection must exist before the agent can write.
 2. Invite the agent account as a collaborator. It gets write access, never admin.
 3. Install OpenAI's Codex GitHub app on the repository, and in Codex's code review settings for it turn on automatic review for all pull requests, triggered on PR open. Leave exhaustive review and credit use off. Installing the app is not enough: without that setting it reviews only when you comment `@codex review`, and `mentat review` waits 20 minutes and reports not reviewed.
 4. The agent opens a pull request with the repository's files:
    - `.github/CODEOWNERS` with `* @<you>`
-   - a CI workflow that runs the one test command as a check named `test`
+   - a CI workflow that runs the one test command as a check, named `test` unless you changed the name in the ruleset
    - `AGENTS.md` naming that test command, with a `## Code Review Rules` section
    - `.claude/settings.json` that turns the plugin on:
 
@@ -93,7 +93,7 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`)
 | `mentat review <PR>` | Marks the pull request ready, which starts the Codex app's review of the current head, and waits for the result | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved |
 | `mentat wait <PR>` | Waits for your response after your review is requested | 0 approved at the current head, 1 needs attention, 2 no response in four hours |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
-| `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |
+| `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. Any required GitHub Actions check counts; `--check` asks for that one by name. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |
 
 Usage errors exit 64.
 
