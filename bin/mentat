@@ -83,6 +83,13 @@ review() {
     not_reviewed "could not read the repository with gh"
   fi
   head_now() { gh pr view "$pr" --json headRefOid --jq .headRefOid; }
+  # same, moved, or unknown when GitHub could not be read: a failed read is a
+  # missed poll, never a moved head and never proof that the head held.
+  head_state() {
+    local h
+    if ! h=$(head_now) || [ -z "$h" ]; then echo unknown; elif [ "$h" = "$head" ]; then echo same; else echo moved; fi
+  }
+  moved() { die "the head moved from $head; run mentat review again" 3; }
   if ! head=$(head_now) || [ -z "$head" ]; then not_reviewed "could not read pull request #$pr"; fi
   n=$(app_reaction "$repo" "$pr" eyes "") || not_reviewed "could not read the reactions on #$pr"
   [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
@@ -98,20 +105,24 @@ review() {
     ready=""; n=$((n + 1)); sleep 2
   done
   [ -n "$ready" ] || not_reviewed "could not see #$pr's new ready event on GitHub"
+  local state
   while :; do
-    [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
+    [ "$(head_state)" != moved ] || moved
     if found=$(gh api --paginate "repos/$repo/pulls/$pr/reviews" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
       '[.[][] | select(.user.login == $a and .commit_id == $h)] | last | .html_url // empty') && [ -n "$found" ]; then
       n=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
         '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"') || n=""
-      [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
-      printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
-      exit 2
-    fi
-    if n=$(app_reaction "$repo" "$pr" +1 "$ready") && [ "$n" -gt 0 ]; then
-      [ "$(head_now)" = "$head" ] || die "the head moved from $head; run mentat review again" 3
-      printf 'The Codex app found nothing on %s\n' "$head"
-      exit 0
+      state=$(head_state); [ "$state" != moved ] || moved
+      if [ "$state" = same ]; then
+        printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
+        exit 2
+      fi
+    elif n=$(app_reaction "$repo" "$pr" +1 "$ready") && [ "$n" -gt 0 ]; then
+      state=$(head_state); [ "$state" != moved ] || moved
+      if [ "$state" = same ]; then
+        printf 'The Codex app found nothing on %s\n' "$head"
+        exit 0
+      fi
     fi
     [ "$secs" -lt "$REVIEW_TIMEOUT_SECONDS" ] ||
       not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds; tell the maintainer. If the app has never reviewed here on its own, automatic review is probably off in Codex's code review settings"
@@ -139,7 +150,11 @@ wait_for_approval() {
       [ "$state" = OPEN ] || die "pull request #$pr is $state"
       [ "$(jq -r .headRefOid <<<"$info")" = "$head0" ] || die "the head moved from $head0"
       latest=$(jq -c --arg o "$owner" '[.reviews[] | select(.author.login == $o and .state != "COMMENTED")] | last // {}' <<<"$info")
-      [ "$(jq -r .state <<<"$latest")" != CHANGES_REQUESTED ] || die "$owner requested changes"
+      # Only a request made since the wait began ends it: GitHub keeps an old
+      # one standing after the fix is pushed, and that is not new feedback.
+      if jq -e --arg t "$start" '.state == "CHANGES_REQUESTED" and ((.submittedAt // "") >= $t)' <<<"$latest" >/dev/null; then
+        die "$owner requested changes"
+      fi
       # New feedback wins over an approval: a comment review, pull request comment
       # or inline review comment (gh pr view omits these) from the maintainer since
       # the wait began, same second included. If this cannot be checked, the
@@ -301,6 +316,7 @@ setup() {
     done <<'RULES'
 deletions blocked|any(.[]; .type == "deletion")
 force pushes blocked|any(.[]; .type == "non_fast_forward")
+one approval required|any(.[]; .type == "pull_request" and (.parameters.required_approving_review_count // 0) >= 1)
 code owner review required|any(.[]; .type == "pull_request" and .parameters.require_code_owner_review == true)
 stale approvals dismissed on push|any(.[]; .type == "pull_request" and .parameters.dismiss_stale_reviews_on_push == true)
 approval of the most recent push required|any(.[]; .type == "pull_request" and .parameters.require_last_push_approval == true)
