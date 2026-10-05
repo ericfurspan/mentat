@@ -69,7 +69,7 @@ check "lists what it cannot check" '[ "$(grep -c "^NOT CHECKED:" "$STUB/out")" =
 check "makes only GET calls to the API" '[ ! -f "$STUB/writes" ] && ! grep -vq -- "-X GET" "$STUB/calls"'
 check "does not point to ruleset.json when the rules are complete" '! points && [ -z "$(ls -A "$root/cwd")" ]'
 
-# Each missing or wrong rule is a problem and writes the ruleset export.
+# Each missing or wrong rule is a problem and points to ruleset.json.
 while IFS='|' read -r name filter; do
   good; mut "$RULES" "$filter"; rc=$(run owner/repo)
   check "$name is a problem" '[ "$rc" = 1 ] && [ "$(last)" = "Setup incomplete: 1 problem(s)" ] && points'

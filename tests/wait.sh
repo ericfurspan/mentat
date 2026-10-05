@@ -38,7 +38,8 @@ comment() { printf '{"author":{"login":"%s"},"createdAt":"%s"}' "$@"; }
 LATE=2999-01-01T00:00:00Z
 EARLY=2000-01-01T00:00:00Z
 case_with() { rm -f "$STUB"/*; pr_json OPEN "$H" "$1" "$2" >"$STUB/pr.json"; }
-run() { "$mentat" wait 5 >/dev/null 2>&1; echo $?; }
+# Output goes to $root/out so a case can check why the command ended.
+run() { "$mentat" wait 5 >"$root/out" 2>&1; echo $?; }
 
 case_with "$(review maint APPROVED "$H" "$EARLY")" ""; rc=$(run)
 check "approval at the current head exits 0" '[ "$rc" = 0 ]'
@@ -51,7 +52,9 @@ check "an approval of an older commit does not count" '[ "$rc" = 2 ]'
 case_with "$(review someone APPROVED "$H" "$LATE")" ""; rc=$(run)
 check "an approval from someone else does not count" '[ "$rc" = 2 ]'
 case_with "$(review maint APPROVED "$H" "$EARLY")" "$(comment maint "$LATE")"; rc=$(run)
-check "an approval followed by a maintainer comment exits 1" '[ "$rc" = 1 ]'
+check "an approval followed by a maintainer comment exits 1" '[ "$rc" = 1 ] && grep -q "maint commented" "$root/out"'
+case_with "$(review maint APPROVED "$H" "$EARLY")" "$(comment maint 2001-01-01T00:00:00Z)"; rc=$(run)
+check "a comment after the approval but before the start still stops it" '[ "$rc" = 1 ] && grep -q "maint commented" "$root/out"'
 case_with "$(review maint APPROVED "$H" "$EARLY"),$(review maint COMMENTED "$H" "$LATE")" ""; rc=$(run)
 check "an approval followed by a maintainer comment review exits 1" '[ "$rc" = 1 ]'
 case_with "$(review maint APPROVED "$H" "$EARLY")" ""
@@ -69,7 +72,7 @@ check "an approval is not accepted when comments cannot be read" '[ "$rc" = 2 ]'
 case_with "" ""; touch "$STUB/api_fail"; pr_json CLOSED "$H" "" "" >"$STUB/later.json"; rc=$(run)
 check "a closed pull request is reported even when comments cannot be read" '[ "$rc" = 1 ]'
 case_with "$(review maint CHANGES_REQUESTED "$H" "$LATE")" ""; rc=$(run)
-check "requested changes exit 1" '[ "$rc" = 1 ]'
+check "requested changes exit 1" '[ "$rc" = 1 ] && grep -q "maint requested changes" "$root/out"'
 case_with "$(review maint CHANGES_REQUESTED "$OLD" "$EARLY")" ""; rc=$(run)
 check "requested changes from before the start do not end the wait" '[ "$rc" = 2 ]'
 case_with "$(review maint CHANGES_REQUESTED "$OLD" "$EARLY"),$(review maint APPROVED "$H" "$LATE")" ""; rc=$(run)
@@ -83,9 +86,9 @@ check "a maintainer comment before the start is ignored" '[ "$rc" = 2 ]'
 case_with "" "$(comment someone "$LATE")"; rc=$(run)
 check "a comment from someone else is ignored" '[ "$rc" = 2 ]'
 case_with "" ""; pr_json OPEN "$OLD" "" "" >"$STUB/later.json"; rc=$(run)
-check "a moved head exits 1" '[ "$rc" = 1 ]'
+check "a moved head exits 1" '[ "$rc" = 1 ] && grep -q "the head moved" "$root/out"'
 case_with "" ""; pr_json CLOSED "$H" "" "" >"$STUB/later.json"; rc=$(run)
-check "a closed pull request exits 1" '[ "$rc" = 1 ]'
+check "a closed pull request exits 1" '[ "$rc" = 1 ] && grep -q "is CLOSED" "$root/out"'
 case_with "" ""; rc=$(run)
 check "no response within the limit exits 2" '[ "$rc" = 2 ]'
 rc=$("$mentat" wait abc >/dev/null 2>&1; echo $?)

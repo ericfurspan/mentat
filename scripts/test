@@ -63,6 +63,17 @@ else
   skip "jq not installed, plugin setting not checked"
 fi
 
+# hooks.json runs the SessionStart hook, which is what loads the rules.
+if command -v jq >/dev/null 2>&1; then
+  if jq -e '.hooks.SessionStart[0].hooks[0].command | endswith("/hooks/session-start")' hooks/hooks.json >/dev/null; then
+    pass "hooks.json runs hooks/session-start on SessionStart"
+  else
+    fail "hooks.json does not run hooks/session-start on SessionStart"
+  fi
+else
+  skip "jq not installed, SessionStart wiring not checked"
+fi
+
 # The SessionStart hook prints rules.md unchanged, within Claude Code's
 # 10,000-character limit for context a hook adds.
 if hook_out=$(hooks/session-start); then
