@@ -10,6 +10,7 @@
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 #   mentat setup <owner/repo> [--check <name>]  Checks a repository is ready for agents.
+#     Any required GitHub Actions check counts; --check asks for that one by name.
 #     0 ready (some things are never checkable; they are listed), 1 incomplete or refused.
 set -uo pipefail
 
@@ -266,7 +267,7 @@ s_get() { gh api -X GET "$@"; }
 s_count() { local n; n=$(s_get "$1" --jq "$2") && case "$n" in '' | *[!0-9]*) return 1 ;; esac && printf '%s' "$n"; }
 
 setup() {
-  local repo="" check="test" usage="usage: mentat setup <owner/repo> [--check <required check name>]"
+  local repo="" check="" usage="usage: mentat setup <owner/repo> [--check <required check name>]"
   while [ $# -gt 0 ]; do
     case "$1" in
       --check) [ -n "${2:-}" ] || die "$usage" 64; check="$2"; shift 2 ;;
@@ -323,7 +324,7 @@ code owner review required|any(.[]; .type == "pull_request" and .parameters.requ
 stale approvals dismissed on push|any(.[]; .type == "pull_request" and .parameters.dismiss_stale_reviews_on_push == true)
 approval of the most recent push required|any(.[]; .type == "pull_request" and .parameters.require_last_push_approval == true)
 squash merges only|any(.[]; .type == "pull_request" and .parameters.allowed_merge_methods == ["squash"])
-required check from GitHub Actions|any(.[]; .type == "required_status_checks" and any(.parameters.required_status_checks[]?; .context == $c and .integration_id == 15368))
+required check from GitHub Actions|any(.[]; .type == "required_status_checks" and any(.parameters.required_status_checks[]?; ($c == "" or .context == $c) and .integration_id == 15368))
 RULES
     # Every rule must name the ruleset it comes from, so each one's bypass is checked.
     if [ "$(jq length <<<"$rules")" = 0 ]; then
@@ -393,7 +394,7 @@ RULES
   if [ "$want" = 1 ]; then
     printf 'The owner imports ruleset.json from the Mentat repository (%s, or https://github.com/ericfurspan/mentat/blob/main/ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset > open the file > review > Create.\n' \
       "$(cd "$(dirname "$0")/.." && pwd)/ruleset.json"
-    [ "$check" = test ] || printf 'ruleset.json requires a check named test; change it to %s while reviewing the import.\n' "$check"
+    [ -z "$check" ] || [ "$check" = test ] || printf 'ruleset.json requires a check named test; change it to %s while reviewing the import.\n' "$check"
   fi
   s_finish
 }

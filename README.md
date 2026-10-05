@@ -93,7 +93,7 @@ You need macOS, Claude Code, `git`, `jq`, the Codex CLI (for `mentat challenge`)
 | `mentat review <PR>` | Marks the pull request ready, which starts the Codex app's review of the current head, and waits for the result | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved |
 | `mentat wait <PR>` | Waits for your response after your review is requested | 0 approved at the current head, 1 needs attention, 2 no response in four hours |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
-| `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |
+| `mentat setup <owner/repo> [--check <name>]` | Checks, read-only, that a repository is ready for agents. Any required GitHub Actions check counts; `--check` asks for that one by name. If a rule is missing, it points to `ruleset.json` | 0 ready, 1 incomplete or refused |
 
 Usage errors exit 64.
 
