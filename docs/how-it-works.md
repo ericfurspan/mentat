@@ -74,4 +74,4 @@ Usage errors exit 64.
 
 ## Developing Mentat
 
-`scripts/test` is the one test command; it runs on macOS and in CI on Linux. Every change to this repository waits for the maintainer's Approve.
+`tests/run` is the one test command; it runs on macOS and in CI on Linux. Every change to this repository waits for the maintainer's Approve.

@@ -100,10 +100,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck scripts/test hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh; then
-    pass "shellcheck scripts/test hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh"
+  if shellcheck tests/run hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh"
   else
-    fail "shellcheck scripts/test hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh"
   fi
 else
   skip "shellcheck not installed, shell scripts not checked"
