@@ -90,7 +90,7 @@ You need macOS, Claude Code, `git`, `jq` (the `mentat` command and the reply hoo
 
 In this order, so each step is still allowed when you take it:
 
-1. The agent opens a pull request that removes `enabledPlugins` and `extraKnownMarketplaces` from `.claude/settings.json`, and, if you want them gone, `.github/CODEOWNERS` and the `## Code Review Rules` section of `AGENTS.md`. It needs your Approve like any other.
+1. The agent opens a pull request that removes the `mentat@mentat` entry under `enabledPlugins` and the `mentat` entry under `extraKnownMarketplaces` in `.claude/settings.json`, leaving any other plugin's entries, and, if you want them gone, `.github/CODEOWNERS` and the `## Code Review Rules` section of `AGENTS.md`. It needs your Approve like any other.
 2. In each checkout, run `claude plugin uninstall mentat@mentat --scope project`. To remove it from the whole machine, run `claude plugin marketplace remove mentat` instead.
 3. Delete the imported ruleset: Settings > Rules > Rulesets > "Mentat rules for the default branch" > Delete ruleset.
 4. Remove the agent account as a collaborator: Settings > Collaborators.
