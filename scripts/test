@@ -19,7 +19,7 @@ skip() {
 # JSON and YAML files parse with strict parsers. JSON must be exactly one
 # standard value (no NaN, Infinity or leading zeros); every YAML document counts.
 if command -v ruby >/dev/null 2>&1; then
-  if ! data_files=$(git ls-files --cached '*.json' '*.yml' '*.yaml'); then
+  if ! data_files=$(git ls-files --cached --others --exclude-standard '*.json' '*.yml' '*.yaml'); then
     fail "could not list JSON and YAML files"
   else
     while IFS= read -r f; do
