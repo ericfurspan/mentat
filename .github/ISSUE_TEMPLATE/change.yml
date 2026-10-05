@@ -23,3 +23,10 @@ body:
       description: What you will be able to see or run when it works.
     validations:
       required: true
+  - type: textarea
+    id: not-in-scope
+    attributes:
+      label: Not in scope
+      description: What this should leave alone, even if it looks related.
+    validations:
+      required: false
