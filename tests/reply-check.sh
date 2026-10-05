@@ -24,10 +24,10 @@ ask() {
 dash=$(printf '\342\200\224')
 fence='```'
 
-out=$(ask "$(words 100)")
-check "a reply at the limit passes" '[ -z "$out" ]'
-out=$(ask "$(words 101)")
-check "a reply over the limit is asked for a rewrite" 'printf "%s" "$out" | grep -q "101 words"'
+out=$(ask "$(words 150)")
+check "a reply at the hook limit passes" '[ -z "$out" ]'
+out=$(ask "$(words 151)")
+check "a reply over the limit is asked for a rewrite" 'printf "%s" "$out" | grep -q "151 words"'
 out=$(ask "$(printf 'Done.\n\n%s\n%s\n%s\n' "$fence" "$(words 300)" "$fence")")
 check "words inside a fenced code block are not counted" '[ -z "$out" ]'
 out=$(ask "$(printf -- '- %s\n- %s\n\n| a | b |\n|---|---|\n' "$(words 49)" "$(words 49)")")
@@ -38,8 +38,8 @@ out=$(ask "$(printf 'Done.\n\n%s\nquoted %s text\n> redirected\n%s\n' "$fence" "
 check "an em dash or > inside a fenced code block passes" '[ -z "$out" ]'
 out=$(ask "$(printf 'The log says:\n\n> not found\n')")
 check "a blockquote is asked for a rewrite" 'printf "%s" "$out" | grep -q "blockquote"'
-out=$(ask "$(words 101)$dash")
-check "every problem is named in one request" 'printf "%s" "$out" | grep -q "101 words" && printf "%s" "$out" | grep -q "em dash"'
+out=$(ask "$(words 151)$dash")
+check "every problem is named in one request" 'printf "%s" "$out" | grep -q "151 words" && printf "%s" "$out" | grep -q "em dash"'
 out=$(ask "$(words 300)" true)
 check "a rewrite is asked for only once per turn" '[ -z "$out" ]'
 out=$(printf 'not json' | "$hook"); rc=$?
@@ -48,7 +48,8 @@ out=$(jq -n '{hook_event_name: "Stop", stop_hook_active: false}' | "$hook"); rc=
 check "an input with no reply lets the turn end" '[ "$rc" = 0 ] && [ -z "$out" ]'
 
 check "hooks.json runs it on Stop" 'jq -e ".hooks.Stop[0].hooks[0].command | endswith(\"/hooks/reply-check\")" "$root/hooks/hooks.json" >/dev/null'
-limit=$(sed -n 's/^limit=//p' "$hook")
-check "the output style states the same limit" '[ -n "$limit" ] && grep -q "$limit words" "$root/output-styles/mentat.md"'
+limit=$(sed -n 's/^limit=\([0-9]*\).*/\1/p' "$hook")
+asked=$(grep -o '[0-9]* words or fewer' "$root/output-styles/mentat.md" | grep -o '[0-9]*')
+check "the output style asks for no more than the hook allows" '[ -n "$limit" ] && [ -n "$asked" ] && [ "$asked" -le "$limit" ]'
 
 [ "$failures" -eq 0 ]
