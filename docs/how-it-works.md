@@ -1,6 +1,6 @@
 # How Mentat works
 
-*For you, the maintainer. Agents follow `rules.md`, not this page.*
+*For people. Agents follow `rules.md`, not this page.*
 
 ## How a change moves, in full
 

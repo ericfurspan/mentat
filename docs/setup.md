@@ -1,6 +1,6 @@
 # Setting up and removing Mentat
 
-*For you, the maintainer. Agents follow `rules.md`, not this page.*
+*For people. Agents follow `rules.md`, not this page.*
 
 ## Using Mentat in a repository
 
