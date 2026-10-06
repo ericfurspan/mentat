@@ -10,7 +10,7 @@
 2. One builder, one branch, one checkout per change. The repository's test command runs before the pull request opens and after every fix.
 3. Every pull request opens as a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
 4. When it is built, `mentat review` waits for CI on the head, then Codex reviews it, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again; five rounds is a hard stop. When the loop ends, it posts a final check, the author's own check and not an approval, and tells you the pull request is ready ([`skills/review`](../skills/review/SKILL.md)).
-5. You merge it, the way your repository merges.
+5. You merge it, the way your repository merges. Or opt the repository in, and Claude Code merges its own pull requests once the review loop ends ready ([Letting agents merge](setup.md#letting-agents-merge)).
 
 After a session that went badly, `/mentat:retro` reads it and proposes fixes to the setup: checks over written rules, pointers, deletions. It changes nothing until you approve; approved fixes become issues or pull requests ([`skills/retro`](../skills/retro/SKILL.md)).
 
@@ -25,13 +25,13 @@ If your repository requires an approval and the agent opens pull requests as you
 ### Claude Code hooks
 
 - The SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear, compact and fork.
-- The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
+- The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. One exception: in a repository that opted in, a merge API call for that repository goes through Claude Code's normal permission rules without Mentat's prompt; the hook reads the opt-in from GitHub each time. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
 - The reply hook checks each final reply when you have chosen the Mentat output style. The style asks for 100 words; over 250 outside fenced code blocks, an em dash or a blockquote gets one request to rewrite it. It reads `outputStyle` from your settings files (local, then project, then user) and asks once per turn, never cutting text itself.
 - `bin/mentat` is on the Bash tool's PATH while the plugin is enabled.
 
 ### Instructions, not guarantees
 
-`rules.md` asks agents never to merge, release, deploy, publish, change secrets or run production operations; never to commit secrets; never to push code changes to the default branch or change repository settings; and to keep production credentials out of agent sessions. An agent that ignores its instructions can still do what its GitHub access and your Mac allow. Mentat does not sandbox it; Claude Code's permission modes are the local control. To have GitHub enforce rules, see [Have GitHub enforce it](setup.md#have-github-enforce-it).
+`rules.md` asks agents never to merge (unless you opted the repository in), release, deploy, publish, change secrets or run production operations; never to commit secrets; never to push code changes to the default branch or change repository settings; and to keep production credentials out of agent sessions. An agent that ignores its instructions can still do what its GitHub access and your Mac allow. Mentat does not sandbox it; Claude Code's permission modes are the local control. To have GitHub enforce rules, see [Have GitHub enforce it](setup.md#have-github-enforce-it).
 
 They draw on:
 
@@ -43,7 +43,7 @@ They draw on:
 
 These are design choices, not proven results:
 
-- You merge. Agents plan, build and answer reviews; the decision to merge stays with you.
+- You merge, by default. Agents plan, build and answer reviews; letting them merge is your choice, one repository at a time.
 - A different model family reviews the builder's work: Codex reviews what Claude Code builds.
 - Reviews come from OpenAI's Codex GitHub app when it is set up, which posts under its own identity with comments on specific lines. It was chosen over a local review after a five-pull-request comparison ([issue 3](https://github.com/ericfurspan/mentat/issues/3)). The local review is the fallback and is labeled as one.
 - Review findings are fixed only when they have a realistic trigger; gates stay small.

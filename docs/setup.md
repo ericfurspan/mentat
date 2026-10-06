@@ -45,6 +45,18 @@ Mentat ships an output style: result first, about 100 words, no narration. It is
 
 Plugin auto-update is off by default for this marketplace, unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then restart the session.
 
+## Letting agents merge
+
+By default you merge every pull request. To let Claude Code merge its own pull requests in one repository, add this line to the repository's AGENTS.md and merge it to the default branch:
+
+```text
+- Agents may merge their own pull requests.
+```
+
+Then, once a pull request's review loop ends ready and the final check is posted, Claude Code merges the commit Codex reviewed through GitHub's merge API. It never turns on auto-merge, and if GitHub refuses (a required approval you have not given, branch protection, a merge queue), it tells you and stops. Required approvals can stay: you approve, then it merges. Remove the line to turn it off; it takes effect at once.
+
+This is a working rule the agent follows, not a guarantee. Opt in only where a merge is cheap to undo, including anything a merge deploys; for deployments, see the environment protection advice under [Have GitHub enforce it](#have-github-enforce-it).
+
 ## Turning it off
 
 ```bash

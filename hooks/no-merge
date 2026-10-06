@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# PreToolUse hook: the owner merges. A command that would merge a pull request
-# (gh pr merge, including --auto, or the merge API through gh api) and the
-# desktop app's auto-merge tool get a permission prompt, so the owner decides.
+# PreToolUse hook: the owner merges, unless the repository opted in to agents
+# merging. A command that would merge a pull request (gh pr merge, including
+# --auto, or the merge API through gh api) and the desktop app's auto-merge tool
+# get a permission prompt, so the owner decides. One exception: the merge API
+# call, pinned to a commit with sha=, for a repository whose AGENTS.md on its
+# default branch, read from GitHub now, says "Agents may merge their own pull
+# requests.", of a pull request opened by the account gh is signed in as. Then Mentat adds no
+# prompt and Claude Code's own permission rules apply. gh pr merge always asks:
+# it can turn on auto-merge or join a merge queue instead of merging.
 # This is a net for mistakes, not a security boundary: other routes exist.
 # When it cannot read its input, it stays out of the way.
 set -uo pipefail
@@ -9,16 +15,43 @@ set -uo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
 input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
+
+ask() {
+  jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
+    permissionDecisionReason: "Mentat: the owner merges. Approve only if you want this pull request merged now."}}'
+  exit 0
+}
+# Whether owner/repo $1 opted in. A failed read is no opt-in.
+opted_in() {
+  gh api -H "Accept: application/vnd.github.raw" "repos/$1/contents/AGENTS.md" 2>/dev/null |
+    grep -Eqix '[[:space:]]*([-*][[:space:]]+)?agents may merge their own pull requests\.?[[:space:]]*'
+}
+
 case "$tool" in
   Bash)
     cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
     # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
     flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
-    printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)|(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)" || exit 0
+    if printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)"; then ask; fi
+    api='(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|$)'
+    printf '%s\n' "$cmd" | grep -Eq "$api" || exit 0
+    # The opt-in counts only for one merge call to one literal owner/repo.
+    targets=$(printf '%s\n' "$cmd" | grep -Eo 'repos/[^/[:space:]"'"'"']+/[^/[:space:]"'"'"']+/pulls/[^/[:space:]]+/merge' | sort -u)
+    [ "$(printf '%s\n' "$targets" | grep -c .)" = 1 ] || ask
+    [ "$(printf '%s\n' "$cmd" | grep -Eo 'pulls/[^/[:space:]]+/merge' | grep -c .)" = 1 ] || ask
+    repo=$(printf '%s\n' "$targets" | sed -E 's#^repos/([^/]+/[^/]+)/pulls/.*#\1#')
+    case "$repo" in *[!A-Za-z0-9._/-]*) ask ;; esac
+    # Pinned to a commit, so it merges that commit or nothing.
+    printf '%s\n' "$cmd" | grep -Eq '(-f|-F|--field|--raw-field)[[:space:]]+sha=[0-9a-f]{7,40}([[:space:]]|$)' || ask
+    opted_in "$repo" || ask
+    # Its own pull request: opened by the account gh is signed in as.
+    num=$(printf '%s\n' "$targets" | sed -E 's#.*/pulls/([^/]+)/merge$#\1#')
+    case "$num" in '' | *[!0-9]*) ask ;; esac
+    author=$(gh api "repos/$repo/pulls/$num" --jq .user.login 2>/dev/null) || ask
+    me=$(gh api user --jq .login 2>/dev/null) || ask
+    { [ -n "$author" ] && [ "$author" = "$me" ]; } || ask
+    exit 0
     ;;
-  mcp__ccd_pr__set_auto_merge) ;;
+  mcp__ccd_pr__set_auto_merge) ask ;;
   *) exit 0 ;;
 esac
-
-jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
-  permissionDecisionReason: "Mentat: the owner merges. Approve only if you want this pull request merged now."}}'

@@ -4,7 +4,7 @@
 
 The maintainer owns this repository. Claude Code plans and builds. Codex reviews pull requests, through OpenAI's Codex GitHub app or locally. The maintainer decides what matters and merges.
 
-The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (merge method, commit and title format, branch flow, labels, templates, or a workflow they name that commits to the default branch, such as a journal), the repository wins, and Claude Code says so once. That exception covers only what the repository names; it is never leave to push code changes to the default branch. The maintainer merging and "What agents never do" below always hold.
+The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (merge method, commit and title format, branch flow, labels, templates, or a workflow they name that commits to the default branch, such as a journal), the repository wins, and Claude Code says so once. That exception covers only what the repository names; it is never leave to push code changes to the default branch. "Approval" and "What agents never do" below always hold.
 
 When a session first starts change work in a repository, Claude Code runs `mentat check`. A failure goes to the maintainer with its lines; warnings are shown to the maintainer, and work goes on.
 
@@ -14,7 +14,7 @@ When a session first starts change work in a repository, Claude Code runs `menta
 3. There is one builder, one branch and one checkout per change. Subagents are mostly for read-only investigation. Claude Code gives the builder the test command.
 4. The test command is the one AGENTS.md names; otherwise the one the repository shows (package scripts, a Makefile, its CI workflow). It runs before the pull request opens and after every fix. Claude Code does not edit the maintainer's AGENTS.md to add one unless asked.
 5. Every pull request opens as a draft. Claude Code writes and updates its description by calling the Skill tool with `mentat:pr`.
-6. When the build is done and the test command passes, Claude Code pushes and calls the Skill tool with `mentat:review`; `mentat review` waits for CI on the head itself. It runs the review loop, ends with the final check, and stops. The maintainer merges.
+6. When the build is done and the test command passes, Claude Code pushes and calls the Skill tool with `mentat:review`; `mentat review` waits for CI on the head itself. It runs the review loop and ends with the final check. Then the maintainer merges, or, where the repository opted in ("Approval"), Claude Code merges as the skill says.
 
 After compaction or a resumed session, Claude Code calls the skill for the step in progress again if its text is no longer in context.
 
@@ -28,11 +28,11 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Required reports and approvals are unchanged: check failures and warnings, exposed secrets, failure details, irreversible or outward actions, permission and access changes, and everything under "What agents never do".
 
 ## Approval
-- The maintainer merges. Claude Code never merges a pull request or turns on auto-merge; Mentat's merge hook asks the maintainer if it tries.
+- The maintainer merges, unless the repository's AGENTS.md on its default branch says "Agents may merge their own pull requests." Then Claude Code merges its own pull request once the review loop ends ready, as `mentat:review` says, and only through GitHub's merge API for the reviewed commit. Claude Code never turns on auto-merge, never merges with `--admin`, and never works around a refusal. Mentat's merge hook asks the maintainer about any other merge.
 - Approving or merging a pull request approves the code, not running it.
 
 ## What agents never do
-- Merge pull requests.
+- Merge pull requests, except as "Approval" allows.
 - Create releases, deploy, publish, change secrets, run production migrations or run destructive operations on outside systems. Agents prepare these; the maintainer runs them.
 - Commit secrets. An exposed secret must be rotated; deleting it is not enough, so the maintainer is told at once.
 - Push code changes to the default branch, force-push a shared branch, or change repository settings.
