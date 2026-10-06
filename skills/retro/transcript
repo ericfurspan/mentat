@@ -2,8 +2,7 @@
 # Prints a Claude Code session log (.jsonl) for a retro, leaving out what most
 # often carries credentials: tool output and command text. It keeps the
 # conversation (cut to 400 characters a message), each tool's name with its
-# description or file path, and whether each tool call failed, with the start of
-# the error. Token-like strings, key=value secrets and private keys are then
+# description or file path, and whether each tool call failed, without its output. Token-like strings, key=value secrets and private keys are then
 # replaced by <REDACTED>. The retro reads a session only through this, never the
 # raw file. Redaction is by pattern and can still miss a credential.
 set -euo pipefail
@@ -18,9 +17,10 @@ jq -r 'select(.type == "user" or .type == "assistant") | .type as $who | .messag
     elif .type == "tool_use" then
       "tool: \(.name) \((.input.description // .input.file_path // .input.path // .input.skill // "") | tostring | .[0:150])"
     elif .type == "tool_result" then
-      if .is_error == true then "result: error: \(.content | tostring | .[0:150])" else "result: ok" end
+      if .is_error == true then "result: error" else "result: ok" end
     else empty end
   end' "$1" |
   perl -0777 -pe 's/-----BEGIN[^\n]*PRIVATE KEY-----.*?(-----END[^\n]*PRIVATE KEY-----|\z)/<REDACTED>/gs;
+    s/\bbearer\s+[^\s"\x27,}]+/Bearer <REDACTED>/gi;
     s/\b(gh[pousr]_|github_pat_|sk-|xox[abpr]-|AKIA|ASIA)[A-Za-z0-9_-]{8,}/<REDACTED>/g;
     s/([A-Za-z_-]*(?:key|secret|token|password|passwd|pwd|credential|auth)[A-Za-z_-]*)(["\x27]?\s*[=:]\s*["\x27]?|\s+)[^\s"\x27,}]{6,}/$1$2<REDACTED>/gi'
