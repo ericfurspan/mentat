@@ -7,7 +7,7 @@ The pull request body has two readers. The maintainer reads it to see what chang
 
 ## Steps
 
-1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff origin/<base>...HEAD`; after, `gh pr diff <pr>`. The issue is `gh issue view <issue>`, a different number from the pull request.
+1. Read the diff and the linked issue, not from memory: before the pull request exists, the branch against its base on the GitHub remote (`git diff <remote>/<base>...HEAD`, after fetching it); after, `gh pr diff <pr>`. The issue is `gh issue view <issue>`, a different number from the pull request.
 2. Pick the shape. If the repository has a pull request template, fill its sections and fold each part below into the nearest one, adding any part it has no place for. Otherwise use the template below.
 3. Where the repository has a `GLOSSARY.md`, use its terms.
 4. Write each section. Done when every claim matches the diff on the head commit and Evidence names the head commit's test result.
