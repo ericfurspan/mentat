@@ -7,21 +7,21 @@ Codex reviews each head commit of the pull request. Claude Code sorts the findin
 
 ## When the loop ends
 
-- **Ready:** the review exits 0 on the latest commit, or exits 2 and every finding was answered with a reason and none is a blocker Claude Code disagrees with; and Claude Code has read and answered every comment and review the maintainer left. Do the final check below, then merge or stop as it says.
+- **Ready:** the review exits 0 on the latest commit, or exits 2 and every finding was fixed or answered with a reason, none is a real defect left unfixed, and none is a blocker Claude Code disagrees with; and Claude Code has read and answered every comment and review the maintainer left. Do the final check below, then merge or stop as it says.
 - **Blocked:** a blocking finding Claude Code disagrees with goes to the maintainer.
 - **Not reviewed** after the local path: tell the maintainer.
-- **Hard stop:** five review rounds. Stop and tell the maintainer why.
+- **Hard stop:** five review rounds. Stop and tell the maintainer why, naming any real defect still unfixed.
 
 ## Steps
 
-1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local, right after pushing. Both first wait for CI on that head (up to 30 minutes; with no CI, about a minute). The app path marks the pull request ready, which starts the Codex app's review of that exact head; the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
+1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local, right after pushing. Both first wait for CI on that head (up to 30 minutes; with no CI, about a minute). The app path marks the pull request ready, which starts the Codex app's review of that exact head (OpenAI's page says the app flags only P0 and P1 issues, though it has posted P2s); the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
 2. Act on the exit code:
    - 0: no findings. Go to "When the loop ends".
    - 2: findings were posted on that commit. Go to step 3.
    - 1: not reviewed. After the app path, run `mentat review --local <N>`; after the local path, tell the maintainer.
    - 3: the head moved. Run the same command again.
    - 4: CI did not pass on that head, and nothing was reviewed. Failing checks: fix them, push, and run the same command again. CI still running at the timeout: tell the maintainer.
-3. Sort each finding as `rules.md` "Findings" says. From the fourth round on, fix only P0 and P1 findings and answer the rest with a reason or a follow-up issue. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
+3. Sort each finding as `rules.md` "Findings" says. The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
 4. Batch the fixes, run the test command, push, and update the description (Skill tool, `mentat:pr`). Then go to step 1 for the new head.
 
 ## Final check
