@@ -11,7 +11,7 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional o
 ## How a change moves
 
 1. You say what you want, in chat or as an issue. Claude Code reads the code, asks what it needs and writes down what it will build.
-2. Once you agree, Claude Code builds it on a branch and opens a draft pull request.
+2. Claude Code builds it on a branch and opens a draft pull request.
 3. Codex reviews the pull request. Claude Code fixes or answers each finding.
 4. Claude Code posts a short final check and tells you it is ready.
 5. You merge it.
