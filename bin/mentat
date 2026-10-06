@@ -55,10 +55,12 @@ run_codex() {
   # Web search stays on Codex's default, "cached": OpenAI's index, no live fetches.
   # A permissions profile replaces `--sandbox read-only`, which reads the whole disk
   # and overrides a profile. Mentat passes it because --ignore-user-config skips
-  # the user's own. The profile denies ~/.gitconfig, so git runs without one.
+  # the user's own. --strict-config makes unknown settings fail instead of being
+  # ignored, so a Codex without profiles fails closed. The profile denies
+  # ~/.gitconfig, so git runs without one.
   # Codex's shell gets only core environment variables, so tokens in the agent's
   # environment do not reach it.
-  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config \
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
