@@ -138,11 +138,14 @@ done
 # The retro reads sessions through skills/retro/transcript, which redacts
 # token-like strings. The values below are fake.
 if command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1; then
-  fixture='{"type":"user","message":{"content":"use ghp_FAKEFAKEFAKEFAKE1234 and password=notarealpass1"}}'
-  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -q FAKEFAKE <<<"$out" && ! grep -q notarealpass <<<"$out" && grep -q "user: use <REDACTED>" <<<"$out"; then
-    pass "skills/retro/transcript redacts token-like strings"
+  fixture='{"type":"user","message":{"content":"use ghp_FAKEFAKEFAKEFAKE1234, password=notarealpass1 and AWS SecretAccessKey=fakeFAKEfakeFAKE0001 -----BEGIN RSA PRIVATE KEY-----\nFAKEPEMBODY\n-----END RSA PRIVATE KEY-----"}}
+{"type":"user","message":{"content":[{"type":"tool_result","content":"FAKEOUTPUT0002"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"echo FAKECOMMAND0003","description":"Print a value"}}]}}'
+  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -qE 'FAKEFAKE|notarealpass|fakeFAKE|FAKEPEM|FAKEOUTPUT|FAKECOMMAND' <<<"$out" &&
+    grep -q "user: use <REDACTED>" <<<"$out" && grep -qx "result: ok" <<<"$out" && grep -qx "tool: Bash Print a value" <<<"$out"; then
+    pass "skills/retro/transcript leaves out tool output and commands and redacts secrets"
   else
-    fail "skills/retro/transcript does not redact token-like strings"
+    fail "skills/retro/transcript lets tool output, a command or a secret through"
   fi
 else
   skip "jq or perl not installed, skills/retro/transcript not checked"
