@@ -58,6 +58,8 @@ These are design choices, not proven results:
 
 Usage errors exit 64.
 
+Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network. Environment variables still pass through to it.
+
 ## What it does not do
 
 - Linux, Windows, other Git hosts, organizations and team workflows.

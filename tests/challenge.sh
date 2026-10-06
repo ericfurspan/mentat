@@ -45,7 +45,9 @@ check "delivers a challenge (exit 0)" '[ "$rc" = 0 ]'
 check "prints Codex's message unedited" 'tail -n 3 "$STUB/stdout" | diff - "$STUB/codex_out" >/dev/null'
 check "header names plan, commit, model and effort" 'grep -qF -- "- Plan: $plan" "$STUB/stdout" && grep -q "Started at commit: $head_sha (uncommitted changes: no)" "$STUB/stdout" && grep -q "Model: Codex default model, reasoning effort high" "$STUB/stdout"'
 check "says it is not a review" 'grep -q "This is a plan challenge, not a review." "$STUB/stdout"'
-check "runs plain codex exec, read-only, no model name, pinned effort" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args" && grep -A1 -x -- "--sandbox" "$STUB/args" | grep -qx read-only && ! grep -q "^model=" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args"'
+check "runs plain codex exec, no model name, pinned effort" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args" && ! grep -q "^model=" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args"'
+check "limits Codex with a read-only profile, not --sandbox" '! grep -q -- "--sandbox" "$STUB/args" && grep -qx "default_permissions=\"mentat-review\"" "$STUB/args" && grep -q "^permissions.mentat-review.filesystem=" "$STUB/args" && grep -qF "\":workspace_roots\"={\".\"=\"read\"}" "$STUB/args" && grep -qF "\"/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/tmp\"=\"deny\"" "$STUB/args" && ! grep -q "write" "$STUB/args"'
+check "the profile names the repository's git directory and never / or the home directory" 'grep -qF "\"$top/.git\"=\"read\"" "$STUB/args" && ! grep -qF "\"/\"=" "$STUB/args" && ! grep -qF "\"$HOME\"=" "$STUB/args"'
 check "pins ephemeral, no user config, no approvals, cached search" 'grep -qx -- --ephemeral "$STUB/args" && grep -qx -- --ignore-user-config "$STUB/args" && grep -qx "approval_policy=\"never\"" "$STUB/args" && grep -qx "web_search=\"cached\"" "$STUB/args"'
 check "runs in the repository top level" '[ "$(cat "$STUB/cwd")" = "$top" ]'
 check "prompt holds exactly the plan inside the data markers" 'sed -n "/^--- BEGIN PLAN DATA ---$/,/^--- END PLAN DATA ---$/p" "$STUB/prompt" | sed "1d;\$d" | grep -v "^$" | diff - "$plan" >/dev/null'
@@ -61,6 +63,12 @@ for name in -n -; do
   check "reads a plan file named $name" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN PLAN DATA ---$/,/^--- END PLAN DATA ---$/p" "$STUB/prompt" | sed "1d;\$d" | grep -v "^$" | diff - "$plan" >/dev/null'
   rm -f "$top/sub/$name"
 done
+
+# A checkout whose path holds a space, a double quote and a backslash is quoted as a TOML string.
+odd="$root/odd \"q\" back\\slash"
+git init -q -b trunk "$odd" && (cd "$odd" && git config user.email t@example.test && git config user.name test && echo x >f && git add f && git commit -q -m base)
+reset; (cd "$odd" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
+check "quotes a path with a space, a double quote and a backslash as a TOML string" '[ "$rc" = 0 ] && grep -qF -- "odd \\\"q\\\" back\\\\slash/.git\"=\"read\"" "$STUB/args"'
 
 for v in "PROCEED" "RETHINK"; do
   reset; printf 'Fine.\nCHALLENGE VERDICT: %s\n' "$v" >"$STUB/codex_out"; rc=$(run "$plan")

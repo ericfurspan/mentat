@@ -50,6 +50,8 @@ STUBEOF
 cat >"$root/bin/codex" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
+printf '%s\n' "$@" >"$STUB/args"
+printf '%s' "${GIT_CONFIG_GLOBAL-unset}" >"$STUB/codex_gitconfig"
 cat >"$STUB/prompt"
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
 while [ $# -gt 0 ]; do [ "$1" = -o ] && cp "$STUB/reply" "$2"; shift; done
@@ -70,6 +72,12 @@ check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "foun
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
+# The harness exports GIT_CONFIG_GLOBAL itself, so this run gives mentat another value and
+# the stub reports what Codex was given.
+reset; rc=$(cd "$root/work" && GIT_CONFIG_GLOBAL="$root/not-this-config" "$mentat" review --local 7 >"$STUB/out" 2>&1; echo $?)
+gitdir=$(git -C "$root/work" rev-parse --path-format=absolute --git-common-dir)
+check "runs Codex without the user's git config" '[ "$rc" = 0 ] && [ "$(cat "$STUB/codex_gitconfig")" = /dev/null ]'
+check "the profile reads the main checkout's git directory, which a worktree's .git points to" '[ "$rc" = 0 ] && case "$gitdir" in */work/.git) true ;; *) false ;; esac && grep -qF "\"$gitdir\"=\"read\"" "$STUB/args" && ! grep -q -- "--sandbox" "$STUB/args"'
 check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ]'
 
 reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
