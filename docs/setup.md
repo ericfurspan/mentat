@@ -27,7 +27,7 @@ Then, in the repository's checkout, for yourself only (writes `.claude/settings.
 claude plugin install mentat@mentat --scope local
 ```
 
-Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit. Each collaborator also needs the marketplace on their own machine (`claude plugin marketplace add ericfurspan/mentat`).
+Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit. Each collaborator also runs `claude plugin marketplace add ericfurspan/mentat` and `claude plugin install mentat@mentat --scope project` once on their own machine.
 
 Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings.
 
