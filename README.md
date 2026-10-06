@@ -6,7 +6,7 @@ Mentat is for one developer on macOS who runs coding agents on their own GitHub 
 
 Mentat requires nothing of your repository's GitHub settings. It works within your rules, approvals and CI, and your AGENTS.md wins on preferences such as commit format and branch flow. One command turns it on or off.
 
-It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional output style, a hook that asks you before the agent merges a pull request with `gh` or turns on auto-merge, a builder subagent, skills for planning, writing pull request descriptions and the review loop, and the `mentat` command.
+It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional output style, a hook that asks you before the agent merges a pull request with `gh` or turns on auto-merge, a builder subagent, skills for planning, writing pull request descriptions, the review loop and session retrospectives, and the `mentat` command.
 
 ## How a change moves
 
@@ -20,6 +20,7 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional o
 
 - Decide what to build and what matters, with Claude Code advising.
 - Merge pull requests on GitHub.
+- When a session went badly, run `/mentat:retro` in Claude Code: it reads the session and proposes fixes to the setup, and changes nothing until you approve.
 - Once per repository: turn Mentat on.
 
 ## Read more
@@ -33,5 +34,5 @@ For agents. You do not need to read these:
 
 - `rules.md`: the workflow rules, loaded into every session.
 - `AGENTS.md`: this repository's test command and review rules.
-- `skills/`: one skill per workflow step (plan, pr, review), called from `rules.md`.
+- `skills/`: one skill per workflow step (plan, pr, review), called from `rules.md`, and `retro`, which you start.
 - `agents/builder.md` and `output-styles/mentat.md`: the builder subagent and the reply style.
