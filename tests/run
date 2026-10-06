@@ -46,18 +46,23 @@ else
   fail "AGENTS.md is missing '## Code Review Rules'"
 fi
 
-# The plugin's output style is named Mentat and applies wherever the plugin is
-# on, and this repository turns the plugin on.
-if grep -qx 'name: Mentat' output-styles/mentat.md && grep -qx 'force-for-plugin: true' output-styles/mentat.md; then
-  pass "output-styles/mentat.md is the forced Mentat style"
+# The plugin's output style is named Mentat and is the owner's to choose, not
+# forced; this repository turns the plugin on and chooses it.
+if grep -qx 'name: Mentat' output-styles/mentat.md && ! grep -q '^force-for-plugin:' output-styles/mentat.md; then
+  pass "output-styles/mentat.md is the Mentat style, not forced"
 else
-  fail "output-styles/mentat.md must set name: Mentat and force-for-plugin: true"
+  fail "output-styles/mentat.md must set name: Mentat and must not set force-for-plugin"
 fi
 if command -v jq >/dev/null 2>&1; then
   if [ "$(jq -r '.enabledPlugins["mentat@mentat"]' .claude/settings.json)" = true ]; then
     pass ".claude/settings.json turns the plugin on"
   else
     fail ".claude/settings.json does not turn on mentat@mentat"
+  fi
+  if [ "$(jq -r '.outputStyle' .claude/settings.json)" = mentat:Mentat ]; then
+    pass ".claude/settings.json chooses the Mentat style"
+  else
+    fail ".claude/settings.json does not choose the Mentat style (outputStyle mentat:Mentat)"
   fi
 else
   skip "jq not installed, plugin setting not checked"
@@ -88,22 +93,22 @@ else
   fail "hooks/session-start exited non-zero"
 fi
 
-# mentat review, wait, challenge and setup behave as specified (stub gh and
-# codex), and so does the reply hook.
+# mentat review, review --local, challenge and check behave as specified (stub
+# gh and codex), and so do the merge and reply hooks.
 if command -v jq >/dev/null 2>&1; then
-  for t in tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh; do
+  for t in tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; do
     if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
   done
 else
-  skip "jq not installed, mentat review, wait, challenge, setup and the reply hook not tested"
+  skip "jq not installed, mentat review, challenge, check and the hooks not tested"
 fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh"
+  if shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/reply-check bin/mentat tests/review.sh tests/wait.sh tests/challenge.sh tests/setup.sh tests/reply-check.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
   fi
 else
   skip "shellcheck not installed, shell scripts not checked"

@@ -1,41 +1,76 @@
-# Setting up and removing Mentat
+# Turning Mentat on and off
 
 *For people. Agents follow `rules.md`, not this page.*
 
-## Using Mentat in a repository
+Mentat needs nothing from your repository's GitHub settings. It works within whatever rules, approvals and CI you already have.
 
-You need macOS, Claude Code, `git`, `jq` (the `mentat` command and the reply hook both use it; without it the hook does nothing), the Codex CLI signed in (`mentat challenge` runs it, and `mentat setup` reports a problem when it is missing), a ChatGPT plan with Codex code review, and `gh` signed in as a separate agent account. Protected branches and code owners on a private repository need GitHub Pro or above ([GitHub's plans](https://docs.github.com/en/get-started/learning-about-github/githubs-plans)).
+## What you need
 
-1. Before the agent has any access, import [`ruleset.json`](../ruleset.json): Settings > Rules > Rulesets > New ruleset > Import a ruleset, open the file, review it and click Create. The file requires a check named `test`; if your CI check has another name, put that name in while reviewing, or the ruleset will wait for a check that never runs. `mentat setup` accepts a required GitHub Actions check of any name. A ruleset the repository already has can stay: rulesets add up and the stricter rule wins. GitHub refuses the import if a ruleset with the same name exists, so the file uses a name of its own. A personal repository cannot give a collaborator read-only access, so protection must exist before the agent can write.
-2. Invite the agent account as a collaborator. It gets write access, never admin.
-3. Connect the repository to Codex in ChatGPT and install OpenAI's Codex GitHub app on it, and in Codex's code review settings for it turn on automatic review for all pull requests, triggered on PR open. Leave exhaustive review and credit use off. Installing the app is not enough: without that setting it reviews only when you comment `@codex review`, and `mentat review` waits 20 minutes and reports not reviewed.
-4. The agent opens a pull request with the repository's files:
-   - `.github/CODEOWNERS` with `* @<you>`
-   - a CI workflow that runs the one test command as a check, named `test` unless you changed the name in the ruleset
-   - `AGENTS.md` naming that test command, with a `## Code Review Rules` section
-   - `.claude/settings.json` that turns the plugin on:
+- macOS, Claude Code, `git`, `jq`, and `gh` signed in.
+- For reviews, one of:
+  - OpenAI's Codex GitHub app on the repository (needs a ChatGPT plan with Codex code review), or
+  - the Codex CLI signed in, for local reviews. `mentat challenge` also uses it.
+- Optional: a separate GitHub account for the agent. Recommended if your repository requires approvals, because GitHub does not let you approve a pull request you opened.
 
-   ```json
-   {
-     "enabledPlugins": { "mentat@mentat": true },
-     "extraKnownMarketplaces": {
-       "mentat": { "source": { "source": "github", "repo": "ericfurspan/mentat" }, "autoUpdate": true }
-     }
-   }
-   ```
+## Turning it on
 
-   Plugin updates: the Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), and that turns plugin auto-update off, whatever `autoUpdate` says ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope project` in the repository, then restart the session.
+Once per machine, add the marketplace:
 
-   The ruleset requires one approval, and the agent cannot approve its own pull request, so this one already waits for your Approve, before CODEOWNERS exists.
-5. After that pull request merges, the agent runs `claude plugin install mentat@mentat --scope project` once in a checkout that is on the default branch. On a machine that has never used Mentat, the marketplace must be known first: open a session in the checkout and accept the trust prompt, or run `claude plugin marketplace add ericfurspan/mentat`. The committed setting enables the plugin but does not download it ([install scopes](https://code.claude.com/docs/en/plugins/install)); on a branch without `.claude/settings.json` the install writes an untracked one. Then it runs `mentat setup <owner/repo>`. Agents start work only on "Setup OK", in a new session that shows Mentat's rules.
-6. Once, by hand, you confirm the blocks hold: a direct push to the default branch and an unapproved merge must both fail.
+```bash
+claude plugin marketplace add ericfurspan/mentat
+```
 
-## Removing Mentat from a repository
+Then, in the repository's checkout, for yourself only (writes `.claude/settings.local.json`, which git ignores):
 
-In this order, so each step is still allowed when you take it:
+```bash
+claude plugin install mentat@mentat --scope local
+```
 
-1. The agent opens a pull request that removes the `mentat@mentat` entry under `enabledPlugins` and the `mentat` entry under `extraKnownMarketplaces` in `.claude/settings.json`, leaving any other plugin's entries, and, if you want them gone, `.github/CODEOWNERS` and the `## Code Review Rules` section of `AGENTS.md`. It needs your Approve like any other.
-2. In each checkout, run `claude plugin uninstall mentat@mentat --scope project`. To remove it from the whole machine, run `claude plugin marketplace remove mentat` instead.
-3. Delete the imported ruleset: Settings > Rules > Rulesets > "Mentat rules for the default branch" > Delete ruleset.
-4. Remove the agent account as a collaborator: Settings > Collaborators.
-5. Turn off automatic review for the repository in Codex's code review settings, or uninstall the Codex GitHub app.
+Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit.
+
+Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings.
+
+### Choosing the Mentat reply style
+
+Mentat ships an output style: result first, about 100 words, no narration. It is not forced on you. To use it, pick Mentat with `/config` (Output style). To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`. The reply hook checks replies only when this style is chosen.
+
+### Reviews
+
+- With the Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and in Codex's code review settings turn on automatic review for all pull requests, triggered on PR open. Without that setting it reviews only when you comment `@codex review`, and `mentat review` falls back to a local review after 20 minutes.
+- Without the app: add a line to the repository's AGENTS.md saying reviews are local, so Claude Code goes straight to `mentat review --local`.
+- Either way, Codex follows a `## Code Review Rules` section in AGENTS.md if you add one.
+
+### Plugin updates
+
+The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), which turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then restart the session.
+
+## Turning it off
+
+```bash
+claude plugin disable mentat@mentat
+```
+
+Turn it back on with `claude plugin enable mentat@mentat`. Both find the scope Mentat is on. A running session keeps Mentat until it restarts.
+
+## Removing it
+
+```bash
+claude plugin uninstall mentat@mentat --scope local
+```
+
+Use the scope you installed with. What remains:
+
+- Local scope: `.claude/settings.local.json`, still ignored by git, with Mentat's entry removed.
+- Project scope: the change to `.claude/settings.json` is yours to commit.
+- On the machine: the marketplace, until you run `claude plugin marketplace remove mentat`.
+
+Mentat never deletes settings files. Remove any `## Code Review Rules` section or review line you added to AGENTS.md if you no longer want it.
+
+## Have GitHub enforce it
+
+Mentat's rules are instructions to the agent, not guarantees. If you want GitHub to stop an agent that ignores them, these are common choices, all yours to make:
+
+- Give the agent its own GitHub account with write access, never admin.
+- Add a ruleset on the default branch that requires a pull request and blocks force pushes, with no bypass for the agent's account ([about rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)).
+- Require one approval in that ruleset, so pull requests the agent opens wait for your Approve.
+- Keep secrets out of reach of workflows a branch can run, or protect them with environments.

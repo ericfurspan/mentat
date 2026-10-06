@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# PreToolUse hook: the owner merges. A command that would merge a pull request
+# (gh pr merge, including --auto, or the merge API through gh api) and the
+# desktop app's auto-merge tool get a permission prompt, so the owner decides.
+# This is a net for mistakes, not a security boundary: other routes exist.
+# When it cannot read its input, it stays out of the way.
+set -uo pipefail
+
+command -v jq >/dev/null 2>&1 || exit 0
+input=$(cat)
+tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
+case "$tool" in
+  Bash)
+    cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
+    # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
+    flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
+    printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)|(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)" || exit 0
+    ;;
+  mcp__ccd_pr__set_auto_merge) ;;
+  *) exit 0 ;;
+esac
+
+jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
+  permissionDecisionReason: "Mentat: the owner merges. Approve only if you want this pull request merged now."}}'

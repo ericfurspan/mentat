@@ -1,6 +1,7 @@
 {
   "model": "opus",
   "effortLevel": "high",
+  "outputStyle": "mentat:Mentat",
   "enabledPlugins": {
     "mentat@mentat": true
   },
