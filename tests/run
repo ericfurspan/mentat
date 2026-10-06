@@ -93,6 +93,17 @@ else
   fail "hooks/session-start exited non-zero"
 fi
 
+# Each skill's name matches its folder, which is how Claude Code finds it.
+for f in skills/*/SKILL.md; do
+  [ -e "$f" ] || continue
+  dir=${f%/SKILL.md}
+  if grep -qx "name: ${dir#skills/}" "$f"; then
+    pass "$f is named ${dir#skills/}"
+  else
+    fail "$f must set name: ${dir#skills/}"
+  fi
+done
+
 # mentat review, review --local, challenge and check behave as specified (stub
 # gh and codex), and so do the merge and reply hooks.
 if command -v jq >/dev/null 2>&1; then
