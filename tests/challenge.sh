@@ -46,7 +46,7 @@ check "prints Codex's message unedited" 'tail -n 3 "$STUB/stdout" | diff - "$STU
 check "header names plan, commit, model and effort" 'grep -qF -- "- Plan: $plan" "$STUB/stdout" && grep -q "Started at commit: $head_sha (uncommitted changes: no)" "$STUB/stdout" && grep -q "Model: Codex default model, reasoning effort high" "$STUB/stdout"'
 check "says it is not a review" 'grep -q "This is a plan challenge, not a review." "$STUB/stdout"'
 check "runs plain codex exec, no model name, pinned effort" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -qx review "$STUB/args" && ! grep -q "^model=" "$STUB/args" && grep -qx "model_reasoning_effort=\"high\"" "$STUB/args"'
-check "limits Codex with a read-only profile and core environment, not --sandbox" '! grep -q -- "--sandbox" "$STUB/args" && grep -qx "default_permissions=\"mentat-review\"" "$STUB/args" && grep -q "^permissions.mentat-review.filesystem=" "$STUB/args" && grep -qF "\":workspace_roots\"={\".\"=\"read\"}" "$STUB/args" && grep -qF "\"/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/tmp\"=\"deny\"" "$STUB/args" && ! grep -q "write" "$STUB/args" && grep -qx -- --strict-config "$STUB/args" && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args" && grep -qx "shell_environment_policy.set={GIT_CONFIG_GLOBAL=\"/dev/null\"}" "$STUB/args"'
+check "limits Codex with a read-only profile and core environment, not --sandbox" '! grep -q -- "--sandbox" "$STUB/args" && grep -qx "default_permissions=\"mentat-review\"" "$STUB/args" && grep -q "^permissions.mentat-review.filesystem=" "$STUB/args" && grep -qF "\":workspace_roots\"={\".\"=\"read\", " "$STUB/args" && grep -qF "\"/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/tmp\"=\"deny\"" "$STUB/args" && ! grep -q "write" "$STUB/args" && grep -qx -- --strict-config "$STUB/args" && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args" && grep -qx "shell_environment_policy.set={GIT_CONFIG_GLOBAL=\"/dev/null\"}" "$STUB/args"'
 check "the profile names the repository's git directory and never / or the home directory" 'grep -qF "\"$top/.git\"=\"read\"" "$STUB/args" && ! grep -qF "\"/\"=" "$STUB/args" && ! grep -qF "\"$HOME\"=" "$STUB/args"'
 check "pins ephemeral, no user config, no approvals, cached search" 'grep -qx -- --ephemeral "$STUB/args" && grep -qx -- --ignore-user-config "$STUB/args" && grep -qx "approval_policy=\"never\"" "$STUB/args" && grep -qx "web_search=\"cached\"" "$STUB/args"'
 check "runs in the repository top level" '[ "$(cat "$STUB/cwd")" = "$top" ]'
@@ -70,9 +70,12 @@ git init -q -b trunk "$odd" && (cd "$odd" && git config user.email t@example.tes
 reset; (cd "$odd" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
 check "quotes a path with a space, a double quote and a backslash as a TOML string" '[ "$rc" = 0 ] && grep -qF -- "odd \\\"q\\\" back\\\\slash/.git\"=\"read\"" "$STUB/args"'
 
+reset; (cd "$top/sub" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
+check "denies credential files inside the checkout, with globs pre-expanded" '[ "$rc" = 0 ] && grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qF "\"**/*.pem\"=\"deny\"" "$STUB/args" && grep -qF "\"**/id_ed25519*\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
 # Nothing in the profile comes from where codex is installed: with codex in $HOME, or in a
 # directory under another temp root, the profile is exactly the fixed paths and the git directory.
-want="{\":minimal\"=\"read\", \"/opt/homebrew\"=\"read\", \"/usr/local\"=\"read\", \"$top/.git\"=\"read\", \"/tmp\"=\"deny\", \"/private/tmp\"=\"deny\", \":workspace_roots\"={\".\"=\"read\"}}"
+deny='"**/.env"="deny", "**/.env.*"="deny", "**/*.pem"="deny", "**/*.key"="deny", "**/*.p12"="deny", "**/*.pfx"="deny", "**/id_rsa*"="deny", "**/id_ecdsa*"="deny", "**/id_ed25519*"="deny", "**/.netrc"="deny", "**/.npmrc"="deny", "**/.pypirc"="deny"'
+want="{\":minimal\"=\"read\", \"/opt/homebrew\"=\"read\", \"/usr/local\"=\"read\", \"$top/.git\"=\"read\", \"/tmp\"=\"deny\", \"/private/tmp\"=\"deny\", \":workspace_roots\"={\".\"=\"read\", $deny}}"
 mkdir -p "$root/fakehome" "$root/tools dir/bin" && cp "$root/bin/codex" "$root/fakehome/codex" && cp "$root/bin/codex" "$root/tools dir/bin/codex"
 fakehome=$(cd "$root/fakehome" && pwd -P)
 reset; (cd "$top/sub" && HOME="$fakehome" PATH="$fakehome:$PATH" "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?

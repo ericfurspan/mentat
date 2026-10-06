@@ -44,8 +44,14 @@ codex_filesystem() {
   local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
   gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
   [ -z "$gitdir" ] || table="$table, $(toml_str "$gitdir")=\"read\""
-  printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read"}}' "$table"
+  printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read", %s}}' "$table" "$CREDENTIAL_DENY"
 }
+# Files inside the checkout that commonly hold credentials, denied to Codex even
+# though the rest of the checkout is readable. Glob denies are pre-expanded to
+# GLOB_DEPTH levels before Codex starts. Example files such as .env.example are
+# denied too; a review that needs one says it could not read it.
+CREDENTIAL_DENY='"**/.env"="deny", "**/.env.*"="deny", "**/*.pem"="deny", "**/*.key"="deny", "**/*.p12"="deny", "**/*.pfx"="deny", "**/id_rsa*"="deny", "**/id_ecdsa*"="deny", "**/id_ed25519*"="deny", "**/.netrc"="deny", "**/.npmrc"="deny", "**/.pypirc"="deny"'
+GLOB_DEPTH=8
 
 # Runs Codex in directory $1 on prompt file $2 and writes its final message to $3.
 # On any failure it calls $4 with the reason, which exits. $5 is Codex's web
@@ -67,6 +73,7 @@ run_codex() {
   # environment do not reach it.
   (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
+    -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
     -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c "web_search=\"$search\"" -o "$out" - <"$prompt") >"$log" 2>&1 &
