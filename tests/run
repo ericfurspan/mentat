@@ -135,6 +135,25 @@ for f in skills/*/SKILL.md; do
   fi
 done
 
+# The retro reads sessions through skills/retro/transcript, which redacts
+# token-like strings. The values below are fake.
+if command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1; then
+  fixture='{"type":"user","message":{"content":"use ghp_FAKEFAKEFAKEFAKE1234, password=notarealpass1 and AWS SecretAccessKey=fakeFAKEfakeFAKE0001 -----BEGIN RSA PRIVATE KEY-----\nFAKEPEMBODY\n-----END RSA PRIVATE KEY-----"}}
+{"type":"user","message":{"content":"Authorization: Bearer FAKEBEARER0004"}}
+{"type":"user","message":{"content":"pasted glpat-FAKEgitlab0006abcdefgh and wJalrXUtnFEMI/K7MDENG/bPxRfiCYFAKE0007 in plan 2026-10-06-skills-split-plan.md"}}
+{"type":"user","message":{"content":[{"type":"tool_result","content":"FAKEOUTPUT0002"}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"FAKEERROR0005"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"echo FAKECOMMAND0003","description":"Print a value"}}]}}'
+  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -qE 'FAKEFAKE|notarealpass|fakeFAKE|FAKEPEM|FAKEBEARER|FAKEgitlab|FAKE0007|FAKEOUTPUT|FAKEERROR|FAKECOMMAND' <<<"$out" && grep -qx "result: error" <<<"$out" && grep -q "2026-10-06-skills-split-plan.md" <<<"$out" &&
+    grep -q "user: use <REDACTED>" <<<"$out" && grep -qx "result: ok" <<<"$out" && grep -qx "tool: Bash Print a value" <<<"$out"; then
+    pass "skills/retro/transcript leaves out tool output and commands and redacts secrets"
+  else
+    fail "skills/retro/transcript lets tool output, a command or a secret through"
+  fi
+else
+  skip "jq or perl not installed, skills/retro/transcript not checked"
+fi
+
 # mentat review, review --local, challenge and check behave as specified (stub
 # gh and codex), and so do the merge and reply hooks.
 if command -v jq >/dev/null 2>&1; then
@@ -147,10 +166,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
+  if shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
   fi
 else
   skip "shellcheck not installed, shell scripts not checked"
