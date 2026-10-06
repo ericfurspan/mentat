@@ -109,13 +109,14 @@ done
 # has a skill, and every skill the agent can call is named there. Each skill
 # stays under 15,000 characters, a house limit toward Claude Code's budget for
 # skill text kept after compaction.
-for name in $(grep -o 'mentat:[a-z-]*' rules.md | sed 's/^mentat://' | sort -u); do
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
   if [ -f "skills/$name/SKILL.md" ]; then
     pass "rules.md names mentat:$name, which exists"
   else
     fail "rules.md names mentat:$name, but skills/$name/SKILL.md is missing"
   fi
-done
+done <<< "$(grep -o 'mentat:[a-z-]*' rules.md | sed 's/^mentat://' | sort -u)"
 for f in skills/*/SKILL.md; do
   [ -e "$f" ] || continue
   name=${f#skills/}; name=${name%/SKILL.md}
