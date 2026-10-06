@@ -58,7 +58,7 @@ These are design choices, not proven results:
 
 Usage errors exit 64.
 
-Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network. Environment variables still pass through to it.
+Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach it.
 
 ## What it does not do
 

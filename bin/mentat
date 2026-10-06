@@ -69,8 +69,11 @@ run_codex() {
   # A permissions profile replaces `--sandbox read-only`, which reads the whole disk
   # and overrides a profile. Mentat passes it because --ignore-user-config skips
   # the user's own. The profile denies ~/.gitconfig, so git runs without one.
-  (cd "$dir" && export GIT_CONFIG_GLOBAL=/dev/null && exec codex exec --ephemeral --ignore-user-config \
+  # Codex's shell gets only core environment variables, so tokens in the agent's
+  # environment do not reach it.
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
+    -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c 'web_search="cached"' -o "$out" - <"$prompt") >"$log" 2>&1 &
   pid=$!
