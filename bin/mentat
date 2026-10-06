@@ -25,15 +25,44 @@ not_reviewed() { die "not reviewed: $1" 1; }
 not_challenged() { die "not challenged: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
-# Runs read-only Codex in directory $1 on prompt file $2 and writes its final
-# message to $3. On any failure it calls $4 with the reason, which exits.
+# A TOML basic string for $1: backslash and double quote escaped.
+toml_str() {
+  local s=${1//\\/\\\\}
+  s=${s//\"/\\\"}
+  printf '"%s"' "$s"
+}
+# Prints the inline TOML table of Codex's filesystem permissions for a review of
+# directory $1: the checkout, its git directory (outside the checkout for a
+# worktree) and the system paths. Codex must be installed under /opt/homebrew or
+# /usr/local (Homebrew, or npm with a system or Homebrew node); anywhere else it
+# cannot start inside the profile, so the run fails closed (not reviewed, not
+# challenged). Nothing is derived from where codex is, so no install can widen it.
+codex_filesystem() {
+  local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
+  gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
+  [ -z "$gitdir" ] || table="$table, $(toml_str "$gitdir")=\"read\""
+  printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read"}}' "$table"
+}
+
+# Runs Codex in directory $1 on prompt file $2 and writes its final message to $3.
+# On any failure it calls $4 with the reason, which exits.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" log rc secs=0 pid kept
+  local dir="$1" prompt="$2" out="$3" fail="$4" log rc secs=0 pid kept filesystem
   log="${out%/*}/codex.log"
+  filesystem=$(codex_filesystem "$dir")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
   # final reply, so it cannot end with the status line the callers check.
   # Web search stays on Codex's default, "cached": OpenAI's index, no live fetches.
-  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --sandbox read-only \
+  # A permissions profile replaces `--sandbox read-only`, which reads the whole disk
+  # and overrides a profile. Mentat passes it because --ignore-user-config skips
+  # the user's own. --strict-config makes unknown settings fail instead of being
+  # ignored, so a Codex without profiles fails closed. The profile denies
+  # ~/.gitconfig, so git runs without one.
+  # Codex's shell gets only core environment variables, so tokens in the agent's
+  # environment do not reach it.
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
+    -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
+    -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c 'web_search="cached"' -o "$out" - <"$prompt") >"$log" 2>&1 &
   pid=$!

@@ -58,6 +58,8 @@ These are design choices, not proven results:
 
 Usage errors exit 64.
 
+Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach it. Codex must be installed under `/opt/homebrew` or `/usr/local`; anywhere else it cannot start and the command reports not reviewed or not challenged.
+
 ## What it does not do
 
 - Linux, Windows, other Git hosts, organizations and team workflows.
