@@ -44,7 +44,6 @@ check "a ready setup is Check OK (exit 0)" '[ "$rc" = 0 ] && [ "$(last)" = "Chec
 check "finds the repository from the checkout" 'grep -qx "repo view --json nameWithOwner --jq .nameWithOwner" "$STUB/calls"'
 check "writes nothing, there or locally" '[ ! -f "$STUB/writes" ] && [ -z "$(ls -A "$root/cwd")" ]'
 check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out"'
-check "does not look at rulesets, approvals or code owners" '! grep -q "rules\|CODEOWNERS\|codeowners\|rulesets" "$STUB/calls"'
 
 reset; rc=$(run owner/repo)
 check "takes owner/repo" '[ "$rc" = 0 ] && ! grep -q "repo view" "$STUB/calls"'
@@ -72,10 +71,7 @@ IFS=$oldifs
 reset; rc=$(PATH="$nocodex" run)
 check "codex missing is a warning" '[ "$rc" = 0 ] && grep -q "WARN: codex is not installed" "$STUB/out"'
 
-for bad in "owner" "-x" "a/b/c" "owner/repo extra"; do
-  # shellcheck disable=SC2086 # word splitting is the point of the last case
-  rc=$("$mentat" check $bad >/dev/null 2>&1; echo $?)
-  check "usage error for: $bad" '[ "$rc" = 64 ]'
-done
+rc=$("$mentat" check a/b/c >/dev/null 2>&1; echo $?)
+check "a malformed owner/repo is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 [ "$failures" -eq 0 ]

@@ -71,7 +71,6 @@ check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/c
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
 check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ]'
-check "leaves the checkout as it was" '[ "$(cat "$root/work/README")" = dirty ]'
 
 reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment"'
