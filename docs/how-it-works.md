@@ -9,7 +9,7 @@
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build and how it will be checked. An uncertain or consequential plan gets a Codex challenge first ([`skills/plan`](../skills/plan/SKILL.md)).
 2. One builder, one branch, one checkout per change. The repository's test command runs before the pull request opens and after every fix.
 3. Every pull request opens as a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
-4. When it is built, `mentat review` waits for CI on the head, then Codex reviews it, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again; five rounds is a hard stop. When the loop ends, it posts a final check, the author's own check and not an approval, and tells you the pull request is ready ([`skills/review`](../skills/review/SKILL.md)).
+4. When it is built, `mentat review` waits for CI on the head, then Codex reviews it, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again; a real defect is never left to a follow-up issue on its own, and five rounds is a hard stop. OpenAI's page says the Codex app flags only P0 and P1 issues (it has posted P2s here); a local review reports P0 to P3 and reads the issues the pull request closes as well as its description. When the loop ends, it posts a final check, the author's own check and not an approval, and tells you the pull request is ready ([`skills/review`](../skills/review/SKILL.md)).
 5. You merge it, the way your repository merges. Or opt the repository in, and Claude Code merges its own pull requests once the review loop ends ready ([Letting agents merge](setup.md#letting-agents-merge)).
 
 After a session that went badly, `/mentat:retro` reads it and proposes fixes to the setup: checks over written rules, pointers, deletions. It changes nothing until you approve; approved fixes become issues or pull requests ([`skills/retro`](../skills/retro/SKILL.md)).
@@ -60,7 +60,7 @@ These are design choices, not proven results:
 
 Usage errors exit 64.
 
-Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach the commands it runs. Codex must be installed under `/opt/homebrew` or `/usr/local`; anywhere else it cannot start and the command reports not reviewed or not challenged.
+Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network for the commands it runs. Codex itself still talks to OpenAI, and its web search runs on OpenAI's side, outside that profile: local reviews turn search off, and `mentat challenge` keeps Codex's cached search (OpenAI's index, no live fetches) to check current practice. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach the commands it runs. Codex must be installed under `/opt/homebrew` or `/usr/local`; anywhere else it cannot start and the command reports not reviewed or not challenged.
 
 ## What it does not do
 

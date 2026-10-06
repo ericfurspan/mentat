@@ -37,9 +37,13 @@ case "$1 $2" in
     h=$(cat "$STUB/head"); [ "$n" -gt 1 ] && [ -f "$STUB/moved_head" ] && h=$(cat "$STUB/moved_head")
     case "$*" in
       *--jq*) echo "$h" ;;
-      *) jq -n --arg h "$h" '{headRefOid: $h, baseRefName: "main", title: "Change README", body: "Requirement: README says change."}' ;;
+      *) jq -n --arg h "$h" --argjson c "$(cat "$STUB/closes" 2>/dev/null || echo '[]')" '{headRefOid: $h, baseRefName: "main", title: "Change README", body: "Requirement: README says change.", closingIssuesReferences: $c}' ;;
     esac ;;
   "repo view") echo owner/repo ;;
+  "issue view")
+    r=$5; f="$STUB/issue_${r/\//_}_$3"
+    [ "$4" = --repo ] && [ -f "$f" ] || exit 1
+    printf 'Issue %s#%s: %s\n\n%s' "$r" "$3" "$(head -1 "$f")" "$(tail -n +2 "$f")" ;;
   "api --paginate")
     case "$3" in
       */check-runs) cat "$STUB/check_runs.json" ;;
@@ -81,6 +85,17 @@ check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "foun
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
+# The issues the pull request closes reach Codex as labeled data, ahead of the description.
+ref() { printf '{"number":%s,"repository":{"name":"%s","owner":{"login":"%s"}}}' "$3" "$2" "$1"; }
+reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(run)
+check "gives Codex the linked issue's request as data" '[ "$rc" = 0 ] && grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt" && grep -q "The README must say change, nothing else." "$STUB/prompt"'
+reset; echo "[$(ref other proj 9)]" >"$STUB/closes"; printf 'Fix the other thing\nIn the other repository.\n' >"$STUB/issue_other_proj_9"; printf 'Wrong issue\nSame number, wrong repository.\n' >"$STUB/issue_owner_repo_9"; rc=$(run)
+check "reads a linked issue from its own repository" '[ "$rc" = 0 ] && grep -q "Issue other/proj#9: Fix the other thing" "$STUB/prompt" && ! grep -q "Wrong issue" "$STUB/prompt"'
+reset; echo "[$(ref owner repo 4)]" >"$STUB/closes"; rc=$(run)
+check "a linked issue that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q "could not read issue owner/repo#4" "$STUB/out" && [ ! -f "$STUB/prompt" ]'
+reset; rc=$(run)
+check "no linked issue: no issue block" '[ "$rc" = 0 ] && ! grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt"'
+check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$STUB/args"'
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
 reset; rc=$(cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1; echo $?)
 gitdir=$(git -C "$root/work" rev-parse --path-format=absolute --git-common-dir)
