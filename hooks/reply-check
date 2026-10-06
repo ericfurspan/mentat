@@ -1,18 +1,31 @@
 #!/usr/bin/env bash
-# Stop hook: checks the reply Claude Code is about to end its turn with. A reply
-# over the word limit, or with an em dash or a blockquote, gets one request to
-# rewrite it. Fenced code blocks are left out of every check. The hook asks once
-# per turn and never cuts text itself, so failure details can stay in full.
-# When it cannot read its input, it lets the turn end.
+# Stop hook: checks the reply Claude Code is about to end its turn with, but only
+# when the owner has chosen the Mentat output style. A reply over the word limit,
+# or with an em dash or a blockquote, gets one request to rewrite it. Fenced code
+# blocks are left out of every check. The hook asks once per turn and never cuts
+# text itself, so failure details can stay in full. When it cannot read its
+# input, it lets the turn end.
 set -uo pipefail
 export LC_ALL=C # count bytes, so the result is the same on macOS and Linux
 
-limit=150 # the style asks for 100; the hook allows a margin so near misses do not cost a rewrite
+limit=200 # the style asks for 100; the hook allows a margin so near misses do not cost a rewrite
 
 command -v jq >/dev/null 2>&1 || exit 0
 input=$(cat)
 active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null) || exit 0
 [ "$active" = false ] || exit 0
+
+# Hook input does not name the active output style, so read outputStyle from the
+# settings files in Claude Code's order: local, project, then user. Managed
+# settings and command-line flags are not read.
+project="${CLAUDE_PROJECT_DIR:-$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)}"
+style=""
+for f in "$project/.claude/settings.local.json" "$project/.claude/settings.json" "$HOME/.claude/settings.json"; do
+  [ -f "$f" ] || continue
+  style=$(jq -r '.outputStyle // empty' "$f" 2>/dev/null) || style=""
+  [ -z "$style" ] || break
+done
+case "$style" in mentat:Mentat | Mentat) ;; *) exit 0 ;; esac
 reply=$(printf '%s' "$input" | jq -r '.last_assistant_message // empty' 2>/dev/null) || exit 0
 
 prose=$(printf '%s\n' "$reply" | awk '/^[ \t]*(```|~~~)/ { fence = !fence; next } !fence')
