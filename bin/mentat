@@ -44,14 +44,16 @@ resolve_path() {
 }
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory and the system and tool paths,
-# and nothing else. A path that is empty, / or $HOME is skipped, so Codex fails
-# closed rather than reading the whole disk or the home directory.
+# and nothing else. A path that is $HOME or a directory above it (so also /) is
+# skipped, so Codex fails closed rather than reading the whole disk or the home
+# directory.
 codex_filesystem() {
-  local dir="$1" bin real p table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
+  local dir="$1" bin real p q table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
   bin=$(command -v codex) || bin=""
   case "$bin" in /*) real=$(resolve_path "$bin") || real="" ;; *) bin=""; real="" ;; esac
   for p in "${bin%/*}" "${real%/*}" "${real%/*/*}" "$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; do
-    case "${p%/}" in '' | "${HOME%/}") continue ;; esac
+    q="${p%/}"
+    case "${HOME%/}/" in "$q"/*) continue ;; esac
     table="$table, $(toml_str "$p")=\"read\""
   done
   printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read"}}' "$table"
