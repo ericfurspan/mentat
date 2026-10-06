@@ -9,7 +9,7 @@
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build and how it will be checked. An uncertain or consequential plan gets a Codex challenge first ([`skills/plan`](../skills/plan/SKILL.md)).
 2. One builder, one branch, one checkout per change. The repository's test command runs before the pull request opens and after every fix.
 3. Every pull request opens as a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
-4. When it is built and CI passes, Codex reviews each head commit, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again; five rounds is a hard stop. When the loop ends, it posts a final check, the author's own check and not an approval, and tells you the pull request is ready ([`skills/review`](../skills/review/SKILL.md)).
+4. When it is built, `mentat review` waits for CI on the head, then Codex reviews it, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again; five rounds is a hard stop. When the loop ends, it posts a final check, the author's own check and not an approval, and tells you the pull request is ready ([`skills/review`](../skills/review/SKILL.md)).
 5. You merge it, the way your repository merges.
 
 ## The repository comes first
@@ -51,8 +51,8 @@ These are design choices, not proven results:
 
 | Command | What it does | Exit codes |
 |---|---|---|
-| `mentat review <PR>` | Marks the pull request ready, which starts the Codex app's review of the current head, and waits for the result | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved |
-| `mentat review --local <PR>` | Reviews the pull request's head with local Codex in a temporary checkout, and posts the result on the pull request if the head has not moved | same |
+| `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), then marks the pull request ready, which starts the Codex app's review of that head, and waits for the result | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
+| `mentat review --local <PR>` | Waits for CI the same way, then reviews the pull request's head with local Codex in a temporary checkout, and posts the result on the pull request if the head has not moved | same |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat check [owner/repo]` | Checks, read-only, what Mentat itself needs: `git`, `gh` and `jq` installed, `gh` signed in, the repository readable. Warns when `codex` is missing or the repository has Actions secrets a branch workflow may read | 0 Mentat can work, 1 it cannot |
 

@@ -14,7 +14,7 @@ When a session first starts change work in a repository, Claude Code runs `menta
 3. There is one builder, one branch and one checkout per change. Subagents are mostly for read-only investigation. Claude Code gives the builder the test command.
 4. The test command is the one AGENTS.md names; otherwise the one the repository shows (package scripts, a Makefile, its CI workflow). It runs before the pull request opens and after every fix. Claude Code does not edit the maintainer's AGENTS.md to add one unless asked.
 5. Every pull request opens as a draft. Claude Code writes and updates its description by calling the Skill tool with `mentat:pr`.
-6. When the build is done, the test command passes and CI passes where the repository has CI, Claude Code calls the Skill tool with `mentat:review`. It runs the review loop, ends with the final check, and stops. The maintainer merges.
+6. When the build is done and the test command passes, Claude Code pushes and calls the Skill tool with `mentat:review`; `mentat review` waits for CI on the head itself. It runs the review loop, ends with the final check, and stops. The maintainer merges.
 
 After compaction or a resumed session, Claude Code calls the skill for the step in progress again if its text is no longer in context.
 

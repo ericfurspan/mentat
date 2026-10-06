@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # mentat: Mentat's command line. Usage errors exit 64.
-#   mentat review <PR>  Marks the pull request ready, which starts the Codex GitHub
-#     app's review of the current head, and waits for the result. 0 no findings,
-#     2 findings posted (printed), 1 not reviewed (app busy, error or no result in
-#     time), 3 the head moved.
-#   mentat review --local <PR>  Reviews the pull request's head with local Codex
-#     instead, and posts the result on the pull request. Same exit codes.
+#   mentat review <PR>  Waits for CI on the pull request's head, then marks the
+#     pull request ready, which starts the Codex GitHub app's review of that head,
+#     and waits for the result. 0 no findings, 2 findings posted (printed), 1 not
+#     reviewed (app busy, error or no result in time), 3 the head moved, 4 CI did
+#     not pass on the head (failing checks printed; nothing reviewed).
+#   mentat review --local <PR>  Waits for CI the same way, then reviews the pull
+#     request's head with local Codex and posts the result. Same exit codes.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 #   mentat check [owner/repo]  Checks, read-only, what Mentat itself needs: tools,
@@ -19,6 +20,8 @@ CODEX_EFFORT="high"
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 REVIEW_INTERVAL_SECONDS="${MENTAT_REVIEW_INTERVAL_SECONDS:-15}"
 READY_TRIES="${MENTAT_READY_TRIES:-10}"
+CI_TIMEOUT_SECONDS="${MENTAT_CI_TIMEOUT_SECONDS:-1800}"
+CI_GRACE_SECONDS="${MENTAT_CI_GRACE_SECONDS:-60}"
 
 die() { printf 'mentat: %s\n' "$1" >&2; exit "${2:-1}"; }
 not_reviewed() { die "not reviewed: $1" 1; }
@@ -89,6 +92,47 @@ run_codex() {
   [ -s "$out" ] || "$fail" "Codex returned no final message"
 }
 
+# CI on commit $2 of repository $1: check runs and commit statuses, read by commit
+# so a push cannot swap them. Returns when every check passed (success, neutral or
+# skipped). Exits 4, printing the checks that did not pass, when one failed or CI
+# is still running after CI_TIMEOUT_SECONDS. No checks at all means no CI, but
+# only after CI_GRACE_SECONDS, because checks appear a little after a push. A
+# failed read is a missed poll; still failing at the timeout, it is not reviewed.
+ci_lines() { # $1 repo, $2 commit: prints "<pass|fail|pending> <name>" per check
+  local runs statuses
+  runs=$(gh api --paginate "repos/$1/commits/$2/check-runs" | jq -rs '.[].check_runs[] |
+    (if .status != "completed" then "pending" elif (.conclusion | IN("success", "neutral", "skipped")) then "pass" else "fail" end) + " " + .name') || return 1
+  statuses=$(gh api --paginate "repos/$1/commits/$2/status" | jq -rs '.[].statuses[] |
+    (if .state == "success" then "pass" elif .state == "pending" then "pending" else "fail" end) + " " + .context') || return 1
+  printf '%s\n%s\n' "$runs" "$statuses" | grep -v '^$' || true
+}
+wait_for_ci() {
+  local repo="$1" commit="$2" secs=0 lines said=no
+  while :; do
+    if lines=$(ci_lines "$repo" "$commit"); then
+      if [ -z "$lines" ]; then
+        [ "$secs" -lt "$CI_GRACE_SECONDS" ] || return 0
+      elif grep -q '^fail ' <<<"$lines"; then
+        printf 'CI did not pass on %s; not reviewed. Failing checks:\n' "$commit"
+        grep '^fail ' <<<"$lines" | sed 's/^fail /- /'
+        exit 4
+      elif ! grep -q '^pending ' <<<"$lines"; then
+        return 0
+      fi
+    elif [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
+      not_reviewed "could not read CI on $commit"
+    fi
+    if [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
+      printf 'CI did not finish on %s within %s seconds; not reviewed. Still running:\n' "$commit" "$CI_TIMEOUT_SECONDS"
+      grep '^pending ' <<<"$lines" | sed 's/^pending /- /'
+      exit 4
+    fi
+    [ "$said" = yes ] || { printf 'Waiting for CI on %s\n' "$commit" >&2; said=yes; }
+    sleep "$REVIEW_INTERVAL_SECONDS"
+    secs=$((secs + REVIEW_INTERVAL_SECONDS))
+  done
+}
+
 # The Codex GitHub app reviews a pull request when it is marked ready. It reacts
 # 👀 while working, then either posts a review tied to the commit it read or
 # reacts 👍 for no findings. A 👍 names no commit, so review starts the run
@@ -117,6 +161,7 @@ review() {
   }
   moved() { die "the head moved from $head; run mentat review again" 3; }
   if ! head=$(head_now) || [ -z "$head" ]; then not_reviewed "could not read pull request #$pr"; fi
+  wait_for_ci "$repo" "$head"
   n=$(app_reaction "$repo" "$pr" eyes "") || not_reviewed "could not read the reactions on #$pr"
   [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
   draft=$(gh pr view "$pr" --json isDraft --jq .isDraft) || not_reviewed "could not read pull request #$pr"
@@ -172,6 +217,10 @@ review_local() {
   head=$(jq -r '.headRefOid // empty' <<<"$info")
   base=$(jq -r '.baseRefName // empty' <<<"$info")
   { [ -n "$head" ] && [ -n "$base" ]; } || not_reviewed "could not read pull request #$pr"
+  if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
+    not_reviewed "could not read the repository with gh"
+  fi
+  wait_for_ci "$repo" "$head"
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
   git -C "$top" fetch -q origin "pull/$pr/head" || not_reviewed "could not fetch pull request #$pr"

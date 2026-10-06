@@ -15,7 +15,8 @@ failures=0
 check() { if eval "$2"; then printf 'PASS: review %s\n' "$1"; else printf 'FAIL: review %s\n' "$1"; failures=$((failures + 1)); fi; }
 
 # State lives in $STUB: head, draft, timeline.json, reviews.json, reactions.json,
-# comments.json. "gh pr ready" records the call and appends a ready event at
+# comments.json, check_runs.json (check_runs_later.json from the second read on)
+# and status.json. "gh pr ready" records the call and appends a ready event at
 # READY_AT; a file named push_on_ready holds a head to switch to at that moment.
 cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
@@ -46,13 +47,17 @@ case "$1 $2" in
       */reviews) cat "$STUB/reviews.json" ;;
       */reactions) cat "$STUB/reactions.json" ;;
       */comments) cat "$STUB/comments.json" ;;
+      */check-runs)
+        n=$(($(cat "$STUB/ci_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/ci_reads"
+        if [ "$n" -ge 2 ] && [ -f "$STUB/check_runs_later.json" ]; then cat "$STUB/check_runs_later.json"; else cat "$STUB/check_runs.json"; fi ;;
+      */status) cat "$STUB/status.json" ;;
       *) exit 99 ;;
     esac ;;
   *) exit 99 ;;
 esac
 STUBEOF
 chmod +x "$root/bin/gh"
-export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_REVIEW_TIMEOUT_SECONDS=2
+export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_REVIEW_TIMEOUT_SECONDS=2 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
 APP='chatgpt-codex-connector[bot]'
 H=1111111111111111111111111111111111111111
@@ -64,7 +69,9 @@ reset() {
   echo "$H" >"$STUB/head"; echo true >"$STUB/draft"; echo "$READY" >"$STUB/ready_at"
   printf '[{"event":"ready_for_review","created_at":"%s"}]\n' "$EARLIER" >"$STUB/timeline.json"
   for f in reviews reactions comments; do echo '[]' >"$STUB/$f.json"; done
+  runs completed success >"$STUB/check_runs.json"; echo '{"statuses":[]}' >"$STUB/status.json"
 }
+runs() { if [ $# = 0 ]; then echo '{"check_runs":[]}'; else printf '{"check_runs":[{"name":"test","status":"%s","conclusion":"%s"}]}\n' "$1" "$2"; fi; }
 reaction() { printf '{"user":{"login":"%s"},"content":"%s","created_at":"%s"}' "$1" "$2" "$3"; }
 review() { printf '{"user":{"login":"%s"},"commit_id":"%s","html_url":"https://example.test/review"}' "$1" "$2"; }
 run() { "$mentat" review 7 >"$STUB/out" 2>&1; echo $?; }
@@ -98,6 +105,21 @@ reset; echo 3 >"$STUB/head_fails_at"; printf '[%s]\n' "$(reaction "$APP" +1 2026
 check "a result is accepted only after the head is read again" '[ "$rc" = 0 ] && [ "$(cat "$STUB/head_reads")" -ge 5 ]'
 reset; rc=$(run)
 check "no result in time is not reviewed (exit 1)" '[ "$rc" = 1 ] && grep -q "no result from the Codex app on $H" "$STUB/out"'
+# CI on the head is waited for before the review starts.
+thumbs() { printf '[%s]\n' "$(reaction "$APP" +1 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_ready"; }
+reset; thumbs; runs in_progress null >"$STUB/check_runs.json"; runs completed success >"$STUB/check_runs_later.json"; rc=$(run)
+check "waits for running CI, then reviews" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -qx "pr ready 7" "$STUB/calls"'
+check "reads CI by the head commit" 'grep -q "repos/owner/repo/commits/$H/check-runs" "$STUB/calls" && grep -q "repos/owner/repo/commits/$H/status" "$STUB/calls"'
+reset; thumbs; runs completed failure >"$STUB/check_runs.json"; rc=$(run)
+check "failed CI is not reviewed (exit 4) and names the check" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
+reset; thumbs; echo '{"statuses":[{"context":"ci/legacy","state":"failure"}]}' >"$STUB/status.json"; rc=$(run)
+check "a failed commit status counts as failed CI" '[ "$rc" = 4 ] && grep -qx -- "- ci/legacy" "$STUB/out"'
+reset; thumbs; runs queued null >"$STUB/check_runs.json"; rc=$(run)
+check "CI still running at the timeout is not reviewed (exit 4)" '[ "$rc" = 4 ] && grep -q "CI did not finish on $H" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
+reset; thumbs; runs >"$STUB/check_runs.json"; rc=$(run)
+check "no CI at all reviews after the grace period" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ]'
+reset; thumbs; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
+check "a skipped check does not block the review" '[ "$rc" = 0 ]'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 

@@ -39,6 +39,13 @@ case "$1 $2" in
       *--jq*) echo "$h" ;;
       *) jq -n --arg h "$h" '{headRefOid: $h, baseRefName: "main", title: "Change README", body: "Requirement: README says change."}' ;;
     esac ;;
+  "repo view") echo owner/repo ;;
+  "api --paginate")
+    case "$3" in
+      */check-runs) cat "$STUB/check_runs.json" ;;
+      */status) echo '{"statuses":[]}' ;;
+      *) exit 99 ;;
+    esac ;;
   "pr comment")
     [ -f "$STUB/comment_fails" ] && exit 1
     while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$STUB/comment"; shift; done
@@ -62,10 +69,13 @@ reset() {
   rm -f "$STUB"/*
   echo "$H" >"$STUB/head"
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
+  echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
 run() { (cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
 
+reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
+check "failed CI is not reviewed (exit 4): Codex does not run and nothing is posted" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && [ ! -f "$STUB/prompt" ] && ! posted'
 reset; rc=$(run)
 check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'

@@ -1,6 +1,6 @@
 ---
 name: review
-description: "Review loop for a pull request: running mentat review, acting on its result, and the final check. Use when a pull request is built and its tests and CI pass, and after every push of review fixes."
+description: "Review loop for a pull request: running mentat review, acting on its result, and the final check. Use when a pull request is built, its tests pass and it is pushed, and after every push of review fixes."
 ---
 
 Codex reviews each head commit of the pull request. Claude Code sorts the findings, fixes and pushes, and reviews again until the loop ends. Then it posts the final check and stops; the maintainer merges.
@@ -14,12 +14,13 @@ Codex reviews each head commit of the pull request. Claude Code sorts the findin
 
 ## Steps
 
-1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local. The app path marks the pull request ready, which starts the Codex app's review of that exact head; the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
+1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local, right after pushing. Both first wait for CI on that head (up to 30 minutes; with no CI, about a minute). The app path marks the pull request ready, which starts the Codex app's review of that exact head; the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
 2. Act on the exit code:
    - 0: no findings. Go to "When the loop ends".
    - 2: findings were posted on that commit. Go to step 3.
    - 1: not reviewed. After the app path, run `mentat review --local <N>`; after the local path, tell the maintainer.
    - 3: the head moved. Run the same command again.
+   - 4: CI did not pass on that head, and nothing was reviewed. Failing checks: fix them, push, and run the same command again. CI still running at the timeout: tell the maintainer.
 3. Sort each finding as `rules.md` "Findings" says. From the fourth round on, fix only P0 and P1 findings and answer the rest with a reason or a follow-up issue. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
 4. Batch the fixes, run the test command, push, and update the description (Skill tool, `mentat:pr`). Then go to step 1 for the new head.
 
