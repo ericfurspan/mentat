@@ -5,7 +5,10 @@
 # Redaction is by pattern and can miss a credential; it lowers the risk, it does
 # not remove it.
 set -euo pipefail
-[ $# -eq 1 ] && [ -r "$1" ] || { printf 'usage: transcript <session.jsonl>\n' >&2; exit 64; }
+if [ $# -ne 1 ] || [ ! -r "$1" ]; then
+  printf 'usage: transcript <session.jsonl>\n' >&2
+  exit 64
+fi
 jq -r 'select(.type == "user" or .type == "assistant") | .type as $who | .message.content |
   if type == "string" then "\($who): \(.[0:400])"
   else .[] |
