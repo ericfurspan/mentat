@@ -140,10 +140,11 @@ done
 if command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1; then
   fixture='{"type":"user","message":{"content":"use ghp_FAKEFAKEFAKEFAKE1234, password=notarealpass1 and AWS SecretAccessKey=fakeFAKEfakeFAKE0001 -----BEGIN RSA PRIVATE KEY-----\nFAKEPEMBODY\n-----END RSA PRIVATE KEY-----"}}
 {"type":"user","message":{"content":"Authorization: Bearer FAKEBEARER0004"}}
+{"type":"user","message":{"content":"pasted glpat-FAKEgitlab0006abcdefgh and wJalrXUtnFEMI/K7MDENG/bPxRfiCYFAKE0007 in plan 2026-10-06-skills-split-plan.md"}}
 {"type":"user","message":{"content":[{"type":"tool_result","content":"FAKEOUTPUT0002"}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"FAKEERROR0005"}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"echo FAKECOMMAND0003","description":"Print a value"}}]}}'
-  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -qE 'FAKEFAKE|notarealpass|fakeFAKE|FAKEPEM|FAKEBEARER|FAKEOUTPUT|FAKEERROR|FAKECOMMAND' <<<"$out" && grep -qx "result: error" <<<"$out" &&
+  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -qE 'FAKEFAKE|notarealpass|fakeFAKE|FAKEPEM|FAKEBEARER|FAKEgitlab|FAKE0007|FAKEOUTPUT|FAKEERROR|FAKECOMMAND' <<<"$out" && grep -qx "result: error" <<<"$out" && grep -q "2026-10-06-skills-split-plan.md" <<<"$out" &&
     grep -q "user: use <REDACTED>" <<<"$out" && grep -qx "result: ok" <<<"$out" && grep -qx "tool: Bash Print a value" <<<"$out"; then
     pass "skills/retro/transcript leaves out tool output and commands and redacts secrets"
   else
