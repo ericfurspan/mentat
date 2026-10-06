@@ -23,6 +23,9 @@ gh pr merge 12 --squash
 gh pr merge --auto --squash 12
 cd repo && gh pr merge 12
 gh  pr   merge
+gh --repo o/r pr merge 7 --squash
+gh -R o/r pr merge 7
+gh pr -R o/r merge 7
 GH_TOKEN= gh pr merge 3
 gh api -X PUT repos/o/r/pulls/7/merge
 gh api repos/o/r/pulls/7/merge -X PUT -f merge_method=squash
@@ -41,6 +44,9 @@ gh api repos/o/r/pulls/7
 gh api repos/o/r/pulls/7/reviews
 gh api repos/o/r/pulls/7/merged-files
 mygh pr merge 12
+gh pr create --title "fix merge logic"
+gh pr comment 7 --body 'please merge this'
+gh -R o/r pr view 7
 PASS
 
 check "asks before the desktop auto-merge tool" '[ "$(decision mcp__ccd_pr__set_auto_merge "")" = ask ]'
