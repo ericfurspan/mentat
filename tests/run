@@ -105,6 +105,36 @@ for f in skills/*/SKILL.md; do
   fi
 done
 
+# rules.md names each workflow skill as a Skill tool call: every name it uses
+# has a skill, and every skill the agent can call is named there. Each skill
+# stays under 15,000 characters, a house limit toward Claude Code's budget for
+# skill text kept after compaction.
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  if [ -f "skills/$name/SKILL.md" ]; then
+    pass "rules.md names mentat:$name, which exists"
+  else
+    fail "rules.md names mentat:$name, but skills/$name/SKILL.md is missing"
+  fi
+done <<< "$(grep -o 'mentat:[a-z-]*' rules.md | sed 's/^mentat://' | sort -u)"
+for f in skills/*/SKILL.md; do
+  [ -e "$f" ] || continue
+  name=${f#skills/}; name=${name%/SKILL.md}
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "disable-model-invocation: true" { found = 1; exit 0 } END { exit !found }' "$f"; then
+    pass "$f is started by the maintainer, not named in rules.md"
+  elif grep -q "mentat:$name\`" rules.md; then
+    pass "$f is named in rules.md"
+  else
+    fail "$f can be called by the agent but rules.md does not name mentat:$name"
+  fi
+  size=$(wc -c < "$f" | tr -d ' ')
+  if [ "$size" -lt 15000 ]; then
+    pass "$f is $size characters (limit 15000)"
+  else
+    fail "$f is $size characters (limit 15000)"
+  fi
+done
+
 # mentat review, review --local, challenge and check behave as specified (stub
 # gh and codex), and so do the merge and reply hooks.
 if command -v jq >/dev/null 2>&1; then
