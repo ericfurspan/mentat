@@ -3,8 +3,9 @@
 # merging. A command that would merge a pull request (gh pr merge, including
 # --auto, or the merge API through gh api) and the desktop app's auto-merge tool
 # get a permission prompt, so the owner decides. One exception: the merge API
-# call for a repository whose AGENTS.md on its default branch, read from GitHub
-# now, says "Agents may merge their own pull requests." Then Mentat adds no
+# call, pinned to a commit with sha=, for a repository whose AGENTS.md on its
+# default branch, read from GitHub now, says "Agents may merge their own pull
+# requests." Then Mentat adds no
 # prompt and Claude Code's own permission rules apply. gh pr merge always asks:
 # it can turn on auto-merge or join a merge queue instead of merging.
 # This is a net for mistakes, not a security boundary: other routes exist.
@@ -40,6 +41,8 @@ case "$tool" in
     [ "$(printf '%s\n' "$cmd" | grep -Eo 'pulls/[^/[:space:]]+/merge' | grep -c .)" = 1 ] || ask
     repo=$(printf '%s\n' "$targets" | sed -E 's#^repos/([^/]+/[^/]+)/pulls/.*#\1#')
     case "$repo" in *[!A-Za-z0-9._/-]*) ask ;; esac
+    # Pinned to a commit, so it merges that commit or nothing.
+    printf '%s\n' "$cmd" | grep -Eq '(-f|-F|--field|--raw-field)[[:space:]]+sha=[0-9a-f]{7,40}([[:space:]]|$)' || ask
     opted_in "$repo" || ask
     exit 0
     ;;

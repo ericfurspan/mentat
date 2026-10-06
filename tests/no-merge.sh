@@ -49,18 +49,19 @@ gh pr create --title "fix merge logic"
 PASS
 # The opt-in: the merge API call to a repository whose AGENTS.md has the line.
 optin o_r
-check "opted in: the merge API call gets no prompt" '[ -z "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f sha=abc -f merge_method=squash")" ]'
+check "opted in: the merge API call gets no prompt" '[ -z "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f sha=abc1234 -f merge_method=squash")" ]'
 check "opted in: reads the target repository's AGENTS.md from GitHub" 'grep -q "repos/o/r/contents/AGENTS.md" "$STUB/calls"'
+check "opted in: a merge API call without sha= still asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f merge_method=squash")" = ask ]'
 check "opted in: gh pr merge still asks" '[ "$(decision Bash "gh pr merge 7 --squash")" = ask ]'
 check "opted in: gh pr merge --auto still asks" '[ "$(decision Bash "gh pr merge 7 --auto --squash")" = ask ]'
 check "opted in: the desktop auto-merge tool still asks" '[ "$(decision mcp__ccd_pr__set_auto_merge "")" = ask ]'
-check "another repository without the line asks" '[ "$(decision Bash "gh api -X PUT repos/other/repo/pulls/7/merge")" = ask ]'
-check "a placeholder repository asks" '[ "$(decision Bash "gh api -X PUT repos/{owner}/{repo}/pulls/7/merge")" = ask ]'
+check "another repository without the line asks" '[ "$(decision Bash "gh api -X PUT repos/other/repo/pulls/7/merge -f sha=abc1234")" = ask ]'
+check "a placeholder repository asks" '[ "$(decision Bash "gh api -X PUT repos/{owner}/{repo}/pulls/7/merge -f sha=abc1234")" = ask ]'
 check "two merge calls in one command ask" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge; gh api -X PUT repos/o/r/pulls/8/merge")" = ask ]'
 printf '# Rules\n\nThe maintainer merges.\n' >"$STUB/o_r.md"
-check "a removed opt-in asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge")" = ask ]'
+check "a removed opt-in asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f sha=abc1234")" = ask ]'
 rm -f "$STUB/o_r.md"
-check "a failed read asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge")" = ask ]'
+check "a failed read asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f sha=abc1234")" = ask ]'
 check "asks before the desktop auto-merge tool" '[ "$(decision mcp__ccd_pr__set_auto_merge "")" = ask ]'
 check "hooks.json runs it on PreToolUse for Bash and the auto-merge tool" \
   'jq -e ".hooks.PreToolUse[0] | (.matcher == \"Bash|mcp__ccd_pr__set_auto_merge\") and (.hooks[0].command | endswith(\"/hooks/no-merge\"))" "$root/hooks/hooks.json" >/dev/null'
