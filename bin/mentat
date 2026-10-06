@@ -231,12 +231,15 @@ review_local() {
   # is the builder's account of it. Both go to Codex, each labeled. An issue that
   # cannot be read leaves the review without its requirements: not reviewed.
   issues=""
-  while IFS= read -r n; do
-    [ -n "$n" ] || continue
-    case "$n" in *[!0-9]*) not_reviewed "could not read the issues #$pr closes" ;; esac
-    issues="$issues$(gh issue view "$n" --json title,body --jq '"Issue #'"$n"': \(.title)\n\n\(.body)"')" || not_reviewed "could not read issue #$n, which #$pr closes"
+  # An issue may live in another repository ("Fixes owner/repo#123").
+  local ref irepo
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    irepo=${ref% *}; n=${ref##* }
+    case "$irepo/$n" in */*/*[!0-9]* | *[!A-Za-z0-9._/-]*) not_reviewed "could not read the issues #$pr closes" ;; esac
+    issues="$issues$(gh issue view "$n" --repo "$irepo" --json title,body --jq '"Issue '"$irepo"'#'"$n"': \(.title)\n\n\(.body)"')" || not_reviewed "could not read issue $irepo#$n, which #$pr closes"
     issues="$issues"$'\n\n'
-  done <<<"$(jq -r '.closingIssuesReferences[]?.number' <<<"$info")"
+  done <<<"$(jq -r '.closingIssuesReferences[]? | "\(.repository.owner.login)/\(.repository.name) \(.number)"' <<<"$info")"
   git -C "$top" fetch -q origin "pull/$pr/head" || not_reviewed "could not fetch pull request #$pr"
   fetched=$(git -C "$top" rev-parse FETCH_HEAD) || not_reviewed "could not read the fetched head"
   [ "$fetched" = "$head" ] || die "the head moved from $head; run mentat review again" 3
