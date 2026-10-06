@@ -5,7 +5,7 @@
 # get a permission prompt, so the owner decides. One exception: the merge API
 # call, pinned to a commit with sha=, for a repository whose AGENTS.md on its
 # default branch, read from GitHub now, says "Agents may merge their own pull
-# requests." Then Mentat adds no
+# requests.", of a pull request opened by the account gh is signed in as. Then Mentat adds no
 # prompt and Claude Code's own permission rules apply. gh pr merge always asks:
 # it can turn on auto-merge or join a merge queue instead of merging.
 # This is a net for mistakes, not a security boundary: other routes exist.
@@ -44,6 +44,12 @@ case "$tool" in
     # Pinned to a commit, so it merges that commit or nothing.
     printf '%s\n' "$cmd" | grep -Eq '(-f|-F|--field|--raw-field)[[:space:]]+sha=[0-9a-f]{7,40}([[:space:]]|$)' || ask
     opted_in "$repo" || ask
+    # Its own pull request: opened by the account gh is signed in as.
+    num=$(printf '%s\n' "$targets" | sed -E 's#.*/pulls/([^/]+)/merge$#\1#')
+    case "$num" in '' | *[!0-9]*) ask ;; esac
+    author=$(gh api "repos/$repo/pulls/$num" --jq .user.login 2>/dev/null) || ask
+    me=$(gh api user --jq .login 2>/dev/null) || ask
+    { [ -n "$author" ] && [ "$author" = "$me" ]; } || ask
     exit 0
     ;;
   mcp__ccd_pr__set_auto_merge) ask ;;

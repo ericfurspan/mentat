@@ -19,6 +19,10 @@ mkdir -p "$STUB" "$root_tmp/bin"
 cat >"$root_tmp/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
+case "$*" in
+  "api user "*) cat "$STUB/me"; exit 0 ;;
+  "api repos/"*/pulls/[0-9]*" --jq .user.login") n=${2##*/}; cat "$STUB/author_$n" 2>/dev/null || exit 1; exit 0 ;;
+esac
 for a in "$@"; do
   case "$a" in repos/*/contents/AGENTS.md) r=${a#repos/}; r=${r%/contents/AGENTS.md}; f="$STUB/${r/\//_}.md"; [ -f "$f" ] && cat "$f" && exit 0; exit 1 ;; esac
 done
@@ -26,6 +30,7 @@ exit 99
 STUBEOF
 chmod +x "$root_tmp/bin/gh"
 export PATH="$root_tmp/bin:$PATH"
+echo agent >"$STUB/me"; echo agent >"$STUB/author_7"; echo maintainer >"$STUB/author_9"
 optin() { printf '# Rules\n\n- Agents may merge their own pull requests.\n' >"$STUB/$1.md"; }
 
 # decision <tool> <command>: prints the hook's permission decision, or nothing
@@ -51,6 +56,9 @@ PASS
 optin o_r
 check "opted in: the merge API call gets no prompt" '[ -z "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f sha=abc1234 -f merge_method=squash")" ]'
 check "opted in: reads the target repository's AGENTS.md from GitHub" 'grep -q "repos/o/r/contents/AGENTS.md" "$STUB/calls"'
+check "opted in: someone else's pull request still asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/9/merge -f sha=abc1234")" = ask ]'
+check "opted in: a pull request whose author cannot be read still asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/8/merge -f sha=abc1234")" = ask ]'
+check "opted in: a variable pull request number still asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/\$pr/merge -f sha=abc1234")" = ask ]'
 check "opted in: a merge API call without sha= still asks" '[ "$(decision Bash "gh api -X PUT repos/o/r/pulls/7/merge -f merge_method=squash")" = ask ]'
 check "opted in: gh pr merge still asks" '[ "$(decision Bash "gh pr merge 7 --squash")" = ask ]'
 check "opted in: gh pr merge --auto still asks" '[ "$(decision Bash "gh pr merge 7 --auto --squash")" = ask ]'
