@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2016
+# shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for hooks/no-merge, the PreToolUse hook. Prints PASS/FAIL per
 # case; exits 1 on any FAIL.
