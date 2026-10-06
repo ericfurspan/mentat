@@ -162,6 +162,8 @@ review() {
   moved() { die "the head moved from $head; run mentat review again" 3; }
   if ! head=$(head_now) || [ -z "$head" ]; then not_reviewed "could not read pull request #$pr"; fi
   wait_for_ci "$repo" "$head"
+  # A push during the wait would get the app's review without passing CI.
+  [ "$(head_state)" != moved ] || moved
   n=$(app_reaction "$repo" "$pr" eyes "") || not_reviewed "could not read the reactions on #$pr"
   [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
   draft=$(gh pr view "$pr" --json isDraft --jq .isDraft) || not_reviewed "could not read pull request #$pr"

@@ -49,6 +49,7 @@ case "$1 $2" in
       */comments) cat "$STUB/comments.json" ;;
       */check-runs)
         n=$(($(cat "$STUB/ci_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/ci_reads"
+        [ -f "$STUB/push_on_ci" ] && cp "$STUB/push_on_ci" "$STUB/head"
         if [ "$n" -ge 2 ] && [ -f "$STUB/check_runs_later.json" ]; then cat "$STUB/check_runs_later.json"; else cat "$STUB/check_runs.json"; fi ;;
       */status) cat "$STUB/status.json" ;;
       *) exit 99 ;;
@@ -99,10 +100,10 @@ check "no new ready event on GitHub is not reviewed" '[ "$rc" = 1 ] && grep -q "
 reset; touch "$STUB/ready_fails"; rc=$(run)
 check "a failed ready is not reviewed" '[ "$rc" = 1 ] && grep -q "could not mark #7 ready" "$STUB/out"'
 # One failed read of the head is a missed poll, not a moved head.
-reset; echo 2 >"$STUB/head_fails_at"; printf '[%s]\n' "$(reaction "$APP" +1 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_ready"; rc=$(run)
-check "a failed head read in the loop is not a moved head" '[ "$rc" = 0 ] && ! grep -q "head moved" "$STUB/out"'
 reset; echo 3 >"$STUB/head_fails_at"; printf '[%s]\n' "$(reaction "$APP" +1 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_ready"; rc=$(run)
-check "a result is accepted only after the head is read again" '[ "$rc" = 0 ] && [ "$(cat "$STUB/head_reads")" -ge 5 ]'
+check "a failed head read in the loop is not a moved head" '[ "$rc" = 0 ] && ! grep -q "head moved" "$STUB/out"'
+reset; echo 4 >"$STUB/head_fails_at"; printf '[%s]\n' "$(reaction "$APP" +1 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_ready"; rc=$(run)
+check "a result is accepted only after the head is read again" '[ "$rc" = 0 ] && [ "$(cat "$STUB/head_reads")" -ge 6 ]'
 reset; rc=$(run)
 check "no result in time is not reviewed (exit 1)" '[ "$rc" = 1 ] && grep -q "no result from the Codex app on $H" "$STUB/out"'
 # CI on the head is waited for before the review starts.
@@ -118,6 +119,8 @@ reset; thumbs; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout is not reviewed (exit 4)" '[ "$rc" = 4 ] && grep -q "CI did not finish on $H" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
 reset; thumbs; runs >"$STUB/check_runs.json"; rc=$(run)
 check "no CI at all reviews after the grace period" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ]'
+reset; thumbs; echo "$OLD" >"$STUB/push_on_ci"; rc=$(run)
+check "a push during the CI wait is caught before the pull request is marked ready (exit 3)" '[ "$rc" = 3 ] && ! grep -q "pr ready" "$STUB/calls"'
 reset; thumbs; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
 check "a skipped check does not block the review" '[ "$rc" = 0 ]'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
