@@ -14,11 +14,9 @@
 
 ## The repository comes first
 
-Mentat requires nothing of a repository's GitHub settings. Rulesets, required approvals, code owners, merge methods and CI are yours, and Mentat works within whatever you have. Where your AGENTS.md says something different from Mentat's rules on a preference, such as commit format, branch flow, or a workflow that commits to the default branch, your AGENTS.md wins.
+Mentat requires nothing of a repository's GitHub settings. Rulesets, required approvals, merge methods and CI are yours, and Mentat works within whatever you have. Where your AGENTS.md says something different from Mentat's rules on a preference, such as commit format, branch flow, or a workflow that commits to the default branch, your AGENTS.md wins.
 
 If your repository requires an approval and the agent opens pull requests as you, GitHub will not let you approve your own pull request. Use a separate GitHub account for the agent in that case; Claude Code tells you when it happens.
-
-If your repository has a code owners file, GitHub requests your review as soon as a pull request is marked ready, which is when the Codex review starts, not when it ends. Claude Code's message that the pull request is ready to merge, with its final-check comment, is the sign that reviews are done.
 
 ## What holds, and how
 

@@ -245,7 +245,7 @@ challenge() {
 
 # Check reads GitHub and changes nothing, there or locally. It looks only for
 # what Mentat itself needs. The repository's own settings (rulesets, required
-# approvals, code owners, merge methods) are the owner's and are not checked.
+# approvals, merge methods) are the owner's and are not checked.
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
 c_problem() { printf 'PROBLEM: %s\n' "$1"; check_problems=$((check_problems + 1)); }

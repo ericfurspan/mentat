@@ -72,5 +72,5 @@ Mentat's rules are instructions to the agent, not guarantees. If you want GitHub
 
 - Give the agent its own GitHub account with write access, never admin.
 - Add a ruleset on the default branch that requires a pull request and blocks force pushes, with no bypass for the agent's account ([about rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)).
-- Require an approval, and a code owners file naming you, so pull requests wait for your Approve ([about code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)).
+- Require one approval in that ruleset, so pull requests the agent opens wait for your Approve.
 - Keep secrets out of reach of workflows a branch can run, or protect them with environments.
