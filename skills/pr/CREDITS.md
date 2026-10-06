@@ -4,7 +4,7 @@ Adapted from the `pr` skill in [mattpocock/skills](https://github.com/mattpocock
 
 The menu of visuals in `visuals.md` comes, through that skill, from [Dex Horthy](https://github.com/dexhorthy)'s `show-me` skill in [humanlayer/skills](https://github.com/humanlayer/skills).
 
-Changes for Mentat: Summary leads with plain prose because Codex reviews against the body; a Not in scope section; repository templates and glossaries come first; the visuals moved to a separate file.
+Changes for Mentat: Summary leads with plain prose because Codex reviews against the body; a Not in scope section; repository templates and glossaries come first; the visuals moved to a separate file and are ordered by what the point is, tables first, with pseudocode kept for code logic.
 
 Both sources are under the MIT License:
 

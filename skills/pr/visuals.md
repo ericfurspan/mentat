@@ -1,65 +1,57 @@
 # Visuals for a pull request summary
 
-Pick the smallest view that makes the key point clear. Place each one next to the short sentence it supports, and keep only the calls, files, states and boundaries the point needs. One is usually enough; several is rare.
+Use a visual only when it makes the point faster than prose. Give it a one-line lead-in that says what it shows, place it next to the sentence it supports, and keep only what the point needs. One is usually enough.
 
-- **Pseudocode** for logic or an algorithm:
+Pick by what the point is, in this order:
 
-```text
-on(save)
-  if content is unchanged
-    return cached result
-  write new content
-  return fresh result
+1. **What happens in each case** (inputs, states, outcomes, a before and after per item): a **table**.
+
+What `mentat review` does with each CI result on the head commit:
+
+| CI on the head | `mentat review` |
+|---|---|
+| All checks pass | Reviews as before |
+| A check fails | Stops, exit 4, lists the failing checks |
+| No checks after 60 s | Treats the repository as having no CI, reviews |
+
+2. **An order of steps, or who calls whom**: a **Mermaid** flowchart or sequence diagram. GitHub renders it as a diagram.
+
+How a review starts after this change:
+
+```mermaid
+flowchart LR
+    push[Push] --> ci{CI on the head}
+    ci -- passes --> review[Codex reviews]
+    ci -- fails --> stop[Stop, exit 4]
 ```
 
-- **Call tree** for runtime control flow:
+3. **Where files or responsibilities live, or what moved**: a **file tree** or a **shaped diff** of the tree.
+
+Where the review loop lives after this change:
+
+```diff
+ rules.md            # always loaded; one pointer per step
+ skills/
+   pr/SKILL.md
++  review/SKILL.md   # review loop and final check
+```
+
+4. **Code structure**: a **call tree** or **component tree**, with only the calls or components that changed and their neighbors.
 
 ```text
 submitForm
   createSession
     persistPrompt
     launchAgent
-  navigateToSession
 ```
 
-- **Component tree** for UI structure, with the state and module boundaries that matter:
+5. **The logic of one function**: **pseudocode**. Use it only for code logic, never to describe behavior or outcomes; a table does that better.
 
 ```text
-<SessionPage> (apps/example/src/routes/session.tsx)
-  useSessionEvents()
-  <SessionToolbar>
-    <RunSkillButton> (packages/ui)
+on(save)
+  if content is unchanged
+    return cached result
+  write new content
 ```
 
-- **File tree** for file responsibility or a broad refactor:
-
-```text
-src/
-├── commands/       # parses user actions
-├── sessions/       # owns session state
-└── transport/      # sends API requests
-```
-
-- **Mermaid** for interaction or data flow between parts:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI
-    participant Daemon
-    User->>UI: choose command
-    UI->>Daemon: send expanded prompt
-    Daemon-->>UI: stream result
-```
-
-- **Shaped diff** when the point is what changes and the surrounding shape already exists. Match the diff's shape to the topic: a tree, a call stack, or control flow.
-
-```diff
- submitForm
-   createSession
-     persistPrompt
-+    expandSkillMention
-     launchAgent
-```
-
-- **The whole block** when most of it is new, or when leaving out context would hide ownership or order.
+6. **The whole block**, when most of it is new, or when leaving out context would hide ownership or order.
