@@ -20,7 +20,7 @@ The pull request body has two readers. The maintainer reads it to see what chang
 
 <One or two sentences: what was asked, and what this changes.>
 
-<Optional: one small visual, next to the sentence it supports.>
+<Optional: one small visual with a one-line lead-in saying what it shows, next to the sentence it supports.>
 
 ## Evidence
 
@@ -45,7 +45,7 @@ Closes #<issue, when there is one>
 
 ### Summary
 
-Plain prose first: what was asked and what the change does, in the words a reviewer would check the diff against. Add a visual only where it makes the point faster than prose; pick the smallest view that does. For the menu of visuals (pseudocode, call tree, file tree, component tree, Mermaid, shaped diff), read [visuals.md](visuals.md).
+Plain prose first: what was asked and what the change does, in the words a reviewer would check the diff against. Add a visual only where it makes the point faster than prose; pick the smallest view that does. To pick one (a table first for what happens in each case, Mermaid for an order of steps, a tree or shaped diff for layout, pseudocode only for code logic), read [visuals.md](visuals.md).
 
 ### Evidence
 
