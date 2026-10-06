@@ -1,15 +1,15 @@
 # How Mentat works
 
-*For people. Agents follow `rules.md`, not this page.*
+*For people. Agents follow `rules.md` and the skills in `skills/`, not this page.*
 
 ## How a change moves, in full
 
-`rules.md` is the source of truth. In short:
+`rules.md` holds what applies in every session and names a skill for each step below; each skill's file is the source of truth for that step.
 
-1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build and how it will be checked. Uncertain or consequential plans get a Codex challenge first (`mentat challenge`).
+1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build and how it will be checked. An uncertain or consequential plan gets a Codex challenge first ([`skills/plan`](../skills/plan/SKILL.md)).
 2. One builder, one branch, one checkout per change. The repository's test command runs before the pull request opens and after every fix.
-3. Every pull request opens as a draft, with a description written by the `pr` skill: a short summary, before-and-after evidence, and the merge danger (whether a revert undoes it, and what breaks if it is wrong). When it is built and CI passes, `mentat review` marks it ready, which starts OpenAI's Codex GitHub app review of that exact commit, and waits for the result. Where the app is not set up, `mentat review --local` reviews that commit with local Codex and posts the result on the pull request. Claude Code fixes findings that have a realistic trigger and answers the rest with a reason, then reviews again for the new commit. From the fourth round on it fixes only P0 and P1 findings; five rounds is a hard stop, and it tells you why.
-4. When the latest review is clean, or every finding is fixed or answered with a reason, Claude Code answers any comments you left and posts a final check of that commit as one comment: what was asked and where the diff does it, test and CI results, what was not checked, and what most deserves your eyes. It is the author's own check, not an approval. Then it tells you the pull request is ready.
+3. Every pull request opens as a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
+4. When it is built and CI passes, Codex reviews each head commit, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again; five rounds is a hard stop. When the loop ends, it posts a final check, the author's own check and not an approval, and tells you the pull request is ready ([`skills/review`](../skills/review/SKILL.md)).
 5. You merge it, the way your repository merges.
 
 ## The repository comes first
