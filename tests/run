@@ -135,6 +135,19 @@ for f in skills/*/SKILL.md; do
   fi
 done
 
+# The retro reads sessions through skills/retro/transcript, which redacts
+# token-like strings. The values below are fake.
+if command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1; then
+  fixture='{"type":"user","message":{"content":"use ghp_FAKEFAKEFAKEFAKE1234 and password=notarealpass1"}}'
+  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -q FAKEFAKE <<<"$out" && ! grep -q notarealpass <<<"$out" && grep -q "user: use <REDACTED>" <<<"$out"; then
+    pass "skills/retro/transcript redacts token-like strings"
+  else
+    fail "skills/retro/transcript does not redact token-like strings"
+  fi
+else
+  skip "jq or perl not installed, skills/retro/transcript not checked"
+fi
+
 # mentat review, review --local, challenge and check behave as specified (stub
 # gh and codex), and so do the merge and reply hooks.
 if command -v jq >/dev/null 2>&1; then
@@ -147,10 +160,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
+  if shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh"
   fi
 else
   skip "shellcheck not installed, shell scripts not checked"

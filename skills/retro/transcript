@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Prints a Claude Code session log (.jsonl) for a retro: who said what, each tool
+# call and the start of each result, cut short, with token-like strings replaced
+# by <REDACTED>. The retro reads a session only through this, never the raw file.
+# Redaction is by pattern and can miss a credential; it lowers the risk, it does
+# not remove it.
+set -euo pipefail
+[ $# -eq 1 ] && [ -r "$1" ] || { printf 'usage: transcript <session.jsonl>\n' >&2; exit 64; }
+jq -r 'select(.type == "user" or .type == "assistant") | .type as $who | .message.content |
+  if type == "string" then "\($who): \(.[0:400])"
+  else .[] |
+    if .type == "text" then "\($who): \(.text[0:400])"
+    elif .type == "tool_use" then "tool: \(.name) \(.input | tostring | .[0:200])"
+    elif .type == "tool_result" then "result: \(.content | tostring | .[0:200])"
+    else empty end
+  end' "$1" |
+  perl -pe 's/\b(gh[pousr]_|github_pat_|sk-|xox[abpr]-|AKIA)[A-Za-z0-9_-]{8,}/<REDACTED>/g;
+    s/(bearer|token|password|passwd|secret|api[_-]?key)(["\x27]?\s*[=:]\s*["\x27]?|\s+)[^\s"\x27,}]{6,}/$1$2<REDACTED>/gi'
