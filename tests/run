@@ -97,7 +97,8 @@ fi
 for f in skills/*/SKILL.md; do
   [ -e "$f" ] || continue
   dir=${f%/SKILL.md}
-  if grep -qx "name: ${dir#skills/}" "$f"; then
+  # Only the frontmatter block at the top of the file counts.
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="name: ${dir#skills/}" "$f"; then
     pass "$f is named ${dir#skills/}"
   else
     fail "$f must set name: ${dir#skills/}"
