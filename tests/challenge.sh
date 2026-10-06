@@ -70,11 +70,15 @@ git init -q -b trunk "$odd" && (cd "$odd" && git config user.email t@example.tes
 reset; (cd "$odd" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
 check "quotes a path with a space, a double quote and a backslash as a TOML string" '[ "$rc" = 0 ] && grep -qF -- "odd \\\"q\\\" back\\\\slash/.git\"=\"read\"" "$STUB/args"'
 
-# Codex installed at $HOME/codex: neither $HOME nor the directory above it may be readable.
-mkdir -p "$root/fakehome" && cp "$root/bin/codex" "$root/fakehome/codex"
-fakehome=$(cd "$root/fakehome" && pwd -P); fakeparent=${fakehome%/*}
+# Nothing in the profile comes from where codex is installed: with codex in $HOME, or in a
+# directory under another temp root, the profile is exactly the fixed paths and the git directory.
+want="{\":minimal\"=\"read\", \"/opt/homebrew\"=\"read\", \"/usr/local\"=\"read\", \"$top/.git\"=\"read\", \"/tmp\"=\"deny\", \"/private/tmp\"=\"deny\", \":workspace_roots\"={\".\"=\"read\"}}"
+mkdir -p "$root/fakehome" "$root/tools dir/bin" && cp "$root/bin/codex" "$root/fakehome/codex" && cp "$root/bin/codex" "$root/tools dir/bin/codex"
+fakehome=$(cd "$root/fakehome" && pwd -P)
 reset; (cd "$top/sub" && HOME="$fakehome" PATH="$fakehome:$PATH" "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
-check "never reads \$HOME or a directory above it, even with codex in \$HOME" '[ "$rc" = 0 ] && grep -qF "\"$top/.git\"=\"read\"" "$STUB/args" && ! grep -qF "\"$fakehome\"=" "$STUB/args" && ! grep -qF "\"$fakeparent\"=" "$STUB/args"'
+check "codex in \$HOME adds nothing to the profile" '[ "$rc" = 0 ] && [ "$(grep "^permissions.mentat-review.filesystem=" "$STUB/args")" = "permissions.mentat-review.filesystem=$want" ]'
+reset; (cd "$top/sub" && PATH="$root/tools dir/bin:$PATH" "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
+check "codex in another directory adds nothing to the profile" '[ "$rc" = 0 ] && [ "$(grep "^permissions.mentat-review.filesystem=" "$STUB/args")" = "permissions.mentat-review.filesystem=$want" ]'
 
 for v in "PROCEED" "RETHINK"; do
   reset; printf 'Fine.\nCHALLENGE VERDICT: %s\n' "$v" >"$STUB/codex_out"; rc=$(run "$plan")

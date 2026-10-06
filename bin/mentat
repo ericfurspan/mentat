@@ -31,31 +31,16 @@ toml_str() {
   s=${s//\"/\\\"}
   printf '"%s"' "$s"
 }
-# Prints $1 with every symlink resolved: readlink without -f (macOS has none) and cd -P.
-resolve_path() {
-  local p="$1" t d n=0
-  while [ -L "$p" ] && [ "$n" -lt 20 ]; do
-    t=$(readlink "$p") || return 1
-    case "$t" in /*) p="$t" ;; *) p="${p%/*}/$t" ;; esac
-    n=$((n + 1))
-  done
-  d=$(cd "${p%/*}" 2>/dev/null && pwd -P) || return 1
-  printf '%s/%s\n' "$d" "${p##*/}"
-}
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
-# directory $1: the checkout, its git directory and the system and tool paths,
-# and nothing else. A path that is $HOME or a directory above it (so also /) is
-# skipped, so Codex fails closed rather than reading the whole disk or the home
-# directory.
+# directory $1: the checkout, its git directory (outside the checkout for a
+# worktree) and the system paths. Codex must be installed under /opt/homebrew or
+# /usr/local (Homebrew, or npm with a system or Homebrew node); anywhere else it
+# cannot start inside the profile, so the run fails closed (not reviewed, not
+# challenged). Nothing is derived from where codex is, so no install can widen it.
 codex_filesystem() {
-  local dir="$1" bin real p q table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
-  bin=$(command -v codex) || bin=""
-  case "$bin" in /*) real=$(resolve_path "$bin") || real="" ;; *) bin=""; real="" ;; esac
-  for p in "${bin%/*}" "${real%/*}" "${real%/*/*}" "$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; do
-    q="${p%/}"
-    case "${HOME%/}/" in "$q"/*) continue ;; esac
-    table="$table, $(toml_str "$p")=\"read\""
-  done
+  local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
+  gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
+  [ -z "$gitdir" ] || table="$table, $(toml_str "$gitdir")=\"read\""
   printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read"}}' "$table"
 }
 
