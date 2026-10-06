@@ -8,7 +8,7 @@
 set -uo pipefail
 export LC_ALL=C # count bytes, so the result is the same on macOS and Linux
 
-limit=200 # the style asks for 100; the hook allows a margin so near misses do not cost a rewrite
+limit=250 # the style asks for 100 and shapes replies; the hook only catches runaway ones
 
 command -v jq >/dev/null 2>&1 || exit 0
 input=$(cat)

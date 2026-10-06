@@ -24,7 +24,7 @@ If your repository requires an approval and the agent opens pull requests as you
 
 - The SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear, compact and fork.
 - The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
-- The reply hook checks each final reply when you have chosen the Mentat output style. The style asks for 100 words; over 200 outside fenced code blocks, an em dash or a blockquote gets one request to rewrite it. It reads `outputStyle` from your settings files (local, then project, then user) and asks once per turn, never cutting text itself.
+- The reply hook checks each final reply when you have chosen the Mentat output style. The style asks for 100 words; over 250 outside fenced code blocks, an em dash or a blockquote gets one request to rewrite it. It reads `outputStyle` from your settings files (local, then project, then user) and asks once per turn, never cutting text itself.
 - `bin/mentat` is on the Bash tool's PATH while the plugin is enabled.
 
 ### Instructions, not guarantees

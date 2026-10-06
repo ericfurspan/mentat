@@ -32,10 +32,10 @@ ask() {
 dash=$(printf '\342\200\224')
 fence='```'
 
-out=$(ask "$(words 200)")
+out=$(ask "$(words 250)")
 check "a reply at the hook limit passes" '[ -z "$out" ]'
-out=$(ask "$(words 201)")
-check "a reply over the limit is asked for a rewrite" 'printf "%s" "$out" | grep -q "201 words"'
+out=$(ask "$(words 251)")
+check "a reply over the limit is asked for a rewrite" 'printf "%s" "$out" | grep -q "251 words"'
 out=$(ask "$(printf 'Done.\n\n%s\n%s\n%s\n' "$fence" "$(words 300)" "$fence")")
 check "words inside a fenced code block are not counted" '[ -z "$out" ]'
 out=$(ask "Merged $dash see the log.")
