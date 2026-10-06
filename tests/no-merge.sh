@@ -26,6 +26,8 @@ gh  pr   merge
 GH_TOKEN= gh pr merge 3
 gh api -X PUT repos/o/r/pulls/7/merge
 gh api repos/o/r/pulls/7/merge -X PUT -f merge_method=squash
+pr=7; gh api -X PUT "repos/o/r/pulls/$pr/merge"
+gh api -X PUT repos/o/r/pulls/${PR}/merge
 ASK
 
 while IFS= read -r cmd; do
@@ -37,6 +39,7 @@ git merge-base main HEAD
 git merge origin/main
 gh api repos/o/r/pulls/7
 gh api repos/o/r/pulls/7/reviews
+gh api repos/o/r/pulls/7/merged-files
 mygh pr merge 12
 PASS
 

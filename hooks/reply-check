@@ -22,7 +22,8 @@ project="${CLAUDE_PROJECT_DIR:-$(printf '%s' "$input" | jq -r '.cwd // empty' 2>
 style=""
 for f in "$project/.claude/settings.local.json" "$project/.claude/settings.json" "$HOME/.claude/settings.json"; do
   [ -f "$f" ] || continue
-  style=$(jq -r '.outputStyle // empty' "$f" 2>/dev/null) || style=""
+  # A file that cannot be read ends the search: a lower file must not apply.
+  style=$(jq -r '.outputStyle // empty' "$f" 2>/dev/null) || exit 0
   [ -z "$style" ] || break
 done
 case "$style" in mentat:Mentat | Mentat) ;; *) exit 0 ;; esac

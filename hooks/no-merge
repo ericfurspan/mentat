@@ -12,7 +12,7 @@ tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
 case "$tool" in
   Bash)
     cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
-    printf '%s\n' "$cmd" | grep -Eq '(^|[^[:alnum:]_.-])gh[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)|(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[0-9]+/merge([^[:alnum:]_]|$)' || exit 0
+    printf '%s\n' "$cmd" | grep -Eq '(^|[^[:alnum:]_.-])gh[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)|(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|$)' || exit 0
     ;;
   mcp__ccd_pr__set_auto_merge) ;;
   *) exit 0 ;;
