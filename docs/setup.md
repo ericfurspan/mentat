@@ -10,6 +10,7 @@ Mentat needs nothing from your repository's GitHub settings. It works within wha
 - For reviews, one of:
   - OpenAI's Codex GitHub app on the repository (needs a ChatGPT plan with Codex code review), or
   - the Codex CLI signed in, for local reviews. `mentat challenge` also uses it.
+- Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node). Anywhere else, local Codex cannot start.
 - Optional: a separate GitHub account for the agent. Recommended if your repository requires approvals, because GitHub does not let you approve a pull request you opened.
 
 ## Turning it on
@@ -26,23 +27,23 @@ Then, in the repository's checkout, for yourself only (writes `.claude/settings.
 claude plugin install mentat@mentat --scope local
 ```
 
-Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit.
+Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit. Each collaborator also needs the marketplace on their own machine (`claude plugin marketplace add ericfurspan/mentat`).
 
 Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings.
 
 ### Choosing the Mentat reply style
 
-Mentat ships an output style: result first, about 100 words, no narration. It is not forced on you. To use it, pick Mentat with `/config` (Output style). To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`. The reply hook checks replies only when this style is chosen.
+Mentat ships an output style: result first, about 100 words, no narration. It is not forced on you. To use it in the terminal, pick Mentat with `/config` (Output style) or `/output-style`. In the desktop app, `/config` opens Settings instead of a menu, so set `outputStyle` in a settings file. To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`. The reply hook checks replies only when this style is chosen.
 
 ### Reviews
 
-- With the Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and in Codex's code review settings turn on automatic review for all pull requests, triggered on PR open. Without that setting it reviews only when you comment `@codex review`, and `mentat review` falls back to a local review after 20 minutes.
+- With the Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and in Codex's code review settings turn on automatic review for all pull requests, triggered on PR open. Without that setting it reviews only when you comment `@codex review`, and `mentat review` gives up after 20 minutes. Claude Code then runs `mentat review --local`.
 - Without the app: add a line to the repository's AGENTS.md saying reviews are local, so Claude Code goes straight to `mentat review --local`.
 - Either way, Codex follows a `## Code Review Rules` section in AGENTS.md if you add one.
 
 ### Plugin updates
 
-The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), which turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then restart the session.
+Plugin auto-update is off by default for this marketplace, unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then restart the session.
 
 ## Turning it off
 
@@ -63,6 +64,8 @@ Use the scope you installed with. What remains:
 - Local scope: `.claude/settings.local.json`, still ignored by git, with Mentat's entry removed.
 - Project scope: the change to `.claude/settings.json` is yours to commit.
 - On the machine: the marketplace, until you run `claude plugin marketplace remove mentat`.
+- `"outputStyle": "mentat:Mentat"`, in whichever settings file you chose it in.
+- Codex automatic review, if you set it up: turn it off, or disconnect the repository, in ChatGPT.
 
 Mentat never deletes settings files. Remove any `## Code Review Rules` section or review line you added to AGENTS.md if you no longer want it.
 

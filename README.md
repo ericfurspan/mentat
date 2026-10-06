@@ -4,9 +4,9 @@ How coding agents work in your GitHub repositories: you decide, Claude Code buil
 
 Mentat is for one developer on macOS who runs coding agents on their own GitHub repositories. You and Claude Code work out what to build: it reads the code, asks what it needs, pushes back where it should, and brings you the decisions that are yours. Then it builds and opens pull requests, Codex reviews each one, and you merge.
 
-Mentat requires nothing of your repository's GitHub settings. It works within your rules, approvals and CI, and your AGENTS.md wins where it differs. One command turns it on or off.
+Mentat requires nothing of your repository's GitHub settings. It works within your rules, approvals and CI, and your AGENTS.md wins on preferences such as commit format and branch flow. One command turns it on or off.
 
-It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional output style, a hook that asks you before any merge, a builder subagent and the `mentat` command.
+It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional output style, a hook that asks you before the agent merges a pull request with `gh` or turns on auto-merge, a builder subagent and the `mentat` command.
 
 ## How a change moves
 
