@@ -14,7 +14,7 @@ case "$tool" in
     cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
     # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
     flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
-    printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh$flags[[:space:]]+pr$flags[[:space:]]+merge([[:space:]]|\$)|(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)" || exit 0
+    printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)|(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)" || exit 0
     ;;
   mcp__ccd_pr__set_auto_merge) ;;
   *) exit 0 ;;
