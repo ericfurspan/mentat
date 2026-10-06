@@ -49,7 +49,8 @@ codex_filesystem() {
 # Files inside the checkout that commonly hold credentials, denied to Codex even
 # though the rest of the checkout is readable. Glob denies are pre-expanded to
 # GLOB_DEPTH levels before Codex starts. Example files such as .env.example are
-# denied too; a review that needs one says it could not read it.
+# denied too; a review that needs one says it could not read it. A committed file
+# stays readable through the git directory; a committed credential is exposed anyway.
 CREDENTIAL_DENY='"**/.env"="deny", "**/.env.*"="deny", "**/*.pem"="deny", "**/*.key"="deny", "**/*.p12"="deny", "**/*.pfx"="deny", "**/id_rsa*"="deny", "**/id_ecdsa*"="deny", "**/id_ed25519*"="deny", "**/.netrc"="deny", "**/.npmrc"="deny", "**/.pypirc"="deny"'
 GLOB_DEPTH=8
 
