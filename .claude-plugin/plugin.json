@@ -1,6 +1,6 @@
 {
   "name": "mentat",
-  "description": "How coding agents work in your GitHub repositories: Claude Code builds, Codex reviews, you approve.",
+  "description": "How coding agents work in your GitHub repositories: Claude Code builds, Codex reviews, you merge.",
   "author": { "name": "ericfurspan" },
   "repository": "https://github.com/ericfurspan/mentat"
 }
