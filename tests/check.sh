@@ -37,10 +37,17 @@ cat >"$root/bin/codex" <<'STUBEOF'
 [ "$1" = --version ] && [ ! -f "$STUB/no_version" ] && echo "codex-cli 9.9.9"
 exit 0
 STUBEOF
-chmod +x "$root/bin/gh" "$root/bin/codex"
+# claude: the one on the PATH prints $STUB/claude_version; the one at
+# $root/exec/claude, for CLAUDE_CODE_EXECPATH, prints $STUB/exec_version.
+mkdir "$root/exec"
+printf '#!/usr/bin/env bash\n[ "$1" = --version ] && cat "$STUB/claude_version"\nexit 0\n' >"$root/bin/claude"
+printf '#!/usr/bin/env bash\n[ "$1" = --version ] && cat "$STUB/exec_version"\nexit 0\n' >"$root/exec/claude"
+chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/claude" "$root/exec/claude"
 export PATH="$root/bin:$PATH"
+# A Claude Code session sets this; the cases below set it themselves.
+unset CLAUDE_CODE_EXECPATH
 
-reset() { rm -f "$STUB"/*; echo 0 >"$STUB/secrets"; }
+reset() { rm -f "$STUB"/*; echo 0 >"$STUB/secrets"; echo "2.1.163 (Claude Code)" >"$STUB/claude_version"; }
 run() { (cd "$root/cwd" && "$mentat" check "$@" >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
 
@@ -52,6 +59,20 @@ check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out
 check "prints the installed codex version" 'grep -qx "OK: codex is installed (codex-cli 9.9.9)" "$STUB/out"'
 reset; touch "$STUB/no_version"; rc=$(run)
 check "a codex with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: codex is installed (version unknown)" "$STUB/out"'
+
+check "Claude Code at the minimum is OK" 'grep -qx "OK: Claude Code 2.1.163 (Mentat needs 2.1.163 or later)" "$STUB/out"'
+
+reset; echo "2.1.1000 (Claude Code)" >"$STUB/claude_version"; rc=$(run)
+check "versions compare as numbers, not text" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.1000" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; echo "2.1.99 (Claude Code)" >"$STUB/claude_version"; rc=$(run)
+check "an older Claude Code is a warning, not a failure" '[ "$rc" = 0 ] && grep -qx "WARN: Claude Code 2.1.99 is older than 2.1.163, which Mentat needs: run claude update, or update the Claude desktop app" "$STUB/out"'
+reset; echo "2.1.99 (Claude Code)" >"$STUB/claude_version"; echo "2.1.200 (Claude Code)" >"$STUB/exec_version"
+rc=$(CLAUDE_CODE_EXECPATH="$root/exec/claude" run)
+check "the running Claude Code wins over the one on the PATH" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.200" "$STUB/out"'
+reset; echo "v22.1.0" >"$STUB/exec_version"; rc=$(CLAUDE_CODE_EXECPATH="$root/exec/claude" run)
+check "a running program that is not Claude Code falls back to the PATH" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.163" "$STUB/out"'
+reset; echo "something else" >"$STUB/claude_version"; rc=$(run)
+check "an unreadable Claude Code version is a warning" '[ "$rc" = 0 ] && grep -qx "WARN: could not tell the Claude Code version; Mentat needs 2.1.163 or later" "$STUB/out"'
 
 reset; rc=$(run owner/repo)
 check "takes owner/repo" '[ "$rc" = 0 ] && ! grep -q "repo view" "$STUB/calls"'
