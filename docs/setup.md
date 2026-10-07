@@ -6,7 +6,7 @@ Mentat needs nothing from your repository's GitHub settings. It works within wha
 
 ## What you need
 
-- macOS, Claude Code 2.1.287 or later, `git`, `jq`, and `gh` signed in.
+- macOS, Claude Code, `git`, `jq`, and `gh` signed in.
 - For reviews, one of:
   - OpenAI's Codex GitHub app on the repository (needs a ChatGPT plan with Codex code review), or
   - the Codex CLI signed in, for local reviews. `mentat challenge` also uses it.

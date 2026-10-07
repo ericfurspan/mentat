@@ -24,8 +24,8 @@ jobs:
           persist-credentials: false
       - if: runner.os == 'macOS'
         run: command -v shellcheck >/dev/null || brew install shellcheck
-      # Pinned so a new Claude Code release cannot change what the tests check; raise it on purpose.
-      - run: npm install -g @anthropic-ai/claude-code@2.1.292
+      # The latest Claude Code, the version the maintainer's own updates to: the mod API may change between releases.
+      - run: npm install -g @anthropic-ai/claude-code
       - run: tests/run
 
   # The check the main ruleset requires is named "test". It passes only when every
