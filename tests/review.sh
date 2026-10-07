@@ -121,8 +121,14 @@ reset; thumbs; runs >"$STUB/check_runs.json"; rc=$(run)
 check "no CI at all reviews after the grace period" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ]'
 reset; thumbs; echo "$OLD" >"$STUB/push_on_ci"; rc=$(run)
 check "a push during the CI wait is caught before the pull request is marked ready (exit 3)" '[ "$rc" = 3 ] && ! grep -q "pr ready" "$STUB/calls"'
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+reset; thumbs; printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"}]}\n' "$now" >"$STUB/check_runs.json"
+printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"},{"name":"slow","status":"in_progress","conclusion":null}]}\n' "$now" >"$STUB/check_runs_later.json"; rc=$(run)
+check "a check that just passed waits for checks that register later" '[ "$rc" = 4 ] && grep -q "CI did not finish" "$STUB/out" && grep -qx -- "- slow" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
 reset; thumbs; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
 check "a skipped check does not block the review" '[ "$rc" = 0 ]'
+rc=$("$mentat" review 7 --local >/dev/null 2>&1; echo $?)
+check "an argument after the number is a usage error, not the app path (exit 64)" '[ "$rc" = 64 ]'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
