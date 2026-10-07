@@ -29,6 +29,7 @@ For you:
 
 - [Turning Mentat on and off](docs/setup.md): what you need, turning it on for a repository, turning it off, and optionally having GitHub enforce the rules.
 - [How Mentat works](docs/how-it-works.md): the full flow, what holds and how, the `mentat` commands, and what Mentat does not do.
+- [An example session](docs/example-session.md): edited excerpts from a real session, from a request to a merge.
 
 For agents. You do not need to read these:
 
