@@ -64,3 +64,21 @@ test('answering in the pane sends the answer to chat as a prompt', async ($, on)
     'Answer to decision d1 ("Keep it?"): yes, for now',
   ])
 })
+
+test('two decisions opened at once get different ids and both are kept', async ($, on) => {
+  mock.clock(on)
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box key="engine-own" />
+  })
+  const [a, b] = await Promise.all([
+    $.tool.call({ tool: OPEN, question: 'First?' } as never),
+    $.tool.call({ tool: OPEN, question: 'Second?' } as never),
+  ])
+  const ids = [a, b].map(r => String((r as { result?: unknown }).result))
+  expect(ids.sort()).toEqual(['Opened decision d1.', 'Opened decision d2.'])
+
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' } as never)
+  expect(await texts(band as never)).toContain('2 decisions wait on you')
+  await band.unmount()
+})

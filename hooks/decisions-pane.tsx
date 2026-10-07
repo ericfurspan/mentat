@@ -17,6 +17,15 @@ const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const isOpen = (d: Decision) => d.closedAt === undefined
 
 export const register: Register = on => {
+  // $.state reads and writes are separate awaits, so two tool calls running at
+  // once could take the same id or drop an entry. Every change runs here, in turn.
+  let queue: Promise<unknown> = Promise.resolve()
+  const inTurn = <T,>(work: () => Promise<T>): Promise<T> => {
+    const run = queue.then(work, work)
+    queue = run.catch(() => undefined)
+    return run
+  }
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'decisions',
@@ -72,11 +81,13 @@ export const register: Register = on => {
       typeof input.recommendation === 'string' && input.recommendation.trim() !== ''
         ? input.recommendation.trim()
         : undefined
-    const n = await read($, nextId)
-    await update($, nextId, v => v + 1)
-    const id = `d${n}`
-    const openedAt = await $.clock.now()
-    await update($, items, list => [...list, { id, question, recommendation, openedAt }].slice(-50))
+    const id = await inTurn(async () => {
+      const n = await read($, nextId)
+      await update($, nextId, () => n + 1)
+      const openedAt = await $.clock.now()
+      await update($, items, list => [...list, { id: `d${n}`, question, recommendation, openedAt }].slice(-50))
+      return `d${n}`
+    })
 
     return { result: `Opened decision ${id}.` }
   })
@@ -84,13 +95,19 @@ export const register: Register = on => {
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
     const input = e as unknown as { id?: unknown; outcome?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
-    const list = await read($, items)
-    if (!list.some(d => d.id === id && isOpen(d))) {
+    const outcome = typeof input.outcome === 'string' && input.outcome.trim() !== '' ? input.outcome.trim() : undefined
+    const isClosed = await inTurn(async () => {
+      const list = await read($, items)
+      if (!list.some(d => d.id === id && isOpen(d))) {
+        return false
+      }
+      const closedAt = await $.clock.now()
+      await update($, items, all => all.map(d => (d.id === id ? { ...d, closedAt, outcome } : d)))
+      return true
+    })
+    if (!isClosed) {
       return { deny: `No open decision with id ${id}.` }
     }
-    const outcome = typeof input.outcome === 'string' && input.outcome.trim() !== '' ? input.outcome.trim() : undefined
-    const closedAt = await $.clock.now()
-    await update($, items, all => all.map(d => (d.id === id ? { ...d, closedAt, outcome } : d)))
 
     return { result: `Closed decision ${id}.` }
   })
@@ -148,12 +165,14 @@ export const register: Register = on => {
             <Button
               key={`done-${d.id}`}
               label="Dismiss"
-              onPress={async () => {
-                const closedAt = await $.clock.now()
-                await update($, items, all =>
-                  all.map(x => (x.id === d.id ? { ...x, closedAt, outcome: 'dismissed in the pane' } : x)),
-                )
-              }}
+              onPress={() =>
+                inTurn(async () => {
+                  const closedAt = await $.clock.now()
+                  await update($, items, all =>
+                    all.map(x => (x.id === d.id ? { ...x, closedAt, outcome: 'dismissed in the pane' } : x)),
+                  )
+                })
+              }
             />
           </Box>
         ))}
