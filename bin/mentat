@@ -163,6 +163,7 @@ latest_ready() { # $1 repo, $2 pr: prints the time of the latest ready_for_revie
   gh api --paginate "repos/$1/issues/$2/timeline" | jq -rs '[.[][] | select(.event == "ready_for_review") | .created_at] | max // empty'
 }
 code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<status> <time to the second> <short sha>"
+  # shellcheck disable=SC2016 # the backticks are the summary's literal markdown
   gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg a "$CODEX_APP" \
     '[.[][] | select(.user.login == $a and (.body | contains("<!-- codex-pull-request-review-summary -->")))] | last | .body // empty' |
     grep -E '^\|[^|]*Code Review[^|]*\|' | head -n 1 |
