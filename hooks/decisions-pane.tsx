@@ -15,6 +15,12 @@ const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 
 const isOpen = (d: Decision) => d.closedAt === undefined
+// Open decisions are never dropped; of the settled ones, the pane shows the last
+// five, so ten are kept.
+const keepOpenAndRecent = (list: Decision[]): Decision[] => {
+  const keep = new Set(list.filter(d => !isOpen(d)).slice(-10))
+  return list.filter(d => isOpen(d) || keep.has(d))
+}
 
 export const register: Register = on => {
   // $.state reads and writes are separate awaits, so two tool calls running at
@@ -85,7 +91,7 @@ export const register: Register = on => {
       const n = await read($, nextId)
       await update($, nextId, () => n + 1)
       const openedAt = await $.clock.now()
-      await update($, items, list => [...list, { id: `d${n}`, question, recommendation, openedAt }].slice(-50))
+      await update($, items, list => keepOpenAndRecent([...list, { id: `d${n}`, question, recommendation, openedAt }]))
       return `d${n}`
     })
 

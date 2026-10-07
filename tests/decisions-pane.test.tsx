@@ -82,3 +82,12 @@ test('two decisions opened at once get different ids and both are kept', async (
   expect(await texts(band as never)).toContain('2 decisions wait on you')
   await band.unmount()
 })
+
+test('an open decision is kept however many come after it', async ($, on) => {
+  mock.clock(on)
+  for (let i = 1; i <= 60; i++) {
+    await $.tool.call({ tool: OPEN, question: `Question ${i}?` } as never)
+  }
+  const closed = await $.tool.call({ tool: CLOSE, id: 'd1' } as never)
+  expect(String((closed as { result?: unknown }).result)).toBe('Closed decision d1.')
+})
