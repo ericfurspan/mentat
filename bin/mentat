@@ -396,9 +396,10 @@ c_finish() {
 claude_code_version() {
   local re='^[0-9]+\.[0-9]+\.[0-9]+ \(Claude Code\)$' bin out
   for bin in "${CLAUDE_CODE_EXECPATH:-}" "$(command -v claude 2>/dev/null)"; do
-    [ -n "$bin" ] && [ -x "$bin" ] || continue
-    out=$("$bin" --version 2>/dev/null | head -n 1)
-    if [[ $out =~ $re ]]; then printf '%s\n' "${out%% *}"; return 0; fi
+    if [ -n "$bin" ] && [ -x "$bin" ]; then
+      out=$("$bin" --version 2>/dev/null | head -n 1)
+      if [[ $out =~ $re ]]; then printf '%s\n' "${out%% *}"; return 0; fi
+    fi
   done
   return 1
 }
