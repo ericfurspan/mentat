@@ -15,10 +15,13 @@ const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 
 const isOpen = (d: Decision) => d.closedAt === undefined
+// Settled decisions, most recently settled first.
+const settled = (list: Decision[]): Decision[] =>
+  list.filter(d => !isOpen(d)).sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0))
 // Open decisions are never dropped; of the settled ones, the pane shows the last
 // five, so ten are kept.
 const keepOpenAndRecent = (list: Decision[]): Decision[] => {
-  const keep = new Set(list.filter(d => !isOpen(d)).slice(-10))
+  const keep = new Set(settled(list).slice(0, 10))
   return list.filter(d => isOpen(d) || keep.has(d))
 }
 
@@ -151,7 +154,7 @@ export const register: Register = on => {
     const { Box, Button, Input, Text } = $.ui.resolve(e)
     const list = await read($, items)
     const open = list.filter(isOpen)
-    const closed = list.filter(d => !isOpen(d)).slice(-5).reverse()
+    const closed = settled(list).slice(0, 5)
 
     return (
       <Box flexDirection="column">

@@ -108,3 +108,26 @@ test('the band keeps what other plugins draw there', async ($, on) => {
     await band.unmount()
   }
 })
+
+test('recently settled lists the latest closed first, whatever order they were opened in', async ($, on) => {
+  const clock = mock.clock(on)
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box key="engine-own" />
+  })
+  for (let i = 1; i <= 7; i++) {
+    await $.tool.call({ tool: OPEN, question: `Question ${i}?` } as never)
+  }
+  for (let i = 2; i <= 7; i++) {
+    await clock.advance(1000)
+    await $.tool.call({ tool: CLOSE, id: `d${i}` } as never)
+  }
+  await clock.advance(1000)
+  await $.tool.call({ tool: CLOSE, id: 'd1' } as never)
+
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal' } as never)
+  const settledRows = (await texts(pane as never)).filter(t => t.startsWith('✓'))
+  expect(settledRows[0]).toContain('Question 1?')
+  expect(settledRows).toHaveLength(5)
+  await pane.unmount()
+})
