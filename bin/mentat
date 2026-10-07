@@ -149,13 +149,25 @@ wait_for_ci() {
 }
 
 # The Codex GitHub app reviews a pull request when it is marked ready. It reacts
-# 👀 while working, then either posts a review tied to the commit it read or
-# reacts 👍 for no findings. A 👍 names no commit, so review starts the run
-# itself: it marks the head ready (or re-readies it), and trusts a 👍 only if it
-# came after that and the head never moved. It never starts while a run is going.
+# 👀 while working, posts findings as a review tied to the commit it read, and
+# keeps one summary comment (marked codex-pull-request-review-summary) with a row
+# per review kind: status, completion time and the short commit. Its 👍 names no
+# commit, so it certifies nothing here. A round is done when the summary's Code
+# Review row shows Completed for the head, at or after the ready event this run
+# created; then every bot review on the head, security reviews included, is a
+# finding. The summary is observed bot output, not a documented API: anything
+# missing, failed or unrecognized ends in "not reviewed", and the review skill
+# falls back to local review. It never starts while a run is going.
 CODEX_APP="chatgpt-codex-connector[bot]"
 latest_ready() { # $1 repo, $2 pr: prints the time of the latest ready_for_review, or nothing
   gh api --paginate "repos/$1/issues/$2/timeline" | jq -rs '[.[][] | select(.event == "ready_for_review") | .created_at] | max // empty'
+}
+code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<status> <time to the second> <short sha>"
+  # shellcheck disable=SC2016 # the backticks are the summary's literal markdown
+  gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg a "$CODEX_APP" \
+    '[.[][] | select(.user.login == $a and (.body | contains("<!-- codex-pull-request-review-summary -->")))] | last | .body // empty' |
+    grep -E '^\|[^|]*Code Review[^|]*\|' | head -n 1 |
+    sed -nE 's/^\|[^|]*\|[^|]*\*\*([A-Za-z ]+)\*\*[^|]*datetime="([0-9T:-]+)(\.[0-9]+)?Z"[^|]*\|[[:space:]]*`([0-9a-f]{7,40})`[[:space:]]*\|.*/\1 \2Z \4/p'
 }
 app_reaction() { # $1 repo, $2 pr, $3 content, $4 since: prints the count
   gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" --arg c "$3" --arg t "$4" \
@@ -193,24 +205,32 @@ review() {
     ready=""; n=$((n + 1)); sleep 2
   done
   [ -n "$ready" ] || not_reviewed "could not see #$pr's new ready event on GitHub"
-  local state
+  local state row status at sha
   while :; do
     [ "$(head_state)" != moved ] || moved
-    if found=$(gh api --paginate "repos/$repo/pulls/$pr/reviews" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
-      '[.[][] | select(.user.login == $a and .commit_id == $h)] | last | .html_url // empty') && [ -n "$found" ]; then
-      n=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
-        '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"') || n=""
-      state=$(head_state); [ "$state" != moved ] || moved
-      if [ "$state" = same ]; then
-        printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
-        exit 2
-      fi
-    elif n=$(app_reaction "$repo" "$pr" +1 "$ready") && [ "$n" -gt 0 ]; then
-      state=$(head_state); [ "$state" != moved ] || moved
-      if [ "$state" = same ]; then
-        printf 'The Codex app found nothing on %s\n' "$head"
-        exit 0
-      fi
+    # Completion first, then the findings, then the head: read in that order so
+    # findings posted just before completion are not missed.
+    row=$(code_review_row "$repo" "$pr") || row=""
+    status=${row%% *}; sha=${row##* }; at=${row#* }; at=${at%% *}
+    case "$head" in "$sha"*) ;; *) row="" ;; esac
+    if [ -n "$row" ] && [ -n "$sha" ] && ! [[ "$at" < "$ready" ]]; then
+      case "$status" in
+        Completed)
+          if found=$(gh api --paginate "repos/$repo/pulls/$pr/reviews" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
+            '[.[][] | select(.user.login == $a and .commit_id == $h) | .html_url] | join(" ")'); then
+            state=$(head_state); [ "$state" != moved ] || moved
+            if [ "$state" = same ] && [ -n "$found" ]; then
+              n=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
+                '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"') || n=""
+              printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
+              exit 2
+            elif [ "$state" = same ]; then
+              printf 'The Codex app found nothing on %s\n' "$head"
+              exit 0
+            fi
+          fi ;;
+        Failed) not_reviewed "the Codex app's code review of $head failed; run mentat review --local $pr instead" ;;
+      esac
     fi
     [ "$secs" -lt "$REVIEW_TIMEOUT_SECONDS" ] ||
       not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds; run mentat review --local $pr instead. If the app has never reviewed here on its own, it is not installed or automatic review is off in Codex's code review settings"
