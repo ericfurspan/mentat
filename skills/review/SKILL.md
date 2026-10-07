@@ -16,7 +16,7 @@ Each round's result is on the pull request (the review and the replies to it). A
 
 ## Steps
 
-1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local, right after pushing. Both first wait for CI on that head (up to 30 minutes; with no CI, about a minute). The app path marks the pull request ready, which starts the Codex app's review of that exact head (OpenAI's page says the app flags only P0 and P1 issues, though it has posted P2s); the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
+1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local, right after pushing. Both first wait for CI on that head (up to 30 minutes; with no CI, about a minute). The app path marks the pull request ready, which starts the Codex app's review of that exact head (OpenAI's page says the app flags only P0 and P1 issues, though it has posted P2s), and reads the result from the app's summary comment for that commit, counting security-review findings too; the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
 2. Act on the exit code:
    - 0: no findings. Go to "When the loop ends".
    - 2: findings were posted on that commit. Go to step 3.
