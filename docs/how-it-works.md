@@ -4,6 +4,18 @@
 
 ## How a change moves, in full
 
+From a request to a merge; the numbered steps below describe each part.
+
+```mermaid
+flowchart TD
+    A["You ask"] --> B["Claude Code plans"]
+    B --> C["Claude Code builds and opens<br/>a draft pull request"]
+    C --> D["Codex reviews"]
+    D -- findings --> E["Claude Code fixes or answers"]
+    E --> D
+    D -- ready --> F["You merge"]
+```
+
 `rules.md` holds what applies in every session and names a skill for each step below; each skill's file is the source of truth for that step.
 
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build and how it will be checked. An uncertain or consequential plan gets a Codex challenge first ([`skills/plan`](../skills/plan/SKILL.md)).
