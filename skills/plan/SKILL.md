@@ -3,7 +3,7 @@ name: plan
 description: "Writing a separate plan and having Codex challenge it. Use when the approach is uncertain, the decision matters, or the maintainer asks for a challenge."
 ---
 
-A separate plan is written only when the approach is uncertain or the decision matters; the maintainer can also ask for a challenge at any time. The scope statement in the issue or pull request (`rules.md` step 2) is still written either way.
+A separate plan is written when `rules.md` step 2 calls for this skill. The scope statement that step requires is still written either way.
 
 ## Steps
 

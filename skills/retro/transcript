@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prints a Claude Code session log (.jsonl) for a retro, leaving out what most
 # often carries credentials: tool output and command text. It keeps the
-# conversation (cut to 400 characters a message), each tool's name with its
+# conversation (cut to 400 characters a message, marked [TRUNCATED] when cut), each tool's name with its
 # description or file path, and whether each tool call failed, without its output. Token-like strings, key=value secrets and private keys are then
 # replaced by <REDACTED> (a private key only up to its end marker, or the end of its
 # message when the 400-character cut removed the marker), and so is any run of 20 or more letters and digits
@@ -13,16 +13,16 @@ if [ $# -ne 1 ] || [ ! -r "$1" ]; then
   exit 64
 fi
 jq -r 'select(.type == "user" or .type == "assistant") | .type as $who | .message.content |
-  if type == "string" then "\($who): \(.[0:400])"
+  if type == "string" then "\($who): \(.[0:400])\(if length > 400 then " [TRUNCATED]" else "" end)"
   else .[] |
-    if .type == "text" then "\($who): \(.text[0:400])"
+    if .type == "text" then "\($who): \(.text[0:400])\(if (.text | length) > 400 then " [TRUNCATED]" else "" end)"
     elif .type == "tool_use" then
       "tool: \(.name) \((.input.description // .input.file_path // .input.path // .input.skill // "") | tostring | .[0:150])"
     elif .type == "tool_result" then
       if .is_error == true then "result: error" else "result: ok" end
     else empty end
   end' "$1" |
-  perl -0777 -pe 's/-----BEGIN[^\n]*PRIVATE KEY-----.*?(-----END[^\n]*PRIVATE KEY-----|(?=\n(?:user|assistant|tool|result): )|\z)/<REDACTED>/gs;
+  perl -0777 -pe 's/-----BEGIN[^\n]*PRIVATE KEY-----.*?(-----END[^\n]*PRIVATE KEY-----|(?= \[TRUNCATED\]\n)|(?=\n(?:user|assistant|tool|result): )|\z)/<REDACTED>/gs;
     s/\bbearer\s+[^\s"\x27,}]+/Bearer <REDACTED>/gi;
     s/\b(gh[pousr]_|github_pat_|sk-|xox[abpr]-|AKIA|ASIA)[A-Za-z0-9_-]{8,}/<REDACTED>/g;
     s/([A-Za-z_-]*(?:key|secret|token|password|passwd|pwd|credential|auth)[A-Za-z_-]*["\x27]?\s*[=:]\s*)(["\x27])[^"\x27\n]*\2/$1$2<REDACTED>$2/gi;

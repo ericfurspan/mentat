@@ -147,7 +147,7 @@ if command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1; then
 {"type":"user","message":{"content":[{"type":"tool_result","content":"FAKEOUTPUT0002"}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"FAKEERROR0005"}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"echo FAKECOMMAND0003","description":"Print a value"}}]}}'
-  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -qE 'FAKEFAKE|notarealpass|fakeFAKE|FAKEPEM|FAKEBEARER|FAKELONGKEY|cabin drift|FAKEgitlab|FAKE0007|FAKEOUTPUT|FAKEERROR|FAKECOMMAND' <<<"$out" && grep -qx "result: error" <<<"$out" && grep -qx "user: kept after the key" <<<"$out" && grep -q "2026-10-06-skills-split-plan.md" <<<"$out" &&
+  if out=$(skills/retro/transcript /dev/stdin <<<"$fixture") && ! grep -qE 'FAKEFAKE|notarealpass|fakeFAKE|FAKEPEM|FAKEBEARER|FAKELONGKEY|cabin drift|FAKEgitlab|FAKE0007|FAKEOUTPUT|FAKEERROR|FAKECOMMAND' <<<"$out" && grep -qx "result: error" <<<"$out" && grep -qx "user: kept after the key" <<<"$out" && grep -q "\[TRUNCATED\]" <<<"$out" && grep -q "2026-10-06-skills-split-plan.md" <<<"$out" &&
     grep -q "user: use <REDACTED>" <<<"$out" && grep -qx "result: ok" <<<"$out" && grep -qx "tool: Bash Print a value" <<<"$out"; then
     pass "skills/retro/transcript leaves out tool output and commands and redacts secrets"
   else

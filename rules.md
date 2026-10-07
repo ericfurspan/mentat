@@ -10,7 +10,7 @@ When a session first starts change work in a repository, Claude Code runs `menta
 
 ## A change
 1. Work starts from a chat request or an issue.
-2. Claude Code reads the code first, then writes down what it will build, what it will leave alone and how the result will be checked, in the issue or the pull request. Anything it adds beyond the request, it names there and asks first when the maintainer did not ask for it. When the approach is uncertain, the decision matters, or the maintainer asks for a challenge, Claude Code calls the Skill tool with `mentat:plan`.
+2. Claude Code reads the code first, then writes down what it will build, what it will leave alone and how the result will be checked: in the issue, or in chat when the request has no issue, and in the pull request once it opens. Anything it adds beyond the request, it names there and asks first when the maintainer did not ask for it. When the approach is uncertain, the decision matters, or the maintainer asks for a challenge, Claude Code calls the Skill tool with `mentat:plan`.
 3. There is one builder, one branch and one checkout per change. Subagents are mostly for read-only investigation. Claude Code gives the builder a brief: the checkout and branch, the AGENTS.md files that apply, what to build and what to leave alone, how the result will be checked, and the test command.
 4. The test command is the one AGENTS.md names; otherwise the one the repository shows (package scripts, a Makefile, its CI workflow). It runs before the pull request opens and after every fix. Claude Code does not edit the maintainer's AGENTS.md to add one unless asked.
 5. Every pull request opens as a draft. Claude Code writes and updates its description by calling the Skill tool with `mentat:pr`.
@@ -19,7 +19,7 @@ When a session first starts change work in a repository, Claude Code runs `menta
 After compaction or a resumed session, Claude Code calls the skill for the step in progress again if its text is no longer in context.
 
 ## Findings
-Claude Code sorts every review and challenge finding. It fixes what affects correctness, the stated requirements or security when the problem has a realistic trigger, and answers the rest with a reason, including edge cases that fail closed or need a broken local setup. A defect Claude Code agrees is real is fixed in the pull request, at any round; if it is not fixed, it goes to the maintainer, never into a follow-up issue on its own. Improvements that are not defects become cheap fixes or follow-up issues. Only a blocking finding Claude Code disagrees with goes to the maintainer.
+Claude Code sorts every review and challenge finding. It fixes what affects correctness, the stated requirements or security when the problem has a realistic trigger, and answers the rest with a reason, including edge cases that fail closed or need a broken local setup. A defect Claude Code agrees is real is fixed in the pull request, at any round; if it is not fixed, it goes to the maintainer, never into a follow-up issue on its own. Improvements that are not defects become cheap fixes or follow-up issues. Of the findings Claude Code disagrees with, only blocking ones go to the maintainer for a decision.
 
 ## What goes to the maintainer
 - Within the authorized scope and existing controls, Claude Code decides implementation questions itself: approach, code, test design, how to settle review findings, and wording. It does not ask again for actions already authorized. It names a consequential call in one line on the pull request, not in chat.
