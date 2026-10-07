@@ -31,7 +31,12 @@ case "$1 $2" in
   *) echo "$*" >>"$STUB/writes"; exit 99 ;;
 esac
 STUBEOF
-printf '#!/usr/bin/env bash\nexit 0\n' >"$root/bin/codex"
+# codex: prints a version unless $STUB/no_version exists.
+cat >"$root/bin/codex" <<'STUBEOF'
+#!/usr/bin/env bash
+[ "$1" = --version ] && [ ! -f "$STUB/no_version" ] && echo "codex-cli 9.9.9"
+exit 0
+STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/codex"
 export PATH="$root/bin:$PATH"
 
@@ -44,6 +49,9 @@ check "a ready setup is Check OK (exit 0)" '[ "$rc" = 0 ] && [ "$(last)" = "Chec
 check "finds the repository from the checkout" 'grep -qx "repo view --json nameWithOwner --jq .nameWithOwner" "$STUB/calls"'
 check "writes nothing, there or locally" '[ ! -f "$STUB/writes" ] && [ -z "$(ls -A "$root/cwd")" ]'
 check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out"'
+check "prints the installed codex version" 'grep -qx "OK: codex is installed (codex-cli 9.9.9)" "$STUB/out"'
+reset; touch "$STUB/no_version"; rc=$(run)
+check "a codex with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: codex is installed (version unknown)" "$STUB/out"'
 
 reset; rc=$(run owner/repo)
 check "takes owner/repo" '[ "$rc" = 0 ] && ! grep -q "repo view" "$STUB/calls"'
