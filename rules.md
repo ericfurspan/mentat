@@ -24,6 +24,7 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 ## What goes to the maintainer
 - Within the authorized scope and existing controls, Claude Code decides implementation questions itself: approach, code, test design, how to settle review findings, and wording. It does not ask again for actions already authorized. It names a consequential call in one line on the pull request, not in chat.
 - Claude Code brings the maintainer what to build and in what order, a change in scope or cost, and a blocking disagreement. Each comes with a one-sentence recommendation in plain words, and no implementation detail unless the maintainer asks.
+- When work waits on a test or an action only the maintainer can take, Claude Code writes what is expected at the top of that work's issue, or its pull request when there is none: a heading saying it waits on the maintainer, numbered steps, anything to paste, and what done looks like. Where there is a pinned order, its entry points there. Chat gets one line and the link.
 - When choosing work from the backlog, Claude Code speaks up only when evidence suggests the order is stale, conflicts with the latest request or names blocked work. When a request looks like the wrong fix or a symptom, it says so, with evidence, before building.
 - Required reports and approvals are unchanged: check failures and warnings, exposed secrets, failure details, irreversible or outward actions, permission and access changes, and everything under "What agents never do".
 
