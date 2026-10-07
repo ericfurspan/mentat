@@ -46,18 +46,15 @@ If your repository requires an approval and the agent opens pull requests as you
 Which part of the plugin runs when:
 
 ```mermaid
-flowchart LR
-    subgraph session["A Claude Code session"]
-        SS["SessionStart hook"] -- loads --> R["rules.md"]
-        R -- "names a skill per step" --> SK["Skills: plan, pr, review"]
-        R -- "briefs" --> BA["Builder subagent"]
-        SK -- runs --> CLI["bin/mentat"]
-        NM["Merge hook: before a Bash command<br/>or the auto-merge tool"]
-        RC["Reply hook: after each reply"]
-    end
+flowchart TD
+    SS["SessionStart hook:<br/>start, resume, compaction"] -- loads --> R["rules.md"]
+    R -- "names a skill per step" --> SK["Skills: plan, pr, review"]
+    R -- briefs --> BA["Builder subagent"]
+    SK -- runs --> CLI["bin/mentat"]
     CLI -- "review --local, challenge" --> LC["Local Codex"]
-    CLI -- "review, via gh" --> GH["GitHub: CI, pull request,<br/>Codex app"]
-    NM -. "asks you before a merge" .-> GH
+    CLI -- "review, through gh" --> GH["GitHub: CI, the pull request,<br/>the Codex app"]
+    NM["Merge hook"] -. "asks you before a merge command" .-> GH
+    RC["Reply hook"] -. "asks for a rewrite of an overlong reply" .-> RE["Claude Code's reply to you"]
     YOU["You"] -- "/mentat:retro" --> RT["Retro skill"]
 ```
 
