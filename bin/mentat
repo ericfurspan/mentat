@@ -10,8 +10,8 @@
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 #   mentat check [owner/repo]  Checks, read-only, what Mentat itself needs: tools,
-#     gh signed in, the repository readable. 0 Mentat can work (warnings printed),
-#     1 it cannot.
+#     gh signed in, the repository readable; prints the codex version. 0 Mentat
+#     can work (warnings printed), 1 it cannot.
 set -uo pipefail
 
 # mentat challenge runs Codex's own default model, so no model name lives here and a
@@ -387,7 +387,7 @@ c_finish() {
   printf 'Check OK (%d warning(s))\n' "$check_warnings"; exit 0
 }
 check() {
-  local repo="${1:-}" usage="usage: mentat check [owner/repo]" tool n
+  local repo="${1:-}" usage="usage: mentat check [owner/repo]" tool n v
   [ $# -le 1 ] || die "$usage" 64
   case "$repo" in
     '') ;;
@@ -399,7 +399,9 @@ check() {
     if command -v "$tool" >/dev/null 2>&1; then c_ok "$tool is installed"; else c_problem "$tool is not installed"; fi
   done
   [ "$check_problems" = 0 ] || c_finish
-  if command -v codex >/dev/null 2>&1; then c_ok "codex is installed"
+  if command -v codex >/dev/null 2>&1; then
+    v=$(codex --version 2>/dev/null | head -n 1)
+    c_ok "codex is installed (${v:-version unknown})"
   else c_warn "codex is not installed: mentat challenge and mentat review --local need it"; fi
   # Exit status only: gh auth status can print token details.
   if gh auth status >/dev/null 2>&1; then c_ok "gh is signed in"; else c_problem "gh is not signed in (run gh auth login)"; c_finish; fi
