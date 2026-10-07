@@ -8,21 +8,12 @@ From a request to a merge; the numbered steps below describe each part.
 
 ```mermaid
 flowchart TD
-    A["Request, in chat or an issue"] --> B["Claude Code reads AGENTS.md and the code,<br/>writes down what it will build"]
-    B --> C{"Approach uncertain<br/>or consequential?"}
-    C -- yes --> D["Plan, challenged by Codex<br/>(mentat challenge)"]
-    D --> E
-    C -- no --> E["Builder works on one branch;<br/>the test command passes"]
-    E --> F["Draft pull request"]
-    F --> G["mentat review: waits for CI,<br/>then Codex reviews the head"]
-    G --> H{"Result"}
-    H -- findings --> I["Fix real defects, answer the rest,<br/>push"]
-    I --> G
-    H -- "nothing, or all settled" --> J["Final check comment"]
-    H -- "blocked, not reviewed,<br/>or five rounds" --> K["Claude Code tells you why and stops"]
-    J --> L{"Repository opted in<br/>to agents merging?"}
-    L -- no --> M["You merge"]
-    L -- yes --> N["Claude Code merges the reviewed commit"]
+    A["You ask"] --> B["Claude Code plans"]
+    B --> C["Claude Code builds and opens<br/>a draft pull request"]
+    C --> D["Codex reviews"]
+    D -- findings --> E["Claude Code fixes or answers"]
+    E --> D
+    D -- ready --> F["You merge"]
 ```
 
 `rules.md` holds what applies in every session and names a skill for each step below; each skill's file is the source of truth for that step.
@@ -47,15 +38,12 @@ Which part of the plugin runs when:
 
 ```mermaid
 flowchart TD
-    SS["SessionStart hook:<br/>start, resume, compaction"] -- loads --> R["rules.md"]
-    R -- "names a skill per step" --> SK["Skills: plan, pr, review"]
-    R -- briefs --> BA["Builder subagent"]
-    SK -- runs --> CLI["bin/mentat"]
-    CLI -- "review --local, challenge" --> LC["Local Codex"]
-    CLI -- "review, through gh" --> GH["GitHub: CI, the pull request,<br/>the Codex app"]
-    NM["Merge hook"] -. "asks you before a merge command" .-> GH
-    RC["Reply hook"] -. "asks for a rewrite of an overlong reply" .-> RE["Claude Code's reply to you"]
-    YOU["You"] -- "/mentat:retro" --> RT["Retro skill"]
+    H["Session start hook"] -- loads --> R["rules.md"]
+    R -- "calls at each step" --> S["Skills: plan, pr, review"]
+    S -- runs --> M["mentat command"]
+    M --> X["Codex"]
+    M --> G["GitHub"]
+    N["Merge hook"] -. "asks you first" .-> G
 ```
 
 ### Claude Code hooks
@@ -104,23 +92,12 @@ sequenceDiagram
     participant M as mentat review
     participant GH as GitHub
     participant App as Codex app
-    CC->>M: mentat review N
-    M->>GH: poll CI checks on the head
-    GH-->>M: all passed (a failure exits 4)
+    CC->>M: review pull request N
+    M->>GH: wait for CI to pass
     M->>GH: mark the pull request ready
-    GH->>App: ready event starts a review of the head
-    App->>GH: findings, and a summary comment naming the commit
-    M->>GH: poll the summary until it shows Completed for the head
-    Note over M,GH: if the head moves at any point, exit 3
-    alt findings on the head
-        M-->>CC: exit 2, findings listed
-    else nothing found
-        M-->>CC: exit 0
-    else summary missing, failed or timed out
-        M-->>CC: exit 1, not reviewed
-        CC->>M: mentat review --local N
-        Note over M: local Codex reviews the head in a temporary checkout and posts the result
-    end
+    GH->>App: review the head
+    App-->>M: result, through GitHub
+    M-->>CC: 0 nothing found, 2 findings, 1 not reviewed
 ```
 
 Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network for the commands it runs. Codex itself still talks to OpenAI, and its web search runs on OpenAI's side, outside that profile: local reviews turn search off, and `mentat challenge` keeps Codex's cached search (OpenAI's index, no live fetches) to check current practice. Inside the checkout, files that commonly hold credentials (`.env` files, private keys such as `*.pem` and `id_ed25519`, `.netrc`, `.npmrc`, `.pypirc`) are denied to it as well. This protects files kept out of git; a credential committed to the repository stays readable through git history, as it is to anyone with the repository, and must be rotated. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach the commands it runs. Codex must be installed under `/opt/homebrew` or `/usr/local`; anywhere else it cannot start and the command reports not reviewed or not challenged.
