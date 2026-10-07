@@ -28,16 +28,7 @@ Each round's result is on the pull request (the review and the replies to it). A
 
 ## Final check
 
-Once the loop ends ready, check that commit and post the result as one comment on the pull request, ten lines at most:
-
-- what was asked and where the diff does it;
-- the test command and CI results on that commit;
-- how each review finding was settled;
-- anything in the diff beyond the request;
-- what was not checked;
-- what most deserves the maintainer's eyes.
-
-Read the diff and the description from GitHub, not from memory, and correct any claim in the description that does not hold. The comment is the author's own check, not a review or an approval.
+Once the loop ends ready, read the diff and the description from GitHub, not from memory, and correct any claim in the description that does not hold. Then post one comment on the pull request, five lines at most, that does not repeat the description's summary or scope: the commit checked and its test and CI results, how each review finding was settled, what was not checked, and what most deserves the maintainer's eyes. The comment is the author's own check, not a review or an approval.
 
 If the pull request is still a draft (a local review does not mark it ready), run `gh pr ready <N>`; if that fails, report it and stop. If the pull request's author is not the repository owner, request the owner's review with `gh pr edit <N> --add-reviewer <owner>`. If the author is the owner and the repository requires approvals, tell the maintainer that GitHub will not let them approve their own pull request. Then:
 
