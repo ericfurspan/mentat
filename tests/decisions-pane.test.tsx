@@ -91,3 +91,20 @@ test('an open decision is kept however many come after it', async ($, on) => {
   const closed = await $.tool.call({ tool: CLOSE, id: 'd1' } as never)
   expect(String((closed as { result?: unknown }).result)).toBe('Closed decision d1.')
 })
+
+test('the band keeps what other plugins draw there', async ($, on) => {
+  mock.clock(on)
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>another plugin's band</Text>
+  })
+  await $.tool.call({ tool: OPEN, question: 'Keep both?' } as never)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const band = await $.ui.mount({ ...BAND, surface } as never)
+    const shown = await texts(band as never)
+    expect(shown).toContain('1 decision waits on you')
+    expect(shown).toContain("another plugin's band")
+    await band.unmount()
+  }
+})

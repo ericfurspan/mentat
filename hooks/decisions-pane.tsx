@@ -128,16 +128,21 @@ export const register: Register = on => {
     }
     const { Box, Button, Text } = $.ui.resolve(e)
     const latest = open[open.length - 1]!
+    // The band is shared: what the plugins beneath draw stays, under this row.
+    const beneath = await next(e)
 
     return (
-      <Box>
-        <Text bold color="claude">
-          {open.length === 1 ? '1 decision waits on you' : `${open.length} decisions wait on you`}
-        </Text>
-        <Text color="text" wrap="truncate-end">
-          {' '}· {latest.question}{' '}
-        </Text>
-        <Button key="show" label="Show" onPress={() => $.ui.open({ id: PANE, title: 'Decisions' })} />
+      <Box flexDirection="column">
+        <Box>
+          <Text bold color="claude">
+            {open.length === 1 ? '1 decision waits on you' : `${open.length} decisions wait on you`}
+          </Text>
+          <Text color="text" wrap="truncate-end">
+            {' '}· {latest.question}{' '}
+          </Text>
+          <Button key="show" label="Show" onPress={() => $.ui.open({ id: PANE, title: 'Decisions' })} />
+        </Box>
+        {beneath}
       </Box>
     )
   })
