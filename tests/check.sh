@@ -48,7 +48,7 @@ export PATH="$root/bin:$PATH"
 unset CLAUDE_CODE_EXECPATH
 
 reset() { rm -f "$STUB"/*; echo 0 >"$STUB/secrets"; echo "2.1.163 (Claude Code)" >"$STUB/claude_version"; }
-run() { (cd "$root/cwd" && "$mentat" check "$@" >"$STUB/out" 2>&1); echo $?; }
+run() { (cd "$root/cwd" && "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
 
 reset; rc=$(run)
