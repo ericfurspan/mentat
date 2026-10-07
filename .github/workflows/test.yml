@@ -9,8 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  run:
     # macOS is where Mentat runs; Linux keeps the scripts portable.
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -24,3 +25,13 @@ jobs:
       - if: runner.os == 'macOS'
         run: command -v shellcheck >/dev/null || brew install shellcheck
       - run: tests/run
+
+  # The check the main ruleset requires is named "test". It passes only when every
+  # run above passed: always() keeps it from being skipped, which would count as passing.
+  test:
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: '[ "${{ needs.run.result }}" = success ]'
