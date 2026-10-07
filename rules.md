@@ -43,4 +43,5 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Issues are the backlog. Where the repository uses them, the pinned issue holds the maintainer's order and the labels `idea` and `ready` mark state.
 - Pull request titles follow Conventional Commits unless the repository says otherwise.
 - Work is referred to as `#N` inside a repository and `owner/repo#N` across repositories.
+- When an issue, pull request or comment gives the maintainer's words, it quotes them exactly, in their own fenced code block. Anything else about what the maintainer asked is labeled as Claude Code's summary.
 - Plain words and common industry terms. Where the repository has a `GLOSSARY.md`, its terms.
