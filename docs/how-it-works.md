@@ -34,18 +34,6 @@ If your repository requires an approval and the agent opens pull requests as you
 
 ## What holds, and how
 
-Which part of the plugin runs when:
-
-```mermaid
-flowchart TD
-    H["Session start hook"] -- loads --> R["rules.md"]
-    R -- "calls at each step" --> S["Skills: plan, pr, review"]
-    S -- runs --> M["mentat command"]
-    M --> X["Codex"]
-    M --> G["GitHub"]
-    N["Merge hook"] -. "asks you first" .-> G
-```
-
 ### Claude Code hooks
 
 - The SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear, compact and fork.
@@ -83,22 +71,6 @@ These are design choices, not proven results:
 | `mentat check [owner/repo]` | Checks, read-only, what Mentat itself needs: `git`, `gh` and `jq` installed, `gh` signed in, the repository readable. Warns when `codex` is missing or the repository has Actions secrets a branch workflow may read | 0 Mentat can work, 1 it cannot |
 
 Usage errors exit 64.
-
-How `mentat review` reaches a result on the app path:
-
-```mermaid
-sequenceDiagram
-    participant CC as Claude Code
-    participant M as mentat review
-    participant GH as GitHub
-    participant App as Codex app
-    CC->>M: review pull request N
-    M->>GH: wait for CI to pass
-    M->>GH: mark the pull request ready
-    GH->>App: review the head
-    App-->>M: result, through GitHub
-    M-->>CC: 0 nothing found, 2 findings, 1 not reviewed
-```
 
 Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network for the commands it runs. Codex itself still talks to OpenAI, and its web search runs on OpenAI's side, outside that profile: local reviews turn search off, and `mentat challenge` keeps Codex's cached search (OpenAI's index, no live fetches) to check current practice. Inside the checkout, files that commonly hold credentials (`.env` files, private keys such as `*.pem` and `id_ed25519`, `.netrc`, `.npmrc`, `.pypirc`) are denied to it as well. This protects files kept out of git; a credential committed to the repository stays readable through git history, as it is to anyone with the repository, and must be rotated. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach the commands it runs. Codex must be installed under `/opt/homebrew` or `/usr/local`; anywhere else it cannot start and the command reports not reviewed or not challenged.
 
