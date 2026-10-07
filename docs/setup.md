@@ -53,7 +53,7 @@ By default you merge every pull request. To let Claude Code merge its own pull r
 - Agents may merge their own pull requests.
 ```
 
-Then, once a pull request's review loop ends ready and the final check is posted, Claude Code merges the commit Codex reviewed through GitHub's merge API. It never turns on auto-merge, and if GitHub refuses (a required approval you have not given, branch protection, a merge queue), it tells you and stops. Required approvals can stay: you approve, then it merges. Remove the line to turn it off; it takes effect at once.
+Then, once a pull request's review loop ends ready and the final check is posted, Claude Code merges the commit Codex reviewed through GitHub's merge API. It never turns on auto-merge, and if GitHub refuses (a required approval you have not given, branch protection, a merge queue), it tells you and stops. Required approvals can stay: if it stops because your approval is missing, approve the pull request, then ask it to merge. Remove the line to turn it off; it takes effect at once.
 
 This is a working rule the agent follows, not a guarantee. Opt in only where a merge is cheap to undo, including anything a merge deploys; for deployments, see the environment protection advice under [Have GitHub enforce it](#have-github-enforce-it).
 

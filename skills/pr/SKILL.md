@@ -45,7 +45,7 @@ Closes #<issue, when there is one>
 
 ### Summary
 
-Plain prose first: what was asked and what the change does, in the words a reviewer would check the diff against. Add a visual only where it makes the point faster than prose; pick the smallest view that does. To pick one (a table first for what happens in each case, Mermaid for an order of steps, a tree or shaped diff for layout, pseudocode only for code logic), read [visuals.md](visuals.md).
+Plain prose first: what was asked and what the change does, in the words a reviewer would check the diff against. For whether to add a visual, which kind, and where, read [visuals.md](visuals.md).
 
 ### Evidence
 

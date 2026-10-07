@@ -105,36 +105,41 @@ run_codex() {
 # CI on commit $2 of repository $1: check runs and commit statuses, read by commit
 # so a push cannot swap them. Returns when every check passed (success, neutral or
 # skipped). Exits 4, printing the checks that did not pass, when one failed or CI
-# is still running after CI_TIMEOUT_SECONDS. No checks at all means no CI, but
-# only after CI_GRACE_SECONDS, because checks appear a little after a push. A
-# failed read is a missed poll; still failing at the timeout, it is not reviewed.
-ci_lines() { # $1 repo, $2 commit: prints "<pass|fail|pending> <name>" per check
+# is still running after CI_TIMEOUT_SECONDS. Checks appear a little after a push,
+# and not all at once, so neither "no checks" nor "all passed" counts until
+# CI_GRACE_SECONDS have passed since the wait began or since the last check
+# finished. A failed read is a missed poll; still failing at the timeout, it is
+# not reviewed.
+ci_lines() { # $1 repo, $2 commit: prints "<pass|fail|pending> <epoch finished> <name>" per check
   local runs statuses
   runs=$(gh api --paginate "repos/$1/commits/$2/check-runs" | jq -rs '.[].check_runs[] |
-    (if .status != "completed" then "pending" elif (.conclusion | IN("success", "neutral", "skipped")) then "pass" else "fail" end) + " " + .name') || return 1
+    (if .status != "completed" then "pending" elif (.conclusion | IN("success", "neutral", "skipped")) then "pass" else "fail" end)
+    + " " + ((.completed_at // "1970-01-01T00:00:00Z") | fromdateiso8601 | tostring) + " " + .name') || return 1
   statuses=$(gh api --paginate "repos/$1/commits/$2/status" | jq -rs '.[].statuses[] |
-    (if .state == "success" then "pass" elif .state == "pending" then "pending" else "fail" end) + " " + .context') || return 1
+    (if .state == "success" then "pass" elif .state == "pending" then "pending" else "fail" end)
+    + " " + ((.updated_at // "1970-01-01T00:00:00Z") | fromdateiso8601 | tostring) + " " + .context') || return 1
   printf '%s\n%s\n' "$runs" "$statuses" | grep -v '^$' || true
 }
 wait_for_ci() {
-  local repo="$1" commit="$2" secs=0 lines said=no
+  local repo="$1" commit="$2" secs=0 lines said=no last
   while :; do
     if lines=$(ci_lines "$repo" "$commit"); then
       if [ -z "$lines" ]; then
         [ "$secs" -lt "$CI_GRACE_SECONDS" ] || return 0
       elif grep -q '^fail ' <<<"$lines"; then
         printf 'CI did not pass on %s; not reviewed. Failing checks:\n' "$commit"
-        grep '^fail ' <<<"$lines" | sed 's/^fail /- /'
+        grep '^fail ' <<<"$lines" | sed -E 's/^fail [0-9]+ /- /'
         exit 4
       elif ! grep -q '^pending ' <<<"$lines"; then
-        return 0
+        last=$(awk '{ if ($2 > m) m = $2 } END { print m + 0 }' <<<"$lines")
+        [ "$secs" -lt "$CI_GRACE_SECONDS" ] && [ $(( $(date -u +%s) - last )) -lt "$CI_GRACE_SECONDS" ] || return 0
       fi
     elif [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
       not_reviewed "could not read CI on $commit"
     fi
     if [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
       printf 'CI did not finish on %s within %s seconds; not reviewed. Still running:\n' "$commit" "$CI_TIMEOUT_SECONDS"
-      grep '^pending ' <<<"$lines" | sed 's/^pending /- /'
+      grep '^pending ' <<<"$lines" | sed -E 's/^pending [0-9]+ /- /'
       exit 4
     fi
     [ "$said" = yes ] || { printf 'Waiting for CI on %s\n' "$commit" >&2; said=yes; }
@@ -400,7 +405,11 @@ check() {
 case "${1:-}" in
   review)
     shift
-    if [ "${1:-}" = --local ]; then shift; review_local "$@"; else review "$@"; fi ;;
+    # Exactly one pull request number, after --local if given: "review 7 --local"
+    # would otherwise run the app path.
+    if [ "${1:-}" = --local ]; then shift; local_review=yes; else local_review=no; fi
+    [ $# -eq 1 ] || die "usage: mentat review [--local] <pull request number>" 64
+    if [ "$local_review" = yes ]; then review_local "$@"; else review "$@"; fi ;;
   challenge) shift; challenge "$@" ;;
   check) shift; check "$@" ;;
   *) die "usage: mentat review [--local] <pull request number> | mentat challenge <plan file> | mentat check [owner/repo]" 64 ;;
