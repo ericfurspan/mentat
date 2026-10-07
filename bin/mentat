@@ -18,9 +18,10 @@ set -uo pipefail
 # mentat challenge runs Codex's own default model, so no model name lives here and a
 # new release needs no change. Effort is pinned.
 CODEX_EFFORT="high"
-# The oldest Claude Code with every feature Mentat uses. 2.1.163 added the Stop
-# hook's additionalContext, which hooks/reply-check returns.
-CLAUDE_CODE_MIN="2.1.163"
+# The oldest Claude Code with every feature Mentat uses. 2.1.287 added mods in
+# the terminal (2.1.286 in the desktop app), which the decisions pane is; it
+# also covers the Stop hook's additionalContext (2.1.163) that hooks/reply-check returns.
+CLAUDE_CODE_MIN="2.1.287"
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 REVIEW_INTERVAL_SECONDS="${MENTAT_REVIEW_INTERVAL_SECONDS:-15}"
 READY_TRIES="${MENTAT_READY_TRIES:-10}"

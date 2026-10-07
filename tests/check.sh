@@ -47,7 +47,7 @@ export PATH="$root/bin:$PATH"
 # A Claude Code session sets this; the cases below set it themselves.
 unset CLAUDE_CODE_EXECPATH
 
-reset() { rm -f "$STUB"/*; echo 0 >"$STUB/secrets"; echo "2.1.163 (Claude Code)" >"$STUB/claude_version"; }
+reset() { rm -f "$STUB"/*; echo 0 >"$STUB/secrets"; echo "2.1.287 (Claude Code)" >"$STUB/claude_version"; }
 run() { (cd "$root/cwd" && "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
 
@@ -60,19 +60,19 @@ check "prints the installed codex version" 'grep -qx "OK: codex is installed (co
 reset; touch "$STUB/no_version"; rc=$(run)
 check "a codex with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: codex is installed (version unknown)" "$STUB/out"'
 
-check "Claude Code at the minimum is OK" 'grep -qx "OK: Claude Code 2.1.163 (Mentat needs 2.1.163 or later)" "$STUB/out"'
+check "Claude Code at the minimum is OK" 'grep -qx "OK: Claude Code 2.1.287 (Mentat needs 2.1.287 or later)" "$STUB/out"'
 
 reset; echo "2.1.1000 (Claude Code)" >"$STUB/claude_version"; rc=$(run)
 check "versions compare as numbers, not text" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.1000" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 reset; echo "2.1.99 (Claude Code)" >"$STUB/claude_version"; rc=$(run)
-check "an older Claude Code is a warning, not a failure" '[ "$rc" = 0 ] && grep -qx "WARN: Claude Code 2.1.99 is older than 2.1.163, which Mentat needs: run claude update, or update the Claude desktop app" "$STUB/out"'
-reset; echo "2.1.99 (Claude Code)" >"$STUB/claude_version"; echo "2.1.200 (Claude Code)" >"$STUB/exec_version"
+check "an older Claude Code is a warning, not a failure" '[ "$rc" = 0 ] && grep -qx "WARN: Claude Code 2.1.99 is older than 2.1.287, which Mentat needs: run claude update, or update the Claude desktop app" "$STUB/out"'
+reset; echo "2.1.99 (Claude Code)" >"$STUB/claude_version"; echo "2.1.300 (Claude Code)" >"$STUB/exec_version"
 rc=$(CLAUDE_CODE_EXECPATH="$root/exec/claude" run)
-check "the running Claude Code wins over the one on the PATH" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.200" "$STUB/out"'
+check "the running Claude Code wins over the one on the PATH" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.300" "$STUB/out"'
 reset; echo "v22.1.0" >"$STUB/exec_version"; rc=$(CLAUDE_CODE_EXECPATH="$root/exec/claude" run)
-check "a running program that is not Claude Code falls back to the PATH" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.163" "$STUB/out"'
+check "a running program that is not Claude Code falls back to the PATH" '[ "$rc" = 0 ] && grep -q "OK: Claude Code 2.1.287" "$STUB/out"'
 reset; echo "something else" >"$STUB/claude_version"; rc=$(run)
-check "an unreadable Claude Code version is a warning" '[ "$rc" = 0 ] && grep -qx "WARN: could not tell the Claude Code version; Mentat needs 2.1.163 or later" "$STUB/out"'
+check "an unreadable Claude Code version is a warning" '[ "$rc" = 0 ] && grep -qx "WARN: could not tell the Claude Code version; Mentat needs 2.1.287 or later" "$STUB/out"'
 
 reset; echo 3 >"$STUB/secrets"; rc=$(run)
 check "Actions secrets are a warning, not a failure" '[ "$rc" = 0 ] && grep -q "WARN: owner/repo has 3 Actions secret(s)" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'

@@ -2,5 +2,6 @@
   "name": "mentat",
   "description": "How coding agents work in your GitHub repositories: Claude Code builds, Codex reviews, you merge.",
   "author": { "name": "ericfurspan" },
-  "repository": "https://github.com/ericfurspan/mentat"
+  "repository": "https://github.com/ericfurspan/mentat",
+  "types": "./types/index.d.ts"
 }

@@ -168,6 +168,21 @@ else
   skip "jq not installed, mentat review, challenge, check and the hooks not tested"
 fi
 
+# The decisions pane is a Claude Code mod: the plugin validates (warnings are fine,
+# only a failure counts) and the mod's own tests, tests/*.test.tsx, pass.
+if command -v claude >/dev/null 2>&1; then
+  for sub in validate test; do
+    if out=$(claude plugin "$sub" . 2>&1); then
+      pass "claude plugin $sub ."
+    else
+      printf '%s\n' "$out"
+      fail "claude plugin $sub ."
+    fi
+  done
+else
+  skip "claude not installed, the decisions pane not validated or tested"
+fi
+
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck tests/run hooks/session-start hooks/reply-check hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/reply-check.sh; then

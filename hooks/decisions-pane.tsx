@@ -1,0 +1,174 @@
+// The decisions pane: a /decisions command, two tools the model calls to record questions, a band above the prompt and a pane to answer them.
+// Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules"); it approves, denies or changes no other tool call.
+
+import { atom, read, update } from 'claude-code'
+import type { Register } from 'claude-code'
+
+import type { Decision } from '../types'
+
+const PLUGIN = 'mentat'
+const PANE = 'decisions'
+const OPEN_TOOL = `mcp__${PLUGIN}__open_decision`
+const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
+
+const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
+const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
+
+const isOpen = (d: Decision) => d.closedAt === undefined
+
+export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    await $.command.register({
+      name: 'decisions',
+      description: 'Show the questions and decisions waiting on you in a pane',
+    })
+    await $.tool.register({
+      name: 'open_decision',
+      description:
+        'Record a question or decision you have just put to the user in chat, so it shows in their decisions pane until answered. ' +
+        'Call it once per real question that waits on the user (not rhetorical ones, not routine status). ' +
+        'Returns an id; call close_decision with that id when the user answers or the question no longer applies.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          question: { type: 'string', description: 'The question, in one short plain sentence' },
+          recommendation: { type: 'string', description: 'Your recommendation, in a few words, if you gave one' },
+        },
+        required: ['question'],
+      },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'close_decision',
+      description:
+        'Close a question opened with open_decision once the user has answered it or it no longer applies.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'The id open_decision returned' },
+          outcome: { type: 'string', description: 'What was decided, in a few words' },
+        },
+        required: ['id'],
+      },
+      isDeferred: false,
+    })
+
+    return next(e)
+  })
+
+  on('command.run', { command: 'decisions' }, async $ => {
+    await $.ui.open({ id: PANE, title: 'Decisions' })
+
+    return { text: 'Decisions pane opened.' }
+  })
+
+  on('tool.call', { tool: OPEN_TOOL }, async ($, e) => {
+    const input = e as unknown as { question?: unknown; recommendation?: unknown }
+    const question = typeof input.question === 'string' ? input.question.trim() : ''
+    if (question === '') {
+      return { deny: 'open_decision needs a question.' }
+    }
+    const recommendation =
+      typeof input.recommendation === 'string' && input.recommendation.trim() !== ''
+        ? input.recommendation.trim()
+        : undefined
+    const n = await read($, nextId)
+    await update($, nextId, v => v + 1)
+    const id = `d${n}`
+    const openedAt = await $.clock.now()
+    await update($, items, list => [...list, { id, question, recommendation, openedAt }].slice(-50))
+
+    return { result: `Opened decision ${id}.` }
+  })
+
+  on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
+    const input = e as unknown as { id?: unknown; outcome?: unknown }
+    const id = typeof input.id === 'string' ? input.id : ''
+    const list = await read($, items)
+    if (!list.some(d => d.id === id && isOpen(d))) {
+      return { deny: `No open decision with id ${id}.` }
+    }
+    const outcome = typeof input.outcome === 'string' && input.outcome.trim() !== '' ? input.outcome.trim() : undefined
+    const closedAt = await $.clock.now()
+    await update($, items, all => all.map(d => (d.id === id ? { ...d, closedAt, outcome } : d)))
+
+    return { result: `Closed decision ${id}.` }
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) {
+      return next(e)
+    }
+    const open = (await read($, items)).filter(isOpen)
+    if (open.length === 0) {
+      return next(e)
+    }
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const latest = open[open.length - 1]!
+
+    return (
+      <Box>
+        <Text bold color="claude">
+          {open.length === 1 ? '1 decision waits on you' : `${open.length} decisions wait on you`}
+        </Text>
+        <Text color="text" wrap="truncate-end">
+          {' '}· {latest.question}{' '}
+        </Text>
+        <Button key="show" label="Show" onPress={() => $.ui.open({ id: PANE, title: 'Decisions' })} />
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const { Box, Button, Input, Text } = $.ui.resolve(e)
+    const list = await read($, items)
+    const open = list.filter(isOpen)
+    const closed = list.filter(d => !isOpen(d)).slice(-5).reverse()
+
+    return (
+      <Box flexDirection="column">
+        <Text bold>Waiting on you</Text>
+        {open.length === 0 && <Text dimColor>Nothing right now.</Text>}
+        {open.map(d => (
+          <Box key={d.id} flexDirection="column" marginTop={1}>
+            <Text>• {d.question}</Text>
+            {d.recommendation !== undefined && <Text italic>  Recommended: {d.recommendation}</Text>}
+            <Input
+              key={`answer-${d.id}`}
+              placeholder="Type your answer"
+              submitLabel="Send"
+              onSubmit={async answer => {
+                const text = answer.trim()
+                if (text === '') return
+                await $.prompt.submit({
+                  text: `Answer to decision ${d.id} ("${d.question}"): ${text}`,
+                })
+              }}
+            />
+            <Button
+              key={`done-${d.id}`}
+              label="Dismiss"
+              onPress={async () => {
+                const closedAt = await $.clock.now()
+                await update($, items, all =>
+                  all.map(x => (x.id === d.id ? { ...x, closedAt, outcome: 'dismissed in the pane' } : x)),
+                )
+              }}
+            />
+          </Box>
+        ))}
+        {closed.length > 0 && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>Recently settled</Text>
+            {closed.map(d => (
+              <Text key={d.id} color="success">
+                ✓ {d.question}
+                {d.outcome !== undefined ? ` → ${d.outcome}` : ''}
+              </Text>
+            ))}
+          </Box>
+        )}
+      </Box>
+    )
+  })
+}
