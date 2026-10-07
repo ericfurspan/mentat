@@ -1,6 +1,6 @@
 # An example session
 
-*For people. Edited excerpts from one real session in this repository on 2026-10-06, while Mentat was being built with Mentat. Messages are shortened, and cuts are marked [...]. Nothing is reworded, except that the name of a private repository is replaced in brackets.*
+*For people. Edited excerpts from one real session in this repository on 2026-10-06, while Mentat was being built with Mentat. Messages are shortened, and cuts are marked [...]. Nothing is reworded.*
 
 The maintainer works in chat with Claude Code, the lead agent. Codex reviews each pull request on GitHub. Things to notice:
 
@@ -12,7 +12,7 @@ The maintainer works in chat with Claude Code, the lead agent. Codex reviews eac
 
 **Maintainer:** thoughts on this skill ? https://www.aihero.dev/skills-pr
 
-**Claude Code:** Most of this skill is already in Mentat. One idea is worth taking: the "merge danger" line. I wouldn't install the skill itself. [...] If you want the merge-danger line, I'd add one line to the template and to the final-check comment. Should I open an issue for that?
+**Claude Code:** Most of this skill is already in Mentat. One idea is worth taking: the "merge danger" line. [...] Should I open an issue for that?
 
 **Maintainer:** yes, open the issue. Stop being so overly confident that our skills do things better because, frankly, in my experience, what we have currently does not work well. [...]
 
@@ -28,19 +28,11 @@ The underlying gap: Mentat says to wait for CI before reviewing, but nothing doe
 
 **Maintainer:** yes, open the issue
 
-The fix was built next. On its own pull request:
-
-**Claude Code:** The new CI wait worked on its own pull request: round 1 logged "Waiting for CI on ee3c39f" and started the review once CI passed. Codex then found a real P1. A push during the wait could still get the app to review a commit that hadn't passed CI. I fixed it in e7b8bc2 with a new test, and round 2 is running now, waiting for CI first.
+That issue became `mentat review` waiting for CI on its own.
 
 ## Review rounds and the hard stop
 
-From [ericfurspan/mentat#70](https://github.com/ericfurspan/mentat/pull/70), which added `/mentat:retro`. Each message arrived on its own while the maintainer did other things.
-
-**Claude Code:** Codex round 2 on #70 raised a real P1: retro read whole session logs, so a credential in an old session would get pulled into the new one. I fixed it in 8521061. [...] Round 3 is running in the background.
-
-**Claude Code:** Codex raised another valid P1 on #70: pattern matching missed some secret formats, like AWS secret keys. Rather than chase patterns, I took its suggestion to leave risky content out entirely. [...]
-
-**Claude Code:** Round 4 on #70 found one more P1: a failed command's error text could still carry a credential into the transcript. I fixed it in edbdecd. [...] Round 5 is running, and it's the last one allowed. If it still finds problems, I'll stop and bring them to you instead of fixing further.
+From [ericfurspan/mentat#70](https://github.com/ericfurspan/mentat/pull/70), which added `/mentat:retro`. Rounds 2 to 4 each found a real problem, fixed without the maintainer.
 
 **Claude Code:** [ericfurspan/mentat#70](https://github.com/ericfurspan/mentat/pull/70) hit the five-round hard stop with one finding still open, so I've stopped.
 
@@ -54,23 +46,19 @@ Should I make that fix and run the extra round, past the five-round limit, on th
 
 **Claude Code:** [ericfurspan/mentat#70](https://github.com/ericfurspan/mentat/pull/70) is ready to merge. The extra round you approved found nothing on 511514a, CI passed, and every review thread is answered. I've posted the final check and requested your review.
 
-The part most worth your eyes is `skills/retro/transcript`, since it decides what a retro can see. [...]
-
 **Maintainer:** merged 70
 
 ## A decision that is the maintainer's
 
 **Claude Code:** #70 is merged and the plugin is updated in both checkouts. Next in #22 is agents merging (#50). It changes Mentat's biggest rule, so I need one decision from you before I plan it.
 
-My recommendation is opt-in per repository. A one-line "agents may merge" in a repository's AGENTS.md would let the agent merge its own pull request after the final check, once the review loop ends ready and CI passes. The merge hook would stop asking where that line exists and keep asking everywhere else. [...]
+My recommendation is opt-in per repository. A one-line "agents may merge" in a repository's AGENTS.md would let the agent merge its own pull request after the final check, once the review loop ends ready and CI passes. [...]
 
 Should it be opt-in per repository, or on everywhere by default?
 
 **Maintainer:** i guess opt-in. what do you think?
 
-**Claude Code:** I'd go with opt-in too. Merging can be harder to undo than it looks, depending on the repository. If [another repository] deploys whenever something merges to `master`, an agent's merge there ships to production, and a revert doesn't take that back. Opt-in means you turn it on only in repositories where a merge is cheap to reverse, and every other repository keeps asking you.
-
-Next I'll write the plan for #50 on that basis, have Codex challenge it, and bring it to you before building.
+**Claude Code:** I'd go with opt-in too. Merging can be harder to undo than it looks, depending on the repository. [...] Opt-in means you turn it on only in repositories where a merge is cheap to reverse, and every other repository keeps asking you.
 
 ## A plan, challenged by Codex
 
@@ -84,16 +72,6 @@ Codex found three real gaps in my draft, and the plan now fixes each one:
 | A stale local copy could still show an opt-in you'd removed | The opt-in line is read fresh from GitHub at merge time, for the repository being merged. |
 | A changed head could still be reported as ready to merge | A refusal because the head moved sends the agent back to review. Any other refusal comes to you. |
 
-Codex also pointed out you can keep required approvals. You approve, then the agent merges.
-
-Should I build it?
+[...] Should I build it?
 
 **Maintainer:** yes, build it
-
-Two review rounds later, each fixing a real P1:
-
-**Claude Code:** [ericfurspan/mentat#71](https://github.com/ericfurspan/mentat/pull/71) is ready to merge. Codex found nothing on db169d6 in round 3, and CI passed there. Both earlier P1s are fixed: the merge has to be pinned to the reviewed commit, and it must be a pull request the agent's own account opened. I've posted the final check and requested your review.
-
-The part most worth your eyes is the one exception in `hooks/no-merge`. Merging this changes nothing anywhere until a repository adds the opt-in line.
-
-**Maintainer:** Merged
