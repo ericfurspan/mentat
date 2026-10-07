@@ -74,9 +74,6 @@ check "a running program that is not Claude Code falls back to the PATH" '[ "$rc
 reset; echo "something else" >"$STUB/claude_version"; rc=$(run)
 check "an unreadable Claude Code version is a warning" '[ "$rc" = 0 ] && grep -qx "WARN: could not tell the Claude Code version; Mentat needs 2.1.163 or later" "$STUB/out"'
 
-reset; rc=$(run owner/repo)
-check "takes owner/repo" '[ "$rc" = 0 ] && ! grep -q "repo view" "$STUB/calls"'
-
 reset; echo 3 >"$STUB/secrets"; rc=$(run)
 check "Actions secrets are a warning, not a failure" '[ "$rc" = 0 ] && grep -q "WARN: owner/repo has 3 Actions secret(s)" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 reset; touch "$STUB/secrets_unreadable"; rc=$(run)
@@ -87,7 +84,7 @@ check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is n
 reset; touch "$STUB/unreadable"; rc=$(run)
 check "an unreadable repository fails" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read owner/repo" "$STUB/out"'
 reset; touch "$STUB/no_repo"; rc=$(run)
-check "no repository to find fails and asks for owner/repo" '[ "$rc" = 1 ] && grep -q "pass owner/repo" "$STUB/out"'
+check "no repository to find fails and says to run it inside a checkout" '[ "$rc" = 1 ] && grep -q "run mentat check inside a checkout" "$STUB/out"'
 
 # Without codex: a PATH of the stub gh, links to git and jq, and every directory
 # that has no codex in it.
@@ -100,7 +97,7 @@ IFS=$oldifs
 reset; rc=$(PATH="$nocodex" run)
 check "codex missing is a warning" '[ "$rc" = 0 ] && grep -q "WARN: codex is not installed" "$STUB/out"'
 
-rc=$("$mentat" check a/b/c >/dev/null 2>&1; echo $?)
-check "a malformed owner/repo is a usage error (exit 64)" '[ "$rc" = 64 ]'
+rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)
+check "an argument is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 [ "$failures" -eq 0 ]

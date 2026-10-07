@@ -134,27 +134,26 @@ check "a result is accepted only after the head is read again" '[ "$rc" = 0 ] &&
 reset; rc=$(run)
 check "no result in time is not reviewed (exit 1)" '[ "$rc" = 1 ] && grep -q "no result from the Codex app on $H" "$STUB/out"'
 # CI on the head is waited for before the review starts.
-thumbs() { done_on 1111111; }
-reset; thumbs; runs in_progress null >"$STUB/check_runs.json"; runs completed success >"$STUB/check_runs_later.json"; rc=$(run)
+reset; done_on 1111111; runs in_progress null >"$STUB/check_runs.json"; runs completed success >"$STUB/check_runs_later.json"; rc=$(run)
 check "waits for running CI, then reviews" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -qx "pr ready 7" "$STUB/calls"'
 check "reads CI by the head commit" 'grep -q "repos/owner/repo/commits/$H/check-runs" "$STUB/calls" && grep -q "repos/owner/repo/commits/$H/status" "$STUB/calls"'
-reset; thumbs; runs completed failure >"$STUB/check_runs.json"; rc=$(run)
+reset; done_on 1111111; runs completed failure >"$STUB/check_runs.json"; rc=$(run)
 check "failed CI is not reviewed (exit 4) and names the check" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
-reset; thumbs; echo '{"statuses":[{"context":"ci/legacy","state":"failure"}]}' >"$STUB/status.json"; rc=$(run)
+reset; done_on 1111111; echo '{"statuses":[{"context":"ci/legacy","state":"failure"}]}' >"$STUB/status.json"; rc=$(run)
 check "a failed commit status counts as failed CI" '[ "$rc" = 4 ] && grep -qx -- "- ci/legacy" "$STUB/out"'
-reset; thumbs; runs queued null >"$STUB/check_runs.json"; rc=$(run)
+reset; done_on 1111111; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout is not reviewed (exit 4)" '[ "$rc" = 4 ] && grep -q "CI did not finish on $H" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
-reset; thumbs; runs >"$STUB/check_runs.json"; rc=$(run)
+reset; done_on 1111111; runs >"$STUB/check_runs.json"; rc=$(run)
 check "no CI at all reviews after the grace period" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ]'
-reset; thumbs; echo "$OLD" >"$STUB/push_on_ci"; rc=$(run)
+reset; done_on 1111111; echo "$OLD" >"$STUB/push_on_ci"; rc=$(run)
 check "a push during the CI wait is caught before the pull request is marked ready (exit 3)" '[ "$rc" = 3 ] && ! grep -q "pr ready" "$STUB/calls"'
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-reset; thumbs; printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"}]}\n' "$now" >"$STUB/check_runs.json"
+reset; done_on 1111111; printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"}]}\n' "$now" >"$STUB/check_runs.json"
 printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"},{"name":"slow","status":"in_progress","conclusion":null}]}\n' "$now" >"$STUB/check_runs_later.json"
 # A grace period far longer than the test, so a clock tick before the first poll cannot end it.
 rc=$(MENTAT_CI_GRACE_SECONDS=30 run)
 check "a check that just passed waits for checks that register later" '[ "$rc" = 4 ] && grep -q "CI did not finish" "$STUB/out" && grep -qx -- "- slow" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
-reset; thumbs; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
+reset; done_on 1111111; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
 check "a skipped check does not block the review" '[ "$rc" = 0 ]'
 rc=$("$mentat" review 7 --local >/dev/null 2>&1; echo $?)
 check "an argument after the number is a usage error, not the app path (exit 64)" '[ "$rc" = 64 ]'

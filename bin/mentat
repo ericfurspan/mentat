@@ -9,7 +9,7 @@
 #     request's head with local Codex and posts the result. Same exit codes.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
-#   mentat check [owner/repo]  Checks, read-only, what Mentat itself needs: tools,
+#   mentat check  Checks, read-only, what Mentat itself needs: tools,
 #     gh signed in, the repository readable; prints the codex version and warns
 #     when Claude Code is older than Mentat needs. 0 Mentat can work (warnings
 #     printed), 1 it cannot.
@@ -173,9 +173,9 @@ code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<
     grep -E '^\|[^|]*Code Review[^|]*\|' | head -n 1 |
     sed -nE 's/^\|[^|]*\|[^|]*\*\*([A-Za-z ]+)\*\*[^|]*datetime="([0-9T:-]+)(\.[0-9]+)?Z"[^|]*\|[[:space:]]*`([0-9a-f]{7,40})`[[:space:]]*\|.*/\1 \2Z \4/p'
 }
-app_reaction() { # $1 repo, $2 pr, $3 content, $4 since: prints the count
-  gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" --arg c "$3" --arg t "$4" \
-    '[.[][] | select(.user.login == $a and .content == $c and .created_at >= $t)] | length'
+app_reviewing() { # $1 repo, $2 pr: prints how many 👀 the app has on the pull request
+  gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" \
+    '[.[][] | select(.user.login == $a and .content == "eyes")] | length'
 }
 review() {
   local pr="${1:-}" repo head draft before ready="" secs=0 found n
@@ -195,7 +195,7 @@ review() {
   wait_for_ci "$repo" "$head"
   # A push during the wait would get the app's review without passing CI.
   [ "$(head_state)" != moved ] || moved
-  n=$(app_reaction "$repo" "$pr" eyes "") || not_reviewed "could not read the reactions on #$pr"
+  n=$(app_reviewing "$repo" "$pr") || not_reviewed "could not read the reactions on #$pr"
   [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
   draft=$(gh pr view "$pr" --json isDraft --jq .isDraft) || not_reviewed "could not read pull request #$pr"
   before=$(latest_ready "$repo" "$pr") || not_reviewed "could not read the timeline of #$pr"
@@ -413,14 +413,8 @@ older_than() {
   ((10#$a3 < 10#$b3))
 }
 check() {
-  local repo="${1:-}" usage="usage: mentat check [owner/repo]" tool n v cc
-  [ $# -le 1 ] || die "$usage" 64
-  case "$repo" in
-    '') ;;
-    -* | *[!A-Za-z0-9._/-]* | */*/* | /* | */) die "$usage" 64 ;;
-    */*) ;;
-    *) die "$usage" 64 ;;
-  esac
+  local repo tool n v cc
+  [ $# -eq 0 ] || die "usage: mentat check" 64
   for tool in git gh jq; do
     if command -v "$tool" >/dev/null 2>&1; then c_ok "$tool is installed"; else c_problem "$tool is not installed"; fi
   done
@@ -438,10 +432,8 @@ check() {
   fi
   # Exit status only: gh auth status can print token details.
   if gh auth status >/dev/null 2>&1; then c_ok "gh is signed in"; else c_problem "gh is not signed in (run gh auth login)"; c_finish; fi
-  if [ -z "$repo" ]; then
-    repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || repo=""
-    [ -n "$repo" ] || { c_problem "could not tell which GitHub repository this is; pass owner/repo"; c_finish; }
-  fi
+  repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || repo=""
+  [ -n "$repo" ] || { c_problem "could not tell which GitHub repository this is; run mentat check inside a checkout of it"; c_finish; }
   if gh api -X GET "repos/$repo" --jq .full_name >/dev/null 2>&1; then c_ok "$repo is readable"
   else c_problem "could not read $repo"; c_finish; fi
   # With write access, an agent can run a workflow on a branch before any review.
@@ -467,5 +459,5 @@ case "${1:-}" in
     if [ "$local_review" = yes ]; then review_local "$@"; else review "$@"; fi ;;
   challenge) shift; challenge "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local] <pull request number> | mentat challenge <plan file> | mentat check [owner/repo]" 64 ;;
+  *) die "usage: mentat review [--local] <pull request number> | mentat challenge <plan file> | mentat check" 64 ;;
 esac
