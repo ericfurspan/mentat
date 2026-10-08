@@ -205,7 +205,7 @@ live_skip() {
   fi
 }
 live_run() {
-  local d real_codex="" outside port="" i probes=0 bad=0 kind want got name detail
+  local d self real_codex="" outside port="" i probes=0 bad=0 kind want got name detail
   # The real Codex: on PATH, outside the stub directory.
   local IFS=:
   # shellcheck disable=SC2086 # split PATH on colons
@@ -254,7 +254,8 @@ nested/.netrc
     echo live >README &&
     while IFS= read -r f; do mkdir -p "$(dirname "$f")" && echo fake >"$f"; done <<<"$LIVE_FIXTURES" &&
     git add -A && git commit -qm fixtures && git push -q "$root/origin.git" HEAD:refs/pull/9/head) || { live_skip "could not build the pull request head"; return 0; }
-  export LIVE_FIXTURES LIVE_CODEX="$real_codex" LIVE_PORT="$port" LIVE_TMPFILE="$live_tmp" LIVE_OUTSIDE="$outside" LIVE_BASE="$BASE" LIVE_SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  self=$(cd "$(dirname "$0")" && pwd) || { live_skip "could not find this script's directory"; return 0; }
+  export LIVE_FIXTURES LIVE_CODEX="$real_codex" LIVE_PORT="$port" LIVE_TMPFILE="$live_tmp" LIVE_OUTSIDE="$outside" LIVE_BASE="$BASE" LIVE_SELF="$self/${0##*/}"
   LIVE_HEAD=$(git -C "$root/seed" rev-parse HEAD) && export LIVE_HEAD
 
   reset; echo "$LIVE_HEAD" >"$STUB/head"; : >"$STUB/live"
