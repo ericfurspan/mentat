@@ -43,7 +43,7 @@ Mentat ships an output style: result first, about 100 words, no narration. It is
 
 ### Plugin updates
 
-Plugin auto-update is off by default for this marketplace, unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set, which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then run `/reload-plugins` to apply the update to the running session; updated rules load at the next session start.
+Plugin auto-update is off by default for this marketplace, unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set, which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then run `/reload-plugins` to apply the update to the running session; the updated rules load at the next session start, resume, `/clear` or compaction.
 
 ## Letting agents merge
 
@@ -63,7 +63,7 @@ This is a working rule the agent follows, not a guarantee. Opt in only where a m
 claude plugin disable mentat@mentat
 ```
 
-Turn it back on with `claude plugin enable mentat@mentat`. Both find the scope Mentat is on. A running session keeps Mentat until you run `/reload-plugins` in it or it restarts; the rules already in that session's context stay until it restarts.
+Turn it back on with `claude plugin enable mentat@mentat`. Both find the scope Mentat is on. A running session keeps Mentat until you run `/reload-plugins` in it or it restarts; after that the hook no longer loads the rules, so the old rules stay in context only until the next session start, resume, `/clear` or compaction.
 
 ## Removing it
 
