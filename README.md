@@ -21,6 +21,7 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional o
 - Decide what to build and what matters, with Claude Code advising.
 - Merge pull requests on GitHub.
 - When a session went badly, run `/mentat:retro` in Claude Code: it reads the session and proposes fixes to the setup, and changes nothing until you approve.
+- To skip Codex for a session, run `/mentat:no-review`: no pull request reviews and no plan challenges, and you merge every pull request. Say so in chat to turn Codex back on.
 - Once per repository: turn Mentat on.
 
 ## Read more
@@ -34,5 +35,5 @@ For agents. You do not need to read these:
 
 - `rules.md`: the workflow rules, loaded into every session.
 - `AGENTS.md`: this repository's test command and review rules.
-- `skills/`: one skill per workflow step (plan, pr, review), called from `rules.md`, and `retro`, which you start.
+- `skills/`: one skill per workflow step (plan, pr, review), called from `rules.md`, and `retro` and `no-review`, which you start.
 - `agents/builder.md` and `output-styles/mentat.md`: the builder subagent and the reply style.

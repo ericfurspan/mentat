@@ -26,6 +26,8 @@ flowchart TD
 
 After a session that went badly, `/mentat:retro` reads it and proposes fixes to the setup: checks over written rules, pointers, deletions. It changes nothing until you approve; approved fixes become issues or pull requests ([`skills/retro`](../skills/retro/SKILL.md)).
 
+To skip Codex for a session, run `/mentat:no-review`. Claude Code then runs no reviews and no plan challenges: it still runs the tests, waits for CI and posts its final check marked not reviewed, then tells you the pull request is ready, and never merges it itself, even in a repository opted in to agent merges. OpenAI's Codex GitHub app, if installed with automatic reviews, can still review when the pull request is marked ready; that is the app's setting. Say so in chat to turn Codex back on ([`skills/no-review`](../skills/no-review/SKILL.md)).
+
 ## The repository comes first
 
 Mentat requires nothing of a repository's GitHub settings. Rulesets, required approvals, merge methods and CI are yours, and Mentat works within whatever you have. Where your AGENTS.md says something different from Mentat's rules on a preference, such as commit format, branch flow, or a workflow that commits to the default branch, your AGENTS.md wins.
@@ -67,6 +69,7 @@ These are design choices, not proven results:
 | Command | What it does | Exit codes |
 |---|---|---|
 | `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), then marks the pull request ready, which starts the Codex app's review of that head, and waits for the result. The result is read from the app's summary comment, which names the reviewed commit; when that comment is missing or unreadable, the review is "not reviewed" and Claude Code falls back to `--local` | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
+| `mentat ci <PR>` | Waits for CI on the pull request's head the same way, and reviews nothing. Used by `/mentat:no-review` | 0 CI passed or there is none, 1 could not read, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
 | `mentat review --local <PR>` | Waits for CI the same way, then reviews the pull request's head with local Codex in a temporary checkout, and posts the result on the pull request if the head has not moved | same |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat check` | Checks, read-only, what Mentat itself needs: `git`, `gh` and `jq` installed, `gh` signed in, the repository readable. Prints the installed `codex` version. Warns when `codex` is missing or the repository has Actions secrets a branch workflow may read | 0 Mentat can work, 1 it cannot |
