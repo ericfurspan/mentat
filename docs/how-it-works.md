@@ -16,8 +16,6 @@ flowchart TD
     D -- ready --> F["You merge"]
 ```
 
-`rules.md` holds what applies in every session and names a skill for each step below; each skill's file is the source of truth for that step.
-
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build and how it will be checked. An uncertain or consequential plan gets a Codex challenge first ([`skills/plan`](../skills/plan/SKILL.md)).
 2. One builder, one branch, one checkout per change. The builder is a subagent, so its edits stay out of your chat: the main session plans, briefs and reports. The repository's test command runs before the pull request opens and after every fix.
 3. Every pull request opens as a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
@@ -39,10 +37,10 @@ If your repository requires an approval and the agent opens pull requests as you
 ### Claude Code hooks
 
 - The SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear, compact and fork.
-- The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. One exception: in a repository that opted in, a merge API call for that repository goes through Claude Code's normal permission rules without Mentat's prompt; the hook reads the opt-in from GitHub each time. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
-- The reply hook checks each final reply when you have chosen the Mentat output style. The style asks for 100 words; over 250 outside fenced code blocks, an em dash or a blockquote gets one request to rewrite it. It reads `outputStyle` from your settings files (local, then project, then user) and asks once per turn, never cutting text itself.
-- The decisions pane (`hooks/decisions-pane.tsx`, a Claude Code mod) shows a band above the prompt with how many decisions wait on you, and a pane, opened by the band's Show button or `/decisions`, that lists them. The agent records each question with two tools, `open_decision` and `close_decision`; nothing forces it to. Answering in the pane sends your answer as a chat message, and Dismiss closes the entry. The pane approves, denies or changes no tool call.
-- `bin/mentat` is on the Bash tool's PATH while the plugin is enabled.
+- The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. One exception, in a repository that opted in: a single merge API call through `gh api`, pinned to a commit with `sha=`, for a pull request opened by the account `gh` is signed in as, goes through Claude Code's normal permission rules without Mentat's prompt. The hook reads the opt-in from the repository's AGENTS.md on its default branch on GitHub each time, and `gh pr merge` always asks. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
+- The reply hook checks each final reply when you have chosen the Mentat output style. The style asks for 100 words; over 250 outside fenced code blocks, an em dash or a blockquote gets one request to rewrite it. It reads `outputStyle` from your settings files (local, then project, then user; managed settings and command-line flags are not read) and asks once per turn, never cutting text itself.
+- The decisions pane shows a band above the prompt with how many decisions wait on you, and a pane, opened by the band's Show button or `/decisions`, that lists them. The agent records each question there itself; nothing forces it to. Answering in the pane sends your answer as a chat message, and Dismiss closes the entry. The pane approves, denies or changes no tool call.
+- The `mentat` command is available to Claude Code's Bash tool while the plugin is on. It is not on your own terminal's PATH; Claude Code runs it.
 
 ### Instructions, not guarantees
 
@@ -50,7 +48,7 @@ If your repository requires an approval and the agent opens pull requests as you
 
 They draw on:
 
-- [Anthropic's Claude Code best practices](https://code.claude.com/docs/en/best-practices): give the agent a check it can run, plan only when the approach is uncertain, keep instruction files short, and use an independent reviewer told to flag only what affects correctness or the stated requirements, because chasing every finding leads to over-engineering.
+- [Anthropic's Claude Code best practices](https://code.claude.com/docs/en/best-practices): give the agent a check it can run, plan when the approach is uncertain, the change touches several files or the code is unfamiliar, and skip the plan for a small clear change, keep instruction files short, and use an independent reviewer told to flag only what affects correctness or the stated requirements, because chasing every finding leads to over-engineering.
 - [OWASP's AI Agent Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html): least privilege for agent tools, human approval for high-impact or irreversible actions, and minimal sensitive data in agent context.
 - [When Does a Second Model Help? Cross-Model Review in LLM Verification](https://arxiv.org/html/2610.01471) (Song, 2026): different models catch partly different errors, though capability differences make the benefit of diversity alone hard to isolate.
 
@@ -68,21 +66,19 @@ These are design choices, not proven results:
 
 | Command | What it does | Exit codes |
 |---|---|---|
-| `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), then marks the pull request ready, which starts the Codex app's review of that head, and waits for the result. The result is read from the app's summary comment, which names the reviewed commit; when that comment is missing or unreadable, the review is "not reviewed" and Claude Code falls back to `--local` | 0 no findings, 2 findings posted (printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
+| `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), then marks the pull request ready, which starts the Codex app's review of that head, and waits up to 20 minutes for the result. A pull request already marked ready goes back to draft for a moment, then ready again, to start the review. With no result in time, the review is "not reviewed" and Claude Code falls back to `--local` | 0 no findings, 2 findings posted (links printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
 | `mentat ci <PR>` | Waits for CI on the pull request's head the same way, and reviews nothing. Used by `/mentat:no-review` | 0 CI passed or there is none, 1 could not read, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
 | `mentat review --local <PR>` | Waits for CI the same way, then reviews the pull request's head with local Codex in a temporary checkout, and posts the result on the pull request if the head has not moved | same |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat check` | Checks, read-only, what Mentat itself needs: `git`, `gh` and `jq` installed, `gh` signed in, the repository readable. Prints the installed `codex` version. Warns when `codex` is missing or the repository has Actions secrets a branch workflow may read | 0 Mentat can work, 1 it cannot |
 
-Usage errors exit 64.
-
-Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network for the commands it runs. Codex itself still talks to OpenAI, and its web search runs on OpenAI's side, outside that profile: local reviews turn search off, and `mentat challenge` keeps Codex's cached search (OpenAI's index, no live fetches) to check current practice. Inside the checkout, files that commonly hold credentials (`.env` files, private keys such as `*.pem` and `id_ed25519`, `.netrc`, `.npmrc`, `.pypirc`) are denied to it as well. This protects files kept out of git; a credential committed to the repository stays readable through git history, as it is to anyone with the repository, and must be rotated. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach the commands it runs. Codex must be installed under `/opt/homebrew` or `/usr/local`; anywhere else it cannot start and the command reports not reviewed or not challenged.
+Local Codex (`review --local` and `challenge`) runs under a permissions profile that lets it read only the checkout, its git directory and system and tool paths, with no writes and no network for the commands it runs. Codex itself still talks to OpenAI, and its web search runs on OpenAI's side, outside that profile: local reviews turn search off, and `mentat challenge` keeps Codex's cached search (OpenAI's index, no live fetches) to check current practice. Inside the checkout, files that commonly hold credentials (`.env` files, private keys such as `*.pem` and `id_ed25519`, `.netrc`, `.npmrc`, `.pypirc`) are denied to it as well. This protects files kept out of git; a credential committed to the repository stays readable through git history, as it is to anyone with the repository, and must be rotated. Only basic environment variables (such as `HOME`, `PATH` and `USER`) reach the commands it runs. Where Codex must be installed is under [What you need](setup.md#what-you-need).
 
 ## What it does not do
 
 - Linux, Windows, other Git hosts, organizations and team workflows.
 - Running deployments or infrastructure.
-- Changing your repository's GitHub settings, or checking any beyond whether it has Actions secrets.
+- Changing your repository's GitHub settings. `mentat check` reads none of them beyond whether the repository has Actions secrets. At the final check, Claude Code reads whether the repository requires approvals; when it merges in a repository you opted in, it also reads which merge methods the repository allows.
 
 ## Developing Mentat
 
