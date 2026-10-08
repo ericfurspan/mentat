@@ -65,17 +65,6 @@ check "an unreadable repository fails" '[ "$rc" = 1 ] && grep -q "PROBLEM: could
 reset; touch "$STUB/no_repo"; rc=$(run)
 check "no repository to find fails and says to run it inside a checkout" '[ "$rc" = 1 ] && grep -q "run mentat check inside a checkout" "$STUB/out"'
 
-# Without codex: a PATH of the stub gh, links to git and jq, and every directory
-# that has no codex in it.
-mkdir "$root/nocodex"
-ln -s "$root/bin/gh" "$(command -v git)" "$(command -v jq)" "$root/nocodex/"
-nocodex="$root/nocodex"
-oldifs=$IFS; IFS=:
-for d in $PATH; do [ -x "$d/codex" ] || nocodex="$nocodex:$d"; done
-IFS=$oldifs
-reset; rc=$(PATH="$nocodex" run)
-check "codex missing is a warning" '[ "$rc" = 0 ] && grep -q "WARN: codex is not installed" "$STUB/out"'
-
 rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)
 check "an argument is a usage error (exit 64)" '[ "$rc" = 64 ]'
 

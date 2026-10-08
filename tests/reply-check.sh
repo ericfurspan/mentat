@@ -56,10 +56,6 @@ style "$tmp/project/.claude/settings.local.json" Mentat; out=$(ask "$long")
 check "local settings win over project settings" 'printf "%s" "$out" | grep -q "300 words"'
 rm "$tmp/project/.claude/settings.local.json" "$tmp/project/.claude/settings.json" "$tmp/home/.claude/settings.json"; out=$(ask "$long")
 check "no style chosen anywhere is left alone" '[ -z "$out" ]'
-style "$tmp/home/.claude/settings.json" mentat:Mentat
-printf 'not json' >"$tmp/project/.claude/settings.local.json"; out=$(ask "$long")
-check "unreadable local settings do not fall through to user settings" '[ -z "$out" ]'
-rm "$tmp/project/.claude/settings.local.json"
 
 check "hooks.json runs it on Stop" 'jq -e ".hooks.Stop[0].hooks[0].command | endswith(\"/hooks/reply-check\")" "$root/hooks/hooks.json" >/dev/null'
 

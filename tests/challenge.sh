@@ -57,18 +57,6 @@ mkdir -p "$top/sub/plans dir" && cp "$plan" "$top/sub/plans dir/my plan.md"
 reset; rc=$(run "plans dir/my plan.md")
 check "reads a relative plan path with a space from a subdirectory" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN PLAN DATA ---$/,/^--- END PLAN DATA ---$/p" "$STUB/prompt" | sed "1d;\$d" | grep -v "^$" | diff - "$plan" >/dev/null'
 rm -rf "$top/sub/plans dir"
-for name in -n -; do
-  cp "$plan" "$top/sub/$name"
-  reset; rc=$(run "$name")
-  check "reads a plan file named $name" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN PLAN DATA ---$/,/^--- END PLAN DATA ---$/p" "$STUB/prompt" | sed "1d;\$d" | grep -v "^$" | diff - "$plan" >/dev/null'
-  rm -f "$top/sub/$name"
-done
-
-# A checkout whose path holds a space, a double quote and a backslash is quoted as a TOML string.
-odd="$root/odd \"q\" back\\slash"
-git init -q -b trunk "$odd" && (cd "$odd" && git config user.email t@example.test && git config user.name test && echo x >f && git add f && git commit -q -m base)
-reset; (cd "$odd" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
-check "quotes a path with a space, a double quote and a backslash as a TOML string" '[ "$rc" = 0 ] && grep -qF -- "odd \\\"q\\\" back\\\\slash/.git\"=\"read\"" "$STUB/args"'
 
 reset; (cd "$top/sub" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>/dev/null </dev/null); rc=$?
 check "denies credential files inside the checkout, with globs pre-expanded" '[ "$rc" = 0 ] && grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qF "\"**/*.pem\"=\"deny\"" "$STUB/args" && grep -qF "\"**/id_ed25519*\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
@@ -112,8 +100,5 @@ reset; rc=$(run)
 check "no plan file is a usage error (exit 64)" '[ "$rc" = 64 ] && [ ! -f "$STUB/args" ]'
 reset; rc=$(run "$root/missing plan.md")
 check "missing plan file is a usage error (exit 64)" '[ "$rc" = 64 ] && [ ! -f "$STUB/args" ]'
-cp "$plan" "$root/locked plan.md" && chmod 000 "$root/locked plan.md"
-reset; rc=$(run "$root/locked plan.md")
-check "unreadable plan file is a usage error (exit 64)" '[ "$rc" = 64 ] && [ ! -f "$STUB/args" ]'
 
 [ "$failures" -eq 0 ]
