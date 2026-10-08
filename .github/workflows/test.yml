@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Weekly, so a Claude Code or Codex release that breaks Mentat shows up without a change.
+  schedule:
+    - cron: '23 13 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,6 +30,9 @@ jobs:
         run: command -v shellcheck >/dev/null || brew install shellcheck
       # The latest Claude Code, the version the maintainer's own updates to: the mod API may change between releases.
       - run: npm install -g @anthropic-ai/claude-code
+      # The latest Codex, for the live sandbox check in tests/review-local.sh. It makes no model call, so no OpenAI credentials are needed.
+      - if: runner.os == 'macOS'
+        run: npm install -g @openai/codex
       - run: tests/run
 
   # The check the main ruleset requires is named "test". It passes only when every

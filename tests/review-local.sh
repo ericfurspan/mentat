@@ -2,12 +2,78 @@
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for `mentat review --local`, using a real git origin, a stub gh
-# and a stub codex. Prints PASS/FAIL per case; exits 1 on any FAIL.
+# and a stub codex. Prints PASS/FAIL per case; exits 1 on any FAIL. One case also
+# replays the permissions settings the review passes to Codex through the real
+# `codex sandbox` (macOS only, no model call): see "Live sandbox check" below.
 set -uo pipefail
+
+# Probe mode, run by the codex stub inside the review (its working directory is the
+# review worktree, which mentat removes on exit). Writes $STUB/live_results: one
+# line "control|<reason>" when a control fails, otherwise a line
+# "probe|<expected>|<observed>|<name>|<detail>" per probe. Never run outside the test.
+live_probe() {
+  local res="$STUB/live_results" cargs=() line prev="" home f out rc got detail
+  : >"$res"
+  control() { printf 'control|%s\n' "$1" >>"$res"; }
+  # Controls first, outside the sandbox: each fixture exists and is readable here, the
+  # write target is writable, the worktree is not under a path the profile denies.
+  case "$(pwd -P)" in /tmp/* | /private/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies"; return 0 ;; esac
+  # shellcheck disable=SC2086 # the fixture names have no spaces
+  for f in README $LIVE_FIXTURES; do
+    { [ -f "$f" ] && [ -r "$f" ]; } || { control "fixture $f is missing or unreadable in the review worktree"; return 0; }
+  done
+  { : >live-write-control && rm -f live-write-control; } 2>/dev/null || { control "the review worktree is not writable"; return 0; }
+  git diff --name-only "$LIVE_BASE" "$LIVE_HEAD" 2>/dev/null | grep -qx README || { control "git diff $LIVE_BASE $LIVE_HEAD does not list README outside the sandbox"; return 0; }
+  # The same script is the control (outside the sandbox) and the probe: sh expands $1.
+  tcp='/bin/bash -c "exec 3<>/dev/tcp/127.0.0.1/$1"'
+  sh -c "$tcp" sh "$LIVE_PORT" 2>/dev/null || { control "the local listener does not accept a connection"; return 0; }
+  # The settings Codex got, minus what is not a -c setting (exec-only arguments).
+  while IFS= read -r line; do
+    [ "$prev" = -c ] && cargs+=(-c "$line")
+    prev=$line
+  done <"$STUB/args"
+  home=$(mktemp -d) || { control "could not create an empty CODEX_HOME"; return 0; }
+  if [ "${#cargs[@]}" -eq 0 ]; then printf 'probe|allowed|broken|settings|no -c settings were captured\n' >>"$res"; return 0; fi
+  # probe <allowed|denied> <name> <sh script> [arguments]: runs the script under the
+  # real `codex sandbox` with the captured settings. Exit 0 is allowed; a failure whose
+  # output is the operating system refusing is denied; any other failure is broken.
+  probe() {
+    local want=$1 name=$2 script=$3
+    shift 3
+    out=$(CODEX_HOME="$home" "$LIVE_CODEX" sandbox "${cargs[@]}" -- sh -c "$script" sh "$@" 2>&1 </dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      got=allowed
+    else
+      case "$out" in *"Operation not permitted"* | *"Permission denied"* | *"Read-only file system"*) got=denied ;; *) got=broken ;; esac
+    fi
+    detail=""
+    [ "$got" = allowed ] || detail=$(printf '%s\n' "$out" | grep -m1 -E 'Operation not permitted|Permission denied|Read-only file system' || printf '%s\n' "$out" | head -n 1)
+    printf 'probe|%s|%s|%s|exit %s: %s\n' "$want" "$got" "$name" "$rc" "$detail" >>"$res"
+  }
+  probe allowed "reads a tracked file" 'cat "$1" >/dev/null' README
+  probe allowed "git diff <base> <head>" 'git diff --name-only "$1" "$2" | grep -qx README' "$LIVE_BASE" "$LIVE_HEAD"
+  # shellcheck disable=SC2086 # the fixture names have no spaces
+  for f in $LIVE_FIXTURES; do
+    probe denied "reads $f" 'cat "$1" >/dev/null' "$f"
+  done
+  probe denied "reads a file outside the checkout" 'cat "$1" >/dev/null' "$LIVE_OUTSIDE"
+  probe denied "reads a file under /tmp" 'cat "$1" >/dev/null' "$LIVE_TMPFILE"
+  probe denied "writes a new file into the worktree" 'echo x >live-write-probe'
+  if [ -e live-write-probe ]; then
+    rm -f live-write-probe
+    printf 'probe|denied|allowed|the write left a file behind|live-write-probe exists afterward\n' >>"$res"
+  fi
+  probe denied "connects to a local TCP listener" "$tcp" "$LIVE_PORT"
+  rm -rf "$home"
+}
+[ "${1:-}" = --probe ] && { live_probe; exit 0; }
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
 root=$(mktemp -d)
-trap 'rm -rf "$root"' EXIT
+listener="" live_tmp=""
+cleanup() { [ -z "$listener" ] || kill "$listener" 2>/dev/null; rm -rf "$root" "$live_tmp"; }
+trap cleanup EXIT
 export STUB="$root/stub"
 mkdir -p "$STUB" "$root/bin"
 failures=0
@@ -63,6 +129,7 @@ cat >"$root/bin/codex" <<'STUBEOF'
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
 printf '%s\n' "$@" >"$STUB/args"
 cat >"$STUB/prompt"
+[ ! -f "$STUB/live" ] || "$LIVE_SELF" --probe
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
 while [ $# -gt 0 ]; do [ "$1" = -o ] && cp "$STUB/reply" "$2"; shift; done
 STUBEOF
@@ -75,7 +142,7 @@ reset() {
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
-run() { (cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1); echo $?; }
+run() { (cd "$root/work" && "$mentat" review --local "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
 
 reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
@@ -121,5 +188,109 @@ check "a failed post is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post 
 
 rc=$("$mentat" review --local abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
+
+# Live sandbox check. Replays the -c settings the review passed to the stub through the
+# real `codex sandbox` (no model call) and runs shell probes against the review
+# worktree. It does not prove that `codex exec --ignore-user-config --strict-config`
+# behaves the same, and it says nothing about Linux or model-backed behavior.
+# A control that fails (the outer sandbox of an agent session may block one) is SKIP,
+# and FAIL in CI. A probe that is broken (the launcher failed) always fails.
+live="review --local live sandbox"
+live_skip() {
+  if [ "${CI:-}" = "true" ]; then
+    printf 'FAIL: %s: %s (required in CI)\n' "$live" "$1"
+    failures=$((failures + 1))
+  else
+    printf 'SKIP: %s: %s\n' "$live" "$1"
+  fi
+}
+live_run() {
+  local d self real_codex="" outside port="" i probes=0 bad=0 kind want got name detail
+  # The real Codex: on PATH, outside the stub directory.
+  local IFS=:
+  # shellcheck disable=SC2086 # split PATH on colons
+  for d in $PATH; do
+    [ "$d" != "$root/bin" ] && [ -x "$d/codex" ] && { real_codex="$d/codex"; break; }
+  done
+  IFS=$' \t\n'
+  [ -n "$real_codex" ] || { live_skip "codex is not installed"; return 0; }
+  # Controls that need no worktree.
+  case "$(cd -P "$root" && pwd -P)" in
+    /tmp/* | /private/tmp/*) live_skip "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
+  esac
+  outside="$(cd -P "$(dirname "$mentat")/.." && pwd -P)/tests/run"
+  case "$outside" in
+    /opt/homebrew/* | /usr/local/* | /tmp/* | /private/tmp/* | "$root"/*) live_skip "$outside is under a path the profile allows or denies for another reason"; return 0 ;;
+  esac
+  [ -r "$outside" ] || { live_skip "$outside is not readable"; return 0; }
+  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_skip "could not create a file under /tmp"; return 0; }
+  echo fake >"$live_tmp" || { live_skip "could not write $live_tmp"; return 0; }
+  [ -r "$live_tmp" ] || { live_skip "$live_tmp is not readable"; return 0; }
+  command -v perl >/dev/null 2>&1 || { live_skip "perl is not installed, so there is no local listener"; return 0; }
+  perl -MIO::Socket::INET -e '$| = 1; my $s = IO::Socket::INET->new(Listen => 5, LocalAddr => "127.0.0.1", LocalPort => 0, ReuseAddr => 1) or exit 1; print $s->sockport, "\n"; while (my $c = $s->accept) { close $c }' >"$root/port" 2>/dev/null &
+  listener=$!
+  disown "$listener" 2>/dev/null
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    port=$(cat "$root/port" 2>/dev/null)
+    [ -z "$port" ] || break
+    sleep 0.5
+  done
+  case "$port" in '' | *[!0-9]*) live_skip "no local listener could start"; return 0 ;; esac
+
+  # A pull request head with one fake fixture per credential rule, nested ones too.
+  LIVE_FIXTURES=".env
+.env.local
+nested/deep/cert.pem
+server.key
+store.p12
+store.pfx
+id_rsa
+id_ecdsa
+keys/id_ed25519_work
+nested/.netrc
+.npmrc
+.pypirc"
+  (cd "$root/seed" && git checkout -q main && git checkout -qb live &&
+    echo live >README &&
+    while IFS= read -r f; do mkdir -p "$(dirname "$f")" && echo fake >"$f"; done <<<"$LIVE_FIXTURES" &&
+    git add -A && git commit -qm fixtures && git push -q "$root/origin.git" HEAD:refs/pull/9/head) || { live_skip "could not build the pull request head"; return 0; }
+  self=$(cd "$(dirname "$0")" && pwd) || { live_skip "could not find this script's directory"; return 0; }
+  export LIVE_FIXTURES LIVE_CODEX="$real_codex" LIVE_PORT="$port" LIVE_TMPFILE="$live_tmp" LIVE_OUTSIDE="$outside" LIVE_BASE="$BASE" LIVE_SELF="$self/${0##*/}"
+  LIVE_HEAD=$(git -C "$root/seed" rev-parse HEAD) && export LIVE_HEAD
+
+  reset; echo "$LIVE_HEAD" >"$STUB/head"; : >"$STUB/live"
+  rc=$(run 9)
+  if [ "$rc" != 0 ] || [ ! -s "$STUB/live_results" ]; then
+    printf 'FAIL: %s: the review did not run the probes (exit %s)\n' "$live" "$rc"
+    failures=$((failures + 1))
+    return 0
+  fi
+  if grep -q '^control|' "$STUB/live_results"; then
+    live_skip "$(sed -n 's/^control|//p' "$STUB/live_results" | head -n 1)"
+    return 0
+  fi
+  while IFS='|' read -r kind want got name detail; do
+    [ "$kind" = probe ] || continue
+    probes=$((probes + 1))
+    if [ "$want" = "$got" ]; then
+      printf 'PASS: %s: %s: %s (%s)\n' "$live" "$want" "$name" "$detail"
+    else
+      printf 'FAIL: %s: expected %s, observed %s: %s (%s)\n' "$live" "$want" "$got" "$name" "$detail"
+      bad=$((bad + 1))
+    fi
+  done <"$STUB/live_results"
+  failures=$((failures + bad))
+  if [ "$bad" -eq 0 ] && [ "$probes" -gt 0 ]; then
+    printf 'PASS: %s: %s probes matched with %s and Claude Code %s\n' "$live" "$probes" "$("$real_codex" --version 2>/dev/null | head -n 1)" "$(claude --version 2>/dev/null | awk '{print $1}')"
+  elif [ "$probes" -eq 0 ]; then
+    printf 'FAIL: %s: no probes ran\n' "$live"
+    failures=$((failures + 1))
+  fi
+}
+if [ "$(uname)" != Darwin ]; then
+  printf 'SKIP: %s: %s sandboxing differs from macOS, where Mentat runs\n' "$live" "$(uname)"
+else
+  live_run
+fi
 
 [ "$failures" -eq 0 ]
