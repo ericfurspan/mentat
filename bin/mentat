@@ -31,12 +31,6 @@ not_reviewed() { die "not reviewed: $1" 1; }
 not_challenged() { die "not challenged: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
-# A TOML basic string for $1: backslash and double quote escaped.
-toml_str() {
-  local s=${1//\\/\\\\}
-  s=${s//\"/\\\"}
-  printf '"%s"' "$s"
-}
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory (outside the checkout for a
 # worktree) and the system paths. Codex must be installed under /opt/homebrew or
@@ -46,7 +40,7 @@ toml_str() {
 codex_filesystem() {
   local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
   gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
-  [ -z "$gitdir" ] || table="$table, $(toml_str "$gitdir")=\"read\""
+  [ -z "$gitdir" ] || table="$table, \"$gitdir\"=\"read\""
   printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read", %s}}' "$table" "$CREDENTIAL_DENY"
 }
 # Files inside the checkout that commonly hold credentials, denied to Codex even
@@ -97,10 +91,8 @@ run_codex() {
   if [ "$rc" -ne 0 ]; then
     # The log is Codex's raw output and may hold a credential, so it is not
     # printed into the agent's session. A copy is kept for the maintainer.
-    if kept=$(mktemp "${TMPDIR:-/tmp}/mentat-codex-log.XXXXXX") && cp "$log" "$kept"; then
-      "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed. The maintainer can read it at $kept"
-    fi
-    "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed, and it could not be kept"
+    kept=$(mktemp "${TMPDIR:-/tmp}/mentat-codex-log.XXXXXX") && cp "$log" "$kept"
+    "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed. The maintainer can read it at $kept"
   fi
   [ -s "$out" ] || "$fail" "Codex returned no final message"
 }
@@ -342,7 +334,7 @@ review_local() {
 challenge() {
   local plan="${1:-}"
   [ -n "$plan" ] || die "usage: mentat challenge <plan file>" 64
-  { [ -f "$plan" ] && [ -r "$plan" ]; } || die "plan file not found or not readable: $plan" 64
+  [ -f "$plan" ] || die "plan file not found: $plan" 64
   local tool
   for tool in git codex; do
     command -v "$tool" >/dev/null 2>&1 || not_challenged "$tool is not installed"

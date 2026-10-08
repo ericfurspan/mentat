@@ -19,7 +19,7 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 **Before:** <the failing check, the old output, or the old line>
 **After:** <the passing check, the new output, or the new line>
 
-<The test command and its result on the head commit. Say so when a check is missing or could not run.>
+<The test command and its result on the head commit. Say so when a check is missing or could not run. Put the builder's material assumptions here or under Merge danger.>
 
 ## Merge danger
 
