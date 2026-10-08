@@ -6,7 +6,7 @@
 # text itself, so failure details can stay in full. When it cannot read its
 # input, it lets the turn end.
 set -uo pipefail
-export LC_ALL=C # count bytes, so the result is the same on macOS and Linux
+export LC_ALL=C # count bytes, so the result is the same under any locale
 
 limit=250 # the style asks for 100 and shapes replies; the hook only catches runaway ones
 

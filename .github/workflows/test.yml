@@ -13,34 +13,19 @@ permissions:
   contents: read
 
 jobs:
-  run:
-    # macOS is where Mentat runs; Linux keeps the scripts portable.
-    name: test (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+  # The job id and name are both "test": the main ruleset requires a check named "test".
+  test:
+    name: test
+    # macOS is where Mentat runs.
+    runs-on: macos-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - if: runner.os == 'macOS'
-        run: command -v shellcheck >/dev/null || brew install shellcheck
+      - run: command -v shellcheck >/dev/null || brew install shellcheck
       # The latest Claude Code, the version the maintainer's own updates to: the mod API may change between releases.
       - run: npm install -g @anthropic-ai/claude-code
       # The latest Codex, for the live sandbox check in tests/review-local.sh. It makes no model call, so no OpenAI credentials are needed.
-      - if: runner.os == 'macOS'
-        run: npm install -g @openai/codex
+      - run: npm install -g @openai/codex
       - run: tests/run
-
-  # The check the main ruleset requires is named "test". It passes only when every
-  # run above passed: always() keeps it from being skipped, which would count as passing.
-  test:
-    needs: run
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - run: '[ "${{ needs.run.result }}" = success ]'

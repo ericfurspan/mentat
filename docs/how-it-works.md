@@ -86,4 +86,4 @@ Local Codex (`review --local` and `challenge`) runs under a permissions profile 
 
 ## Developing Mentat
 
-`tests/run` is the one test command; it runs locally on macOS and in CI on both macOS and Linux. This repository's own settings require the maintainer's Approve on every change.
+`tests/run` is the one test command; it runs locally and in CI on macOS. This repository's own settings require the maintainer's Approve on every change.
