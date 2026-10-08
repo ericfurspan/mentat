@@ -31,6 +31,8 @@ Or, to turn it on for everyone who clones the repository, use `--scope project`.
 
 Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings.
 
+Use Auto permission mode. Manual and Accept edits stop the work at each command, and in Bypass permissions the merge prompt may not appear.
+
 ### Choosing the Mentat reply style
 
 Mentat ships an output style: result first, about 100 words, no narration. It is not forced on you. To use it in the terminal, pick Mentat with `/config` (Output style) or `/output-style`. In the desktop app, `/config` opens Settings instead of a menu, so set `outputStyle` in a settings file. To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`. The reply hook checks replies only when this style is chosen.
