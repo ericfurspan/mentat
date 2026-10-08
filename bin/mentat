@@ -7,6 +7,9 @@
 #     not pass on the head (failing checks printed; nothing reviewed).
 #   mentat review --local <PR>  Waits for CI the same way, then reviews the pull
 #     request's head with local Codex and posts the result. Same exit codes.
+#   mentat review --skip <PR>  Waits for CI the same way and reviews nothing, for a
+#     change only people read. 0 CI passed on the head, 1 could not read it, 3 the
+#     head moved, 4 CI did not pass.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
@@ -242,6 +245,19 @@ review() {
 # A local review reads the pull request's head as GitHub has it, never this
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, and posts the result only if the head has not moved since.
+# A change only people read skips the review but not CI.
+review_skip() {
+  local pr="$1" repo head now
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --skip] <pull request number>" 64 ;; esac
+  if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
+    not_reviewed "could not read the repository with gh"
+  fi
+  if ! head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$head" ]; then not_reviewed "could not read pull request #$pr"; fi
+  wait_for_ci "$repo" "$head"
+  if ! now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$now" ]; then not_reviewed "could not read pull request #$pr"; fi
+  [ "$now" = "$head" ] || die "the head moved from $head; run mentat review --skip again" 3
+  printf 'CI passed on %s; review skipped\n' "$head"
+}
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues n
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local] <pull request number>" 64 ;; esac
@@ -419,12 +435,12 @@ check() {
 case "${1:-}" in
   review)
     shift
-    # Exactly one pull request number, after --local if given: "review 7 --local"
-    # would otherwise run the app path.
-    if [ "${1:-}" = --local ]; then shift; local_review=yes; else local_review=no; fi
-    [ $# -eq 1 ] || die "usage: mentat review [--local] <pull request number>" 64
-    if [ "$local_review" = yes ]; then review_local "$@"; else review "$@"; fi ;;
+    # Exactly one pull request number, after --local or --skip if given:
+    # "review 7 --local" would otherwise run the app path.
+    case "${1:-}" in --local | --skip) mode=$1; shift ;; *) mode=app ;; esac
+    [ $# -eq 1 ] || die "usage: mentat review [--local | --skip] <pull request number>" 64
+    case "$mode" in --local) review_local "$@" ;; --skip) review_skip "$@" ;; *) review "$@" ;; esac ;;
   challenge) shift; challenge "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local] <pull request number> | mentat challenge <plan file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --skip] <pull request number> | mentat challenge <plan file> | mentat check" 64 ;;
 esac

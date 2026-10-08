@@ -155,6 +155,18 @@ rc=$(MENTAT_CI_GRACE_SECONDS=30 run)
 check "a check that just passed waits for checks that register later" '[ "$rc" = 4 ] && grep -q "CI did not finish" "$STUB/out" && grep -qx -- "- slow" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
 reset; done_on 1111111; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
 check "a skipped check does not block the review" '[ "$rc" = 0 ]'
+# --skip waits for CI the same way and reviews nothing.
+skip_run() { "$mentat" review --skip 7 >"$STUB/out" 2>&1; echo $?; }
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed success >"$STUB/check_runs_later.json"; rc=$(skip_run)
+check "--skip waits for running CI, then passes without marking ready (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "CI passed on $H; review skipped" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
+reset; runs completed failure >"$STUB/check_runs.json"; rc=$(skip_run)
+check "--skip with failed CI exits 4" '[ "$rc" = 4 ] && grep -qx -- "- test" "$STUB/out"'
+reset; runs >"$STUB/check_runs.json"; rc=$(skip_run)
+check "--skip with no CI passes only after the grace period" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ]'
+reset; echo "$OLD" >"$STUB/push_on_ci"; rc=$(skip_run)
+check "--skip catches a push during the CI wait (exit 3)" '[ "$rc" = 3 ]'
+rc=$("$mentat" review 7 --skip >/dev/null 2>&1; echo $?)
+check "--skip after the number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 rc=$("$mentat" review 7 --local >/dev/null 2>&1; echo $?)
 check "an argument after the number is a usage error, not the app path (exit 64)" '[ "$rc" = 64 ]'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
