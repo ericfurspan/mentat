@@ -7,7 +7,7 @@ Codex reviews each head commit of the pull request. Claude Code sorts the findin
 
 ## Skipping the review
 
-When every file the pull request changes is prose only people read, such as `docs/` pages, a README or a changelog, skip the loop and go to the final check, which says the review was skipped and why. Anything a program or an agent reads is reviewed: code, tests, config, workflows, prompts, AGENTS.md, rules and skills. A later push that changes such a file brings the review back. Claude Code never merges a skipped pull request, even where the repository opted in; the maintainer does. Where the repository uses the Codex app, marking the pull request ready still starts the app's review.
+When every file the pull request changes is prose only people read, such as `docs/` pages, a README or a changelog, skip the loop: wait for CI on the head with `gh pr checks <N> --watch` (a repository with no checks goes on), fix any failing check and push, then go to the final check, which says the review was skipped and why. Anything a program or an agent reads is reviewed: code, tests, config, workflows, prompts, AGENTS.md, rules and skills. A later push that changes such a file brings the review back. Claude Code never merges a skipped pull request, even where the repository opted in; the maintainer does. Where the repository uses the Codex app, marking the pull request ready still starts the app's review.
 
 ## When the loop ends
 
