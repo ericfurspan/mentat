@@ -29,7 +29,7 @@ claude plugin install mentat@mentat --scope local
 
 Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit. Each collaborator also runs `claude plugin marketplace add ericfurspan/mentat` and `claude plugin install mentat@mentat --scope project` once on their own machine.
 
-Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings.
+Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings. The `mentat` command is available to Claude Code's Bash tool while the plugin is on, not in your own terminal.
 
 ### Choosing the Mentat reply style
 
@@ -43,7 +43,7 @@ Mentat ships an output style: result first, about 100 words, no narration. It is
 
 ### Plugin updates
 
-Plugin auto-update is off by default for this marketplace, unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set (seen with its bundled 2.1.286), which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then restart the session.
+Plugin auto-update is off by default for this marketplace, unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set, which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). To update, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope <the scope you installed with>`, then run `/reload-plugins` to apply the update to the running session; updated rules load at the next session start.
 
 ## Letting agents merge
 
@@ -53,7 +53,7 @@ By default you merge every pull request. To let Claude Code merge its own pull r
 - Agents may merge their own pull requests.
 ```
 
-Then, once a pull request's review loop ends ready and the final check is posted, Claude Code merges the commit Codex reviewed through GitHub's merge API. It never turns on auto-merge, and if GitHub refuses (a required approval you have not given, branch protection, a merge queue), it tells you and stops. Required approvals can stay: if it stops because your approval is missing, approve the pull request, then ask it to merge. Remove the line to turn it off; it takes effect at once.
+Then, once a pull request's review loop ends ready and the final check is posted, Claude Code merges the commit Codex reviewed through GitHub's merge API. It never turns on auto-merge, and if GitHub refuses (a required approval you have not given, branch protection, a merge queue), it tells you and stops. Required approvals can stay: if it stops because your approval is missing, approve the pull request, then ask it to merge. To turn it off, remove the line and merge that change: the merge hook and the agent read AGENTS.md from the default branch on GitHub, so a local edit or a change still on a branch does nothing until it is merged. The next merge reads the change.
 
 This is a working rule the agent follows, not a guarantee. Opt in only where a merge is cheap to undo, including anything a merge deploys; for deployments, see the environment protection advice under [Have GitHub enforce it](#have-github-enforce-it).
 
@@ -63,7 +63,7 @@ This is a working rule the agent follows, not a guarantee. Opt in only where a m
 claude plugin disable mentat@mentat
 ```
 
-Turn it back on with `claude plugin enable mentat@mentat`. Both find the scope Mentat is on. A running session keeps Mentat until it restarts.
+Turn it back on with `claude plugin enable mentat@mentat`. Both find the scope Mentat is on. A running session keeps Mentat until you run `/reload-plugins` in it or it restarts; the rules already in that session's context stay until it restarts.
 
 ## Removing it
 
@@ -71,15 +71,16 @@ Turn it back on with `claude plugin enable mentat@mentat`. Both find the scope M
 claude plugin uninstall mentat@mentat --scope local
 ```
 
-Use the scope you installed with. What remains:
+Use the scope you installed with, once per scope and checkout you installed in. What remains:
 
 - Local scope: `.claude/settings.local.json`, still ignored by git, with Mentat's entry removed.
 - Project scope: the change to `.claude/settings.json` is yours to commit.
 - On the machine: the marketplace, until you run `claude plugin marketplace remove mentat`.
 - `"outputStyle": "mentat:Mentat"`, in whichever settings file you chose it in.
 - Codex automatic review, if you set it up: turn it off, or disconnect the repository, in ChatGPT.
+- Any `mentat-codex-log.*` file in your temporary directory (`$TMPDIR`, else `/tmp`). One is kept each time local Codex exits with an error, and it may hold credentials: delete them.
 
-Mentat never deletes settings files. Remove any `## Code Review Rules` section or review line you added to AGENTS.md if you no longer want it.
+Mentat never deletes settings files. Remove the "Agents may merge their own pull requests." line, and any `## Code Review Rules` section or review line you added to AGENTS.md, if you no longer want them.
 
 ## Have GitHub enforce it
 
