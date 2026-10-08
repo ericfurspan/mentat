@@ -12,7 +12,7 @@ When started, say in one line that Codex is off for this session. If a `mentat r
 
 1. Do not call `mentat:review` or run `mentat review` or `mentat review --local`.
 2. Once the test command passes on the head, push and update the description (Skill tool, `mentat:pr`). Its Evidence says the pull request was not reviewed because the maintainer turned Codex off for this session.
-3. Where the repository has CI, wait for it on that head (`gh pr checks <N> --watch`). Failing checks: fix them, run the test command, push, and wait again.
+3. Run `mentat ci <N>`, which waits for CI on the head (up to 30 minutes; with no CI, about a minute) and reviews nothing. 0: go on. 3: the head moved; run it again. 4: failing checks: fix them, run the test command, push, and run it again; CI still running at the timeout: tell the maintainer. 1: tell the maintainer.
 4. Read the diff and the description from GitHub, not from memory, and correct any claim that does not hold. Post one comment, five lines at most: the commit checked and its test and CI results, "Not reviewed: Codex turned off by the maintainer", what was not checked, and what most deserves the maintainer's eyes.
 5. Run `gh pr ready <N>`; if that fails, report it and stop. Tell the maintainer in chat that the pull request is ready to merge, unreviewed, and stop.
 

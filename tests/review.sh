@@ -155,6 +155,20 @@ rc=$(MENTAT_CI_GRACE_SECONDS=30 run)
 check "a check that just passed waits for checks that register later" '[ "$rc" = 4 ] && grep -q "CI did not finish" "$STUB/out" && grep -qx -- "- slow" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
 reset; done_on 1111111; runs completed skipped >"$STUB/check_runs.json"; rc=$(run)
 check "a skipped check does not block the review" '[ "$rc" = 0 ]'
+# mentat ci waits for CI the same way and never marks the pull request ready.
+runci() { "$mentat" ci 7 >"$STUB/out" 2>&1; echo $?; }
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed success >"$STUB/check_runs_later.json"; rc=$(runci)
+check "ci waits for running CI, then passes without marking ready (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "CI passed on $H" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
+reset; runs completed failure >"$STUB/check_runs.json"; rc=$(runci)
+check "ci reports failed CI (exit 4) and names the check" '[ "$rc" = 4 ] && grep -qx -- "- test" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
+reset; printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"}]}\n' "$now" >"$STUB/check_runs.json"
+printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"},{"name":"slow","status":"in_progress","conclusion":null}]}\n' "$now" >"$STUB/check_runs_later.json"
+rc=$(MENTAT_CI_GRACE_SECONDS=30 runci)
+check "ci waits for checks that register after one passed" '[ "$rc" = 4 ] && grep -qx -- "- slow" "$STUB/out"'
+reset; echo "$OLD" >"$STUB/push_on_ci"; rc=$(runci)
+check "ci catches a push during the wait (exit 3)" '[ "$rc" = 3 ]'
+rc=$("$mentat" ci abc >/dev/null 2>&1; echo $?)
+check "ci with a bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 rc=$("$mentat" review 7 --local >/dev/null 2>&1; echo $?)
 check "an argument after the number is a usage error, not the app path (exit 64)" '[ "$rc" = 64 ]'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)

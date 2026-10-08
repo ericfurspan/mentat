@@ -7,6 +7,9 @@
 #     not pass on the head (failing checks printed; nothing reviewed).
 #   mentat review --local <PR>  Waits for CI the same way, then reviews the pull
 #     request's head with local Codex and posts the result. Same exit codes.
+#   mentat ci <PR>  Waits for CI on the pull request's head the same way, and
+#     reviews nothing. 0 CI passed (or there is none), 1 could not read, 3 the head
+#     moved, 4 CI did not pass (failing or unfinished checks printed).
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
@@ -242,6 +245,18 @@ review() {
 # A local review reads the pull request's head as GitHub has it, never this
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, and posts the result only if the head has not moved since.
+ci() {
+  local pr="${1:-}" repo head now
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat ci <pull request number>" 64 ;; esac
+  if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
+    die "could not read the repository with gh"
+  fi
+  if ! head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$head" ]; then die "could not read pull request #$pr"; fi
+  wait_for_ci "$repo" "$head"
+  if ! now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$now" ]; then die "could not read pull request #$pr"; fi
+  [ "$now" = "$head" ] || die "the head moved from $head; run mentat ci again" 3
+  printf 'CI passed on %s\n' "$head"
+}
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues n
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local] <pull request number>" 64 ;; esac
@@ -424,7 +439,8 @@ case "${1:-}" in
     if [ "${1:-}" = --local ]; then shift; local_review=yes; else local_review=no; fi
     [ $# -eq 1 ] || die "usage: mentat review [--local] <pull request number>" 64
     if [ "$local_review" = yes ]; then review_local "$@"; else review "$@"; fi ;;
+  ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   challenge) shift; challenge "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local] <pull request number> | mentat challenge <plan file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local] <pull request number> | mentat ci <pull request number> | mentat challenge <plan file> | mentat check" 64 ;;
 esac
