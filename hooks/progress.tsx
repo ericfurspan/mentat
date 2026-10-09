@@ -204,18 +204,22 @@ const readReview = (issueComments: unknown[], pullComments: unknown[], reviews: 
 }
 
 const sha7 = (sha: string): string => sha.slice(0, 7)
+const localText = (local: NonNullable<ReviewSnapshot['local']>): string => {
+  const result = local.result === undefined ? [] : [local.result === 'FINDINGS' ? 'Findings' : 'No findings']
+  return ['Local review posted', ...result, sha7(local.sha)].join(' · ')
+}
 const codexText = (r: ReviewSnapshot): string => {
   const c = r.codex
+  // A completed app result stands. Otherwise a local review of the same head (the
+  // review workflow's fallback) is what happened, so it shows even over a Running
+  // or Failed app summary.
   if (c.kind === 'completed') {
     if (c.findings === 0) return c.hasReview ? `Findings in review · ${sha7(c.sha)}` : `No findings · ${sha7(c.sha)}`
     return `${plural(c.findings, 'finding', 'findings')} · ${c.replied} replied · ${sha7(c.sha)}`
   }
+  if (r.local !== undefined) return localText(r.local)
   if (c.kind === 'running') return `Running · ${sha7(c.sha)}`
   if (c.kind === 'failed') return `Failed · ${sha7(c.sha)}`
-  if (r.local !== undefined) {
-    const result = r.local.result === undefined ? [] : [r.local.result === 'FINDINGS' ? 'Findings' : 'No findings']
-    return ['Local review posted', ...result, sha7(r.local.sha)].join(' · ')
-  }
   return c.kind === 'other' ? 'Not on this commit' : c.kind === 'none' ? 'No review yet' : 'unknown'
 }
 
@@ -268,6 +272,10 @@ const parseRef = (ref: string): { repo: string; number: number } => {
   const m = /^(.+)#(\d+)$/.exec(ref)
   return { repo: m![1]!, number: Number(m![2]) }
 }
+
+// The stored list is treated as unknown-shaped JSON: an entry with a closedAt was
+// settled by the former decisions pane.
+export const withoutSettled = <T,>(list: T[]): T[] => list.filter(d => asObj(d).closedAt === undefined)
 
 // ---- state changes: one at a time -------------------------------------------------------
 
@@ -564,6 +572,9 @@ export const register: Register = (on, _options) => {
 
     // A (re)load: reconcile the agents with the engine's list and start the timers
     // over; reads that a former load left running are told apart by their sequence number.
+    // The former decisions pane kept settled entries (with closedAt) in this state;
+    // nothing shows them now, so they must not come back as open questions.
+    await inTurn(() => update($, items, withoutSettled))
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()

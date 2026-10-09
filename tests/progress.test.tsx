@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { withoutSettled } from '../hooks/progress'
+
 // Tests for hooks/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
 // `$.session.usage` are tables too, and the clock moves only when a test moves it.
@@ -266,6 +268,25 @@ test('an opened question shows in the band and pane, and closing it removes it',
   await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'opened' })
   expect((await bandTexts($)).some(t => t.includes('question'))).toBe(false)
   expect((await paneTexts($)).includes('Open the issue?')).toBe(false)
+})
+
+test('settled entries a former decisions pane stored are dropped on load', async ($, on) => {
+  boot(on)
+  // The kit cannot write a plugin's state from a test, so the load's filter is tried on
+  // the shape the old pane stored, and the load itself must leave real questions alone.
+  const legacy = [
+    { id: 'd1', question: 'Answered already?', openedAt: 1, closedAt: 2, outcome: 'yes' },
+    { id: 'd2', question: 'Still open?', openedAt: 3 },
+    { id: 'd3', question: 'Dismissed?', openedAt: 4, closedAt: 5, outcome: 'dismissed in the pane' },
+  ]
+  expect(withoutSettled(legacy).map(d => d.id)).toEqual(['d2'])
+  expect(withoutSettled([])).toEqual([])
+
+  await eng($).tool.call({ tool: OPEN, question: 'Open before the load' })
+  await startSession($)
+  await startSession($)
+  expect(await bandTexts($)).toContain('1 question')
+  expect(await paneTexts($)).toContain('Open before the load')
 })
 
 test('a question needs text', async ($, on) => {
@@ -557,6 +578,28 @@ test('Codex: a local review shows as posted with its result line, not counted', 
   await bash(world, $, 'mentat review --local 109', '')
   for (let i = 0; i < 200 && (await codexLine($)) !== 'Local review posted · No findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
   expect(await codexLine($)).toBe('Local review posted · No findings · 415e6d9')
+})
+
+test('Codex: a same-head local review shows over an app summary that is running or failed, not over a completed one', async ($, on) => {
+  const { world } = boot(on)
+  world.issueComments = ok(pages([summary(H1, 'Failed'), localReview(H1, 'NO FINDINGS')]))
+  await follow109($)
+  expect(await codexLine($)).toBe('Local review posted · No findings · 415e6d9')
+
+  world.issueComments = ok(pages([summary(H1, 'In progress'), localReview(H1, 'FINDINGS')]))
+  await bash(world, $, 'mentat review --local 109', '')
+  for (let i = 0; i < 200 && (await codexLine($)) !== 'Local review posted · Findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
+  expect(await codexLine($)).toBe('Local review posted · Findings · 415e6d9')
+
+  // A local review of another commit does not displace Running; a completed app result wins.
+  world.issueComments = ok(pages([summary(H1, 'In progress'), localReview(H2)]))
+  await bash(world, $, 'mentat review 109', '')
+  for (let i = 0; i < 200 && (await codexLine($)) !== 'Running · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
+  expect(await codexLine($)).toBe('Running · 415e6d9')
+  world.issueComments = ok(pages([summary(H1, 'Completed'), localReview(H1, 'FINDINGS')]))
+  await bash(world, $, 'mentat review 109', '')
+  for (let i = 0; i < 200 && (await codexLine($)) !== 'No findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
+  expect(await codexLine($)).toBe('No findings · 415e6d9')
 })
 
 test('Codex: a local review of another commit, or by someone else, is not shown', async ($, on) => {
