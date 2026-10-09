@@ -42,7 +42,7 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Bring production credentials into an agent session.
 
 ## Records
-- Issues are the backlog. Where the repository uses them, the pinned issue holds the maintainer's order and the labels `idea` and `ready` mark state.
+- Issues are the backlog. Where the repository uses them, the pinned issue holds the maintainer's order. Each issue gets one label for what it is, from the repository's own (on GitHub's defaults: `bug`, `enhancement`, `documentation`, `question`). Where the repository has a `ready` label, it marks an issue the maintainer agreed to build.
 - Pull request titles follow Conventional Commits unless the repository says otherwise.
 - Work is referred to as `#N` inside a repository and `owner/repo#N` across repositories.
 - When an issue, pull request or comment gives the maintainer's words, it quotes them exactly, in their own fenced code block. Anything else about what the maintainer asked is labeled as Claude Code's summary.
