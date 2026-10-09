@@ -1343,6 +1343,17 @@ test('desktop card: no line for other open pull requests, while the terminal car
   expect(t.some(x => x.includes('other open'))).toBe(false)
 })
 
+test('on the desktop a followed pull request whose first read failed is named with the failure, and the pane is not blank', async ($, on) => {
+  const { world } = boot(on)
+  world.pr = failed
+  await startSession($)
+  await follow($)
+  await untilPane($, 'PR read failed', 60)
+  const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect(await textsOf(desktop)).toEqual(['o/r#109 · PR read failed'])
+  await desktop.unmount()
+})
+
 test('a failed first read shows the pull request as named and says the read failed', async ($, on) => {
   const { world } = boot(on)
   world.pr = failed

@@ -1477,6 +1477,11 @@ export const register: Register = (on, _options) => {
               <Text dimColor>Nothing waiting on you.</Text>
             </Box>
           )}
+          {ref !== '' && pr === null && (
+            <Box marginTop={SECTION_GAP}>
+              <Text color={prFresh === undefined ? undefined : 'warning'} wrap="truncate-end">{`${ref} · ${prFresh ?? 'reading'}`}</Text>
+            </Box>
+          )}
           {open.map(d => {
             const kind = kindOf(d)
             const q = cardSvg(W, kind, d.question, d.recommendation, d.lines)
