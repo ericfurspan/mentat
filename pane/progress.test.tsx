@@ -470,9 +470,10 @@ test('an answer the conversation did not take raises a toast and can be sent aga
     await pane.press({ key: `accept-${id}` })
     expect(world.sent).toEqual([`Answer to decision ${id} ("Mock it?"): Yes`])
     expect(world.toasts.length).toBe(2)
-    // Taken: the question shows it is sent, with no field and no buttons.
+    // Taken: the question shows it is sent, with no field and no answer buttons.
     expect((await pane.findAll({ type: 'Input' })).length).toBe(0)
-    expect((await pane.findAll({ type: 'Button' })).length).toBe(0)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
+    expect(await textsOf(pane)).toContain(DELIVERED_LINE)
     await pane.unmount()
   }
 })
@@ -494,7 +495,9 @@ const watchSent = (on: never) => {
 
   return async (_$: never): Promise<string[]> => ids
 }
+// While the submit is pending, and once the prompt has entered the session.
 const SENT_LINE = 'Sent: Yes. Claude Code reads it after its current turn.'
+const DELIVERED_LINE = 'Sent: Yes.'
 
 test('pressing the accept button again while the turn runs submits nothing more', async ($, on) => {
   const { world } = boot(on)
@@ -512,7 +515,7 @@ test('pressing the accept button again while the turn runs submits nothing more'
   await pane.unmount()
 })
 
-test('after a press the question shows it is sent and offers no buttons or field, while the turn runs', async ($, on) => {
+test('after a press the question shows it is sent, with only Dismiss left, and the line changes once the answer is in', async ($, on) => {
   const { world } = boot(on)
   for (const [i, surface] of SURFACES.entries()) {
     const id = `d${i + 1}`
@@ -531,13 +534,18 @@ test('after a press the question shows it is sent and offers no buttons or field
     expect(shown).toContain(SENT_LINE)
     expect(shown.some(t => t.includes(`Mock it ${id}?`))).toBe(true)
     expect(shown.some(t => t.includes('—'))).toBe(false)
-    expect((await pane.findAll({ type: 'Button' })).length).toBe(0)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
     expect((await pane.findAll({ type: 'Input' })).length).toBe(0)
     turn.release()
     await press
+    // The prompt entered the session: the line no longer says it waits.
+    const after = await textsOf(pane)
+    expect(after).toContain(DELIVERED_LINE)
+    expect(after).not.toContain(SENT_LINE)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
     await pane.unmount()
     // The mark is in state, so a pane opened again shows it too.
-    expect(await paneTexts($, surface)).toContain(SENT_LINE)
+    expect(await paneTexts($, surface)).toContain(DELIVERED_LINE)
     expect(world.sent).toEqual([`Answer to decision ${id} ("Mock it ${id}?"): Yes`])
     world.sent.length = 0
     await eng($).tool.call({ tool: CLOSE, id })
@@ -560,9 +568,10 @@ test('the answer field marks the question sent too, and a second submit adds not
     const shown = await textsOf(pane)
     expect(shown).toContain('Sent: yes, for now. Claude Code reads it after its current turn.')
     expect((await pane.findAll({ type: 'Input' })).length).toBe(0)
-    expect((await pane.findAll({ type: 'Button' })).length).toBe(0)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
     turn.release()
     await Promise.all([send, again])
+    expect(await textsOf(pane)).toContain('Sent: yes, for now.')
     expect(world.sent).toEqual([`Answer to decision ${id} ("Keep it?"): yes, for now`])
     await pane.unmount()
   }
@@ -590,6 +599,38 @@ test('a submit the conversation drops brings the buttons back', async ($, on) =>
     expect(await sentIds($)).toEqual([])
     await pane.unmount()
     await eng($).tool.call({ tool: CLOSE, id })
+  }
+})
+
+test('Dismiss on a sent card removes the question and its sent entry, while the answer waits or after it is in', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  for (const [i, surface] of SURFACES.entries()) {
+    for (const [j, isPending] of [true, false].entries()) {
+      const id = `d${i * 2 + j + 1}`
+      const turn = held()
+      world.promptGate = turn.gate
+      await eng($).tool.call({ tool: OPEN, question: `Clear ${id}?`, accept: 'Yes' })
+      const pane = await mount($, PANE, surface)
+      const press = pane.press({ key: `accept-${id}` })
+      await new Promise(r => setTimeout(r, 20))
+      if (!isPending) {
+        turn.release()
+        await press
+      }
+      expect(await sentIds($)).toEqual([id])
+      await pane.press({ key: `dismiss-${id}` })
+      expect(await sentIds($)).toEqual([])
+      expect((await textsOf(pane)).some(t => t.includes(`Clear ${id}?`))).toBe(false)
+      if (isPending) {
+        // The held submit ends later: it must not bring a mark back.
+        turn.release()
+        await press
+        expect(await sentIds($)).toEqual([])
+      }
+      await pane.unmount()
+      expect((await eng($).tool.call({ tool: CLOSE, id })).deny).toContain('No open decision')
+    }
   }
 })
 

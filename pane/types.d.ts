@@ -71,8 +71,9 @@ declare module 'claude-code' {
       decisionsNextId: number
       // Decisions whose answer field is open.
       decisionsAnswering: string[]
-      // Decisions whose answer was pressed, with the answer: sent, or held until the turn ends.
-      decisionsSent: { id: string; text: string }[]
+      // Decisions whose answer was pressed, with the answer. isDelivered: the prompt entered the
+      // session; until then it is held for the end of the running turn.
+      decisionsSent: { id: string; text: string; isDelivered?: boolean }[]
       agents: AgentRow[]
       // The session's pull request as owner/repo#N, or '' for none.
       prRef: string

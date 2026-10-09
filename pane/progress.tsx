@@ -1090,13 +1090,18 @@ export const register: Register = (on, _options) => {
         $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
         return false
       }
+      // The answer entered the session; the line stops saying it waits.
+      await inTurn(() => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
       return true
     }
-    // The line that takes the place of the buttons once an answer is sent.
+    // The line that takes the place of the answer buttons once an answer is sent; it says
+    // the answer waits for the turn until the prompt has entered the session.
     const sentLine = (id: string): string | undefined => {
-      const text = sentList.find(x => x.id === id)?.text
-      if (text === undefined) return undefined
-      return `Sent: ${text.length > 60 ? `${text.slice(0, 59)}…` : text}. Claude Code reads it after its current turn.`
+      const entry = sentList.find(x => x.id === id)
+      if (entry === undefined) return undefined
+      const { text } = entry
+
+      return `Sent: ${text.length > 60 ? `${text.slice(0, 59)}…` : text}.${entry.isDelivered === true ? '' : ' Claude Code reads it after its current turn.'}`
     }
     const dismiss = (id: string) =>
       inTurn(async () => {
@@ -1164,19 +1169,20 @@ export const register: Register = (on, _options) => {
             return (
               <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
                 <Svg source={q.svg} alt={`Question: ${d.question}`} width={W} height={q.h} />
-                {sentLine(d.id) !== undefined ? (
+                {sentLine(d.id) !== undefined && (
                   <Box marginTop={1}>
                     <Text dimColor>{sentLine(d.id)}</Text>
                   </Box>
-                ) : (
-                  <Box flexDirection="row" gap={1} marginTop={1}>
-                    {d.accept !== undefined && (
-                      <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
-                    )}
-                    <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
-                    <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
-                  </Box>
                 )}
+                <Box flexDirection="row" gap={1} marginTop={1}>
+                  {sentLine(d.id) === undefined && d.accept !== undefined && (
+                    <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
+                  )}
+                  {sentLine(d.id) === undefined && (
+                    <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
+                  )}
+                  <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
+                </Box>
                 {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
                   <Box marginTop={0.5} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
                     <Input
@@ -1216,19 +1222,20 @@ export const register: Register = (on, _options) => {
             <Heading label="Question for you" color="warning" />
             <Text bold>{d.question}</Text>
             {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
-            {sentLine(d.id) !== undefined ? (
+            {sentLine(d.id) !== undefined && (
               <Box marginTop={1}>
                 <Text dimColor>{sentLine(d.id)}</Text>
               </Box>
-            ) : (
-              <Box flexDirection="row" gap={1} marginTop={1}>
-                {d.accept !== undefined && (
-                  <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
-                )}
-                <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
-                <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
-              </Box>
             )}
+            <Box flexDirection="row" gap={1} marginTop={1}>
+              {sentLine(d.id) === undefined && d.accept !== undefined && (
+                <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
+              )}
+              {sentLine(d.id) === undefined && (
+                <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
+              )}
+              <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
+            </Box>
             {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
               <Box marginTop={1} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
                 <Input
