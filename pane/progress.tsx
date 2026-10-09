@@ -264,9 +264,10 @@ const isActive = (s: AgentStatus): boolean => s === 'running' || s === 'waiting'
 
 type AgentInfoLike = { id: string; type: string; description: string; status: AgentStatus }
 // Fits the rows to what the engine lists: statuses follow the engine, an end freezes
-// the elapsed time, an agent the mod never saw is added without a model or start,
+// the elapsed time, an agent the mod never saw is added without a model or start (with the
+// effort its requests used, if any were seen),
 // and one the engine no longer lists is ended (unknown), never finished.
-const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): AgentRow[] => {
+const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number, efforts: ReadonlyMap<string, string>): AgentRow[] => {
   const next = rows.map(row => {
     const info = infos.find(i => i.id === row.id)
     if (info === undefined) return isEnded(row.status) ? row : { ...row, status: 'unknown' as const, endedAt: now }
@@ -276,7 +277,15 @@ const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): Agent
   })
   for (const info of infos) {
     if (rows.some(r => r.id === info.id)) continue
-    next.push({ id: info.id, type: info.type, description: info.description, status: info.status, ...(isEnded(info.status) ? { endedAt: now } : {}) })
+    const effort = efforts.get(info.id)
+    next.push({
+      id: info.id,
+      type: info.type,
+      description: info.description,
+      status: info.status,
+      ...(effort === undefined ? {} : { effort }),
+      ...(isEnded(info.status) ? { endedAt: now } : {}),
+    })
   }
   return next.slice(-30)
 }
@@ -353,20 +362,20 @@ async function run($: EngineInterface, argv: string[], cwd?: string): Promise<st
   }
 }
 
-async function syncAgents($: EngineInterface): Promise<void> {
+async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
   try {
     const infos = (await $.agent.list()) as AgentInfoLike[]
     const now = await $.clock.now()
-    await inTurn(() => update($, agents, rows => reconcile(rows, infos, now)))
+    await inTurn(() => update($, agents, rows => reconcile(rows, infos, now, efforts)))
   } catch {
     // the next check tries again
   }
 }
 
-async function agentTick($: EngineInterface): Promise<void> {
+async function agentTick($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
   const rows = await read($, agents)
   if (!rows.some(r => !isEnded(r.status))) return
-  await syncAgents($)
+  await syncAgents($, efforts)
   await invalidate($)
 }
 
@@ -816,8 +825,8 @@ export const register: Register = (on, _options) => {
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()
-    await syncAgents($)
-    agentTimer = $.clock.every(1000, () => void agentTick($))
+    await syncAgents($, effortByAgent)
+    agentTimer = $.clock.every(1000, () => void agentTick($, effortByAgent))
     refreshTimer = $.clock.every(60_000, () => void refresh($))
     void refresh($)
 
@@ -981,7 +990,7 @@ export const register: Register = (on, _options) => {
         await inTurn(() => update($, agents, rows => rows.map(r => (r.id === id ? { ...r, tokens } : r))))
       }
       // A subagent's turn is not its end: only the engine's list says that.
-      await syncAgents($)
+      await syncAgents($, effortByAgent)
       await invalidate($)
     }
 

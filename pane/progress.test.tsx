@@ -1630,6 +1630,25 @@ test('a request that comes before the agent\'s row is kept for the row', async (
   expect(rowFor(await paneTexts($), 'Late row')).toBe('general-purpose · Opus 4.8 · xhigh · running · 0s')
 })
 
+test('an agent the mod never saw spawn takes the effort its requests used when the engine\'s list brings it in', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  // z9 steps before it is listed, and a reload lists it.
+  await step($, 'z9', 'xhigh')
+  await until(() => world.steps.length === 1, 'the step')
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
+  await startSession($)
+  expect(rowFor(await untilFacts($, 'terminal', 'Unseen one', 'xhigh'), 'Unseen one')).toBe('Explore · xhigh · running')
+  expect(await untilFacts($, 'desktop', 'Unseen one', 'xhigh')).toContain('·  xhigh')
+
+  // y8 steps, and the engine's next check of its list (once a second, while an agent runs) brings it in.
+  await step($, 'y8', 'low')
+  await until(() => world.steps.length === 2, 'the step')
+  world.agents = [...world.agents, { id: 'y8', type: 'Plan', description: 'Other one', status: 'running' }]
+  await clock.advance(1_000)
+  expect(rowFor(await untilFacts($, 'terminal', 'Other one', 'low'), 'Other one')).toBe('Plan · low · running')
+})
+
 test('turn.step passes the request on unchanged and returns what is beneath', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
