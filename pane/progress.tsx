@@ -759,7 +759,8 @@ ${reset !== '' && tw > 96 ? `<text class="m" x="${x + tw - 12}" y="52" text-anch
 }
 
 // The card of one open item: a tinted panel with a bar and a label in the kind's color, the
-// text (up to three lines), detail lines (the PROBLEM lines of an alert) and the recommendation.
+// text (up to three lines), detail lines (the PROBLEM or WARN lines of a check item, each wrapped
+// over up to three lines) and the recommendation.
 const CARD_STYLE: Record<DecisionKind, { label: string; hue: string; fill: string; alt: string }> = {
   question: { label: 'Question for you', hue: HUE.amber, fill: 'q', alt: 'Question' },
   action: { label: 'Waiting on you', hue: HUE.blue, fill: 'qb', alt: 'Waiting on you' },
@@ -776,10 +777,13 @@ const cardSvg = (W: number, kind: DecisionKind, text: string, recommendation: st
   const lines = wrap(text, 14, W - tx - 14, 3)
   const shown = cutLines(details)
   let y = 42 + (lines.length - 1) * 19
-  const detailSvg = shown.map(d => {
-    y += 18
-    return `<text class="s" x="${tx}" y="${y}" font-family="${FONT}" font-size="12">${xml(fit(d, 12, W - tx - 14))}</text>`
-  })
+  // A detail line wraps (up to three lines, the last cut with an ellipsis) and the card grows to hold it.
+  const detailSvg = shown.flatMap(d =>
+    wrap(d, 12, W - tx - 14, 3).map((part, i) => {
+      y += i === 0 ? 18 : 15
+      return `<text class="s" x="${tx}" y="${y}" font-family="${FONT}" font-size="12">${xml(part)}</text>`
+    }),
+  )
   const recY = y + 20
   const h = recommendation === undefined ? y + 16 : recY + 14
   const body = `<rect class="${fill}" x="0" y="0" width="${W}" height="${h}" rx="10"/><rect x="0" y="0" width="4" height="${h}" rx="2" fill="${hue}"/>
@@ -1551,7 +1555,7 @@ export const register: Register = (on, _options) => {
           <Heading label={CARD_STYLE[kind].label} color={kind === 'alert' ? 'error' : kind === 'warning' ? 'warning' : 'suggestion'} />
           <Text bold>{d.question}</Text>
           {details.map((line, i) => (
-            <Text key={i} dimColor wrap="truncate-end">{line}</Text>
+            <Text key={i} dimColor>{line}</Text>
           ))}
           {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
           <Box flexDirection="row" alignItems="center" gap={1} marginTop={1}>

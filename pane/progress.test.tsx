@@ -2633,6 +2633,43 @@ test('the pane lists alerts, then questions, then the check warning, then action
   expect(Math.min(at('ALERT'), at('QUESTION FOR YOU'), at('CHECK WARNINGS'), at('WAITING ON YOU'))).toBeGreaterThanOrEqual(0)
 })
 
+const LONG_WARN = 'o/r has 2 Actions secret(s); a workflow the agent pushes on a branch may be able to read them (access controls not checked)'
+const LONG_PROBLEM = 'the repository settings could not be read because the signed in account lacks the admin scope the check needs to list them'
+
+test('a long WARN line is wrapped whole on the desktop card, which grows to hold it, and wraps on the terminal', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', 'WARN: short one\nCheck OK (1 warning(s))\n')
+  const [short] = await checkItemsOf($)
+  const heightOf = (source: string) => Number(/ height="(\d+)"/.exec(source)![1])
+  await bash(world, $, 'mentat check', `WARN: ${LONG_WARN}\nCheck OK (1 warning(s))\n`)
+  const [card] = await checkItemsOf($)
+  const drawn = card!.drawn.join(' ')
+  expect(drawn).toContain('(access controls not checked)')
+  expect(drawn).not.toContain('…')
+  expect(drawn.replace(/^.*Check passed with 1 warning /, '')).toBe(LONG_WARN)
+  expect(heightOf(card!.source)).toBeGreaterThan(heightOf(short!.source))
+  // The terminal Text is not cut.
+  const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  const line = (await term.findAll({ type: 'Text', text: LONG_WARN }))[0]
+  expect(line).toBeDefined()
+  expect(line!.props?.wrap).toBeUndefined()
+  await term.unmount()
+})
+
+test('a long PROBLEM line is wrapped whole in the red alert on the desktop', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', 'PROBLEM: short\nCheck failed: 1 problem(s)')
+  const [short] = await alertsOf($)
+  await bash(world, $, 'mentat check', `PROBLEM: ${LONG_PROBLEM}\nCheck failed: 1 problem(s)`)
+  const [card] = await alertsOf($)
+  const drawn = card!.drawn.join(' ')
+  expect(drawn).toContain('list them')
+  expect(drawn).not.toContain('…')
+  expect(drawn.replace(/^.*Check failed: 1 problem\(s\) /, '')).toBe(LONG_PROBLEM)
+  const heightOf = (source: string) => Number(/ height="(\d+)"/.exec(source)![1])
+  expect(heightOf(card!.source)).toBeGreaterThan(heightOf(short!.source))
+})
+
 test('the agent cannot open a warning: open_decision refuses the kind and records nothing', async ($, on) => {
   boot(on)
   const refused = await eng($).tool.call({ tool: OPEN, kind: 'warning', question: 'Careful?' })
