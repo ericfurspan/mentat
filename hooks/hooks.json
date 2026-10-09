@@ -1,5 +1,5 @@
 {
-  "modules": ["./progress.tsx"],
+  "modules": ["../pane/progress.tsx"],
   "hooks": {
     "SessionStart": [
       {

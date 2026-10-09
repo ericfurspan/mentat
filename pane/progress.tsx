@@ -3,13 +3,13 @@
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
-// Everything a drawing reads lives in $.state (types/index.d.ts); render hooks never
+// Everything a drawing reads lives in $.state (pane/types.d.ts); render hooks never
 // write it. Every $ call is in a hook or in a top-level function that takes $.
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Checks, CodexRead, PrSnapshot, ReadMark, ReviewSnapshot } from '../types'
+import type { AgentRow, AgentStatus, Checks, CodexRead, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'

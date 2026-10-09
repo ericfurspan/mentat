@@ -1,8 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { withoutSettled } from '../hooks/progress'
+import { withoutSettled } from './progress'
 
-// Tests for hooks/progress.tsx. The test's hooks stand for the engine: `gh` is a
+// Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
 // `$.session.usage` are tables too, and the clock moves only when a test moves it.
 
