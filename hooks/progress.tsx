@@ -761,6 +761,8 @@ export const register: Register = (on, _options) => {
             {isChecked && <Text bold>{`#${pr.number}`}</Text>}
             {isChecked && <Text wrap="truncate-end">{cleanTitle(pr.title)}</Text>}
             {isChecked && <Text color="warning">· Final check posted</Text>}
+            {!isChecked && <Text dimColor>?</Text>}
+            {!isChecked && <Text wrap="truncate-end">{open[open.length - 1]!.question}</Text>}
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
             {open.length > 0 && (

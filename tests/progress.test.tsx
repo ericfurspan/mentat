@@ -295,6 +295,34 @@ test('settled entries a former decisions pane stored are dropped on load', async
   expect(await paneTexts($)).toContain('Open before the load')
 })
 
+test('with only questions raising it, the band shows the newest question on the left', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'First one?' })
+  await eng($).tool.call({ tool: OPEN, question: 'Newest one?' })
+  for (const surface of SURFACES) {
+    const t = await bandTexts($, surface)
+    expect(t).toContain('Newest one?')
+    expect(t).not.toContain('First one?')
+    expect(t).toContain('2 questions')
+    expect(t.some(x => x.includes('Final check'))).toBe(false)
+  }
+  // The question is cut to fit, not wrapped.
+  const d = await mount($, BAND, 'terminal')
+  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toContain('open')
+  await d.unmount()
+})
+
+test('with a final-checked pull request the band keeps the pull request on the left, not a question', async ($, on) => {
+  const { world } = boot(on)
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await follow109($)
+  await eng($).tool.call({ tool: OPEN, question: 'A question too?' })
+  const t = await bandTexts($)
+  expect(t).toContain('· Final check posted')
+  expect(t).toContain('1 question')
+  expect(t).not.toContain('A question too?')
+})
+
 test('a question needs text', async ($, on) => {
   boot(on)
   const ran = await eng($).tool.call({ tool: OPEN, question: '   ' })
