@@ -502,6 +502,21 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
   }
 }
 
+// A `mentat review` command names its pull request before it runs, so the card is
+// there during the long wait for the review.
+async function followReview($: EngineInterface, command: string): Promise<void> {
+  try {
+    const target = reviewTarget(command)
+    if (target === undefined) return
+    const repo = target.repo ?? (await repoOf($, cdTarget(command)))
+    if (repo === undefined) return
+    await follow($, `${repo}#${target.number}`)
+    await refresh($)
+  } catch {
+    // afterBash tries again when the command ends
+  }
+}
+
 async function repoOf($: EngineInterface, cwd?: string): Promise<string | undefined> {
   const out = await run($, ['gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'], cwd ?? (await $.session.cwd()))
   const repo = out?.trim()
@@ -586,6 +601,17 @@ export const register: Register = (on, _options) => {
     return next(e)
   })
 
+  // A different conversation starts (/clear, /resume, /branch): the pull request of
+  // the old one is not this session's. A mod reload (session.start), a startup and a
+  // compaction are the same conversation and keep it.
+  on('classic.SessionStart', async ($, e, next) => {
+    if (e.source === 'clear' || e.source === 'resume' || e.source === 'fork') {
+      await follow($, '')
+    }
+
+    return next(e)
+  })
+
   on('command.run', { command: 'mentat' }, async ($, e) => {
     const args = e.args.trim()
     if (args === '') {
@@ -652,10 +678,12 @@ export const register: Register = (on, _options) => {
       const effort = (e as unknown as { effort?: unknown }).effort
       if (typeof effort === 'string') effortByCall.set(e.tool_use_id, effort)
     }
+    const isMainBash = e.tool === 'Bash' && e.agentId === undefined && typeof e.command === 'string'
+    if (isMainBash) void followReview($, e.command as string)
     const ran = await next(e)
-    if (e.tool === 'Bash' && e.agentId === undefined && typeof e.command === 'string') {
+    if (isMainBash) {
       const stdout = str(asObj((ran as { result?: unknown }).result).stdout)
-      void afterBash($, e.command, stdout)
+      void afterBash($, e.command as string, stdout)
     }
 
     return ran

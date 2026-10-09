@@ -84,6 +84,8 @@ type World = {
   opened: string[]
   sent: string[]
   agentCallId: string
+  // When set, a Bash call does not return until it resolves.
+  bashGate?: Promise<void>
 }
 
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
@@ -129,7 +131,11 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
       rateLimits: world.usage.limits ?? [],
     },
   }))
-  onFn('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: world.bash, stderr: '' } }))
+  onFn('tool.call', { tool: 'Bash' }, async () => {
+    await world.bashGate
+    return { result: { stdout: world.bash, stderr: '' } }
+  })
+  onFn('classic.SessionStart', (_$: unknown, e: unknown) => e)
   onFn('tool.call', { tool: 'Agent' }, (_$: unknown, e: { tool_use_id: string }) => {
     world.agentCallId = e.tool_use_id
     return { result: {} }
@@ -438,6 +444,41 @@ test('commands from an agent, failed commands and other commands do not name a p
   await new Promise(r => setTimeout(r, 30))
   expect(prViews(world)).toBe(0)
   expect((await paneTexts($)).includes('#109')).toBe(false)
+})
+
+test('a mentat review call follows its pull request at once, while the review is still running', async ($, on) => {
+  const { world } = boot(on)
+  world.pr = ok(prJson({ number: 7 }))
+  await startSession($)
+  let release: () => void = () => undefined
+  world.bashGate = new Promise<void>(r => { release = r })
+  const call = bash(world, $, 'mentat review 7', 'The Codex app found nothing\n')
+  const t = await untilPane($, '#7')
+  expect(t).toContain('Label issues by kind')
+  expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'view') && a[3] === '7')).toBe(true)
+  release()
+  await call
+})
+
+test('a new conversation (clear, resume, branch) drops the followed pull request; a reload and a compaction keep it', async ($, on) => {
+  const { world } = boot(on)
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  for (const source of ['clear', 'resume', 'fork']) {
+    await follow109($)
+    await classic.SessionStart({ source })
+    const t = await paneTexts($)
+    expect(t).not.toContain('#109')
+    expect(t.some(x => x.includes('o/r#'))).toBe(false)
+    expect(t).not.toContain('GitHub')
+  }
+
+  await follow109($)
+  await startSession($)
+  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'compact' })
+  await new Promise(r => setTimeout(r, 30))
+  expect(await paneTexts($)).toContain('#109')
+  expect(world.calls.length).toBeGreaterThan(0)
 })
 
 test('/mentat pr sets the pull request by hand, and says when it cannot', async ($, on) => {
