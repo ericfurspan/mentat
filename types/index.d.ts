@@ -5,8 +5,6 @@ export type Decision = {
   // The label of a one-press answer (for example Yes); the pane shows it as a button.
   accept?: string
   openedAt: number
-  closedAt?: number
-  outcome?: string
 }
 
 export type AgentStatus = 'pending' | 'running' | 'waiting' | 'idle' | 'completed' | 'failed' | 'killed' | 'unknown'
@@ -62,7 +60,8 @@ export type ReviewSnapshot = {
 }
 
 // okAt and failedAt are clock times of the last good and the last failed read (0: none).
-export type ReadMark = { seq: number; okAt: number; failedAt: number }
+// cause 'user': the read that failed was the agent account's login, not the review itself.
+export type ReadMark = { seq: number; okAt: number; failedAt: number; cause?: 'user' }
 
 declare module 'claude-code' {
   interface PluginState {

@@ -693,6 +693,27 @@ test('a failed read keeps the last good facts and says how old they are, only on
   await untilPane($, 'Review read failed (last ok 2m ago)')
 })
 
+test('a failed read of the agent account is named, not called a review failure', async ($, on) => {
+  const { world } = boot(on)
+  world.me = failed
+  await follow109($)
+  const t = await untilPane($, 'GitHub user read failed')
+  expect(t).not.toContain('Review read failed')
+  // The comments cannot be attributed, so Codex is unknown; the pull request's own facts stand.
+  expect(t).toContain('Approval required')
+  expect(t[t.indexOf('Codex') + 1]).toBe('unknown')
+  expect(world.calls.some(a => a.join(' ').includes('/issues/109/comments'))).toBe(false)
+
+  // Once the account can be read, the line goes and the review is read.
+  world.me = ok(`${ME}\n`)
+  world.issueComments = ok(pages([summary(H1)]))
+  await bash(world, $, 'git push', '')
+  for (let i = 0; i < 300 && (await paneTexts($)).includes('GitHub user read failed'); i++) await new Promise(r => setTimeout(r, 5))
+  const after = await paneTexts($)
+  expect(after).not.toContain('GitHub user read failed')
+  expect(after[after.indexOf('Codex') + 1]).toBe('No findings · 415e6d9')
+})
+
 test('data older than five minutes is marked old', async ($, on) => {
   const { world, clock } = boot(on)
   await follow109($)

@@ -39,16 +39,6 @@ const COLOR = { track: '#8b949e33', now: '#4c8bf5', warn: '#d29922' }
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
-const isOpen = (d: { closedAt?: number }) => d.closedAt === undefined
-// Settled decisions, most recently settled first.
-const settled = <D extends { closedAt?: number }>(list: D[]): D[] =>
-  list.filter(d => !isOpen(d)).sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0))
-// Open decisions are never dropped; of the settled ones the last ten are kept.
-const keepOpenAndRecent = <D extends { closedAt?: number }>(list: D[]): D[] => {
-  const keep = new Set(settled(list).slice(0, 10))
-  return list.filter(d => isOpen(d) || keep.has(d))
-}
-
 const cleanTitle = (t: string): string => t.replace(/^[a-z]+(\([^)]*\))?!?:\s*/, '').replace(/^\w/, c => c.toUpperCase())
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 const shortModel = (model: string): string =>
@@ -338,7 +328,12 @@ async function follow($: EngineInterface, ref: string): Promise<boolean> {
   return changed
 }
 
-const failedMark = (mark: ReadMark, seq: number, at: number): ReadMark => ({ seq, okAt: mark.okAt, failedAt: at })
+const failedMark = (mark: ReadMark, seq: number, at: number, cause?: 'user'): ReadMark => ({
+  seq,
+  okAt: mark.okAt,
+  failedAt: at,
+  ...(cause === undefined ? {} : { cause }),
+})
 
 // Stores a read of the pull request, unless the followed PR changed or a newer read
 // is already stored. A new head discards review data read for the old one.
@@ -361,7 +356,7 @@ async function commitPr($: EngineInterface, ref: string, seq: number, snapshot: 
 
 // Stores a read of the review sources, unless it was read for a head that is not
 // the stored PR's head now, or a newer one is stored.
-async function commitReview($: EngineInterface, ref: string, seq: number, head: string, snapshot: ReviewSnapshot | undefined, at: number): Promise<void> {
+async function commitReview($: EngineInterface, ref: string, seq: number, head: string, snapshot: ReviewSnapshot | undefined, at: number, cause?: 'user'): Promise<void> {
   await inTurn(async () => {
     if ((await read($, prRef)) !== ref) return
     const pr = await read($, prAtom)
@@ -369,7 +364,7 @@ async function commitReview($: EngineInterface, ref: string, seq: number, head: 
     const mark = await read($, reviewMark)
     if (seq < mark.seq) return
     if (snapshot === undefined) {
-      await update($, reviewMark, () => failedMark(mark, seq, at))
+      await update($, reviewMark, () => failedMark(mark, seq, at, cause))
       return
     }
     await update($, reviewAtom, () => snapshot)
@@ -428,13 +423,19 @@ async function readOnce($: EngineInterface): Promise<void> {
   const me = (meOut ?? '').trim()
   if (me !== '' && knownMe === '') await inTurn(() => update($, meAtom, cur => (cur === '' ? me : cur)))
   const head = snapshot.head
+  // Without the agent account's login nothing in the comments can be attributed:
+  // the read of the account is what failed, so it is named.
+  if (me === '') {
+    await commitReview($, ref, seq, head, undefined, await $.clock.now(), 'user')
+    return
+  }
   const [issueOut, pullOut] = await Promise.all([
     run($, ['gh', 'api', '--paginate', `repos/${repo}/issues/${number}/comments`]),
     run($, ['gh', 'api', '--paginate', `repos/${repo}/pulls/${number}/comments`]),
   ])
   let review: ReviewSnapshot | undefined
   try {
-    if (me === '' || issueOut === undefined || pullOut === undefined) throw new Error('a review source could not be read')
+    if (issueOut === undefined || pullOut === undefined) throw new Error('a review source could not be read')
     review = { ref, seq, head, ...readReview(parsePages(issueOut), parsePages(pullOut), head, me) }
   } catch {
     review = undefined
@@ -601,7 +602,7 @@ export const register: Register = (on, _options) => {
       await update($, nextId, () => n + 1)
       const openedAt = await $.clock.now()
       await update($, items, list =>
-        keepOpenAndRecent([...list, { id: `d${n}`, question, recommendation, accept, openedAt }]),
+        [...list, { id: `d${n}`, question, recommendation, accept, openedAt }],
       )
       return `d${n}`
     })
@@ -611,16 +612,15 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
-    const input = e as unknown as { id?: unknown; outcome?: unknown }
+    const input = e as unknown as { id?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
-    const outcome = typeof input.outcome === 'string' && input.outcome.trim() !== '' ? input.outcome.trim() : undefined
     const isClosed = await inTurn(async () => {
       const list = await read($, items)
-      if (!list.some(d => d.id === id && isOpen(d))) {
+      if (!list.some(d => d.id === id)) {
         return false
       }
-      const closedAt = await $.clock.now()
-      await update($, items, all => all.map(d => (d.id === id ? { ...d, closedAt, outcome } : d)))
+      // A closed decision is dropped: nothing shows settled ones.
+      await update($, items, all => all.filter(d => d.id !== id))
       return true
     })
     if (!isClosed) {
@@ -689,7 +689,7 @@ export const register: Register = (on, _options) => {
     if (e.props.hasSurvey) {
       return next(e)
     }
-    const open = (await read($, items)).filter(isOpen)
+    const open = (await read($, items))
     const pr = await read($, prAtom)
     const review = await read($, reviewAtom)
     // Only an action the maintainer owns raises the band: an open question, or a
@@ -734,7 +734,7 @@ export const register: Register = (on, _options) => {
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
     const isNarrow = cols < 48
-    const open = (await read($, items)).filter(isOpen)
+    const open = (await read($, items))
     const openAnswers = await read($, answering)
     const ref = await read($, prRef)
     const pr = await read($, prAtom)
@@ -782,7 +782,9 @@ export const register: Register = (on, _options) => {
 
     // A freshness line only when a read failed or is more than five minutes old.
     const freshness = (what: string, mark: ReadMark): string | undefined => {
-      if (mark.failedAt > 0) return `${what} read failed${mark.okAt > 0 ? ` (last ok ${ago(now - mark.okAt)})` : ''}`
+      if (mark.failedAt > 0) {
+        return `${mark.cause === 'user' ? 'GitHub user' : what} read failed${mark.okAt > 0 ? ` (last ok ${ago(now - mark.okAt)})` : ''}`
+      }
       if (mark.okAt > 0 && now - mark.okAt > STALE_MS) return `${what} read ${Math.floor((now - mark.okAt) / 60_000)}m old`
       return undefined
     }
@@ -820,10 +822,7 @@ export const register: Register = (on, _options) => {
                 label="Dismiss"
                 onPress={() =>
                   inTurn(async () => {
-                    const closedAt = await $.clock.now()
-                    await update($, items, all =>
-                      all.map(x => (x.id === d.id ? { ...x, closedAt, outcome: 'dismissed in the pane' } : x)),
-                    )
+                    await update($, items, all => all.filter(x => x.id !== d.id))
                     await update($, answering, ids => ids.filter(x => x !== d.id))
                   })
                 }
