@@ -88,6 +88,10 @@ type World = {
   bashGate?: Promise<void>
   // When set, prompt.submit answers that the prompt did not enter.
   dropPrompts: boolean
+  // When set, prompt.submit does not answer until it resolves (as while a turn runs).
+  promptGate?: Promise<void>
+  // When set, prompt.submit rejects.
+  rejectPrompts: boolean
   toasts: string[]
   // When set, $.session.usage() throws.
   usageFails: boolean
@@ -116,6 +120,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
     sent: [],
     agentCallId: '',
     dropPrompts: false,
+    rejectPrompts: false,
     toasts: [],
     usageFails: false,
   }
@@ -152,7 +157,9 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
     world.agentCallId = e.tool_use_id
     return { result: {} }
   })
-  onFn('prompt.submit', (_$: unknown, e: { text: string }) => {
+  onFn('prompt.submit', async (_$: unknown, e: { text: string }) => {
+    await world.promptGate
+    if (world.rejectPrompts) throw new Error('the engine reloaded')
     if (world.dropPrompts) return { drop: 'a turn is running' }
     world.sent.push(e.text)
     return { text: e.text }
@@ -443,32 +450,258 @@ test('a new conversation (clear, resume, branch) drops the open questions too; a
 
 test('an answer the conversation did not take raises a toast and can be sent again', async ($, on) => {
   const { world } = boot(on)
-  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
-  for (const surface of SURFACES) {
+  // Once an answer is sent its question takes no other, so each surface has its own.
+  for (const [i, surface] of SURFACES.entries()) {
+    const id = `d${i + 1}`
+    await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
     world.sent.length = 0
     world.toasts.length = 0
     world.dropPrompts = true
     const pane = await mount($, PANE, surface)
-    await pane.press({ key: 'accept-d1' })
+    await pane.press({ key: `accept-${id}` })
     expect(world.sent).toEqual([])
     expect(world.toasts.length).toBe(1)
     expect(world.toasts[0]).toContain('Answer not sent')
     expect(world.toasts[0]).toContain('Press again')
 
     // A typed answer that was not taken keeps its field open.
-    await pane.press({ key: 'answer-open-d1' })
-    await pane.input({ key: 'answer-d1', text: 'maybe' })
+    await pane.press({ key: `answer-open-${id}` })
+    await pane.input({ key: `answer-${id}`, text: 'maybe' })
     expect(world.toasts.length).toBe(2)
-    expect((await pane.findAll({ type: 'Input' })).map(i => i.key)).toEqual(['answer-d1'])
+    expect((await pane.findAll({ type: 'Input' })).map(x => x.key)).toEqual([`answer-${id}`])
 
     world.dropPrompts = false
-    await pane.press({ key: 'accept-d1' })
-    expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes'])
+    await pane.press({ key: `accept-${id}` })
+    expect(world.sent).toEqual([`Answer to decision ${id} ("Mock it?"): Yes`])
     expect(world.toasts.length).toBe(2)
-    await pane.input({ key: 'answer-d1', text: 'maybe' })
+    // Taken: the question shows it is sent, with no field and no answer buttons.
     expect((await pane.findAll({ type: 'Input' })).length).toBe(0)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
+    expect(await textsOf(pane)).toContain(DELIVERED_LINE)
     await pane.unmount()
   }
+})
+
+// A held promise stands for a running turn: the plugin's prompt runs once it is idle.
+const held = () => {
+  let release: () => void = () => undefined
+  const gate = new Promise<void>(r => (release = r))
+  return { gate, release }
+}
+// The ids of the questions marked sent, as last written to state.
+const watchSent = (on: never) => {
+  let ids: string[] = []
+  ;(on as (e: string, ...r: unknown[]) => void)('state.set', async (_$: never, e: { plugin: string; key: string; value: { id: string }[] }, next: (e: unknown) => unknown) => {
+    if (e.plugin === 'mentat' && e.key === 'decisionsSent') ids = e.value.map(x => x.id)
+
+    return next(e)
+  })
+
+  return async (_$: never): Promise<string[]> => ids
+}
+// While the submit is pending, and once the prompt has entered the session.
+const SENT_LINE = 'Sent: Yes. Claude Code reads it after its current turn.'
+const DELIVERED_LINE = 'Sent: Yes.'
+
+test('pressing the accept button again while the turn runs submits nothing more', async ($, on) => {
+  const { world } = boot(on)
+  const turn = held()
+  world.promptGate = turn.gate
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
+  const pane = await mount($, PANE, 'terminal')
+  // A press waits for its handler, which waits for the turn: press three times meanwhile,
+  // the last two before the drawing could have changed.
+  const presses = [pane.press({ key: 'accept-d1' }), pane.press({ key: 'accept-d1' }), pane.press({ key: 'accept-d1' })]
+  await new Promise(r => setTimeout(r, 20))
+  turn.release()
+  await Promise.all(presses)
+  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes'])
+  await pane.unmount()
+})
+
+test('after a press the question shows it is sent, with only Dismiss left, and the line changes once the answer is in', async ($, on) => {
+  const { world } = boot(on)
+  for (const [i, surface] of SURFACES.entries()) {
+    const id = `d${i + 1}`
+    const turn = held()
+    world.promptGate = turn.gate
+    await eng($).tool.call({ tool: OPEN, question: `Mock it ${id}?`, recommendation: 'Yes', accept: 'Yes' })
+    const pane = await mount($, PANE, surface)
+    expect((await textsOf(pane)).some(t => t.startsWith('Sent:'))).toBe(false)
+    await pane.press({ key: `answer-open-${id}` })
+    expect((await pane.findAll({ type: 'Input' })).length).toBe(1)
+    const press = pane.press({ key: `accept-${id}` })
+    await new Promise(r => setTimeout(r, 20))
+    // The press is still waiting for the turn.
+    expect(world.sent).toEqual([])
+    const shown = await textsOf(pane)
+    expect(shown).toContain(SENT_LINE)
+    expect(shown.some(t => t.includes(`Mock it ${id}?`))).toBe(true)
+    expect(shown.some(t => t.includes('—'))).toBe(false)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
+    expect((await pane.findAll({ type: 'Input' })).length).toBe(0)
+    turn.release()
+    await press
+    // The prompt entered the session: the line no longer says it waits.
+    const after = await textsOf(pane)
+    expect(after).toContain(DELIVERED_LINE)
+    expect(after).not.toContain(SENT_LINE)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
+    await pane.unmount()
+    // The mark is in state, so a pane opened again shows it too.
+    expect(await paneTexts($, surface)).toContain(DELIVERED_LINE)
+    expect(world.sent).toEqual([`Answer to decision ${id} ("Mock it ${id}?"): Yes`])
+    world.sent.length = 0
+    await eng($).tool.call({ tool: CLOSE, id })
+  }
+})
+
+test('the answer field marks the question sent too, and a second submit adds nothing', async ($, on) => {
+  const { world } = boot(on)
+  for (const [i, surface] of SURFACES.entries()) {
+    const id = `d${i + 1}`
+    const turn = held()
+    world.promptGate = turn.gate
+    world.sent.length = 0
+    await eng($).tool.call({ tool: OPEN, question: 'Keep it?' })
+    const pane = await mount($, PANE, surface)
+    await pane.press({ key: `answer-open-${id}` })
+    const send = pane.input({ key: `answer-${id}`, text: 'yes, for now' })
+    const again = pane.input({ key: `answer-${id}`, text: 'yes, for now' }).catch(() => undefined)
+    await new Promise(r => setTimeout(r, 20))
+    const shown = await textsOf(pane)
+    expect(shown).toContain('Sent: yes, for now. Claude Code reads it after its current turn.')
+    expect((await pane.findAll({ type: 'Input' })).length).toBe(0)
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key).filter(k => k?.endsWith(`-${id}`))).toEqual([`dismiss-${id}`])
+    turn.release()
+    await Promise.all([send, again])
+    expect(await textsOf(pane)).toContain('Sent: yes, for now.')
+    expect(world.sent).toEqual([`Answer to decision ${id} ("Keep it?"): yes, for now`])
+    await pane.unmount()
+  }
+})
+
+test('a submit the conversation drops brings the buttons back', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  for (const [i, surface] of SURFACES.entries()) {
+    const id = `d${i + 1}`
+    const turn = held()
+    world.promptGate = turn.gate
+    world.dropPrompts = true
+    await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
+    const pane = await mount($, PANE, surface)
+    const press = pane.press({ key: `accept-${id}` })
+    await new Promise(r => setTimeout(r, 20))
+    expect(await textsOf(pane)).toContain(SENT_LINE)
+    expect(await sentIds($)).toEqual([id])
+    turn.release()
+    await press
+    expect((await pane.findAll({ type: 'Button' })).map(x => x.key)).toEqual([`accept-${id}`, `answer-open-${id}`, `dismiss-${id}`])
+    expect((await textsOf(pane)).some(t => t.startsWith('Sent:'))).toBe(false)
+    expect(world.toasts.at(-1)).toContain('Answer not sent')
+    expect(await sentIds($)).toEqual([])
+    await pane.unmount()
+    await eng($).tool.call({ tool: CLOSE, id })
+  }
+})
+
+test('Dismiss on a sent card removes the question and its sent entry, while the answer waits or after it is in', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  for (const [i, surface] of SURFACES.entries()) {
+    for (const [j, isPending] of [true, false].entries()) {
+      const id = `d${i * 2 + j + 1}`
+      const turn = held()
+      world.promptGate = turn.gate
+      await eng($).tool.call({ tool: OPEN, question: `Clear ${id}?`, accept: 'Yes' })
+      const pane = await mount($, PANE, surface)
+      const press = pane.press({ key: `accept-${id}` })
+      await new Promise(r => setTimeout(r, 20))
+      if (!isPending) {
+        turn.release()
+        await press
+      }
+      expect(await sentIds($)).toEqual([id])
+      await pane.press({ key: `dismiss-${id}` })
+      expect(await sentIds($)).toEqual([])
+      expect((await textsOf(pane)).some(t => t.includes(`Clear ${id}?`))).toBe(false)
+      if (isPending) {
+        // The held submit ends later: it must not bring a mark back.
+        turn.release()
+        await press
+        expect(await sentIds($)).toEqual([])
+      }
+      await pane.unmount()
+      expect((await eng($).tool.call({ tool: CLOSE, id })).deny).toContain('No open decision')
+    }
+  }
+})
+
+test('a session start (restart or reload) forgets an answer still waiting for a turn and keeps a delivered one', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Delivered?', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, question: 'Waiting?', accept: 'Yes' })
+  const pane = await mount($, PANE, 'terminal')
+  await pane.press({ key: 'accept-d1' })
+  // The submit of d2 is lost with the old load: it ends in a rejection, after the restart.
+  let lose: () => void = () => undefined
+  world.promptGate = new Promise<void>((_, reject) => (lose = () => reject(new Error('the engine reloaded'))))
+  const lost = pane.press({ key: 'accept-d2' })
+  await new Promise(r => setTimeout(r, 20))
+  expect(await sentIds($)).toEqual(['d1', 'd2'])
+  expect(await textsOf(pane)).toContain('Sent: Yes. Claude Code reads it after its current turn.')
+
+  await startSession($)
+  await new Promise(r => setTimeout(r, 20))
+  expect(await sentIds($)).toEqual(['d1'])
+  const keys = (await pane.findAll({ type: 'Button' })).map(x => x.key)
+  expect(keys).toEqual(['dismiss-d1', 'accept-d2', 'answer-open-d2', 'dismiss-d2'])
+  expect(await textsOf(pane)).toContain('Sent: Yes.')
+  // The waiting one can be answered again.
+  world.promptGate = undefined
+  await pane.press({ key: 'accept-d2' })
+  expect(world.sent).toEqual(['Answer to decision d1 ("Delivered?"): Yes', 'Answer to decision d2 ("Waiting?"): Yes'])
+  // The lost submit ends now; it neither throws nor takes back the new, delivered mark.
+  lose()
+  await lost
+  expect(await sentIds($)).toEqual(['d1', 'd2'])
+  await pane.unmount()
+})
+
+test('a submit the engine rejects is treated like a drop: a toast, and the buttons come back', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', accept: 'Yes' })
+  const pane = await mount($, PANE, 'terminal')
+  world.rejectPrompts = true
+  await pane.press({ key: 'accept-d1' })
+  expect(world.toasts.length).toBe(1)
+  expect(world.toasts[0]).toContain('Answer not sent')
+  expect(await sentIds($)).toEqual([])
+  expect((await pane.findAll({ type: 'Button' })).map(x => x.key)).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
+  world.rejectPrompts = false
+  await pane.press({ key: 'accept-d1' })
+  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes'])
+  await pane.unmount()
+})
+
+test('closing a question, or a new conversation, forgets that it was sent', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  for (const q of ['One?', 'Two?', 'Three?']) await eng($).tool.call({ tool: OPEN, question: q, accept: 'Yes' })
+  const pane = await mount($, PANE, 'terminal')
+  for (const id of ['d1', 'd2', 'd3']) await pane.press({ key: `accept-${id}` })
+  await pane.unmount()
+  expect(world.sent.length).toBe(3)
+  expect(await sentIds($)).toEqual(['d1', 'd2', 'd3'])
+  await eng($).tool.call({ tool: CLOSE, id: 'd2' })
+  expect(await sentIds($)).toEqual(['d1', 'd3'])
+  // A sent question has no Dismiss to press; a new conversation drops the questions and their marks.
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  await classic.SessionStart({ source: 'clear' })
+  expect(await sentIds($)).toEqual([])
 })
 
 test('a question needs text', async ($, on) => {
@@ -486,35 +719,38 @@ test('closing an unknown id is refused', async ($, on) => {
 test('typing an answer in the pane sends it to chat as a prompt', async ($, on) => {
   const { world } = boot(on)
   await eng($).tool.call({ tool: OPEN, question: 'Keep it?' })
+  await eng($).tool.call({ tool: OPEN, question: 'Keep it?' })
 
-  for (const surface of SURFACES) {
+  for (const [i, surface] of SURFACES.entries()) {
     const pane = await mount($, PANE, surface)
-    await pane.press({ key: 'answer-open-d1' })
-    await pane.input({ key: 'answer-d1', text: 'yes, for now' })
+    await pane.press({ key: `answer-open-d${i + 1}` })
+    await pane.input({ key: `answer-d${i + 1}`, text: 'yes, for now' })
     await pane.unmount()
   }
   expect(world.sent).toEqual([
     'Answer to decision d1 ("Keep it?"): yes, for now',
-    'Answer to decision d1 ("Keep it?"): yes, for now',
+    'Answer to decision d2 ("Keep it?"): yes, for now',
   ])
 })
 
 test('the accept button sends its label as the answer, the same path as typing', async ($, on) => {
   const { world } = boot(on)
+  // d1 and d2 for the two surfaces; d3 has no one-press answer.
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
   await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
   await eng($).tool.call({ tool: OPEN, question: 'No one-press answer?' })
 
-  for (const surface of SURFACES) {
+  for (const [i, surface] of SURFACES.entries()) {
     const pane = await mount($, PANE, surface)
     const buttons = (await pane.findAll({ type: 'Button' })).map(b => b.key)
-    expect(buttons).toContain('accept-d1')
-    expect(buttons).not.toContain('accept-d2')
-    await pane.press({ key: 'accept-d1' })
+    expect(buttons).toContain(`accept-d${i + 1}`)
+    expect(buttons).not.toContain('accept-d3')
+    await pane.press({ key: `accept-d${i + 1}` })
     await pane.unmount()
   }
-  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes', 'Answer to decision d1 ("Mock it?"): Yes'])
+  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes', 'Answer to decision d2 ("Mock it?"): Yes'])
   // Sending an answer does not settle the question: the model closes it.
-  expect((await bandTexts($)).includes('2 questions')).toBe(true)
+  expect((await bandTexts($)).includes('3 questions')).toBe(true)
 })
 
 test('dismiss settles a question', async ($, on) => {
