@@ -129,9 +129,8 @@ const budgetAlert = (limits: Meter[]): string | undefined => {
     .filter(m => (m.kind === 'five_hour' || m.kind === 'seven_day') && m.percent >= WARN_PERCENT)
     .sort((a, b) => b.percent - a.percent)[0]
   if (over === undefined) return undefined
-  const reset = resetWhen(over.reset)
 
-  return `${over.label} limit ${over.percent}%${reset === '' ? '' : ` · resets ${reset}`}`
+  return `${over.label} limit ${over.percent}%${over.reset === '' ? '' : ` · ${over.reset}`}`
 }
 
 // `gh api --paginate` prints each page as its own JSON array, one after the other.
@@ -424,6 +423,11 @@ async function readZone($: EngineInterface): Promise<string | undefined> {
   } catch {
     return undefined
   }
+}
+
+// True when the pane would have nothing to show: no open item, no followed pull request, no agent.
+async function isPaneEmpty($: EngineInterface): Promise<boolean> {
+  return (await read($, items)).length === 0 && (await read($, prRef)) === '' && (await read($, agents)).length === 0
 }
 
 // Runs a command; the stdout, or undefined when it failed (nonzero exit or rejection).
@@ -1023,9 +1027,7 @@ export const register: Register = (on, _options) => {
     const args = e.args.trim()
     if (args === '') {
       // With nothing but budget to show, a pane would be mostly empty: say it in a line.
-      const isEmpty =
-        (await read($, items)).length === 0 && (await read($, prRef)) === '' && (await read($, agents)).length === 0
-      if (isEmpty) {
+      if (await isPaneEmpty($)) {
         const { meters } = metersOf(await readUsage($), await $.clock.now(), await readZone($))
 
         return { text: meters.length === 0 ? 'Nothing waiting on you; session budget unavailable.' : budgetLine(meters) }
@@ -1252,12 +1254,14 @@ export const register: Register = (on, _options) => {
             ? left.text
             : `${CARD_STYLE[left.kind].alt}: ${left.text}`
       // The count is left out when the one open item is the one shown.
+      // The app's usage popover has the detail of a budget band, so a pane with nothing else in it gets no button.
+      const isBudgetOnly = left.kind === 'budget' && (await isPaneEmpty($))
       const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action')
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
             <Svg source={bandSvg(W, left, isLone ? 0 : open.length, pillLabel(open), pillHue(open))} alt={alt} width={W} height={28} />
-            <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
+            {!isBudgetOnly && <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />}
           </Box>
           {beneath}
         </Box>
@@ -1468,6 +1472,11 @@ export const register: Register = (on, _options) => {
       const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRows.map(agentRow))
       return (
         <Box flexDirection="column" paddingX={1}>
+          {open.length === 0 && ref === '' && rows.length === 0 && (
+            <Box marginTop={SECTION_GAP}>
+              <Text dimColor>Nothing waiting on you.</Text>
+            </Box>
+          )}
           {open.map(d => {
             const kind = kindOf(d)
             const q = cardSvg(W, kind, d.question, d.recommendation, d.lines)

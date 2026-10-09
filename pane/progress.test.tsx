@@ -2055,10 +2055,11 @@ test('the band shows for a rate limit at 80 and not at 79, on both surfaces', as
   world.usage = { context: 5, limits: [limit('five_hour', 80, RESET_5H()), limit('seven_day', 10)] }
   for (const surface of SURFACES) {
     const t = await bandTexts($, surface)
-    expect(t).toContain('5-hour limit 80% · resets 1h 29m')
-    // The row keeps its Details button.
+    expect(t).toContain('5-hour limit 80% · resets in 1h 29m')
+    // The terminal row keeps its Details button; the desktop's budget-only band has none, the
+    // app's usage popover has the detail.
     const d = await mount($, BAND, surface)
-    expect((await d.findAll({ type: 'Button' })).length).toBe(1)
+    expect((await d.findAll({ type: 'Button' })).length).toBe(surface === 'terminal' ? 1 : 0)
     await d.unmount()
   }
 
@@ -2086,6 +2087,35 @@ test('the context meter alone does not raise the band, and a failed usage read m
   await failed.unmount()
 })
 
+test('a desktop budget band keeps its Details button when the pane has something to show', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 5, limits: [limit('five_hour', 90, RESET_5H())] }
+  const id = await callAgent(world, $, 'high')
+  world.agents = [{ id, type: 'general-purpose', description: 'Working', status: 'running' }]
+  await eng($).agent.spawn(spawn(id, 'Working'))
+  expect(await bandTexts($, 'terminal')).toContain('5-hour limit 90% · resets in 1h 29m')
+  for (const surface of SURFACES) {
+    const d = await mount($, BAND, surface)
+    expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
+    await d.unmount()
+  }
+})
+
+test('the desktop pane with nothing to show says so in one line; the terminal pane draws no such line', async ($, on) => {
+  boot(on)
+  const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect(await textsOf(desktop)).toEqual(['Nothing waiting on you.'])
+  expect((await desktop.findAll({ type: 'Svg' })).length).toBe(0)
+  expect((await desktop.findAll({ type: 'Button' })).length).toBe(0)
+  await desktop.unmount()
+
+  // Something open: the line goes.
+  await eng($).tool.call({ tool: OPEN, question: 'Anything?' })
+  const busy = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect(await textsOf(busy)).not.toContain('Nothing waiting on you.')
+  await busy.unmount()
+})
+
 test('the weekly reset prints as weekday and local time in the band, /mentat and the terminal meters; the 5-hour one stays a countdown', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 91, RESET_WEEK())] }
@@ -2099,7 +2129,7 @@ test('the weekly reset prints as weekday and local time in the band, /mentat and
 
   // The 5-hour limit alone keeps its countdown in the band.
   world.usage = { context: 10, limits: [limit('five_hour', 90, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
-  expect(await bandTexts($)).toContain('5-hour limit 90% · resets 1h 29m')
+  expect(await bandTexts($)).toContain('5-hour limit 90% · resets in 1h 29m')
 })
 
 test('the weekly reset follows TZ', async ($, on) => {
@@ -2423,7 +2453,7 @@ test('without alerts or a final check the band shows the newest question over a 
   // An action alone does not outrank a budget warning; the count says it is there.
   for (const surface of SURFACES) {
     const { texts } = await bandWith($, surface)
-    expect(texts).toContain('5-hour limit 95% · resets 1h 29m')
+    expect(texts).toContain('5-hour limit 95% · resets in 1h 29m')
     expect(texts).not.toContain('Do the thing')
     expect(pillFor(texts)).toBe('1 item')
   }
