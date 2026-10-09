@@ -366,15 +366,17 @@ test('with only questions raising it, the band shows the newest question on the 
   await d.unmount()
 })
 
-test('with a final-checked pull request the band keeps the pull request on the left, not a question', async ($, on) => {
+test('with a final-checked pull request an open question takes the left of the band, and the pull request returns when it is closed', async ($, on) => {
   const { world } = boot(on)
   world.issueComments = ok(pages([finalCheck(H1)]))
   await follow109($)
   await eng($).tool.call({ tool: OPEN, question: 'A question too?' })
   const t = await bandTexts($)
-  expect(t).toContain('· Final check posted')
+  expect(t).toContain('A question too?')
   expect(t).toContain('1 question')
-  expect(t).not.toContain('A question too?')
+  expect(t.some(x => x.includes('Final check'))).toBe(false)
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  expect(await bandTexts($)).toContain('· Final check posted')
 })
 
 test('on the desktop the band and each card are one drawn Svg, found by alt text; the terminal draws text', async ($, on) => {
@@ -384,16 +386,23 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }]))
   world.usage = { context: 41, limits: [{ kind: 'five_hour', percentUsed: 85, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
   await follow109($)
+  // Desktop band with only the final-checked PR: the drawn row and a native Details button.
+  const prBand = await mount($, BAND, 'desktop')
+  const prBandSvg = await svgsOf(prBand)
+  expect(prBandSvg.map(v => v.alt)).toEqual(['#109 final check posted'])
+  expect(prBandSvg[0]!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Final check posted']))
+  expect((await prBand.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
+  await prBand.unmount()
   await eng($).tool.call({ tool: OPEN, question: 'Open it?', recommendation: 'Yes', accept: 'Yes' })
   const id = await callAgent(world, $, 'high')
   world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
   await eng($).agent.spawn(spawn(id))
 
-  // Desktop band: the drawn row (the PR with its final check) and a native Details button.
+  // Desktop band with the question open: it is the question that is drawn, alone, with its Details button.
   const band = await mount($, BAND, 'desktop')
   const bandSvg = await svgsOf(band)
-  expect(bandSvg.map(v => v.alt)).toEqual(['#109 final check posted'])
-  expect(bandSvg[0]!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Final check posted', '1 question']))
+  expect(bandSvg.map(v => v.alt)).toEqual(['Question: Open it?'])
+  expect(bandSvg[0]!.drawn).toEqual(['?', 'Open it?'])
   expect((await band.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
   await band.unmount()
 
@@ -420,7 +429,7 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   // The terminal draws no Svg at all, only text.
   const tBand = await mount($, BAND, 'terminal')
   expect((await tBand.findAll({ type: 'Svg' })).length).toBe(0)
-  expect(await textsOf(tBand)).toContain('· Final check posted')
+  expect(await textsOf(tBand)).toEqual(expect.arrayContaining(['Open it?', '1 question']))
   await tBand.unmount()
   const tPane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await tPane.findAll({ type: 'Svg' })).length).toBe(0)
@@ -1171,7 +1180,7 @@ test('the final check may name the head by a short or the full SHA', async ($, o
   expect(await bandTexts($)).toContain('· Final check posted')
 })
 
-test('the band shows both the final check and the question count', async ($, on) => {
+test('with a final check and two questions the band shows the newest question and the count, the pane keeps the final check', async ($, on) => {
   const { world } = boot(on)
   world.issueComments = ok(pages([finalCheck(H1)]))
   await follow109($)
@@ -1179,24 +1188,32 @@ test('the band shows both the final check and the question count', async ($, on)
   await eng($).tool.call({ tool: OPEN, question: 'Two?' })
   const t = await bandTexts($)
   expect(t).toContain('2 questions')
-  expect(t).toContain('· Final check posted')
+  expect(t).toContain('Two?')
+  expect(t.some(x => x.includes('Final check'))).toBe(false)
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect((await svgsOf(d)).find(v => v.alt.startsWith('#109'))!.drawn).toContain('Final check posted · 415e6d9')
+  await d.unmount()
 })
 
 test('a failed read of the pull request takes the final check off the band; a later good read puts it back', async ($, on) => {
   const { world, clock } = boot(on)
   world.issueComments = ok(pages([finalCheck(H1)]))
   await follow109($)
-  await eng($).tool.call({ tool: OPEN, question: 'Still asked?' })
   expect(await bandTexts($)).toContain('· Final check posted')
 
-  // The branch may have moved; the read that would show it failed. Questions still raise the band.
+  // The branch may have moved; the read that would show it failed.
   world.pr = failed
   await clock.advance(60_000)
   await untilPane($, 'PR read failed (last ok 1m ago)')
   let t = await bandTexts($)
   expect(t.some(x => x.includes('Final check'))).toBe(false)
-  expect(t).toContain('1 question')
   expect(await paneTexts($)).toContain('Approval required')
+  // Questions still raise the band; the band shows the question, not the final check.
+  await eng($).tool.call({ tool: OPEN, question: 'Still asked?' })
+  t = await bandTexts($)
+  expect(t).toContain('Still asked?')
+  expect(t).toContain('1 question')
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
 
   world.pr = ok(prJson())
   await clock.advance(60_000)
@@ -2141,4 +2158,387 @@ test('a pull request title ending in a word wider than the card is cut with an e
     expect(t.endsWith('…')).toBe(true)
     expect(t.length).toBeLessThan(token.length)
   }
+})
+
+// ---- kinds of open item: question, action, alert ------------------------------------------
+
+const RED = '#D0453F'
+const BLUE = '#3D7FE6'
+const AMBER = '#C98A0E'
+// Opens an item with kind (none: a call without kind); call the result with $.
+const open = (kind: string | undefined, question: string, extra: object = {}) => ($: never) =>
+  eng($).tool.call({ tool: OPEN, ...(kind === undefined ? {} : { kind }), question, ...extra })
+// Every Button key, Link href and Svg alt of a drawing.
+const keysOf = async (d: Drawing) => (await d.findAll({ type: 'Button' })).map(b => b.key)
+const hrefsOf = async (d: Drawing) => (await d.findAll({ type: 'Link' })).map(l => String(l.props?.href))
+const altsOf = async (d: Drawing) => (await svgsOf(d)).map(v => v.alt)
+
+test('an alert card is red, labelled ALERT, with Dismiss and no answer buttons, on both surfaces', async ($, on) => {
+  boot(on)
+  await open('alert', 'CI is red and I cannot fix it', { accept: 'Yes', recommendation: 'Look at the log' })($)
+  const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  const t = await textsOf(term)
+  expect(t).toEqual(expect.arrayContaining(['ALERT', 'CI is red and I cannot fix it', '→ Look at the log']))
+  expect(t).not.toContain('QUESTION FOR YOU')
+  expect((await term.findAll({ type: 'Text', text: 'ALERT' }))[0]!.props?.color).toBe('error')
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d0453f24')).toBe(true)
+  expect(await keysOf(term)).toEqual(['dismiss-d1'])
+  expect(await term.findAll({ type: 'Input' })).toEqual([])
+  await term.unmount()
+
+  const desk = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const [card] = (await svgsOf(desk)).filter(v => v.alt.startsWith('Alert'))
+  expect(card!.alt).toBe('Alert: CI is red and I cannot fix it')
+  expect(card!.drawn).toEqual(expect.arrayContaining(['ALERT', 'CI is red and I cannot fix it', '→ Look at the log']))
+  expect(card!.source).toContain(RED)
+  expect(card!.source).toContain('class="qr"')
+  expect(card!.source).not.toContain(AMBER)
+  expect(await keysOf(desk)).toEqual(['dismiss-d1'])
+  await desk.unmount()
+})
+
+test('an action card is blue, labelled WAITING ON YOU, with Dismiss and no answer buttons, on both surfaces', async ($, on) => {
+  boot(on)
+  await open('action', 'Merge #112 when ready', { accept: 'Yes' })($)
+  const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  expect(await textsOf(term)).toEqual(expect.arrayContaining(['WAITING ON YOU', 'Merge #112 when ready']))
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#3d7fe624')).toBe(true)
+  expect(await keysOf(term)).toEqual(['dismiss-d1'])
+  await term.unmount()
+
+  const desk = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const [card] = (await svgsOf(desk)).filter(v => v.alt.startsWith('Waiting on you'))
+  expect(card!.alt).toBe('Waiting on you: Merge #112 when ready')
+  expect(card!.drawn).toEqual(expect.arrayContaining(['WAITING ON YOU', 'Merge #112 when ready']))
+  expect(card!.source).toContain(BLUE)
+  expect(card!.source).toContain('class="qb"')
+  expect(await keysOf(desk)).toEqual(['dismiss-d1'])
+  await desk.unmount()
+})
+
+test('a question with kind question and one without a kind are the same amber card with answer buttons', async ($, on) => {
+  boot(on)
+  await open(undefined, 'Plain?', { accept: 'Yes' })($)
+  await open('question', 'Explicit?', { accept: 'Yes' })($)
+  for (const surface of SURFACES) {
+    const d = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect(await keysOf(d)).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1', 'accept-d2', 'answer-open-d2', 'dismiss-d2'])
+    expect(await textsOf(d)).toEqual(expect.arrayContaining(['QUESTION FOR YOU', 'Plain?', 'Explicit?']))
+    if (surface === 'desktop') {
+      const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Question'))
+      expect(cards.map(c => c.alt)).toEqual(['Question: Plain?', 'Question: Explicit?'])
+      for (const c of cards) expect(c.source).toContain(AMBER)
+      // The same drawing for both: only the text differs.
+      expect(cards[0]!.source.replace('Plain?', 'Explicit?')).toBe(cards[1]!.source)
+    }
+    await d.unmount()
+  }
+})
+
+test('an unknown kind is refused with a message and records nothing', async ($, on) => {
+  boot(on)
+  const refused = await eng($).tool.call({ tool: OPEN, kind: 'urgent', question: 'Now?' })
+  expect(refused.deny).toBe('open_decision kind must be question, action or alert.')
+  expect(await paneTexts($)).not.toContain('Now?')
+  expect((await bandTexts($)).length).toBe(0)
+})
+
+test('the pane lists alerts, then questions, then actions, in the order opened within each kind', async ($, on) => {
+  boot(on)
+  await open('action', 'Action one')($)
+  await open(undefined, 'Question one')($)
+  await open('alert', 'Alert one')($)
+  await open('action', 'Action two')($)
+  await open('alert', 'Alert two')($)
+  await open('question', 'Question two')($)
+  const want = ['Alert one', 'Alert two', 'Question one', 'Question two', 'Action one', 'Action two']
+  const t = await paneTexts($, 'terminal')
+  expect(want.map(w => t.indexOf(w))).toEqual([...want.map(w => t.indexOf(w))].sort((a, b) => a - b))
+  expect(want.every(w => t.includes(w))).toBe(true)
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect((await altsOf(d)).filter(a => /^(Alert|Question|Waiting)/.test(a))).toEqual([
+    'Alert: Alert one',
+    'Alert: Alert two',
+    'Question: Question one',
+    'Question: Question two',
+    'Waiting on you: Action one',
+    'Waiting on you: Action two',
+  ])
+  await d.unmount()
+})
+
+test('an action or alert shows its link as a Link element beside Dismiss, only when it is an https URL', async ($, on) => {
+  boot(on)
+  const url = 'https://github.com/o/r/issues/112'
+  await open('action', 'With a link', { link: url })($)
+  await open('alert', 'Alert link', { link: `  ${url}  ` })($)
+  for (const bad of ['http://github.com/o/r', 'javascript:alert(1)', 'ftp://x/y', 'github.com/o/r', 'https://', 'https:// spaced', 'file:///etc/passwd', '']) {
+    await open('action', `Bad ${bad}`, { link: bad })($)
+  }
+  for (const surface of SURFACES) {
+    const d = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect(await hrefsOf(d)).toEqual([url, url])
+    const links = await d.findAll({ type: 'Link' })
+    expect(links.every(l => l.props?.label === 'github.com/o/r/issues/112')).toBe(true)
+    // Dismiss is drawn for every card, link or not.
+    expect((await keysOf(d)).filter(k => String(k).startsWith('dismiss-')).length).toBe(10)
+    await d.unmount()
+  }
+})
+
+test('a question draws no link, and a call without kind or link behaves as before', async ($, on) => {
+  boot(on)
+  await open(undefined, 'No link?', { link: 'https://github.com/o/r/issues/1' })($)
+  for (const surface of SURFACES) {
+    const d = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect(await hrefsOf(d)).toEqual([])
+    await d.unmount()
+  }
+})
+
+// Band priority. A final-checked pull request, a rate limit over 80% and the items open together.
+const bandWith = async ($: never, surface: 'terminal' | 'desktop') => {
+  const d = await mount($, BAND, surface)
+  const out = { texts: await textsOf(d), alts: await altsOf(d) }
+  await d.unmount()
+  return out
+}
+const pillFor = (t: string[]) => t.find(x => /^\d+ (question|questions|item|items)$/.test(x))
+
+test('the band shows the newest alert over everything else, then a question, a final-checked pull request, a budget warning and an action', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await follow109($)
+  await open('action', 'Do the thing')($)
+  await open(undefined, 'Ask first?')($)
+  await open('alert', 'Old alert')($)
+  await open('alert', 'New alert')($)
+  const ids = { action: 'd1', question: 'd2', old: 'd3', fresh: 'd4' }
+
+  // Everything raises it: the alert wins and the count is of all four.
+  for (const surface of SURFACES) {
+    const { texts, alts } = await bandWith($, surface)
+    expect(texts).toContain('New alert')
+    expect(texts).not.toContain('Old alert')
+    expect(texts.some(x => x.includes('Final check') || x.includes('limit') || x.includes('Ask first?') || x.includes('Do the thing'))).toBe(false)
+    expect(pillFor(texts)).toBe('4 items')
+    if (surface === 'desktop') {
+      expect(alts).toEqual(['Alert: New alert'])
+      expect(texts).toContain('!')
+    }
+  }
+  const term = await mount($, BAND, 'terminal')
+  expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('error')
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d0453f24')).toBe(true)
+  await term.unmount()
+  const desk = await mount($, BAND, 'desktop')
+  const band = (await svgsOf(desk))[0]!.source
+  expect(band).toContain(RED)
+  await desk.unmount()
+
+  // The alerts closed: the question, with the count of the two left.
+  await eng($).tool.call({ tool: CLOSE, id: ids.fresh })
+  await eng($).tool.call({ tool: CLOSE, id: ids.old })
+  for (const surface of SURFACES) {
+    const { texts, alts } = await bandWith($, surface)
+    expect(texts).toContain('Ask first?')
+    expect(texts.some(x => x.includes('Final check') || x.includes('limit') || x.includes('Do the thing'))).toBe(false)
+    expect(pillFor(texts)).toBe('2 items')
+    if (surface === 'desktop') expect(alts).toEqual(['Question: Ask first?'])
+  }
+
+  // The question closed: the final-checked pull request, with the action counted; then the same
+  // with the pull request not final-checked would show the budget (the next test).
+  await eng($).tool.call({ tool: CLOSE, id: ids.question })
+  for (const surface of SURFACES) {
+    const { texts, alts } = await bandWith($, surface)
+    expect(texts).toContain(surface === 'terminal' ? '· Final check posted' : 'Final check posted')
+    expect(texts.some(x => x.includes('limit') || x.includes('Do the thing'))).toBe(false)
+    expect(pillFor(texts)).toBe('1 item')
+    if (surface === 'desktop') expect(alts).toEqual(['#109 final check posted'])
+  }
+})
+
+test('without alerts or a final check the band shows the newest question over a budget warning, then the budget over an action', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+  await open('action', 'Do the thing')($)
+  // An action alone does not outrank a budget warning; the count says it is there.
+  for (const surface of SURFACES) {
+    const { texts } = await bandWith($, surface)
+    expect(texts).toContain('5-hour limit 95% · resets 1h 29m')
+    expect(texts).not.toContain('Do the thing')
+    expect(pillFor(texts)).toBe('1 item')
+  }
+  await open(undefined, 'Ask first?')($)
+  for (const surface of SURFACES) {
+    const { texts } = await bandWith($, surface)
+    expect(texts).toContain('Ask first?')
+    expect(texts.some(x => x.includes('limit'))).toBe(false)
+    expect(pillFor(texts)).toBe('2 items')
+  }
+})
+
+test('a lone action raises the band, with its text on the left and no count on the desktop', async ($, on) => {
+  boot(on)
+  await open('action', 'Run the plugin update', { link: 'https://github.com/o/r/pull/9' })($)
+  const term = await bandWith($, 'terminal')
+  expect(term.texts).toEqual(expect.arrayContaining(['→', 'Run the plugin update', '1 item']))
+  const desk = await bandWith($, 'desktop')
+  expect(desk.alts).toEqual(['Waiting on you: Run the plugin update'])
+  expect(desk.texts).toContain('Run the plugin update')
+  expect(pillFor(desk.texts)).toBeUndefined()
+  // A second item brings the count back, and the band's Details button stays.
+  await open('action', 'Another')($)
+  expect(pillFor((await bandWith($, 'desktop')).texts)).toBe('2 items')
+  const d = await mount($, BAND, 'terminal')
+  expect(await keysOf(d)).toEqual(['open'])
+  await d.unmount()
+})
+
+test('the count says questions when every open item is a question, and items otherwise', async ($, on) => {
+  boot(on)
+  await open(undefined, 'One?')($)
+  await open('question', 'Two?')($)
+  expect(pillFor((await bandWith($, 'terminal')).texts)).toBe('2 questions')
+  await open('alert', 'Down')($)
+  expect(pillFor((await bandWith($, 'terminal')).texts)).toBe('3 items')
+  expect(pillFor((await bandWith($, 'desktop')).texts)).toBe('3 items')
+})
+
+test('/mentat opens the pane for an open action or alert', async ($, on) => {
+  const { world } = boot(on)
+  await open('action', 'Do it')($)
+  await eng($).command.run({ command: 'mentat', args: '' })
+  expect(world.opened).toEqual(['mentat'])
+})
+
+test('closing an alert or an action by id removes it, and a new conversation drops them too', async ($, on) => {
+  boot(on)
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  await open('alert', 'Down')($)
+  await open('action', 'Do it')($)
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  expect(await paneTexts($)).not.toContain('Down')
+  expect(await paneTexts($)).toContain('Do it')
+  await classic.SessionStart({ source: 'clear' })
+  expect(await paneTexts($)).not.toContain('Do it')
+  expect((await bandTexts($)).length).toBe(0)
+})
+
+// ---- the `mentat check` signal ----------------------------------------------------------------
+
+const FAILED_RUN = 'OK: gh is installed\nPROBLEM: codex is not installed\nPROBLEM: gh is not logged in\nCheck failed: 2 problem(s)\n'
+const alertsOf = async ($: never) => {
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Alert'))
+  await d.unmount()
+  return cards
+}
+const toastTexts = (w: World) => w.toasts.map(t => (JSON.parse(t) as { text: string }).text)
+
+test('a failed mentat check pins one alert with its PROBLEM lines, in the pane and the band', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'cd "a b" && mentat check 2>&1', FAILED_RUN)
+  const [card, ...more] = await alertsOf($)
+  expect(more).toEqual([])
+  expect(card!.alt).toBe('Alert: Check failed: 2 problem(s)')
+  expect(card!.drawn).toEqual(expect.arrayContaining(['ALERT', 'Check failed: 2 problem(s)', 'codex is not installed', 'gh is not logged in']))
+  expect(card!.drawn).not.toContain('gh is installed')
+  const term = await paneTexts($, 'terminal')
+  expect(term).toEqual(expect.arrayContaining(['ALERT', 'Check failed: 2 problem(s)', 'codex is not installed', 'gh is not logged in']))
+  for (const surface of SURFACES) expect((await bandTexts($, surface)).includes('Check failed: 2 problem(s)')).toBe(true)
+  // Only Dismiss: no answer buttons, no toast for a failure.
+  const d = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  expect(await keysOf(d)).toEqual(['dismiss-check'])
+  await d.unmount()
+  expect(toastTexts(world)).toEqual([])
+})
+
+test('a second failed run replaces the alert, so there is still one', async ($, on) => {
+  const { world } = boot(on)
+  await open(undefined, 'A question stays?')($)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  await bash(world, $, '/Users/me/.local/bin/mentat check | cat', 'PROBLEM: gh is not logged in\nCheck failed: 1 problem(s)')
+  const cards = await alertsOf($)
+  expect(cards.length).toBe(1)
+  expect(cards[0]!.alt).toBe('Alert: Check failed: 1 problem(s)')
+  expect(cards[0]!.drawn).toContain('gh is not logged in')
+  expect(cards[0]!.drawn).not.toContain('codex is not installed')
+  // The agent's own question is untouched, and the alert is still the first card.
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect((await altsOf(d)).filter(a => /^(Alert|Question)/.test(a))).toEqual(['Alert: Check failed: 1 problem(s)', 'Question: A question stays?'])
+  await d.unmount()
+})
+
+test('a passing mentat check removes the alert and toasts Mentat engaged, with the warning count when there are warnings', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  expect((await alertsOf($)).length).toBe(1)
+
+  await bash(world, $, 'mentat check', 'OK: gh is installed\nCheck OK (0 warning(s))\n')
+  expect(await alertsOf($)).toEqual([])
+  expect((await paneTexts($, 'terminal')).includes('ALERT')).toBe(false)
+  expect((await bandTexts($)).length).toBe(0)
+  expect(toastTexts(world)).toEqual(['Mentat engaged'])
+
+  await bash(world, $, 'mentat check', 'WARN: gh is old\nWARN: codex is old\nCheck OK (2 warning(s))\n')
+  await bash(world, $, 'mentat check 2>&1', 'WARN: gh is old\nCheck OK (1 warning(s))\n')
+  expect(toastTexts(world)).toEqual(['Mentat engaged', 'Mentat engaged · 2 warnings', 'Mentat engaged · 1 warning'])
+  // A passing run leaves nothing in the band.
+  expect((await bandTexts($)).length).toBe(0)
+})
+
+test('Dismiss removes the check alert, and a later failed run pins it again', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  await d.press({ key: 'dismiss-check' })
+  await d.unmount()
+  expect(await alertsOf($)).toEqual([])
+  expect((await bandTexts($)).length).toBe(0)
+
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  expect((await alertsOf($)).length).toBe(1)
+})
+
+test('a subagent running mentat check changes nothing', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', FAILED_RUN, { agentId: 'a1' })
+  expect(await alertsOf($)).toEqual([])
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  await bash(world, $, 'mentat check', 'Check OK (0 warning(s))', { agentId: 'a1' })
+  expect((await alertsOf($)).length).toBe(1)
+  expect(toastTexts(world)).toEqual([])
+})
+
+test('other Bash output is ignored: no mentat check command, no final line, or text that only looks like one', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'cat check.log', FAILED_RUN)
+  await bash(world, $, 'echo mentat checkout', FAILED_RUN)
+  await bash(world, $, 'mentat checks', FAILED_RUN)
+  await bash(world, $, 'mentat check', 'PROBLEM: cut off by a pipe\n')
+  await bash(world, $, 'mentat check', 'usage: mentat check\n')
+  await bash(world, $, 'mentat check', 'Check failed: lots\nCheck OK soon')
+  await bash(world, $, 'ls', 'Check OK (0 warning(s))')
+  expect(await alertsOf($)).toEqual([])
+  expect(toastTexts(world)).toEqual([])
+
+  // A run whose output has both final lines says nothing certain either.
+  await bash(world, $, 'mentat check', 'Check failed: 1 problem(s)\nCheck OK (0 warning(s))')
+  expect(await alertsOf($)).toEqual([])
+  expect(toastTexts(world)).toEqual([])
+})
+
+test('a long list of problems is cut to six lines, the last counting the rest, on both surfaces', async ($, on) => {
+  const { world } = boot(on)
+  const problems = Array.from({ length: 9 }, (_, i) => `problem number ${i + 1}`)
+  await bash(world, $, 'mentat check', `${problems.map(p => `PROBLEM: ${p}`).join('\n')}\nCheck failed: 9 problem(s)`)
+  const [card] = await alertsOf($)
+  expect(card!.drawn).toEqual(expect.arrayContaining([...problems.slice(0, 5), '+4 more']))
+  expect(card!.drawn).not.toContain('problem number 6')
+  const t = await paneTexts($, 'terminal')
+  expect(t).toEqual(expect.arrayContaining([...problems.slice(0, 5), '+4 more']))
+  expect(t).not.toContain('problem number 6')
 })

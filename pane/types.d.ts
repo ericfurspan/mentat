@@ -1,6 +1,16 @@
+// What an open item is: a question to answer, an action only the maintainer can take, or an
+// alert (a failure the agent could not resolve). An item stored without a kind is a question.
+export type DecisionKind = 'question' | 'action' | 'alert'
+
 export type Decision = {
   id: string
+  kind?: DecisionKind
+  // The text of the item; for an alert from `mentat check`, its `Check failed:` line.
   question: string
+  // An https URL (the issue or pull request that holds the steps); other values are not stored.
+  link?: string
+  // Detail lines under the text: the PROBLEM lines of a failed `mentat check`.
+  lines?: string[]
   recommendation?: string
   // The label of a one-press answer (for example Yes); the pane shows it as a button.
   accept?: string
