@@ -609,10 +609,10 @@ const wrap = (s: string, size: number, maxW: number, lines: number): string[] =>
     const next = cur === '' ? w : `${cur} ${w}`
     if (textW(next, size) <= maxW) { cur = next; continue }
     if (out.length === lines - 1) { out.push(fit(`${cur} ${words.slice(i).join(' ')}`.trim(), size, maxW)); return out }
-    out.push(cur === '' ? fit(w, size, maxW) : cur)
+    out.push(fit(cur === '' ? w : cur, size, maxW))
     cur = cur === '' ? '' : w
   }
-  if (cur !== '') out.push(cur)
+  if (cur !== '') out.push(fit(cur, size, maxW))
   return out
 }
 const svgOf = (W: number, H: number, body: string): string =>

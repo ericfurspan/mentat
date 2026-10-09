@@ -1472,3 +1472,23 @@ test('a long pull request title is wrapped whole on the desktop card, which grow
   expect(shown).not.toContain('…')
   expect(long.height).toBeGreaterThan(short.height)
 })
+
+test('a pull request title ending in a word wider than the card is cut with an ellipsis, not left to overflow', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  const token = 'hooks/' + 'a'.repeat(120) + '.tsx'
+  world.pr = ok(prJson({ title: `fix: handle ${token}` }))
+  await bash(world, $, 'gh pr ready 109', '')
+  for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).some(t => t.startsWith('Handle')); i++) await new Promise(r => setTimeout(r, 5))
+  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const drawn = (await svgsOf(pane)).find(v => v.alt.startsWith('#109'))!.drawn
+  await pane.unmount()
+  const lines = drawn.filter(t => t.startsWith('Handle') || t.includes('aaaa'))
+  expect(lines.length).toBeGreaterThan(0)
+  expect(lines.some(t => t.includes('aaaa'))).toBe(true)
+  expect(lines.some(t => t.includes('.tsx'))).toBe(false)
+  for (const t of lines.filter(t => t.includes('aaaa'))) {
+    expect(t.endsWith('…')).toBe(true)
+    expect(t.length).toBeLessThan(token.length)
+  }
+})
