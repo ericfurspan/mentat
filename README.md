@@ -21,7 +21,7 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional o
 - Decide what to build and what matters, with Claude Code advising.
 - Merge pull requests on GitHub.
 - When a session went badly, run `/mentat:retro` in Claude Code: it reads the session and proposes fixes to the setup, and changes nothing until you approve.
-- To skip Codex for a session, run `/mentat:no-review`: no pull request reviews and no plan challenges, and you merge every pull request. Say so in chat to turn Codex back on.
+- To skip Codex for a session, run `/mentat:no-review`: one Claude `code-review` at medium effort per pull request (at most two rounds), no plan challenges, a final check marked reviewed by Claude, not Codex, and you still merge every pull request. Claude is the same model family as the builder, so this review is weaker than a cross-model one. Say so in chat to turn Codex back on.
 - Once per repository: turn Mentat on.
 
 ## Read more

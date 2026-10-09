@@ -24,7 +24,7 @@ flowchart TD
 
 After a session that went badly, `/mentat:retro` reads it and proposes fixes to the setup: checks over written rules, pointers, deletions. It changes nothing until you approve; approved fixes become issues or pull requests ([`skills/retro`](../skills/retro/SKILL.md)).
 
-To skip Codex for a session, run `/mentat:no-review`. Claude Code then runs no reviews and no plan challenges: it still runs the tests, waits for CI and posts its final check marked not reviewed, then tells you the pull request is ready, and never merges it itself, even in a repository opted in to agent merges. OpenAI's Codex GitHub app, if installed with automatic reviews, can still review when the pull request is marked ready; that is the app's setting. Say so in chat to turn Codex back on ([`skills/no-review`](../skills/no-review/SKILL.md)).
+To skip Codex for a session, run `/mentat:no-review`. Claude Code then runs one Claude `code-review` at medium effort per pull request (at most two rounds) instead of the Codex review, and no plan challenges: it still runs the tests, waits for CI and posts its final check marked reviewed by Claude, not Codex, then tells you the pull request is ready, and never merges it itself, even in a repository opted in to agent merges; you still merge. The limit: the reviewer is the same model family as the builder, so it is weaker than a cross-model review. OpenAI's Codex GitHub app, if installed with automatic reviews, can still review when the pull request is marked ready; that is the app's setting. Say so in chat to turn Codex back on ([`skills/no-review`](../skills/no-review/SKILL.md)).
 
 ## The repository comes first
 
