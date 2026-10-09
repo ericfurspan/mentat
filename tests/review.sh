@@ -53,7 +53,6 @@ case "$1 $2" in
         n=$(($(cat "$STUB/ci_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/ci_reads"
         [ -f "$STUB/push_on_ci" ] && cp "$STUB/push_on_ci" "$STUB/head"
         if [ "$n" -ge 2 ] && [ -f "$STUB/check_runs_later.json" ]; then cat "$STUB/check_runs_later.json"; else cat "$STUB/check_runs.json"; fi ;;
-      */status) cat "$STUB/status.json" ;;
       *) exit 99 ;;
     esac ;;
   *) exit 99 ;;
@@ -72,7 +71,7 @@ reset() {
   echo "$H" >"$STUB/head"; echo true >"$STUB/draft"; echo "$READY" >"$STUB/ready_at"
   printf '[{"event":"ready_for_review","created_at":"%s"}]\n' "$EARLIER" >"$STUB/timeline.json"
   for f in reviews reactions comments issue_comments; do echo '[]' >"$STUB/$f.json"; done
-  runs completed success >"$STUB/check_runs.json"; echo '{"statuses":[]}' >"$STUB/status.json"
+  runs completed success >"$STUB/check_runs.json"
 }
 runs() { if [ $# = 0 ]; then echo '{"check_runs":[]}'; else printf '{"check_runs":[{"name":"test","status":"%s","conclusion":"%s"}]}\n' "$1" "$2"; fi; }
 reaction() { printf '{"user":{"login":"%s"},"content":"%s","created_at":"%s"}' "$1" "$2" "$3"; }
@@ -136,11 +135,9 @@ check "no result in time is not reviewed (exit 1)" '[ "$rc" = 1 ] && grep -q "no
 # CI on the head is waited for before the review starts.
 reset; done_on 1111111; runs in_progress null >"$STUB/check_runs.json"; runs completed success >"$STUB/check_runs_later.json"; rc=$(run)
 check "waits for running CI, then reviews" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -qx "pr ready 7" "$STUB/calls"'
-check "reads CI by the head commit" 'grep -q "repos/owner/repo/commits/$H/check-runs" "$STUB/calls" && grep -q "repos/owner/repo/commits/$H/status" "$STUB/calls"'
+check "reads CI by the head commit" 'grep -q "repos/owner/repo/commits/$H/check-runs" "$STUB/calls"'
 reset; done_on 1111111; runs completed failure >"$STUB/check_runs.json"; rc=$(run)
 check "failed CI is not reviewed (exit 4) and names the check" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
-reset; done_on 1111111; echo '{"statuses":[{"context":"ci/legacy","state":"failure"}]}' >"$STUB/status.json"; rc=$(run)
-check "a failed commit status counts as failed CI" '[ "$rc" = 4 ] && grep -qx -- "- ci/legacy" "$STUB/out"'
 reset; done_on 1111111; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout is not reviewed (exit 4)" '[ "$rc" = 4 ] && grep -q "CI did not finish on $H" "$STUB/out" && ! grep -q "pr ready" "$STUB/calls"'
 reset; done_on 1111111; runs >"$STUB/check_runs.json"; rc=$(run)

@@ -113,7 +113,6 @@ case "$1 $2" in
   "api --paginate")
     case "$3" in
       */check-runs) cat "$STUB/check_runs.json" ;;
-      */status) echo '{"statuses":[]}' ;;
       *) exit 99 ;;
     esac ;;
   "pr comment")
