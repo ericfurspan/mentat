@@ -734,7 +734,7 @@ const roleOf = (type: string): { role: Role; label: string } => {
 }
 // Glyphs on a 24 by 24 grid, drawn in the role color: a wrench, a magnifier, a compass, a dot.
 const GLYPH: Record<Role, string> = {
-  builder: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>',
+  builder: '<path d="M13 11L5 19"/><path d="M16.7 3.9A4.2 4.2 0 1 0 20.1 7.3"/>',
   explore: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
   plan: '<circle cx="12" cy="12" r="8.5"/><path d="M15.8 8.2l-2.1 5.5-5.5 2.1 2.1-5.5z"/>',
   other: '<circle cx="12" cy="12" r="4" stroke="none" fill="HUE"/>',
