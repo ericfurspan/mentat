@@ -42,7 +42,8 @@ export type PrSnapshot = {
 
 export type CodexRead =
   | { kind: 'running'; sha: string }
-  | { kind: 'completed'; sha: string; findings: number; replied: number }
+  // hasReview: the app also posted a review object on the head (it may have no inline comment).
+  | { kind: 'completed'; sha: string; findings: number; replied: number; hasReview: boolean }
   | { kind: 'failed'; sha: string }
   // The app's summary is about another commit than the head.
   | { kind: 'other'; sha: string }

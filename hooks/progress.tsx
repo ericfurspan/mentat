@@ -164,7 +164,7 @@ const parseSummary = (body: string): { status: string; sha: string } | undefined
 }
 
 // What the review reads of GitHub say about the PR's head, for the agent account `me`.
-const readReview = (issueComments: unknown[], pullComments: unknown[], head: string, me: string): Omit<ReviewSnapshot, 'ref' | 'seq' | 'head'> => {
+const readReview = (issueComments: unknown[], pullComments: unknown[], reviews: unknown[], head: string, me: string): Omit<ReviewSnapshot, 'ref' | 'seq' | 'head'> => {
   const issue = issueComments.map(asObj)
   const inline = pullComments.map(asObj)
   const summaries = issue.filter(c => login(c) === CODEX_APP && str(c.body).includes(SUMMARY_MARK))
@@ -179,7 +179,10 @@ const readReview = (issueComments: unknown[], pullComments: unknown[], head: str
       const findings = inline.filter(c => login(c) === CODEX_APP && str(c.commit_id) === head && c.in_reply_to_id == null)
       const ids = new Set(findings.map(c => c.id))
       const replied = new Set(inline.filter(c => login(c) === me && ids.has(c.in_reply_to_id)).map(c => c.in_reply_to_id))
-      codex = { kind: 'completed', sha: parsed.sha, findings: findings.length, replied: replied.size }
+      // A review of the head by the app with no inline comment (a head-level or
+      // security review) is findings too, but has no count.
+      const hasReview = reviews.map(asObj).some(r => login(r) === CODEX_APP && str(r.commit_id) === head)
+      codex = { kind: 'completed', sha: parsed.sha, findings: findings.length, replied: replied.size, hasReview }
     } else if (status === 'failed') codex = { kind: 'failed', sha: parsed.sha }
     else if (status !== undefined && /^(running|in progress|reviewing|queued|pending)$/.test(status)) codex = { kind: 'running', sha: parsed.sha }
     else codex = { kind: 'unknown' }
@@ -204,7 +207,8 @@ const sha7 = (sha: string): string => sha.slice(0, 7)
 const codexText = (r: ReviewSnapshot): string => {
   const c = r.codex
   if (c.kind === 'completed') {
-    return c.findings === 0 ? `No findings · ${sha7(c.sha)}` : `${plural(c.findings, 'finding', 'findings')} · ${c.replied} replied · ${sha7(c.sha)}`
+    if (c.findings === 0) return c.hasReview ? `Findings in review · ${sha7(c.sha)}` : `No findings · ${sha7(c.sha)}`
+    return `${plural(c.findings, 'finding', 'findings')} · ${c.replied} replied · ${sha7(c.sha)}`
   }
   if (c.kind === 'running') return `Running · ${sha7(c.sha)}`
   if (c.kind === 'failed') return `Failed · ${sha7(c.sha)}`
@@ -429,14 +433,15 @@ async function readOnce($: EngineInterface): Promise<void> {
     await commitReview($, ref, seq, head, undefined, await $.clock.now(), 'user')
     return
   }
-  const [issueOut, pullOut] = await Promise.all([
+  const [issueOut, pullOut, reviewsOut] = await Promise.all([
     run($, ['gh', 'api', '--paginate', `repos/${repo}/issues/${number}/comments`]),
     run($, ['gh', 'api', '--paginate', `repos/${repo}/pulls/${number}/comments`]),
+    run($, ['gh', 'api', '--paginate', `repos/${repo}/pulls/${number}/reviews`]),
   ])
   let review: ReviewSnapshot | undefined
   try {
-    if (issueOut === undefined || pullOut === undefined) throw new Error('a review source could not be read')
-    review = { ref, seq, head, ...readReview(parsePages(issueOut), parsePages(pullOut), head, me) }
+    if (issueOut === undefined || pullOut === undefined || reviewsOut === undefined) throw new Error('a review source could not be read')
+    review = { ref, seq, head, ...readReview(parsePages(issueOut), parsePages(pullOut), parsePages(reviewsOut), head, me) }
   } catch {
     review = undefined
   }

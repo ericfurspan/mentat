@@ -45,6 +45,8 @@ const summary = (sha: string, status = 'Completed', login = CODEX) => ({
   user: { login },
   body: `<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **${status}** <relative-time datetime="2026-01-01T00:11:00.123456Z">2026-01-01T00:11:00.123456Z</relative-time> | \`${sha.slice(0, 7)}\` | Draft marked ready |\n`,
 })
+// A pull request review object (not an inline comment), as GET pulls/N/reviews returns it.
+const reviewOf = (sha: string, login = CODEX) => ({ id: 77, user: { login }, commit_id: sha, html_url: 'https://example.test/review' })
 const comment = (login: string, body: string, id = 500) => ({ id, user: { login }, body })
 const inline = (id: number, sha: string, login = CODEX, inReplyTo?: number) => ({
   id,
@@ -71,6 +73,7 @@ type World = {
   me: Answer
   issueComments: Answer
   pullComments: Answer
+  reviews: Answer
   bash: string
   agents: { id: string; type: string; description: string; status: string }[]
   usage: Usage
@@ -94,6 +97,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
     me: ok(`${ME}\n`),
     issueComments: ok(pages([])),
     pullComments: ok(pages([])),
+    reviews: ok(pages([])),
     bash: '',
     agents: [],
     usage: { context: 12, limits: [] },
@@ -145,6 +149,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
       else if (isCall(argv, 'gh', 'api', 'user')) answer = world.me
       else if (argv[0] === 'gh' && argv[1] === 'api' && argv.some(a => a.endsWith('/issues/109/comments'))) answer = world.issueComments
       else if (argv[0] === 'gh' && argv[1] === 'api' && argv.some(a => a.endsWith('/pulls/109/comments'))) answer = world.pullComments
+      else if (argv[0] === 'gh' && argv[1] === 'api' && argv.some(a => a.endsWith('/pulls/109/reviews'))) answer = world.reviews
       const run = typeof answer === 'function' ? await answer() : answer
 
       return { value: { exitCode: run.exitCode, stdout: run.stdout, stderr: run.stderr ?? '' } }
@@ -561,10 +566,43 @@ test('Codex: a local review of another commit, or by someone else, is not shown'
   expect(await codexLine($)).toBe('No review yet')
 })
 
+test('Codex: a review on the head with no inline comment is findings without a count, never No findings', async ($, on) => {
+  const { world } = boot(on)
+  world.issueComments = ok(pages([summary(H1)]))
+  world.reviews = ok(pages([reviewOf(H1)]))
+  await follow109($)
+  expect(await codexLine($)).toBe('Findings in review · 415e6d9')
+
+  // Inline comments, when there are some, keep their count.
+  world.pullComments = ok(pages([inline(1, H1)]))
+  await bash(world, $, 'mentat review 109', '')
+  for (let i = 0; i < 200 && (await codexLine($)) !== '1 finding · 0 replied · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
+  expect(await codexLine($)).toBe('1 finding · 0 replied · 415e6d9')
+})
+
+test('Codex: a review on an older commit, or by someone else, is not findings', async ($, on) => {
+  const { world } = boot(on)
+  world.issueComments = ok(pages([summary(H1)]))
+  world.reviews = ok(pages([reviewOf(H2), reviewOf(H1, 'someone-else')]))
+  await follow109($)
+  expect(await codexLine($)).toBe('No findings · 415e6d9')
+})
+
+test('a failed read of the reviews is a failed review read, not No findings', async ($, on) => {
+  const { world } = boot(on)
+  world.issueComments = ok(pages([summary(H1)]))
+  world.reviews = failed
+  await follow109($)
+  const t = await untilPane($, 'Review read failed')
+  expect(t[t.indexOf('Codex') + 1]).toBe('unknown')
+  expect(t).not.toContain('No findings · 415e6d9')
+})
+
 test('review comments are read across pages', async ($, on) => {
   const { world } = boot(on)
   world.issueComments = ok(pages([comment('a', 'x', 1)], [summary(H1)]))
   world.pullComments = ok(pages([inline(1, H1)], [inline(2, H1)], [inline(3, H1, ME, 2)]))
+  world.reviews = ok(pages([reviewOf(H2)], [reviewOf(H2)]))
   await follow109($)
   expect(await codexLine($)).toBe('2 findings · 1 replied · 415e6d9')
   expect(world.calls.filter(a => isCall(a, 'gh', 'api')).every(a => a.includes('--paginate') || a[2] === 'user')).toBe(true)
