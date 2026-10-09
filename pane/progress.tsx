@@ -20,7 +20,7 @@ const CODEX_APP = 'chatgpt-codex-connector[bot]'
 const SUMMARY_MARK = '<!-- codex-pull-request-review-summary -->'
 const STALE_MS = 5 * 60_000
 const LIST_LIMIT = 100
-// A rate limit this far gone raises the band; the tiles and meters turn amber here too.
+// A rate limit this far gone raises the band; the terminal pane's meters turn amber here too.
 const WARN_PERCENT = 80
 // Rows between the desktop pane's sections.
 const SECTION_GAP = 2
@@ -72,6 +72,26 @@ const resetIn = (at: string | undefined, now: number): string => {
   const m = Math.floor((ms % 3_600_000) / 60_000)
   return h >= 24 ? `resets in ${Math.round(h / 24)}d` : h > 0 ? `resets in ${h}h ${m}m` : `resets in ${m}m`
 }
+// The weekly reset as the desktop app's usage popover words it: `resets Thu 7:00 PM`, the short
+// weekday and the 12-hour clock in the local time zone. `zone` is an IANA name, or undefined
+// for the zone the process runs in; a name the runtime does not know falls back to that zone.
+export const resetAt = (at: string | undefined, now: number, zone?: string): string => {
+  if (at === undefined || !(Date.parse(at) - now > 0)) return ''
+  const when = new Date(at)
+  const parts = (timeZone: string | undefined) =>
+    new Intl.DateTimeFormat('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone }).formatToParts(when)
+  let found: Intl.DateTimeFormatPart[]
+  try {
+    found = parts(zone === '' ? undefined : zone)
+  } catch {
+    found = parts(undefined)
+  }
+  const part = (type: string) => found.find(x => x.type === type)?.value ?? ''
+
+  return `resets ${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod')}`
+}
+// What follows `resets`: the part the band and `/mentat` print without the word.
+const resetWhen = (reset: string): string => reset.replace(/^resets (in )?/, '')
 
 const textMeter = (cells: number, percent: number): string => {
   const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * cells)
@@ -81,14 +101,15 @@ const textMeter = (cells: number, percent: number): string => {
 type Meter = { kind: string; label: string; percent: number; reset: string }
 type Usage = Awaited<ReturnType<EngineInterface['session']['usage']>>
 
-// The session budget as the pane, the band and `/mentat` all read it: the context
-// window and each rate limit, with their percent and the time to the reset.
-const metersOf = (usage: Usage | undefined, now: number): { meters: Meter[]; limits: Meter[] } => {
+// The session budget as the terminal pane, the band and `/mentat` all read it: the context
+// window and each rate limit, with their percent and the reset: a countdown for the 5-hour
+// limit, the weekday and local time for the weekly one.
+const metersOf = (usage: Usage | undefined, now: number, zone?: string): { meters: Meter[]; limits: Meter[] } => {
   const limits = (usage?.rateLimits ?? []).map(r => ({
     kind: r.kind,
     label: r.kind === 'five_hour' ? '5-hour' : r.kind === 'seven_day' ? 'Week' : r.kind,
     percent: Math.round(r.percentUsed),
-    reset: resetIn(r.resetsAt, now),
+    reset: r.kind === 'seven_day' ? resetAt(r.resetsAt, now, zone) : resetIn(r.resetsAt, now),
   }))
   const context = usage?.context.percent
   return {
@@ -97,9 +118,9 @@ const metersOf = (usage: Usage | undefined, now: number): { meters: Meter[]; lim
   }
 }
 
-// One line of the budget: `Context 10% · 5-hour 12% (1h 29m) · Week 8% (6d)`.
+// One line of the budget: `Context 10% · 5-hour 12% (1h 29m) · Week 8% (Thu 7:00 PM)`.
 const budgetLine = (meters: Meter[]): string =>
-  meters.map(m => `${m.label} ${m.percent}%${m.reset === '' ? '' : ` (${m.reset.replace(/^resets in /, '')})`}`).join(' · ')
+  meters.map(m => `${m.label} ${m.percent}%${m.reset === '' ? '' : ` (${resetWhen(m.reset)})`}`).join(' · ')
 
 // The band's budget text, for the most used of the 5-hour and weekly limits when it
 // is at WARN_PERCENT or more. The context window never raises the band.
@@ -108,7 +129,7 @@ const budgetAlert = (limits: Meter[]): string | undefined => {
     .filter(m => (m.kind === 'five_hour' || m.kind === 'seven_day') && m.percent >= WARN_PERCENT)
     .sort((a, b) => b.percent - a.percent)[0]
   if (over === undefined) return undefined
-  const reset = over.reset.replace(/^resets in /, '')
+  const reset = resetWhen(over.reset)
 
   return `${over.label} limit ${over.percent}%${reset === '' ? '' : ` · resets ${reset}`}`
 }
@@ -391,6 +412,15 @@ async function invalidate($: EngineInterface): Promise<void> {
 async function readUsage($: EngineInterface): Promise<Usage | undefined> {
   try {
     return await $.session.usage()
+  } catch {
+    return undefined
+  }
+}
+
+// The time zone the reset times are shown in: TZ when it is set, else the process's own (undefined).
+async function readZone($: EngineInterface): Promise<string | undefined> {
+  try {
+    return await $.env.get('TZ')
   } catch {
     return undefined
   }
@@ -737,27 +767,6 @@ const githubHue = (text: string): string =>
 const codexHue = (text: string): string =>
   text.startsWith('No findings') ? HUE.green : text.startsWith('Running') ? HUE.blue : text.startsWith('Failed') || text === 'unknown' ? HUE.red : /finding/i.test(text) ? HUE.amber : HUE.grey
 
-// Session tiles: neutral cards with a big number and a bar; the bar turns amber
-// from WARN_PERCENT and red from 95%, the only color they carry.
-const SESSION_H = 86
-const sessionSvg = (W: number, meters: { label: string; percent: number; reset: string }[]): string => {
-  const gap = 8
-  const n = Math.max(1, meters.length)
-  const tw = (W - gap * (n - 1)) / n
-  const tiles = meters.map((m, i) => {
-    const x = i * (tw + gap)
-    const hue = m.percent >= 95 ? HUE.red : m.percent >= WARN_PERCENT ? HUE.amber : undefined
-    const fill = Math.max(6, ((tw - 24) * Math.min(100, m.percent)) / 100)
-    const reset = m.reset.replace(/^resets in /, '')
-    return `<rect class="card" x="${x}" y="0" width="${tw}" height="${SESSION_H}" rx="12"/>
-${label(x + 12, 21, m.label)}
-<text class="t" x="${x + 12}" y="52" font-family="${FONT}" font-size="26" font-weight="650" font-variant-numeric="tabular-nums">${m.percent}<tspan font-size="15" class="s">%</tspan></text>
-${reset !== '' && tw > 96 ? `<text class="m" x="${x + tw - 12}" y="52" text-anchor="end" font-family="${FONT}" font-size="11">${xml(reset)}</text>` : ''}
-<rect class="k" x="${x + 12}" y="66" width="${tw - 24}" height="6" rx="3"/><rect ${hue === undefined ? 'class="s"' : `fill="${hue}"`} x="${x + 12}" y="66" width="${fill.toFixed(1)}" height="6" rx="3"/>`
-  })
-  return svgOf(W, SESSION_H, tiles.join(''))
-}
-
 // The card of one open item: a tinted panel with a bar and a label in the kind's color, the
 // text (up to three lines), detail lines (the PROBLEM or WARN lines of a check item, each wrapped
 // over up to three lines) and the recommendation.
@@ -1017,7 +1026,7 @@ export const register: Register = (on, _options) => {
       const isEmpty =
         (await read($, items)).length === 0 && (await read($, prRef)) === '' && (await read($, agents)).length === 0
       if (isEmpty) {
-        const { meters } = metersOf(await readUsage($), await $.clock.now())
+        const { meters } = metersOf(await readUsage($), await $.clock.now(), await readZone($))
 
         return { text: meters.length === 0 ? 'Nothing waiting on you; session budget unavailable.' : budgetLine(meters) }
       }
@@ -1213,7 +1222,7 @@ export const register: Register = (on, _options) => {
     // Budget raises it only when nothing above it does. Nothing redraws the band for a
     // change of usage alone; it is read when the band is drawn (see the report).
     const isAbove = alert !== undefined || question !== undefined || warning !== undefined || isChecked
-    const budget = !isAbove ? budgetAlert(metersOf(await readUsage($), now).limits) : undefined
+    const budget = !isAbove ? budgetAlert(metersOf(await readUsage($), now, await readZone($)).limits) : undefined
     const action = !isAbove && budget === undefined ? newest('action') : undefined
     if (!isAbove && budget === undefined && action === undefined) {
       return next(e)
@@ -1307,8 +1316,6 @@ export const register: Register = (on, _options) => {
     const liveRows = rows.filter(a => !isEnded(a.status))
     const doneRows = rows.filter(a => isEnded(a.status))
     const toggleFinished = () => inTurn(() => update($, finishedHidden, v => !v))
-    const usage = await readUsage($)
-
     const Card = ({ tint, children }: { tint?: string; children?: RenderChildren }) => (
       <Box flexDirection="column" backgroundColor={tint ?? TINT.surface} paddingX={2} paddingY={1.5} marginTop={1}>
         {children}
@@ -1423,8 +1430,6 @@ export const register: Register = (on, _options) => {
     const ci = pr === null ? undefined : ciLine(pr.checks)
     const others = pr?.others
     const cells = isNarrow ? 6 : 10
-    const { meters } = metersOf(usage, now)
-
     if (Svg !== undefined) {
       const W = Math.max(220, Math.min(900, cols * 8 - 24))
       // The app already shows the pull request's number, repository, branch, diff and CI, so
@@ -1463,11 +1468,6 @@ export const register: Register = (on, _options) => {
       const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRows.map(agentRow))
       return (
         <Box flexDirection="column" paddingX={1}>
-          {meters.length > 0 && (
-            <Box marginTop={SECTION_GAP}>
-              <Svg source={sessionSvg(W, meters)} alt={meters.map(m => `${m.label} ${m.percent}%`).join(', ')} width={W} height={SESSION_H} />
-            </Box>
-          )}
           {open.map(d => {
             const kind = kindOf(d)
             const q = cardSvg(W, kind, d.question, d.recommendation, d.lines)
@@ -1569,6 +1569,8 @@ export const register: Register = (on, _options) => {
         </Card>
       )
     }
+
+    const { meters } = metersOf(await readUsage($), now, await readZone($))
 
     return (
       <Box flexDirection="column" paddingX={1}>

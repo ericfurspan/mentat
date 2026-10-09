@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { withoutSettled } from './progress'
+import { resetAt, withoutSettled } from './progress'
 
 // Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
@@ -13,6 +13,9 @@ const PANE = { plugin: 'mentat', component: 'Pane', requestId: 'mentat' }
 const SURFACES = ['terminal', 'desktop'] as const
 
 const T0 = Date.parse('2026-10-09T12:00:00Z')
+// The time zone reset times are shown in: the mod reads TZ, and every test sets it, so a weekly
+// reset prints the same wherever the tests run.
+const ZONE = 'America/New_York'
 const REPO = 'o/r'
 const ME = 'mentat-bot'
 const CODEX = 'chatgpt-codex-connector[bot]'
@@ -102,8 +105,9 @@ type World = {
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
 
 // `band: false` leaves what the band draws beneath the plugin to the test.
-const boot = (on: never, opts: { band?: boolean } = {}) => {
+const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
   const onFn = on as (event: string, ...rest: unknown[]) => void
+  mock.env(on, { TZ: opts.zone ?? ZONE })
   const clock = mock.clock(on, { now: T0 })
   const world: World = {
     repo: ok(`${REPO}\n`),
@@ -406,17 +410,16 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   expect((await band.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
   await band.unmount()
 
-  // Desktop pane: session tiles, the question card, the PR card, the agents card.
+  // Desktop pane: the question card, the PR card, the agents card; no usage tiles (the app's own popover shows those).
   const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
   const svgs = await svgsOf(pane)
   const alt = (prefix: string) => svgs.find(v => v.alt.startsWith(prefix))
   expect(svgs.map(v => v.alt)).toEqual([
-    'Context 41%, 5-hour 85%',
     'Question: Open it?',
     '#109 Approval required',
     'Running agents: 1',
   ])
-  expect(alt('Context')!.drawn).toEqual(expect.arrayContaining(['CONTEXT', '41', '5-HOUR', '85', '1h 0m']))
+  expect(svgs.flatMap(v => v.drawn).some(x => /context|5-hour|%/i.test(x))).toBe(false)
   expect(alt('Question')!.drawn).toEqual(expect.arrayContaining(['Open it?', '→ Yes']))
   expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'Codex · 1 finding · 0 replied · 415e6d9', 'Final check posted · 415e6d9']))
   // The app's own chip shows CI and the other pull requests, so the desktop card leaves them out.
@@ -434,7 +437,7 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   const tPane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await tPane.findAll({ type: 'Svg' })).length).toBe(0)
   const t = await textsOf(tPane)
-  for (const x of ['Open it?', 'Approval required', '✓', '1 other open PR in this repository', 'Check the docs', 'Context', '41%']) expect(t).toContain(x)
+  for (const x of ['Open it?', 'Approval required', '✓', '1 other open PR in this repository', 'Check the docs', 'Context', '41%', 'resets in 1h 0m']) expect(t).toContain(x)
   expect(t.some(x => /[█░]/.test(x))).toBe(true)
   await tPane.unmount()
 })
@@ -1924,7 +1927,9 @@ test('the session card shows context and the rate limits with percent and reset 
     ],
   }
   const t = await paneTexts($, 'terminal', 60)
-  for (const x of ['Context', '5-hour', 'Week', '42%', '12%', '88%', 'resets in 2h 10m', 'resets in 3d']) expect(t).toContain(x)
+  // The 5-hour reset is a countdown; the weekly one is the weekday and local time (Mon 12:00Z is 8:00 AM in New York).
+  for (const x of ['Context', '5-hour', 'Week', '42%', '12%', '88%', 'resets in 2h 10m', 'resets Mon 8:00 AM']) expect(t).toContain(x)
+  expect(t.some(x => x.includes('3d'))).toBe(false)
 })
 
 test('below 48 columns reset times and secondary agent facts drop', async ($, on) => {
@@ -1947,11 +1952,20 @@ test('below 48 columns reset times and secondary agent facts drop', async ($, on
   expect(facts).toContain('running')
 })
 
-test('meters are drawn as Svg on the desktop and as text elsewhere', async ($, on) => {
-  boot(on)
+test('the desktop pane draws no usage tiles or meters; the terminal draws text meters', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 41, limits: [limit('five_hour', 85, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
   const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect((await desktop.findAll({ type: 'Svg' })).length).toBeGreaterThan(0)
+  expect((await desktop.findAll({ type: 'Svg' })).length).toBe(0)
+  expect((await textsOf(desktop)).some(t => /context|5-hour|week|resets|%|[█░]/i.test(t))).toBe(false)
   await desktop.unmount()
+  // With something to show, the desktop pane draws its card and still no tile.
+  await eng($).tool.call({ tool: OPEN, question: 'Anything?' })
+  const withCard = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect((await altsOf(withCard)).filter(a => !a.startsWith('Question'))).toEqual([])
+  expect((await textsOf(withCard)).some(t => /context|5-hour|week|resets|[█░]/i.test(t))).toBe(false)
+  await withCard.unmount()
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   const terminal = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await terminal.findAll({ type: 'Svg' })).length).toBe(0)
   expect((await textsOf(terminal)).some(t => /[█░]/.test(t))).toBe(true)
@@ -1968,7 +1982,8 @@ test('no card is drawn for what there is not: no pull request, no agents, no que
 })
 
 const RESET_5H = () => new Date(T0 + 3600_000 + 29 * 60_000).toISOString()
-const RESET_WEEK = () => new Date(T0 + 6 * 86400_000).toISOString()
+// Thu 2026-10-15 23:00Z: Thu 7:00 PM in New York.
+const RESET_WEEK = () => new Date(T0 + 6 * 86400_000 + 11 * 3600_000).toISOString()
 const limit = (kind: string, percentUsed: number, resetsAt?: string) => ({ kind, percentUsed, resetsAt })
 
 test('/mentat opens the pane at once when there is something to show', async ($, on) => {
@@ -1985,7 +2000,7 @@ test('/mentat with nothing but budget answers in one line and opens no pane', as
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
   await startSession($)
   const ran = await eng($).command.run({ command: 'mentat', args: '' })
-  expect(ran.text).toBe('Context 10% · 5-hour 12% (1h 29m) · Week 8% (6d)')
+  expect(ran.text).toBe('Context 10% · 5-hour 12% (1h 29m) · Week 8% (Thu 7:00 PM)')
   expect(world.opened).toEqual([])
 })
 
@@ -2048,7 +2063,7 @@ test('the band shows for a rate limit at 80 and not at 79, on both surfaces', as
   }
 
   world.usage = { context: 5, limits: [limit('five_hour', 40), limit('seven_day', 91, RESET_WEEK())] }
-  expect(await bandTexts($)).toContain('Week limit 91% · resets 6d')
+  expect(await bandTexts($)).toContain('Week limit 91% · resets Thu 7:00 PM')
 
   // Both over: the higher one.
   world.usage = { context: 5, limits: [limit('five_hour', 84), limit('seven_day', 91)] }
@@ -2069,6 +2084,47 @@ test('the context meter alone does not raise the band, and a failed usage read m
   const failed = await mount($, BAND, 'terminal')
   expect((await failed.findAll({ type: 'Button' })).length).toBe(0)
   await failed.unmount()
+})
+
+test('the weekly reset prints as weekday and local time in the band, /mentat and the terminal meters; the 5-hour one stays a countdown', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 91, RESET_WEEK())] }
+  expect(await bandTexts($, 'terminal')).toContain('Week limit 91% · resets Thu 7:00 PM')
+  expect(await bandTexts($, 'desktop')).toContain('Week limit 91% · resets Thu 7:00 PM')
+  await startSession($)
+  expect((await eng($).command.run({ command: 'mentat', args: '' })).text).toBe('Context 10% · 5-hour 12% (1h 29m) · Week 91% (Thu 7:00 PM)')
+  const t = await paneTexts($, 'terminal', 60)
+  expect(t).toContain('resets in 1h 29m')
+  expect(t).toContain('resets Thu 7:00 PM')
+
+  // The 5-hour limit alone keeps its countdown in the band.
+  world.usage = { context: 10, limits: [limit('five_hour', 90, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
+  expect(await bandTexts($)).toContain('5-hour limit 90% · resets 1h 29m')
+})
+
+test('the weekly reset follows TZ', async ($, on) => {
+  const { world } = boot(on, { zone: 'Asia/Kolkata' })
+  world.usage = { context: 10, limits: [limit('seven_day', 91, RESET_WEEK())] }
+  // 23:00Z is 4:30 AM the next day in India (UTC+5:30).
+  expect(await bandTexts($)).toContain('Week limit 91% · resets Fri 4:30 AM')
+})
+
+test('resetAt words the weekly reset in 12-hour time with a short weekday, in the zone given', () => {
+  const now = T0
+  const at = '2026-10-15T23:00:00Z'
+  expect(resetAt(at, now, 'America/New_York')).toBe('resets Thu 7:00 PM')
+  expect(resetAt(at, now, 'UTC')).toBe('resets Thu 11:00 PM')
+  expect(resetAt(at, now, 'Asia/Tokyo')).toBe('resets Fri 8:00 AM')
+  expect(resetAt('2026-10-16T04:00:00Z', now, 'America/Los_Angeles')).toBe('resets Thu 9:00 PM')
+  // Midnight and noon read 12 AM and 12 PM.
+  expect(resetAt('2026-10-16T00:00:00Z', now, 'UTC')).toBe('resets Fri 12:00 AM')
+  expect(resetAt('2026-10-16T12:05:00Z', now, 'UTC')).toBe('resets Fri 12:05 PM')
+  // No reset known, or one already past: nothing.
+  expect(resetAt(undefined, now, 'UTC')).toBe('')
+  expect(resetAt('2026-10-09T11:00:00Z', now, 'UTC')).toBe('')
+  expect(resetAt('not a date', now, 'UTC')).toBe('')
+  // An unknown zone name still words the reset, in the process's own zone.
+  expect(resetAt(at, now, 'Not/AZone')).toMatch(/^resets \w{3} \d{1,2}:\d{2} [AP]M$/)
 })
 
 test('a question comes before budget in the band, and so does a final-checked pull request', async ($, on) => {
