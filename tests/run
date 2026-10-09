@@ -168,7 +168,7 @@ else
   skip "jq not installed, mentat review, challenge, check and the hooks not tested"
 fi
 
-# The decisions pane is a Claude Code mod: the plugin validates (warnings are fine,
+# The Mentat band and pane is a Claude Code mod: the plugin validates (warnings are fine,
 # only a failure counts) and the mod's own tests, tests/*.test.tsx, pass.
 if command -v claude >/dev/null 2>&1; then
   for sub in validate test; do
@@ -180,7 +180,7 @@ if command -v claude >/dev/null 2>&1; then
     fi
   done
 else
-  skip "claude not installed, the decisions pane not validated or tested"
+  skip "claude not installed, the Mentat band and pane not validated or tested"
 fi
 
 # Shell scripts pass shellcheck.
