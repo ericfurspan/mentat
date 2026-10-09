@@ -389,7 +389,7 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   ])
   expect(alt('Context')!.drawn).toEqual(expect.arrayContaining(['CONTEXT', '41', '5-HOUR', '85', '1h 0m']))
   expect(alt('Question')!.drawn).toEqual(expect.arrayContaining(['Open it?', '→ Yes']))
-  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'CI passed', 'Codex · 1 finding · 0 replied · 415e6d9', '+1 more open PR']))
+  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'CI passed', 'Codex · 1 finding · 0 replied · 415e6d9', '1 other open PR in this repository']))
   expect(alt('1 agents')!.drawn).toEqual(expect.arrayContaining(['Check the docs', 'general-purpose']))
   // The buttons stay native, under the question card.
   expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
@@ -987,18 +987,18 @@ test('other open pull requests are counted without this one, singular and plural
   const { world } = boot(on)
   world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }]))
   await follow109($)
-  await untilPane($, '+1 more open PR')
+  await untilPane($, '1 other open PR in this repository')
 
   world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }, { number: 8 }]))
   await bash(world, $, 'gh pr ready 109', '')
-  await untilPane($, '+2 more open PRs')
+  await untilPane($, '2 other open PRs in this repository')
 })
 
 test('other open pull requests say 100+ when the list hit its limit', async ($, on) => {
   const { world } = boot(on)
   world.prList = ok(JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i + 1 }))))
   await follow109($)
-  await untilPane($, '100+ more open PRs')
+  await untilPane($, '100+ other open PRs in this repository')
   expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'list') && a.includes('--limit') && a.includes('100') && a.includes('open'))).toBe(true)
 })
 
@@ -1445,4 +1445,30 @@ test('the answer field starts focused and sits in a full-width box tinted like t
     expect(boxes[0]!.props?.backgroundColor).toBe('#d2992224')
     await pane.unmount()
   }
+})
+
+test('a long pull request title is wrapped whole on the desktop card, which grows to hold it', async ($, on) => {
+  const { world } = boot(on)
+  const title = 'feat: ' + 'make the pull request title long enough to need several lines of the card '.repeat(2).trim() + ' finale'
+  expect(title.length).toBeGreaterThan(140)
+  await follow109($)
+  const heightOf = async () => {
+    const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+    const svg = (await pane.findAll({ type: 'Svg' })).find(x => String(x.props?.alt ?? '').startsWith('#109'))!
+    const drawn = (await svgsOf(pane)).find(v => v.alt.startsWith('#109'))!.drawn
+    await pane.unmount()
+
+    return { height: Number(svg.props?.height), drawn }
+  }
+  const short = await heightOf()
+
+  world.pr = ok(prJson({ title }))
+  await bash(world, $, 'gh pr ready 109', '')
+  for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).includes('Finale'); i++) await new Promise(r => setTimeout(r, 5))
+  const long = await heightOf()
+  const shown = long.drawn.filter(t => !/^(#109|CI|Codex|Approval|Merge|Draft)/.test(t) && !t.includes('open PR')).join(' ')
+  expect(shown).toBe(title.replace(/^feat: /, '').replace(/^\w/, c => c.toUpperCase()))
+  expect(shown).toContain('finale')
+  expect(shown).not.toContain('…')
+  expect(long.height).toBeGreaterThan(short.height)
 })

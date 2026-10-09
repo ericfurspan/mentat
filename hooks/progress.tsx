@@ -685,9 +685,11 @@ const prSvg = (W: number, p: { number: number; title: string; facts: { text: str
   const pad = 14
   const num = `#${p.number}`
   const numW = Math.round(14 + textW(num, 12))
-  const title = fit(p.title, 14, W - pad * 2 - numW - 8)
-  const c = chips(pad, 46, W - pad, p.facts)
-  let y = 46 + c.h + 8
+  // The title wraps (up to three lines) beside the number chip, under its first line's left edge.
+  const titleLines = wrap(p.title, 14, W - pad * 2 - numW - 8, 3)
+  const top = 46 + (titleLines.length - 1) * 19
+  const c = chips(pad, top, W - pad, p.facts)
+  let y = top + c.h + 8
   const foot = p.foot.map(f => {
     y += 16
     return `<text fill="${f.hue}" x="${pad}" y="${y}" font-family="${FONT}" font-size="11.5">${xml(fit(f.text, 11.5, W - pad * 2))}</text>`
@@ -695,7 +697,7 @@ const prSvg = (W: number, p: { number: number; title: string; facts: { text: str
   const h = y + 14
   const body = `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>
 <rect class="chip" x="${pad}" y="13" width="${numW}" height="22" rx="6"/><text class="s" x="${pad + 7}" y="28" font-family="${FONT}" font-size="12" font-weight="600" font-variant-numeric="tabular-nums">${num}</text>
-<text class="t" x="${pad + numW + 8}" y="29" font-family="${FONT}" font-size="14" font-weight="600">${xml(title)}</text>
+${titleLines.map((l, i) => `<text class="t" x="${pad + numW + 8}" y="${29 + i * 19}" font-family="${FONT}" font-size="14" font-weight="600">${xml(l)}</text>`).join('')}
 ${c.svg}${foot.join('')}`
   return { svg: svgOf(W, h, body), h }
 }
@@ -1101,7 +1103,7 @@ export const register: Register = (on, _options) => {
       const ciChip = pr === null ? undefined : pr.checks.failed > 0 ? { text: `CI ${pr.checks.failed} failed`, hue: HUE.red } : pr.checks.running > 0 ? { text: 'CI running', hue: HUE.blue } : pr.checks.passed > 0 ? { text: 'CI passed', hue: HUE.green } : { text: 'No CI', hue: HUE.grey }
       const codex = pr !== null && (isReviewed || rm.failedAt > 0) ? (isReviewed ? codexText(review) : 'unknown') : undefined
       const foot = [
-        ...(others !== undefined && others.count > 0 ? [{ text: others.isLimit ? '100+ more open PRs' : `+${others.count} more open PR${others.count === 1 ? '' : 's'}`, hue: HUE.grey }] : []),
+        ...(others !== undefined && others.count > 0 ? [{ text: others.isLimit ? '100+ other open PRs in this repository' : `${others.count} other open PR${others.count === 1 ? '' : 's'} in this repository`, hue: HUE.grey }] : []),
         ...(prFresh === undefined ? [] : [{ text: prFresh, hue: HUE.amber }]),
         ...(reviewFresh === undefined ? [] : [{ text: reviewFresh, hue: HUE.amber }]),
       ]
@@ -1254,7 +1256,7 @@ export const register: Register = (on, _options) => {
             {others !== undefined && others.count > 0 && (
               <Box marginTop={1}>
                 <Text dimColor wrap="truncate-end">
-                  {others.isLimit ? '100+ more open PRs' : `+${others.count} more open PR${others.count === 1 ? '' : 's'}`}
+                  {others.isLimit ? '100+ other open PRs in this repository' : `${others.count} other open PR${others.count === 1 ? '' : 's'} in this repository`}
                 </Text>
               </Box>
             )}
