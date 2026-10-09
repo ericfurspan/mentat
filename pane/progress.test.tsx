@@ -1283,11 +1283,11 @@ test('desktop card: the final check chip shows only when the final check is on t
   await untilCard($, 'desktop', t => t.some(x => x.startsWith('Codex')), 'the Codex chip')
   expect((await cardOf($, 'desktop')).some(t => t.includes('Final check'))).toBe(false)
 
-  world.issueComments = ok(pages([summary(H1), finalCheck(H2)]))
+  // The Codex chip changes in the same snapshot, so seeing it means the read landed.
+  world.issueComments = ok(pages([summary(H1, 'In progress'), finalCheck(H2)]))
   await bash(world, $, 'mentat review 109', '')
-  await until(() => world.calls.filter(a => a.join(' ').includes('/issues/109/comments')).length >= 2, 'a second review read')
-  await new Promise(r => setTimeout(r, 50))
-  expect((await cardOf($, 'desktop')).some(t => t.includes('Final check'))).toBe(false)
+  const other = await untilCard($, 'desktop', t => t.includes('Codex · Running · 415e6d9'), 'the second review read')
+  expect(other.some(t => t.includes('Final check'))).toBe(false)
 
   world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
   await bash(world, $, 'mentat review 109', '')
