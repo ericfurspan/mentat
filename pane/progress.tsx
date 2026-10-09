@@ -30,6 +30,7 @@ const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const answering = atom({ plugin: 'mentat', key: 'decisionsAnswering' } as const, [])
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
+const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
 const prRef = atom({ plugin: 'mentat', key: 'prRef' } as const, '')
 const prAtom = atom({ plugin: 'mentat', key: 'pr' } as const, null)
 const prMark = atom({ plugin: 'mentat', key: 'prMark' } as const, { seq: 0, okAt: 0, failedAt: 0 })
@@ -597,7 +598,7 @@ const CSS = `<style>
 .t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}.chip{fill:#ecebe7}.q{fill:#fbf3e2}
 @media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}.chip{fill:#2a2a28}.q{fill:#2b2618}}
 </style>`
-const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', grey: '#8f8f8a' }
+const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', teal: '#1E9E9A', grey: '#8f8f8a' }
 
 const xml = (s: string): string => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
 const charEm = (ch: string): number => (/[\s.,:;'|!il1()[\]]/.test(ch) ? 0.3 : /[A-Z@%mw#]/.test(ch) ? 0.72 : 0.56)
@@ -721,25 +722,56 @@ const agentMark = (x: number, y: number, status: AgentStatus): string => {
   return `<circle cx="${x}" cy="${y}" r="7" fill="none" class="m" stroke="${HUE.grey}" stroke-width="1.3"/>`
 }
 
-const agentsSvg = (W: number, rows: { status: AgentStatus; title: string; type: string; meta: string; right: string }[]): string => {
-  const head = 30
-  const rowH = 46
-  const h = head + rows.length * rowH + 4
-  const running = rows.filter(r => isActive(r.status)).length
+// The role of an agent by its type: the label shown, its color and its glyph.
+type Role = 'builder' | 'explore' | 'plan' | 'other'
+const ROLE_HUE: Record<Role, string> = { builder: HUE.violet, explore: HUE.blue, plan: HUE.teal, other: HUE.grey }
+const roleOf = (type: string): { role: Role; label: string } => {
+  const t = type.toLowerCase()
+  if (t === 'builder' || t === 'mentat:builder') return { role: 'builder', label: 'builder' }
+  if (t === 'explore') return { role: 'explore', label: 'explore' }
+  if (t === 'plan') return { role: 'plan', label: 'plan' }
+  return { role: 'other', label: type }
+}
+// Glyphs on a 24 by 24 grid, drawn in the role color: a wrench, a magnifier, a compass, a dot.
+const GLYPH: Record<Role, string> = {
+  builder: '<path d="M13 11L5 19"/><path d="M16.7 3.9A4.2 4.2 0 1 0 20.1 7.3"/>',
+  explore: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
+  plan: '<circle cx="12" cy="12" r="8.5"/><path d="M15.8 8.2l-2.1 5.5-5.5 2.1 2.1-5.5z"/>',
+  other: '<circle cx="12" cy="12" r="4" stroke="none" fill="HUE"/>',
+}
+// A tinted tile with the role's glyph, centered on (cx, cy); a finished agent's is dimmed.
+const roleIcon = (cx: number, cy: number, role: Role, isDone: boolean): string => {
+  const hue = ROLE_HUE[role]
+
+  return `<g opacity="${isDone ? 0.55 : 1}"><rect x="${cx - 15}" y="${cy - 15}" width="30" height="30" rx="8" fill="${hue}" opacity="0.14"/><g data-role="${role}" transform="translate(${cx - 9} ${cy - 9}) scale(0.75)" fill="none" stroke="${hue}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPH[role].replace('HUE', hue)}</g></g>`
+}
+
+type AgentCardRow = { status: AgentStatus; title: string; type: string; model: string; stats: string }
+const AGENT_ROW_H = 64
+const AGENT_HEAD_H = 34
+// One group of agents as its own card: an optional header, then roomy rows. The role icon is on
+// the left, the status mark on the right edge; the title, the role and model, and the stats
+// (right-aligned) take three lines.
+const agentsSvg = (W: number, header: string | undefined, rows: AgentCardRow[]): { svg: string; h: number } => {
+  const top = header === undefined ? 6 : AGENT_HEAD_H
+  const h = top + rows.length * AGENT_ROW_H + 6
+  const tx = 62
   const body = rows.map((r, i) => {
-    const y = head + i * rowH
-    const rightW = textW(r.right, 11.5) + 4
-    const tx = 40
-    const typeW = textW(r.type, 11.5)
-    // A finished agent is drawn in the muted color, so running work stands out; its mark keeps its own.
+    const y = top + i * AGENT_ROW_H
     const done = isEnded(r.status)
-    return `${agentMark(24, y + 18, r.status)}
-<text class="${done ? 'm' : 't'}" x="${tx}" y="${y + 16}" font-family="${FONT}" font-size="13.5" font-weight="${isActive(r.status) ? 600 : 500}">${xml(fit(r.title, 13.5, W - tx - rightW - 22))}</text>
-<text class="${done ? 'm' : 's'}" x="${W - 14}" y="${y + 16}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.right)}</text>
-<text x="${tx}" y="${y + 33}" font-family="${FONT}" font-size="11.5"><tspan fill="${HUE.violet}">${xml(r.type)}</tspan><tspan class="${done ? 'm' : 's'}">${xml(fit(r.meta === '' ? '' : `  ·  ${r.meta}`, 11.5, W - tx - typeW - 16))}</tspan></text>
-${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + rowH - 3.5}" x2="${W - 14}" y2="${y + rowH - 3.5}"/>` : ''}`
+    const { role, label } = roleOf(r.type)
+    const model = r.model === '' ? '' : fit(r.model, 12, W - tx - textW(label, 12) - 30)
+    // A finished agent is drawn in the muted color, so running work stands out; its mark keeps its own.
+    return `${roleIcon(30, y + 30, role, done)}
+<text class="${done ? 'm' : 't'}" x="${tx}" y="${y + 21}" font-family="${FONT}" font-size="14.5" font-weight="${isActive(r.status) ? 600 : 500}">${xml(fit(r.title, 14.5, W - tx - 46))}</text>
+${agentMark(W - 26, y + 17, r.status)}
+<text x="${tx}" y="${y + 39}" font-family="${FONT}" font-size="12"><tspan fill="${ROLE_HUE[role]}" fill-opacity="${done ? 0.65 : 1}" font-weight="600">${xml(label)}</tspan>${model === '' ? '' : `<tspan class="${done ? 'm' : 's'}" dx="8">${xml(model)}</tspan>`}</text>
+${r.stats === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${W - 16}" y="${y + 56}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.stats)}</text>`}
+${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2="${W - 16}" y2="${y + AGENT_ROW_H}"/>` : ''}`
   })
-  return svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${label(14, 20, `Agents  ${rows.length}${running > 0 ? `  ·  ${running} running` : ''}`)}${body.join('')}`)
+  const head = header === undefined ? '' : `<text class="s" x="16" y="23" font-family="${FONT}" font-size="12.5" font-weight="600">${xml(header)}</text>`
+
+  return { svg: svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${head}${body.join('')}`), h }
 }
 
 const bandSvg = (W: number, left: { kind: 'question'; text: string } | { kind: 'budget'; text: string } | { kind: 'pr'; number: number; title: string }, count: number): string => {
@@ -1087,6 +1119,11 @@ export const register: Register = (on, _options) => {
       if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
       return (b.startedAt ?? 0) - (a.startedAt ?? 0)
     })
+    const isHidden = await read($, finishedHidden)
+    // Agents that have not ended (running, waiting, idle) first, then the finished ones.
+    const liveRows = rows.filter(a => !isEnded(a.status))
+    const doneRows = rows.filter(a => isEnded(a.status))
+    const toggleFinished = () => inTurn(() => update($, finishedHidden, v => !v))
     const usage = await readUsage($)
 
     const Card = ({ tint, children }: { tint?: string; children?: RenderChildren }) => (
@@ -1111,6 +1148,37 @@ export const register: Register = (on, _options) => {
         </Text>
       </Box>
     )
+
+    // One agent on the terminal: the description with the status mark at the end of its line, then the facts.
+    const termRow = (a: AgentRow, i: number) => {
+      const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
+      const facts = [
+        a.type,
+        a.model === undefined ? undefined : shortModel(a.model),
+        isNarrow ? undefined : a.effort,
+        a.status === 'unknown' ? 'ended' : a.status,
+        ms === undefined ? undefined : duration(ms),
+        isNarrow || a.tokens === undefined ? undefined : `${kTokens(a.tokens)} reported`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      const color = isActive(a.status) ? 'suggestion' : a.status === 'failed' || a.status === 'killed' ? 'error' : a.status === 'completed' ? 'success' : 'subtle'
+      return (
+        <Box key={a.id} flexDirection="column" marginTop={i === 0 ? 0 : 1}>
+          <Box flexDirection="row" gap={1}>
+            <Box flexGrow={1} flexShrink={1}>
+              <Text bold={isActive(a.status)} dimColor={isEnded(a.status)} wrap="truncate-end">
+                {a.description}
+              </Text>
+            </Box>
+            <Text color={color}>{isActive(a.status) ? '●' : a.status === 'completed' ? '✓' : a.status === 'failed' || a.status === 'killed' ? '✕' : '○'}</Text>
+          </Box>
+          <Text dimColor wrap="truncate-end">
+            {facts}
+          </Text>
+        </Box>
+      )
+    }
 
     // True when the answer was taken (queued or in the conversation). The prompt of a
     // plugin runs once Claude Code is idle, so while a turn runs this waits for the turn:
@@ -1196,16 +1264,20 @@ export const register: Register = (on, _options) => {
         ],
         foot,
       })
-      const agentRows = rows.map(a => {
+      const agentRow = (a: AgentRow): AgentCardRow => {
         const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
+        const elapsed = ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms)
+
         return {
           status: a.status,
           title: a.description,
           type: a.type,
-          meta: [a.model === undefined ? undefined : shortModel(a.model), a.effort, a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`].filter(Boolean).join('  ·  '),
-          right: ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms),
+          model: [a.model === undefined ? undefined : shortModel(a.model), a.effort].filter(Boolean).join(' · '),
+          stats: [a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`, elapsed === '' ? undefined : elapsed].filter(Boolean).join(' · '),
         }
-      })
+      }
+      const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRows.map(agentRow))
+      const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRows.map(agentRow))
       return (
         <Box flexDirection="column" paddingX={1}>
           {meters.length > 0 && (
@@ -1255,9 +1327,19 @@ export const register: Register = (on, _options) => {
               <Svg source={card.svg} alt={`#${pr!.number} ${githubLine(pr!)}`} width={W} height={card.h} />
             </Box>
           )}
-          {agentRows.length > 0 && (
-            <Box marginTop={SECTION_GAP}>
-              <Svg source={agentsSvg(W, agentRows)} alt={`${agentRows.length} agents`} width={W} height={30 + agentRows.length * 46 + 4} />
+          {rows.length > 0 && (
+            <Box flexDirection="column" marginTop={SECTION_GAP}>
+              {liveCard !== undefined && <Svg source={liveCard.svg} alt={`Running agents: ${liveRows.length}`} width={W} height={liveCard.h} />}
+              {doneRows.length > 0 && (
+                <Box flexDirection="row" marginTop={liveCard === undefined ? 0 : 1}>
+                  <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
+                </Box>
+              )}
+              {doneCard !== undefined && (
+                <Box marginTop={1}>
+                  <Svg source={doneCard.svg} alt={`Finished agents: ${doneRows.length}`} width={W} height={doneCard.h} />
+                </Box>
+              )}
             </Box>
           )}
         </Box>
@@ -1350,36 +1432,22 @@ export const register: Register = (on, _options) => {
 
         {rows.length > 0 && (
           <Card>
-            <Heading label={`Agents  ${rows.length}`} />
-            {rows.map((a, i) => {
-              const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
-              const facts = [
-                a.type,
-                a.model === undefined ? undefined : shortModel(a.model),
-                isNarrow ? undefined : a.effort,
-                a.status === 'unknown' ? 'ended' : a.status,
-                ms === undefined ? undefined : duration(ms),
-                isNarrow || a.tokens === undefined ? undefined : `${kTokens(a.tokens)} reported`,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-              const color = isActive(a.status) ? 'suggestion' : a.status === 'failed' || a.status === 'killed' ? 'error' : a.status === 'completed' ? 'success' : 'subtle'
-              return (
-                <Box key={a.id} flexDirection="column" marginTop={i === 0 ? 0 : 1}>
-                  <Box flexDirection="row" gap={1}>
-                    <Text color={color}>{isActive(a.status) ? '●' : a.status === 'completed' ? '✓' : a.status === 'failed' || a.status === 'killed' ? '✕' : '○'}</Text>
-                    <Text bold={isActive(a.status)} dimColor={isEnded(a.status)} wrap="truncate-end">
-                      {a.description}
-                    </Text>
-                  </Box>
-                  <Box paddingLeft={2}>
-                    <Text dimColor wrap="truncate-end">
-                      {facts}
-                    </Text>
-                  </Box>
+            {liveRows.length > 0 && (
+              <Box flexDirection="column">
+                <Box marginBottom={1}>
+                  <Text bold color="subtle">{`Running · ${liveRows.length}`}</Text>
                 </Box>
-              )
-            })}
+                {liveRows.map((a, i) => termRow(a, i))}
+              </Box>
+            )}
+            {doneRows.length > 0 && (
+              <Box flexDirection="column" marginTop={liveRows.length > 0 ? 1 : 0}>
+                <Box flexDirection="row">
+                  <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
+                </Box>
+                {!isHidden && <Box flexDirection="column" marginTop={1}>{doneRows.map((a, i) => termRow(a, i))}</Box>}
+              </Box>
+            )}
           </Card>
         )}
 
