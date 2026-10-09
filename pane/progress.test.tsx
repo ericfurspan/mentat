@@ -2436,6 +2436,7 @@ const alertsOf = async ($: never) => {
   await d.unmount()
   return cards
 }
+const HUE_AMBER = '#C98A0E'
 const toastTexts = (w: World) => w.toasts.map(t => (JSON.parse(t) as { text: string }).text)
 
 test('a failed mentat check pins one alert with its PROBLEM lines, in the pane and the band', async ($, on) => {
@@ -2472,22 +2473,244 @@ test('a second failed run replaces the alert, so there is still one', async ($, 
   await d.unmount()
 })
 
-test('a passing mentat check removes the alert and toasts Mentat engaged, with the warning count when there are warnings', async ($, on) => {
+const WARN_RUN = 'OK: gh is installed\nWARN: gh is old\nWARN: codex is old\nCheck OK (2 warning(s))\n'
+const CLEAN_RUN = 'OK: gh is installed\nCheck OK (0 warning(s))\n'
+const SESSION_MODE = { plugin: 'mentat', component: 'SessionMode' }
+// The footer label as drawn: each Text with its color and dim flag, in order.
+const footerOf = async ($: never, surface: 'terminal' | 'desktop', modes: string[] = []) => {
+  const d = await mount($, SESSION_MODE, surface, { modes })
+  const texts = (await d.findAll({ type: 'Text' })).map(t => ({ text: t.text ?? '', color: t.props?.color as string | undefined, dim: t.props?.dimColor === true }))
+  await d.unmount()
+  return texts
+}
+const checkItemsOf = async ($: never) => {
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Check warnings'))
+  await d.unmount()
+  return cards
+}
+
+test('a passing mentat check removes the alert; with no warnings nothing is pinned and no toast is raised', async ($, on) => {
   const { world } = boot(on)
   await bash(world, $, 'mentat check', FAILED_RUN)
   expect((await alertsOf($)).length).toBe(1)
 
-  await bash(world, $, 'mentat check', 'OK: gh is installed\nCheck OK (0 warning(s))\n')
+  await bash(world, $, 'mentat check', CLEAN_RUN)
   expect(await alertsOf($)).toEqual([])
+  expect(await checkItemsOf($)).toEqual([])
   expect((await paneTexts($, 'terminal')).includes('ALERT')).toBe(false)
   expect((await bandTexts($)).length).toBe(0)
-  expect(toastTexts(world)).toEqual(['Mentat engaged'])
+  expect(toastTexts(world)).toEqual([])
+})
 
-  await bash(world, $, 'mentat check', 'WARN: gh is old\nWARN: codex is old\nCheck OK (2 warning(s))\n')
-  await bash(world, $, 'mentat check 2>&1', 'WARN: gh is old\nCheck OK (1 warning(s))\n')
-  expect(toastTexts(world)).toEqual(['Mentat engaged', 'Mentat engaged · 2 warnings', 'Mentat engaged · 1 warning'])
-  // A passing run leaves nothing in the band.
+test('the footer label shows the last check: dim before one, green on a pass, amber with the count, red on a fail, with the engine modes after it', async ($, on) => {
+  const { world } = boot(on)
+  for (const surface of SURFACES) {
+    expect(await footerOf($, surface)).toEqual([{ text: '● Mentat', color: undefined, dim: true }])
+    expect(await footerOf($, surface, ['focus', 'memory paused'])).toEqual([
+      { text: '● Mentat', color: undefined, dim: true },
+      { text: 'focus & memory paused', color: undefined, dim: true },
+    ])
+  }
+
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  for (const surface of SURFACES) {
+    expect(await footerOf($, surface, ['focus'])).toEqual([
+      { text: '● Mentat', color: 'success', dim: false },
+      { text: 'focus', color: undefined, dim: true },
+    ])
+  }
+
+  await bash(world, $, 'mentat check', WARN_RUN)
+  for (const surface of SURFACES) {
+    expect(await footerOf($, surface, ['focus'])).toEqual([
+      { text: '● Mentat · 2 warnings', color: 'warning', dim: false },
+      { text: 'focus', color: undefined, dim: true },
+    ])
+  }
+  await bash(world, $, 'mentat check', 'WARN: gh is old\nCheck OK (1 warning(s))\n')
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '● Mentat · 1 warning', color: 'warning', dim: false })
+
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  for (const surface of SURFACES) {
+    expect(await footerOf($, surface, ['focus'])).toEqual([
+      { text: '● Mentat check failed', color: 'error', dim: false },
+      { text: 'focus', color: undefined, dim: true },
+    ])
+  }
+  // A run that says nothing certain leaves the label as it was.
+  await bash(world, $, 'mentat check', 'usage: mentat check\n')
+  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat check failed')
+  // A subagent's check does not change it either.
+  await bash(world, $, 'mentat check', CLEAN_RUN, { agentId: 'a1' })
+  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat check failed')
+  expect(toastTexts(world)).toEqual([])
+})
+
+test('the footer label leaves other surfaces (mobile) to the engine', async ($, on) => {
+  boot(on)
+  const d = await mount($, SESSION_MODE, 'mobile' as never, { modes: ['focus'] })
+  expect((await d.findAll({ type: 'Text' })).map(t => t.text)).not.toContain('● Mentat')
+  expect((await d.findAll({ type: 'Box' })).map(b => b.key)).toEqual(['engine-own'])
+  await d.unmount()
+})
+
+test('a pass with warnings pins one warning card with the WARN lines, a clean pass removes it, a fail makes it the red alert', async ($, on) => {
+  const { world } = boot(on)
+  await open(undefined, 'A question stays?')($)
+  await bash(world, $, 'cd "a b" && mentat check 2>&1', WARN_RUN)
+
+  const [card, ...more] = await checkItemsOf($)
+  expect(more).toEqual([])
+  expect(card!.alt).toBe('Check warnings: Check passed with 2 warnings')
+  expect(card!.drawn).toEqual(expect.arrayContaining(['CHECK WARNINGS', 'Check passed with 2 warnings', 'gh is old', 'codex is old']))
+  expect(card!.drawn).not.toContain('gh is installed')
+  expect(card!.source).toContain(HUE_AMBER)
+  const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  expect(await textsOf(term)).toEqual(expect.arrayContaining(['CHECK WARNINGS', 'Check passed with 2 warnings', 'gh is old', 'codex is old']))
+  expect((await term.findAll({ type: 'Text', text: 'CHECK WARNINGS' }))[0]!.props?.color).toBe('warning')
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d2992224')).toBe(true)
+  // Only Dismiss: no answer buttons and no link.
+  expect(await keysOf(term)).toEqual(expect.arrayContaining(['dismiss-check']))
+  expect((await keysOf(term)).filter(k => String(k).includes('check'))).toEqual(['dismiss-check'])
+  expect(await hrefsOf(term)).toEqual([])
+  await term.unmount()
+  // The next warned run replaces it, so there is still one.
+  await bash(world, $, 'mentat check', 'WARN: only one\nCheck OK (1 warning(s))\n')
+  const again = await checkItemsOf($)
+  expect(again.length).toBe(1)
+  expect(again[0]!.alt).toBe('Check warnings: Check passed with 1 warning')
+  expect(again[0]!.drawn).toContain('only one')
+  expect(again[0]!.drawn).not.toContain('gh is old')
+
+  // A fail turns it into the red alert; there is one item with the id check.
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  expect(await checkItemsOf($)).toEqual([])
+  expect((await alertsOf($)).length).toBe(1)
+
+  // A clean pass after a warned one removes it; the agent's question is untouched.
+  await bash(world, $, 'mentat check', WARN_RUN)
+  expect((await alertsOf($)).length).toBe(0)
+  expect((await checkItemsOf($)).length).toBe(1)
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  expect(await checkItemsOf($)).toEqual([])
+  expect(await paneTexts($, 'terminal')).not.toContain('CHECK WARNINGS')
+  expect(await paneTexts($, 'terminal')).toContain('A question stays?')
+  expect(toastTexts(world)).toEqual([])
+})
+
+test('a warning count the output does not show is still counted, and many warnings are cut to six lines', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', 'WARN: seen\nCheck OK (2 warning(s))\n')
+  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 2 warnings')
+  const [card] = await checkItemsOf($)
+  expect(card!.drawn).toEqual(expect.arrayContaining(['seen', 'A warning whose text was not in the output']))
+
+  const warns = Array.from({ length: 8 }, (_, i) => `warning number ${i + 1}`)
+  await bash(world, $, 'mentat check', `${warns.map(w => `WARN: ${w}`).join('\n')}\nCheck OK (8 warning(s))`)
+  const [many] = await checkItemsOf($)
+  expect(many!.drawn).toEqual(expect.arrayContaining([...warns.slice(0, 5), '+3 more']))
+  expect(many!.drawn).not.toContain('warning number 6')
+})
+
+test('the pane lists alerts, then questions, then the check warning, then actions', async ($, on) => {
+  const { world } = boot(on)
+  await open('action', 'Do the thing')($)
+  await bash(world, $, 'mentat check', WARN_RUN)
+  await open(undefined, 'Ask first?')($)
+  await open('alert', 'Down')($)
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect((await altsOf(d)).filter(a => /^(Alert|Question|Check warnings|Waiting on you)/.test(a))).toEqual([
+    'Alert: Down',
+    'Question: Ask first?',
+    'Check warnings: Check passed with 2 warnings',
+    'Waiting on you: Do the thing',
+  ])
+  await d.unmount()
+  const t = await paneTexts($, 'terminal')
+  const at = (x: string) => t.indexOf(x)
+  expect([at('ALERT'), at('QUESTION FOR YOU'), at('CHECK WARNINGS'), at('WAITING ON YOU')]).toEqual([...[at('ALERT'), at('QUESTION FOR YOU'), at('CHECK WARNINGS'), at('WAITING ON YOU')]].sort((a, b) => a - b))
+  expect(Math.min(at('ALERT'), at('QUESTION FOR YOU'), at('CHECK WARNINGS'), at('WAITING ON YOU'))).toBeGreaterThanOrEqual(0)
+})
+
+test('the agent cannot open a warning: open_decision refuses the kind and records nothing', async ($, on) => {
+  boot(on)
+  const refused = await eng($).tool.call({ tool: OPEN, kind: 'warning', question: 'Careful?' })
+  expect(refused.deny).toBe('open_decision kind must be question, action or alert.')
+  expect(await paneTexts($, 'terminal')).not.toContain('Careful?')
   expect((await bandTexts($)).length).toBe(0)
+})
+
+test('the band shows an alert, then a question, then the check warning, then a final-checked pull request, a budget warning and an action', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await follow109($)
+  await open('action', 'Do the thing')($)
+  await bash(world, $, 'mentat check', WARN_RUN)
+  const none = (texts: string[], ...words: string[]) => expect(texts.some(x => words.some(w => x.includes(w)))).toBe(false)
+
+  // The warning outranks the pull request, the budget and the action.
+  for (const surface of SURFACES) {
+    const { texts, alts } = await bandWith($, surface)
+    expect(texts).toContain('Check passed with 2 warnings')
+    none(texts, 'Final check', 'limit', 'Do the thing')
+    expect(pillFor(texts)).toBe('2 items')
+    if (surface === 'desktop') {
+      expect(alts).toEqual(['Check warnings: Check passed with 2 warnings'])
+      expect(texts).toContain('!')
+    }
+  }
+  const term = await mount($, BAND, 'terminal')
+  expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d2992224')).toBe(true)
+  await term.unmount()
+  const desk = await mount($, BAND, 'desktop')
+  expect((await svgsOf(desk))[0]!.source).toContain(HUE_AMBER)
+  await desk.unmount()
+
+  // A question outranks the warning.
+  await open(undefined, 'Ask first?')($)
+  for (const surface of SURFACES) {
+    const { texts } = await bandWith($, surface)
+    expect(texts).toContain('Ask first?')
+    none(texts, 'Check passed')
+    expect(pillFor(texts)).toBe('3 items')
+  }
+  // An alert (the failed check replaces the warning) outranks the question.
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  for (const surface of SURFACES) expect((await bandWith($, surface)).texts).toContain('Check failed: 2 problem(s)')
+
+  // Back to the warning, then a clean pass: the question is gone too, so the pull request shows.
+  await bash(world, $, 'mentat check', WARN_RUN)
+  await eng($).tool.call({ tool: CLOSE, id: 'd2' })
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  for (const surface of SURFACES) {
+    const { texts } = await bandWith($, surface)
+    expect(texts).toContain(surface === 'terminal' ? '· Final check posted' : 'Final check posted')
+    none(texts, 'Check passed', 'Do the thing')
+  }
+})
+
+test('a new conversation drops the check result and its warning card, and a mod reload keeps them', async ($, on) => {
+  const { world } = boot(on)
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  await bash(world, $, 'mentat check', WARN_RUN)
+  await startSession($)
+  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 2 warnings')
+  expect((await checkItemsOf($)).length).toBe(1)
+  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'compact' })
+  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 2 warnings')
+
+  for (const source of ['clear', 'resume', 'fork']) {
+    await bash(world, $, 'mentat check', FAILED_RUN)
+    expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat check failed')
+    await classic.SessionStart({ source })
+    expect(await footerOf($, 'terminal')).toEqual([{ text: '● Mentat', color: undefined, dim: true }])
+    expect(await alertsOf($)).toEqual([])
+    expect(await checkItemsOf($)).toEqual([])
+  }
 })
 
 test('Dismiss removes the check alert, and a later failed run pins it again', async ($, on) => {
