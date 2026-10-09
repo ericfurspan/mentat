@@ -9,7 +9,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Checks, CodexRead, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
+import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -39,8 +39,12 @@ const reviewMark = atom({ plugin: 'mentat', key: 'reviewMark' } as const, { seq:
 const meAtom = atom({ plugin: 'mentat', key: 'me' } as const, '')
 const seqAtom = atom({ plugin: 'mentat', key: 'seq' } as const, 0)
 
-// Neutral tints that read on dark and light; amber for what needs the maintainer.
-const TINT = { surface: '#8b949e14', you: '#d2992224' }
+// Neutral tints that read on dark and light; amber for what needs the maintainer, red for an
+// alert, blue for an action only the maintainer can take.
+const TINT = { surface: '#8b949e14', you: '#d2992224', alert: '#d0453f24', action: '#3d7fe624' }
+// The id of the alert the mod itself pins for a failed `mentat check`: a new failed run replaces
+// it, a passing run removes it.
+const CHECK_ID = 'check'
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
@@ -319,6 +323,36 @@ const parseRef = (ref: string): { repo: string; number: number } => {
   return { repo: m![1]!, number: Number(m![2]) }
 }
 
+// The kinds of open item, in the order the pane lists them. An item stored without a kind is a question.
+const KIND_RANK: Record<DecisionKind, number> = { alert: 0, question: 1, action: 2 }
+const kindOf = (d: { kind?: DecisionKind }): DecisionKind => d.kind ?? 'question'
+const byKind = (list: Decision[]): Decision[] => [...list].sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
+const isKind = (v: unknown): v is DecisionKind => v === 'question' || v === 'action' || v === 'alert'
+// A link is drawn only when it is an https URL.
+const httpsLink = (v: unknown): string | undefined => {
+  const link = typeof v === 'string' ? v.trim() : ''
+  return link.length <= 2048 && /^https:\/\/[^\s/]\S*$/.test(link) ? link : undefined
+}
+// The words an item's link is drawn with: the address without its scheme.
+const linkLabel = (link: string): string => link.replace(/^https:\/\//, '')
+
+// `mentat check` as words anywhere in a command: after a `cd ... &&`, with a path or quotes
+// around mentat, before `2>&1` or a pipe.
+const CHECK_COMMAND = /(?:^|[\s;&|(/"'])mentat["']?\s+check(?=$|[\s;&|)"'])/
+// What a `mentat check` run says: its final line (`Check OK (N warning(s))` or `Check failed:
+// N problem(s)`) and its PROBLEM lines. A Bash result has no exit code, so the final line is the
+// signal; without one (an interrupted run, a usage error, output cut by a pipe) there is nothing
+// to record. A line that came twice (the same output in two parts of the result) counts once.
+type CheckRead = { passed: true; warnings: number } | { passed: false; failedLine: string; problems: string[] }
+const parseCheck = (output: string): CheckRead | undefined => {
+  const lines = [...new Set(output.replace(/\r/g, '').split('\n').map(l => l.trimEnd()))]
+  const ok = lines.map(l => /^Check OK \((\d+) warning\(s\)\)$/.exec(l)).find(m => m !== null)
+  const failedLine = lines.find(l => /^Check failed: \d+ problem\(s\)$/.test(l))
+  if ((ok !== undefined) === (failedLine !== undefined)) return undefined
+  if (ok !== undefined && ok !== null) return { passed: true, warnings: Number(ok[1]) }
+  return { passed: false, failedLine: failedLine!, problems: lines.filter(l => l.startsWith('PROBLEM: ')).map(l => l.slice(9)) }
+}
+
 // The stored list is treated as unknown-shaped JSON: an entry with a closedAt was
 // settled by the former decisions pane.
 export const withoutSettled = <T,>(list: T[]): T[] => list.filter(d => asObj(d).closedAt === undefined)
@@ -557,6 +591,37 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
   }
 }
 
+// What the main loop's `mentat check` run says: a failed run pins one alert (id CHECK_ID) with its
+// PROBLEM lines, replacing the one a former run left; a passing run removes it and toasts.
+// A failing check exits 1, so the Bash result may be an error: its text is then in `text` (what the
+// model read) and not in the typed record. All the parts are read.
+async function afterCheck($: EngineInterface, command: string, ran: { result?: unknown; text?: unknown; deny?: unknown }): Promise<void> {
+  try {
+    if (!CHECK_COMMAND.test(command) || ran.deny !== undefined) return
+    const record = ran.result
+    const typed = typeof record === 'object' && record !== null ? (record as { stdout?: unknown; stderr?: unknown; interrupted?: unknown }) : undefined
+    if (typed?.interrupted === true) return
+    const output = [typed?.stdout, typed?.stderr, typeof record === 'string' ? record : undefined, ran.text]
+      .filter((part): part is string => typeof part === 'string')
+      .join('\n')
+    const outcome = parseCheck(output)
+    if (outcome === undefined) return
+    const openedAt = await $.clock.now()
+    await inTurn(async () => {
+      await update($, items, list => {
+        const rest = list.filter(d => d.id !== CHECK_ID)
+        return outcome.passed ? rest : [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, lines: outcome.problems, openedAt }]
+      })
+      await update($, answering, ids => ids.filter(x => x !== CHECK_ID))
+      await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
+    })
+    if (outcome.passed) $.ui.toast(outcome.warnings > 0 ? `Mentat engaged · ${plural(outcome.warnings, 'warning', 'warnings')}` : 'Mentat engaged')
+    await invalidate($)
+  } catch {
+    // the check's own output already told the agent
+  }
+}
+
 // A `mentat review` command names its pull request before it runs, so the card is
 // there during the long wait for the review.
 async function followReview($: EngineInterface, command: string): Promise<void> {
@@ -595,8 +660,8 @@ async function resolveTarget($: EngineInterface, arg: string): Promise<string | 
 // ---- Drawn desktop design: each card is one themed Svg; buttons stay native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
 const CSS = `<style>
-.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}.chip{fill:#ecebe7}.q{fill:#fbf3e2}
-@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}.chip{fill:#2a2a28}.q{fill:#2b2618}}
+.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}.chip{fill:#ecebe7}.q{fill:#fbf3e2}.qr{fill:#fbeceb}.qb{fill:#e9f0fc}
+@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}.chip{fill:#2a2a28}.q{fill:#2b2618}.qr{fill:#2d1b1a}.qb{fill:#18222f}}
 </style>`
 const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', teal: '#1E9E9A', grey: '#8f8f8a' }
 
@@ -681,16 +746,33 @@ ${reset !== '' && tw > 96 ? `<text class="m" x="${x + tw - 12}" y="52" text-anch
   return svgOf(W, SESSION_H, tiles.join(''))
 }
 
-const questionSvg = (W: number, question: string, recommendation: string | undefined): { svg: string; h: number } => {
+// The card of one open item: a tinted panel with a bar and a label in the kind's color, the
+// text (up to three lines), detail lines (the PROBLEM lines of an alert) and the recommendation.
+const CARD_STYLE: Record<DecisionKind, { label: string; hue: string; fill: string; alt: string }> = {
+  question: { label: 'Question for you', hue: HUE.amber, fill: 'q', alt: 'Question' },
+  action: { label: 'Waiting on you', hue: HUE.blue, fill: 'qb', alt: 'Waiting on you' },
+  alert: { label: 'Alert', hue: HUE.red, fill: 'qr', alt: 'Alert' },
+}
+// An alert shows at most this many detail lines, the last of them `+N more` when there are more.
+const DETAIL_LINES = 6
+const cutLines = (details: string[]): string[] =>
+  details.length > DETAIL_LINES ? [...details.slice(0, DETAIL_LINES - 1), `+${details.length - DETAIL_LINES + 1} more`] : details
+const cardSvg = (W: number, kind: DecisionKind, text: string, recommendation: string | undefined, details: string[] = []): { svg: string; h: number } => {
+  const { label: title, hue, fill } = CARD_STYLE[kind]
   const tx = 18
-  const lines = wrap(question, 14, W - tx - 14, 3)
-  const lastY = 42 + (lines.length - 1) * 19
-  const recY = lastY + 20
-  const h = recommendation === undefined ? lastY + 16 : recY + 14
-  const body = `<rect class="q" x="0" y="0" width="${W}" height="${h}" rx="10"/><rect x="0" y="0" width="4" height="${h}" rx="2" fill="${HUE.amber}"/>
-${label(tx, 20, 'Question for you', HUE.amber)}
+  const lines = wrap(text, 14, W - tx - 14, 3)
+  const shown = cutLines(details)
+  let y = 42 + (lines.length - 1) * 19
+  const detailSvg = shown.map(d => {
+    y += 18
+    return `<text class="s" x="${tx}" y="${y}" font-family="${FONT}" font-size="12">${xml(fit(d, 12, W - tx - 14))}</text>`
+  })
+  const recY = y + 20
+  const h = recommendation === undefined ? y + 16 : recY + 14
+  const body = `<rect class="${fill}" x="0" y="0" width="${W}" height="${h}" rx="10"/><rect x="0" y="0" width="4" height="${h}" rx="2" fill="${hue}"/>
+${label(tx, 20, title, hue)}
 ${lines.map((l, i) => `<text class="t" x="${tx}" y="${42 + i * 19}" font-family="${FONT}" font-size="14" font-weight="600">${xml(l)}</text>`).join('')}
-${recommendation === undefined ? '' : `<text class="s" x="${tx}" y="${recY}" font-family="${FONT}" font-size="12">${xml(fit(`→ ${recommendation}`, 12, W - tx - 14))}</text>`}`
+${detailSvg.join('')}${recommendation === undefined ? '' : `<text class="s" x="${tx}" y="${recY}" font-family="${FONT}" font-size="12">${xml(fit(`→ ${recommendation}`, 12, W - tx - 14))}</text>`}`
   return { svg: svgOf(W, h, body), h }
 }
 
@@ -774,13 +856,29 @@ ${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2=
   return { svg: svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${head}${body.join('')}`), h }
 }
 
-const bandSvg = (W: number, left: { kind: 'question'; text: string } | { kind: 'budget'; text: string } | { kind: 'pr'; number: number; title: string }, count: number): string => {
-  const pillText = count > 0 ? `${count} question${count === 1 ? '' : 's'}` : ''
-  const pillW = pillText === '' ? 0 : Math.round(20 + textW(pillText, 12))
+// What the band's left side shows: the newest alert or question, the final-checked pull
+// request, a budget warning, or, when nothing else raises it, the newest action.
+type BandLeft = { kind: 'alert' | 'question' | 'action' | 'budget'; text: string } | { kind: 'pr'; number: number; title: string }
+const MARK: Record<'alert' | 'question' | 'action' | 'budget', { char: string; hue: string }> = {
+  alert: { char: '!', hue: HUE.red },
+  question: { char: '?', hue: HUE.amber },
+  action: { char: '→', hue: HUE.blue },
+  budget: { char: '!', hue: HUE.amber },
+}
+// The pill that counts the open items: `N questions` when all are questions, else `N items`.
+const pillLabel = (list: Decision[]): string =>
+  list.every(d => kindOf(d) === 'question') ? plural(list.length, 'question', 'questions') : plural(list.length, 'item', 'items')
+// The pill's color follows the most urgent open item.
+const pillHue = (list: Decision[]): string => (list.some(d => kindOf(d) === 'alert') ? HUE.red : list.some(d => kindOf(d) === 'question') ? HUE.amber : HUE.blue)
+
+const bandSvg = (W: number, left: BandLeft, count: number, pillText: string, pillColor: string): string => {
+  const shownPill = count > 0 ? pillText : ''
+  const pillW = shownPill === '' ? 0 : Math.round(20 + textW(shownPill, 12))
   const room = W - pillW - 16
   let leftSvg: string
-  if (left.kind === 'question' || left.kind === 'budget') {
-    leftSvg = `<circle cx="11" cy="14" r="8" fill="${HUE.amber}" opacity="0.18"/><text fill="${HUE.amber}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${left.kind === 'budget' ? '!' : '?'}</text>
+  if (left.kind !== 'pr') {
+    const mark = MARK[left.kind]
+    leftSvg = `<circle cx="11" cy="14" r="8" fill="${mark.hue}" opacity="0.18"/><text fill="${mark.hue}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${mark.char}</text>
 <text class="t" x="27" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(fit(left.text, 13, room - 30))}</text>`
   } else {
     const num = `#${left.number}`
@@ -791,7 +889,7 @@ const bandSvg = (W: number, left: { kind: 'question'; text: string } | { kind: '
 <text class="s" x="${2 + numW}" y="18.5" font-family="${FONT}" font-size="13">${xml(fit(left.title, 13, room - numW - tagW - 14))}</text>
 <rect x="${room - tagW}" y="4" width="${tagW}" height="20" rx="10" fill="${HUE.green}" opacity="0.16"/><text fill="${HUE.green}" x="${room - tagW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="11.5" font-weight="600">${tag}</text>`
   }
-  const pill = pillText === '' ? '' : `<rect x="${W - pillW}" y="4" width="${pillW}" height="20" rx="10" fill="${HUE.amber}" opacity="0.18"/><text fill="${HUE.amber}" x="${W - pillW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600">${pillText}</text>`
+  const pill = shownPill === '' ? '' : `<rect x="${W - pillW}" y="4" width="${pillW}" height="20" rx="10" fill="${pillColor}" opacity="0.18"/><text fill="${pillColor}" x="${W - pillW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600">${shownPill}</text>`
   return svgOf(W, 28, leftSvg + pill)
 }
 
@@ -814,18 +912,26 @@ export const register: Register = (on, _options) => {
     await $.tool.register({
       name: 'open_decision',
       description:
-        'Record a question or decision you have just put to the user in chat, so it shows in their Mentat pane until answered. ' +
-        'Call it once per real question that waits on the user (not rhetorical ones, not routine status). ' +
-        'Returns an id; call close_decision with that id when the user answers or the question no longer applies.',
+        'Record something that waits on the user, so it stays in their Mentat pane until settled. ' +
+        'kind "question" (the default) is a question or decision you have just put to them in chat: one call per real question that waits on them (not rhetorical ones, not routine status). ' +
+        'kind "action" is something only the user can do (a merge, a manual test, a plugin update after a merge, rotating a secret); link is the issue or pull request that holds the steps. ' +
+        'kind "alert" is a failure you could not resolve, a blocking disagreement on a review finding, or an exposed secret. ' +
+        'Returns an id; call close_decision with that id when the user answers, the action is done or the item no longer applies.',
       inputSchema: {
         type: 'object',
         properties: {
-          question: { type: 'string', description: 'The question, in one short plain sentence' },
+          kind: {
+            type: 'string',
+            enum: ['question', 'action', 'alert'],
+            description: 'question (the default), action (something only the user can do) or alert (a failure you could not resolve)',
+          },
+          question: { type: 'string', description: 'The question, or for an action or alert what it is, in one short plain sentence' },
+          link: { type: 'string', description: 'An https URL: the issue or pull request that holds the steps. Anything else is ignored' },
           recommendation: { type: 'string', description: 'Your recommendation, in a few words, if you gave one' },
           accept: {
             type: 'string',
             description:
-              'If your recommendation can be taken with one press, the label of that answer (for example Yes); the pane shows it as a button',
+              'For a question: if your recommendation can be taken with one press, the label of that answer (for example Yes); the pane shows it as a button. Ignored for an action or alert',
           },
         },
         required: ['question'],
@@ -834,7 +940,7 @@ export const register: Register = (on, _options) => {
     })
     await $.tool.register({
       name: 'close_decision',
-      description: 'Close a question opened with open_decision once the user has answered it or it no longer applies.',
+      description: 'Close a question, action or alert opened with open_decision once it is settled or no longer applies.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -910,20 +1016,26 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: OPEN_TOOL }, async ($, e) => {
-    const input = e as unknown as { question?: unknown; recommendation?: unknown; accept?: unknown }
+    const input = e as unknown as { kind?: unknown; question?: unknown; recommendation?: unknown; accept?: unknown; link?: unknown }
     const question = typeof input.question === 'string' ? input.question.trim() : ''
     if (question === '') {
       return { deny: 'open_decision needs a question.' }
     }
+    if (input.kind !== undefined && !isKind(input.kind)) {
+      return { deny: 'open_decision kind must be question, action or alert.' }
+    }
+    const kind: DecisionKind = input.kind ?? 'question'
     const optional = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined)
     const recommendation = optional(input.recommendation)
-    const accept = optional(input.accept)
+    // Only a question has answer buttons.
+    const accept = kind === 'question' ? optional(input.accept) : undefined
+    const link = httpsLink(input.link)
     const id = await inTurn(async () => {
       const n = await read($, nextId)
       await update($, nextId, () => n + 1)
       const openedAt = await $.clock.now()
       await update($, items, list =>
-        [...list, { id: `d${n}`, question, recommendation, accept, openedAt }],
+        [...list, { id: `d${n}`, ...(kind === 'question' ? {} : { kind }), question, ...(link === undefined ? {} : { link }), recommendation, accept, openedAt }],
       )
       return `d${n}`
     })
@@ -964,6 +1076,7 @@ export const register: Register = (on, _options) => {
     if (isMainBash) {
       const stdout = str(asObj((ran as { result?: unknown }).result).stdout)
       void afterBash($, e.command as string, stdout)
+      await afterCheck($, e.command as string, ran as { result?: unknown; text?: unknown; deny?: unknown })
     }
 
     return ran
@@ -1039,36 +1152,53 @@ export const register: Register = (on, _options) => {
     const now = await $.clock.now()
     const pm = await read($, prMark)
     const rm = await read($, reviewMark)
-    // Only an action the maintainer owns raises the band: an open question, or a
-    // pull request whose current head has Claude Code's final check. The stored facts
-    // may be of an old head, so the latest read of the PR and of its review must have
+    // What raises the band, most urgent first: an alert, a question, a pull request whose current
+    // head has Claude Code's final check, a budget warning, and last an action, so a lone action is
+    // not invisible. The rest of the open items are counted beside the first. The stored facts of
+    // the PR may be of an old head, so the latest read of the PR and of its review must have
     // succeeded and be fresh; otherwise the pane still shows them, with their lines.
+    const newest = (kind: DecisionKind) => open.filter(d => kindOf(d) === kind).pop()
+    const alert = newest('alert')
+    const question = newest('question')
     const isCurrent = (m: ReadMark) => m.okAt > m.failedAt && now - m.okAt <= STALE_MS
     const isChecked =
       pr !== null && pr.state === 'OPEN' && review !== null && review.head === pr.head && review.isFinalChecked &&
       isCurrent(pm) && isCurrent(rm)
-    // Budget raises it only when neither of those does. Nothing redraws the band for a
+    // Budget raises it only when nothing above it does. Nothing redraws the band for a
     // change of usage alone; it is read when the band is drawn (see the report).
-    const budget = open.length === 0 && !isChecked ? budgetAlert(metersOf(await readUsage($), now).limits) : undefined
-    if (open.length === 0 && !isChecked && budget === undefined) {
+    const budget = alert === undefined && question === undefined && !isChecked ? budgetAlert(metersOf(await readUsage($), now).limits) : undefined
+    const action = alert === undefined && question === undefined && !isChecked && budget === undefined ? newest('action') : undefined
+    if (alert === undefined && question === undefined && !isChecked && budget === undefined && action === undefined) {
       return next(e)
     }
+    const left: BandLeft =
+      alert !== undefined
+        ? { kind: 'alert', text: alert.question }
+        : question !== undefined
+          ? { kind: 'question', text: question.question }
+          : isChecked
+            ? { kind: 'pr', number: pr.number, title: cleanTitle(pr.title) }
+            : budget !== undefined
+              ? { kind: 'budget', text: budget }
+              : { kind: 'action', text: action!.question }
     const { Box, Button, Text } = $.ui.resolve(e)
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
     if (e.surface === 'desktop') {
       const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
       const W = Math.max(200, (e.props.bodyColumns ?? 80) * 8 - 96)
-      const left = isChecked
-        ? { kind: 'pr' as const, number: pr.number, title: cleanTitle(pr.title) }
-        : budget !== undefined
-          ? { kind: 'budget' as const, text: budget }
-          : { kind: 'question' as const, text: open[open.length - 1]!.question }
-      const alt = isChecked ? `#${pr.number} final check posted` : budget !== undefined ? budget : `Question: ${open[open.length - 1]!.question}`
+      const alt =
+        left.kind === 'pr'
+          ? `#${left.number} final check posted`
+          : left.kind === 'budget'
+            ? left.text
+            : `${CARD_STYLE[left.kind].alt}: ${left.text}`
+      // The count is left out when the one open item is the one shown.
+      const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'action')
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-            <Svg source={bandSvg(W, left, left.kind === 'question' && open.length === 1 ? 0 : open.length)} alt={alt} width={W} height={28} />
+            <Svg source={bandSvg(W, left, isLone ? 0 : open.length, pillLabel(open), pillHue(open))} alt={alt} width={W} height={28} />
             <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
           </Box>
           {beneath}
@@ -1080,17 +1210,19 @@ export const register: Register = (on, _options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={2}>
           <Box flexDirection="row" alignItems="center" gap={1} flexShrink={1}>
-            {isChecked && <Text bold>{`#${pr.number}`}</Text>}
-            {isChecked && <Text wrap="truncate-end">{cleanTitle(pr.title)}</Text>}
-            {isChecked && <Text color="warning">· Final check posted</Text>}
-            {budget !== undefined && <Text color="warning" wrap="truncate-end">{budget}</Text>}
-            {!isChecked && budget === undefined && <Text dimColor>?</Text>}
-            {!isChecked && budget === undefined && <Text wrap="truncate-end">{open[open.length - 1]!.question}</Text>}
+            {left.kind === 'pr' && <Text bold>{`#${left.number}`}</Text>}
+            {left.kind === 'pr' && <Text wrap="truncate-end">{left.title}</Text>}
+            {left.kind === 'pr' && <Text color="warning">· Final check posted</Text>}
+            {left.kind === 'budget' && <Text color="warning" wrap="truncate-end">{left.text}</Text>}
+            {left.kind === 'alert' && <Text color="error">!</Text>}
+            {left.kind === 'question' && <Text dimColor>?</Text>}
+            {left.kind === 'action' && <Text color="suggestion">→</Text>}
+            {(left.kind === 'alert' || left.kind === 'question' || left.kind === 'action') && <Text wrap="truncate-end">{left.text}</Text>}
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
             {open.length > 0 && (
-              <Box flexDirection="row" backgroundColor={TINT.you} paddingX={1}>
-                <Text color="warning">{plural(open.length, 'question', 'questions')}</Text>
+              <Box flexDirection="row" backgroundColor={alert !== undefined ? TINT.alert : question !== undefined ? TINT.you : TINT.action} paddingX={1}>
+                <Text color={alert !== undefined ? 'error' : question !== undefined ? 'warning' : 'suggestion'}>{pillLabel(open)}</Text>
               </Box>
             )}
             <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
@@ -1102,12 +1234,13 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Input, Text } = $.ui.resolve(e)
+    const { Box, Button, Input, Link, Text } = $.ui.resolve(e)
     const Svg = e.surface === 'desktop' ? $.ui.resolve(e as typeof e & { surface: 'desktop' }).Svg : undefined
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
     const isNarrow = cols < 48
-    const open = (await read($, items))
+    // Alerts first, then questions, then actions; in the order opened within each.
+    const open = byKind(await read($, items))
     const openAnswers = await read($, answering)
     const sentList = await read($, sentAtom)
     const ref = await read($, prRef)
@@ -1286,7 +1419,23 @@ export const register: Register = (on, _options) => {
             </Box>
           )}
           {open.map(d => {
-            const q = questionSvg(W, d.question, d.recommendation)
+            const kind = kindOf(d)
+            const q = cardSvg(W, kind, d.question, d.recommendation, d.lines)
+            if (kind !== 'question') {
+              return (
+                <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
+                  <Svg source={q.svg} alt={`${CARD_STYLE[kind].alt}: ${d.question}`} width={W} height={q.h} />
+                  <Box flexDirection="row" alignItems="center" gap={1} marginTop={1}>
+                    <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
+                    {d.link !== undefined && (
+                      <Text>
+                        <Link href={d.link} label={linkLabel(d.link)} />
+                      </Text>
+                    )}
+                  </Box>
+                </Box>
+              )
+            }
             return (
               <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
                 <Svg source={q.svg} alt={`Question: ${d.question}`} width={W} height={q.h} />
@@ -1346,9 +1495,36 @@ export const register: Register = (on, _options) => {
       )
     }
 
+    // The terminal card of an alert or an action: no answer buttons, a Dismiss button and the link.
+    const otherCard = (d: Decision) => {
+      const kind = kindOf(d)
+      const details = cutLines(d.lines ?? [])
+
+      return (
+        <Card key={d.id} tint={kind === 'alert' ? TINT.alert : TINT.action}>
+          <Heading label={CARD_STYLE[kind].label} color={kind === 'alert' ? 'error' : 'suggestion'} />
+          <Text bold>{d.question}</Text>
+          {details.map((line, i) => (
+            <Text key={i} dimColor wrap="truncate-end">{line}</Text>
+          ))}
+          {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
+          <Box flexDirection="row" alignItems="center" gap={1} marginTop={1}>
+            <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
+            {d.link !== undefined && (
+              <Text>
+                <Link href={d.link} label={linkLabel(d.link)} />
+              </Text>
+            )}
+          </Box>
+        </Card>
+      )
+    }
+
     return (
       <Box flexDirection="column" paddingX={1}>
-        {open.map(d => (
+        {open.filter(d => kindOf(d) === 'alert').map(otherCard)}
+
+        {open.filter(d => kindOf(d) === 'question').map(d => (
           <Card key={d.id} tint={TINT.you}>
             <Heading label="Question for you" color="warning" />
             <Text bold>{d.question}</Text>
@@ -1384,6 +1560,8 @@ export const register: Register = (on, _options) => {
             )}
           </Card>
         ))}
+
+        {open.filter(d => kindOf(d) === 'action').map(otherCard)}
 
         {ref !== '' && (
           <Card>
