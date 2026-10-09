@@ -38,12 +38,13 @@ const reviewAtom = atom({ plugin: 'mentat', key: 'review' } as const, null)
 const reviewMark = atom({ plugin: 'mentat', key: 'reviewMark' } as const, { seq: 0, okAt: 0, failedAt: 0 })
 const meAtom = atom({ plugin: 'mentat', key: 'me' } as const, '')
 const seqAtom = atom({ plugin: 'mentat', key: 'seq' } as const, 0)
+const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 
 // Neutral tints that read on dark and light; amber for what needs the maintainer, red for an
 // alert, blue for an action only the maintainer can take.
 const TINT = { surface: '#8b949e14', you: '#d2992224', alert: '#d0453f24', action: '#3d7fe624' }
-// The id of the alert the mod itself pins for a failed `mentat check`: a new failed run replaces
-// it, a passing run removes it.
+// The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
+// warning card after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
 // ---- plain helpers (no $) -----------------------------------------------------------
@@ -324,10 +325,11 @@ const parseRef = (ref: string): { repo: string; number: number } => {
 }
 
 // The kinds of open item, in the order the pane lists them. An item stored without a kind is a question.
-const KIND_RANK: Record<DecisionKind, number> = { alert: 0, question: 1, action: 2 }
+const KIND_RANK: Record<DecisionKind, number> = { alert: 0, question: 1, warning: 2, action: 3 }
 const kindOf = (d: { kind?: DecisionKind }): DecisionKind => d.kind ?? 'question'
 const byKind = (list: Decision[]): Decision[] => [...list].sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
-const isKind = (v: unknown): v is DecisionKind => v === 'question' || v === 'action' || v === 'alert'
+// The kinds the agent may open. A warning is the mod's own, for a passing `mentat check` with warnings.
+const isKind = (v: unknown): v is Exclude<DecisionKind, 'warning'> => v === 'question' || v === 'action' || v === 'alert'
 // A link is drawn only when it is an https URL.
 const httpsLink = (v: unknown): string | undefined => {
   const link = typeof v === 'string' ? v.trim() : ''
@@ -340,16 +342,23 @@ const linkLabel = (link: string): string => link.replace(/^https:\/\//, '')
 // around mentat, before `2>&1` or a pipe.
 const CHECK_COMMAND = /(?:^|[\s;&|(/"'])mentat["']?\s+check(?=$|[\s;&|)"'])/
 // What a `mentat check` run says: its final line (`Check OK (N warning(s))` or `Check failed:
-// N problem(s)`) and its PROBLEM lines. A Bash result has no exit code, so the final line is the
+// N problem(s)`), its PROBLEM lines and its WARN lines. A Bash result has no exit code, so the final line is the
 // signal; without one (an interrupted run, a usage error, output cut by a pipe) there is nothing
 // to record. A line that came twice (the same output in two parts of the result) counts once.
-type CheckRead = { passed: true; warnings: number } | { passed: false; failedLine: string; problems: string[] }
+type CheckRead = { passed: true; warnings: string[] } | { passed: false; failedLine: string; problems: string[] }
+// Stands for a warning the final line counts but the output did not show (a cut or doubled line).
+const UNSHOWN_WARNING = 'A warning whose text was not in the output'
 const parseCheck = (output: string): CheckRead | undefined => {
   const lines = [...new Set(output.replace(/\r/g, '').split('\n').map(l => l.trimEnd()))]
   const ok = lines.map(l => /^Check OK \((\d+) warning\(s\)\)$/.exec(l)).find(m => m !== null)
   const failedLine = lines.find(l => /^Check failed: \d+ problem\(s\)$/.test(l))
   if ((ok !== undefined) === (failedLine !== undefined)) return undefined
-  if (ok !== undefined && ok !== null) return { passed: true, warnings: Number(ok[1]) }
+  if (ok !== undefined && ok !== null) {
+    const warns = lines.filter(l => l.startsWith('WARN: ')).map(l => l.slice(6))
+    const count = Number(ok[1])
+    while (warns.length < count) warns.push(UNSHOWN_WARNING)
+    return { passed: true, warnings: warns }
+  }
   return { passed: false, failedLine: failedLine!, problems: lines.filter(l => l.startsWith('PROBLEM: ')).map(l => l.slice(9)) }
 }
 
@@ -592,7 +601,8 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
 }
 
 // What the main loop's `mentat check` run says: a failed run pins one alert (id CHECK_ID) with its
-// PROBLEM lines, replacing the one a former run left; a passing run removes it and toasts.
+// PROBLEM lines, replacing the item a former run left; a passing run with warnings pins one warning card
+// with the WARN lines in its place; a clean pass removes it. The result is also kept for the footer label.
 // A failing check exits 1, so the Bash result may be an error: its text is then in `text` (what the
 // model read) and not in the typed record. All the parts are read.
 async function afterCheck($: EngineInterface, command: string, ran: { result?: unknown; text?: unknown; deny?: unknown }): Promise<void> {
@@ -610,12 +620,14 @@ async function afterCheck($: EngineInterface, command: string, ran: { result?: u
     await inTurn(async () => {
       await update($, items, list => {
         const rest = list.filter(d => d.id !== CHECK_ID)
-        return outcome.passed ? rest : [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, lines: outcome.problems, openedAt }]
+        if (!outcome.passed) return [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, lines: outcome.problems, openedAt }]
+        if (outcome.warnings.length === 0) return rest
+        return [...rest, { id: CHECK_ID, kind: 'warning' as const, question: `Check passed with ${plural(outcome.warnings.length, 'warning', 'warnings')}`, lines: outcome.warnings, openedAt }]
       })
+      await update($, checkResult, () => (outcome.passed ? { state: outcome.warnings.length > 0 ? ('warn' as const) : ('pass' as const), warnings: outcome.warnings } : { state: 'fail' as const, warnings: [] }))
       await update($, answering, ids => ids.filter(x => x !== CHECK_ID))
       await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
     })
-    if (outcome.passed) $.ui.toast(outcome.warnings > 0 ? `Mentat engaged · ${plural(outcome.warnings, 'warning', 'warnings')}` : 'Mentat engaged')
     await invalidate($)
   } catch {
     // the check's own output already told the agent
@@ -747,11 +759,13 @@ ${reset !== '' && tw > 96 ? `<text class="m" x="${x + tw - 12}" y="52" text-anch
 }
 
 // The card of one open item: a tinted panel with a bar and a label in the kind's color, the
-// text (up to three lines), detail lines (the PROBLEM lines of an alert) and the recommendation.
+// text (up to three lines), detail lines (the PROBLEM or WARN lines of a check item, each wrapped
+// over up to three lines) and the recommendation.
 const CARD_STYLE: Record<DecisionKind, { label: string; hue: string; fill: string; alt: string }> = {
   question: { label: 'Question for you', hue: HUE.amber, fill: 'q', alt: 'Question' },
   action: { label: 'Waiting on you', hue: HUE.blue, fill: 'qb', alt: 'Waiting on you' },
   alert: { label: 'Alert', hue: HUE.red, fill: 'qr', alt: 'Alert' },
+  warning: { label: 'Check warnings', hue: HUE.amber, fill: 'q', alt: 'Check warnings' },
 }
 // An alert shows at most this many detail lines, the last of them `+N more` when there are more.
 const DETAIL_LINES = 6
@@ -763,10 +777,13 @@ const cardSvg = (W: number, kind: DecisionKind, text: string, recommendation: st
   const lines = wrap(text, 14, W - tx - 14, 3)
   const shown = cutLines(details)
   let y = 42 + (lines.length - 1) * 19
-  const detailSvg = shown.map(d => {
-    y += 18
-    return `<text class="s" x="${tx}" y="${y}" font-family="${FONT}" font-size="12">${xml(fit(d, 12, W - tx - 14))}</text>`
-  })
+  // A detail line wraps (up to three lines, the last cut with an ellipsis) and the card grows to hold it.
+  const detailSvg = shown.flatMap(d =>
+    wrap(d, 12, W - tx - 14, 3).map((part, i) => {
+      y += i === 0 ? 18 : 15
+      return `<text class="s" x="${tx}" y="${y}" font-family="${FONT}" font-size="12">${xml(part)}</text>`
+    }),
+  )
   const recY = y + 20
   const h = recommendation === undefined ? y + 16 : recY + 14
   const body = `<rect class="${fill}" x="0" y="0" width="${W}" height="${h}" rx="10"/><rect x="0" y="0" width="4" height="${h}" rx="2" fill="${hue}"/>
@@ -856,12 +873,13 @@ ${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2=
   return { svg: svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${head}${body.join('')}`), h }
 }
 
-// What the band's left side shows: the newest alert or question, the final-checked pull
-// request, a budget warning, or, when nothing else raises it, the newest action.
-type BandLeft = { kind: 'alert' | 'question' | 'action' | 'budget'; text: string } | { kind: 'pr'; number: number; title: string }
-const MARK: Record<'alert' | 'question' | 'action' | 'budget', { char: string; hue: string }> = {
+// What the band's left side shows: the newest alert, question or check warning, the final-checked
+// pull request, a budget warning, or, when nothing else raises it, the newest action.
+type BandLeft = { kind: 'alert' | 'question' | 'warning' | 'action' | 'budget'; text: string } | { kind: 'pr'; number: number; title: string }
+const MARK: Record<'alert' | 'question' | 'warning' | 'action' | 'budget', { char: string; hue: string }> = {
   alert: { char: '!', hue: HUE.red },
   question: { char: '?', hue: HUE.amber },
+  warning: { char: '!', hue: HUE.amber },
   action: { char: '→', hue: HUE.blue },
   budget: { char: '!', hue: HUE.amber },
 }
@@ -869,7 +887,8 @@ const MARK: Record<'alert' | 'question' | 'action' | 'budget', { char: string; h
 const pillLabel = (list: Decision[]): string =>
   list.every(d => kindOf(d) === 'question') ? plural(list.length, 'question', 'questions') : plural(list.length, 'item', 'items')
 // The pill's color follows the most urgent open item.
-const pillHue = (list: Decision[]): string => (list.some(d => kindOf(d) === 'alert') ? HUE.red : list.some(d => kindOf(d) === 'question') ? HUE.amber : HUE.blue)
+const pillHue = (list: Decision[]): string =>
+  list.some(d => kindOf(d) === 'alert') ? HUE.red : list.some(d => kindOf(d) === 'question' || kindOf(d) === 'warning') ? HUE.amber : HUE.blue
 
 const bandSvg = (W: number, left: BandLeft, count: number, pillText: string, pillColor: string): string => {
   const shownPill = count > 0 ? pillText : ''
@@ -982,6 +1001,8 @@ export const register: Register = (on, _options) => {
         await update($, items, () => [])
         await update($, answering, () => [])
         await update($, sentAtom, () => [])
+        // The last check was of the old conversation too.
+        await update($, checkResult, () => null)
       })
       await invalidate($)
     }
@@ -1142,6 +1163,30 @@ export const register: Register = (on, _options) => {
     return next(e)
   })
 
+  // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.
+  // Dim until a `mentat check` has run, then green, amber with the warning count, or red.
+  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
+    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
+    const result = await read($, checkResult)
+    const { Box, Text } = $.ui.resolve(e)
+    const modes = e.props.modes
+    const [text, color] =
+      result === null
+        ? ['● Mentat', undefined]
+        : result.state === 'fail'
+          ? ['● Mentat check failed', 'error']
+          : result.state === 'warn'
+            ? [`● Mentat · ${plural(result.warnings.length, 'warning', 'warnings')}`, 'warning']
+            : ['● Mentat', 'success']
+
+    return (
+      <Box flexDirection="row" gap={1}>
+        {color === undefined ? <Text dimColor>{text}</Text> : <Text color={color}>{text}</Text>}
+        {modes.length > 0 && <Text dimColor>{modes.join(' & ')}</Text>}
+      </Box>
+    )
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) {
       return next(e)
@@ -1160,15 +1205,17 @@ export const register: Register = (on, _options) => {
     const newest = (kind: DecisionKind) => open.filter(d => kindOf(d) === kind).pop()
     const alert = newest('alert')
     const question = newest('question')
+    const warning = newest('warning')
     const isCurrent = (m: ReadMark) => m.okAt > m.failedAt && now - m.okAt <= STALE_MS
     const isChecked =
       pr !== null && pr.state === 'OPEN' && review !== null && review.head === pr.head && review.isFinalChecked &&
       isCurrent(pm) && isCurrent(rm)
     // Budget raises it only when nothing above it does. Nothing redraws the band for a
     // change of usage alone; it is read when the band is drawn (see the report).
-    const budget = alert === undefined && question === undefined && !isChecked ? budgetAlert(metersOf(await readUsage($), now).limits) : undefined
-    const action = alert === undefined && question === undefined && !isChecked && budget === undefined ? newest('action') : undefined
-    if (alert === undefined && question === undefined && !isChecked && budget === undefined && action === undefined) {
+    const isAbove = alert !== undefined || question !== undefined || warning !== undefined || isChecked
+    const budget = !isAbove ? budgetAlert(metersOf(await readUsage($), now).limits) : undefined
+    const action = !isAbove && budget === undefined ? newest('action') : undefined
+    if (!isAbove && budget === undefined && action === undefined) {
       return next(e)
     }
     const left: BandLeft =
@@ -1176,11 +1223,13 @@ export const register: Register = (on, _options) => {
         ? { kind: 'alert', text: alert.question }
         : question !== undefined
           ? { kind: 'question', text: question.question }
-          : isChecked
-            ? { kind: 'pr', number: pr.number, title: cleanTitle(pr.title) }
-            : budget !== undefined
-              ? { kind: 'budget', text: budget }
-              : { kind: 'action', text: action!.question }
+          : warning !== undefined
+            ? { kind: 'warning', text: warning.question }
+            : isChecked
+              ? { kind: 'pr', number: pr.number, title: cleanTitle(pr.title) }
+              : budget !== undefined
+                ? { kind: 'budget', text: budget }
+                : { kind: 'action', text: action!.question }
     const { Box, Button, Text } = $.ui.resolve(e)
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
@@ -1194,7 +1243,7 @@ export const register: Register = (on, _options) => {
             ? left.text
             : `${CARD_STYLE[left.kind].alt}: ${left.text}`
       // The count is left out when the one open item is the one shown.
-      const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'action')
+      const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action')
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
@@ -1216,13 +1265,14 @@ export const register: Register = (on, _options) => {
             {left.kind === 'budget' && <Text color="warning" wrap="truncate-end">{left.text}</Text>}
             {left.kind === 'alert' && <Text color="error">!</Text>}
             {left.kind === 'question' && <Text dimColor>?</Text>}
+            {left.kind === 'warning' && <Text color="warning">!</Text>}
             {left.kind === 'action' && <Text color="suggestion">→</Text>}
-            {(left.kind === 'alert' || left.kind === 'question' || left.kind === 'action') && <Text wrap="truncate-end">{left.text}</Text>}
+            {(left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action') && <Text wrap="truncate-end">{left.text}</Text>}
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
             {open.length > 0 && (
-              <Box flexDirection="row" backgroundColor={alert !== undefined ? TINT.alert : question !== undefined ? TINT.you : TINT.action} paddingX={1}>
-                <Text color={alert !== undefined ? 'error' : question !== undefined ? 'warning' : 'suggestion'}>{pillLabel(open)}</Text>
+              <Box flexDirection="row" backgroundColor={alert !== undefined ? TINT.alert : question !== undefined || warning !== undefined ? TINT.you : TINT.action} paddingX={1}>
+                <Text color={alert !== undefined ? 'error' : question !== undefined || warning !== undefined ? 'warning' : 'suggestion'}>{pillLabel(open)}</Text>
               </Box>
             )}
             <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
@@ -1239,7 +1289,7 @@ export const register: Register = (on, _options) => {
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
     const isNarrow = cols < 48
-    // Alerts first, then questions, then actions; in the order opened within each.
+    // Alerts first, then questions, then check warnings, then actions; in the order opened within each.
     const open = byKind(await read($, items))
     const openAnswers = await read($, answering)
     const sentList = await read($, sentAtom)
@@ -1495,17 +1545,17 @@ export const register: Register = (on, _options) => {
       )
     }
 
-    // The terminal card of an alert or an action: no answer buttons, a Dismiss button and the link.
+    // The terminal card of an alert, a check warning or an action: no answer buttons, a Dismiss button and the link.
     const otherCard = (d: Decision) => {
       const kind = kindOf(d)
       const details = cutLines(d.lines ?? [])
 
       return (
-        <Card key={d.id} tint={kind === 'alert' ? TINT.alert : TINT.action}>
-          <Heading label={CARD_STYLE[kind].label} color={kind === 'alert' ? 'error' : 'suggestion'} />
+        <Card key={d.id} tint={kind === 'alert' ? TINT.alert : kind === 'warning' ? TINT.you : TINT.action}>
+          <Heading label={CARD_STYLE[kind].label} color={kind === 'alert' ? 'error' : kind === 'warning' ? 'warning' : 'suggestion'} />
           <Text bold>{d.question}</Text>
           {details.map((line, i) => (
-            <Text key={i} dimColor wrap="truncate-end">{line}</Text>
+            <Text key={i} dimColor>{line}</Text>
           ))}
           {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
           <Box flexDirection="row" alignItems="center" gap={1} marginTop={1}>
@@ -1560,6 +1610,8 @@ export const register: Register = (on, _options) => {
             )}
           </Card>
         ))}
+
+        {open.filter(d => kindOf(d) === 'warning').map(otherCard)}
 
         {open.filter(d => kindOf(d) === 'action').map(otherCard)}
 

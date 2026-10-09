@@ -1,6 +1,8 @@
 // What an open item is: a question to answer, an action only the maintainer can take, or an
 // alert (a failure the agent could not resolve). An item stored without a kind is a question.
-export type DecisionKind = 'question' | 'action' | 'alert'
+// A warning is the mod's own: the card for a passing `mentat check` with warnings; the agent
+// cannot open one.
+export type DecisionKind = 'question' | 'action' | 'alert' | 'warning'
 
 export type Decision = {
   id: string
@@ -9,7 +11,8 @@ export type Decision = {
   question: string
   // An https URL (the issue or pull request that holds the steps); other values are not stored.
   link?: string
-  // Detail lines under the text: the PROBLEM lines of a failed `mentat check`.
+  // Detail lines under the text: the PROBLEM lines of a failed `mentat check`, or the WARN lines
+  // of a passing one.
   lines?: string[]
   recommendation?: string
   // The label of a one-press answer (for example Yes); the pane shows it as a button.
@@ -70,6 +73,9 @@ export type ReviewSnapshot = {
   isFinalChecked: boolean
 }
 
+// The last `mentat check` of the main session: pass, pass with warnings, or fail.
+export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] }
+
 // okAt and failedAt are clock times of the last good and the last failed read (0: none).
 // cause 'user': the read that failed was the agent account's login, not the review itself.
 export type ReadMark = { seq: number; okAt: number; failedAt: number; cause?: 'user' }
@@ -96,6 +102,8 @@ declare module 'claude-code' {
       // The login gh acts as: the agent account.
       me: string
       seq: number
+      // The last `mentat check` run this conversation; null until one has run.
+      checkResult: CheckResult | null
     }
   }
 }
