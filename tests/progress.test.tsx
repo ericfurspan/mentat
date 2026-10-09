@@ -680,7 +680,6 @@ test('the band is raised by a final check on the current head, in short labels',
     expect(t).toContain('#109')
     expect(t).toContain('Label issues by kind')
     expect(t).toContain('· Final check posted')
-    expect(t.some(x => x.includes('(stale)'))).toBe(false)
   }
 })
 
@@ -704,22 +703,65 @@ test('the final check may name the head by a short or the full SHA', async ($, o
   expect(await bandTexts($)).toContain('· Final check posted')
 })
 
-test('the band shows both the final check and the question count, and says stale when GitHub data is old', async ($, on) => {
-  const { world, clock } = boot(on)
+test('the band shows both the final check and the question count', async ($, on) => {
+  const { world } = boot(on)
   world.issueComments = ok(pages([finalCheck(H1)]))
   await follow109($)
   await eng($).tool.call({ tool: OPEN, question: 'One?' })
   await eng($).tool.call({ tool: OPEN, question: 'Two?' })
-  let t = await bandTexts($)
+  const t = await bandTexts($)
   expect(t).toContain('2 questions')
   expect(t).toContain('· Final check posted')
+})
 
+test('a failed read of the pull request takes the final check off the band; a later good read puts it back', async ($, on) => {
+  const { world, clock } = boot(on)
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await follow109($)
+  await eng($).tool.call({ tool: OPEN, question: 'Still asked?' })
+  expect(await bandTexts($)).toContain('· Final check posted')
+
+  // The branch may have moved; the read that would show it failed. Questions still raise the band.
   world.pr = failed
-  await clock.advance(6 * 60_000)
-  await until(() => prViews(world) >= 3, 'reads to keep failing')
-  await new Promise(r => setTimeout(r, 30))
+  await clock.advance(60_000)
+  await untilPane($, 'PR read failed (last ok 1m ago)')
+  let t = await bandTexts($)
+  expect(t.some(x => x.includes('Final check'))).toBe(false)
+  expect(t).toContain('1 question')
+  expect(await paneTexts($)).toContain('Approval required')
+
+  world.pr = ok(prJson())
+  await clock.advance(60_000)
+  for (let i = 0; i < 300 && !(await bandTexts($)).includes('· Final check posted'); i++) await new Promise(r => setTimeout(r, 5))
   t = await bandTexts($)
-  expect(t).toContain('· Final check posted (stale)')
+  expect(t).toContain('· Final check posted')
+})
+
+test('a failed read of the review sources takes the final check off the band too', async ($, on) => {
+  const { world, clock } = boot(on)
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await follow109($)
+  expect(await bandTexts($)).toContain('· Final check posted')
+  world.pullComments = failed
+  await clock.advance(60_000)
+  await untilPane($, 'Review read failed (last ok 1m ago)')
+  expect((await bandTexts($)).some(x => x.includes('Final check'))).toBe(false)
+})
+
+test('a read older than five minutes does not raise the band', async ($, on) => {
+  const { world, clock } = boot(on)
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await follow109($)
+  expect(await bandTexts($)).toContain('· Final check posted')
+
+  // Reads hang: nothing failed, but nothing newer arrives either.
+  world.pr = () => new Promise<Run>(() => undefined)
+  await clock.advance(4 * 60_000)
+  await until(() => prViews(world) >= 2, 'a read to hang')
+  expect(await bandTexts($)).toContain('· Final check posted')
+  await clock.advance(2 * 60_000)
+  expect((await bandTexts($)).some(x => x.includes('Final check'))).toBe(false)
+  expect((await paneTexts($)).some(x => x.startsWith('PR read 6m old'))).toBe(true)
 })
 
 // ---- other open pull requests, freshness, failed reads ------------------------------------------------

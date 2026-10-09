@@ -705,19 +705,23 @@ export const register: Register = (on, _options) => {
     if (e.props.hasSurvey) {
       return next(e)
     }
-    const open = (await read($, items))
+    const open = await read($, items)
     const pr = await read($, prAtom)
     const review = await read($, reviewAtom)
-    // Only an action the maintainer owns raises the band: an open question, or a
-    // pull request whose current head has Claude Code's final check.
-    const isChecked = pr !== null && pr.state === 'OPEN' && review !== null && review.head === pr.head && review.isFinalChecked
-    if (open.length === 0 && !isChecked) {
-      return next(e)
-    }
     const now = await $.clock.now()
     const pm = await read($, prMark)
     const rm = await read($, reviewMark)
-    const isStale = now - pm.okAt > STALE_MS || now - rm.okAt > STALE_MS
+    // Only an action the maintainer owns raises the band: an open question, or a
+    // pull request whose current head has Claude Code's final check. The stored facts
+    // may be of an old head, so the latest read of the PR and of its review must have
+    // succeeded and be fresh; otherwise the pane still shows them, with their lines.
+    const isCurrent = (m: ReadMark) => m.okAt > m.failedAt && now - m.okAt <= STALE_MS
+    const isChecked =
+      pr !== null && pr.state === 'OPEN' && review !== null && review.head === pr.head && review.isFinalChecked &&
+      isCurrent(pm) && isCurrent(rm)
+    if (open.length === 0 && !isChecked) {
+      return next(e)
+    }
     const { Box, Button, Text } = $.ui.resolve(e)
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
@@ -728,7 +732,7 @@ export const register: Register = (on, _options) => {
           <Box flexDirection="row" alignItems="center" gap={1} flexShrink={1}>
             {isChecked && <Text bold>{`#${pr.number}`}</Text>}
             {isChecked && <Text wrap="truncate-end">{cleanTitle(pr.title)}</Text>}
-            {isChecked && <Text color="warning">{isStale ? '· Final check posted (stale)' : '· Final check posted'}</Text>}
+            {isChecked && <Text color="warning">· Final check posted</Text>}
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
             {open.length > 0 && (
