@@ -1,6 +1,5 @@
 name: Change
 description: Something to build, fix or decide.
-labels: ["idea"]
 body:
   - type: textarea
     id: what
