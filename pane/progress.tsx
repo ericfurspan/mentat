@@ -1087,9 +1087,16 @@ export const register: Register = (on, _options) => {
         return true
       })
       if (!isFirst) return false
-      const sent = await $.prompt.submit({ text: `Answer to decision ${d.id} ("${d.question}"): ${text}` })
-      if (sent.drop !== undefined) {
-        await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id)))
+      // A submit the engine rejects (for example around a reload) did not enter either.
+      let isTaken = false
+      try {
+        const sent = await $.prompt.submit({ text: `Answer to decision ${d.id} ("${d.question}"): ${text}` })
+        isTaken = sent.drop === undefined
+      } catch {
+        isTaken = false
+      }
+      if (!isTaken) {
+        await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
         $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
         return false
       }

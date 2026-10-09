@@ -90,6 +90,8 @@ type World = {
   dropPrompts: boolean
   // When set, prompt.submit does not answer until it resolves (as while a turn runs).
   promptGate?: Promise<void>
+  // When set, prompt.submit rejects.
+  rejectPrompts: boolean
   toasts: string[]
   // When set, $.session.usage() throws.
   usageFails: boolean
@@ -118,6 +120,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
     sent: [],
     agentCallId: '',
     dropPrompts: false,
+    rejectPrompts: false,
     toasts: [],
     usageFails: false,
   }
@@ -156,6 +159,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
   })
   onFn('prompt.submit', async (_$: unknown, e: { text: string }) => {
     await world.promptGate
+    if (world.rejectPrompts) throw new Error('the engine reloaded')
     if (world.dropPrompts) return { drop: 'a turn is running' }
     world.sent.push(e.text)
     return { text: e.text }
@@ -641,9 +645,10 @@ test('a session start (restart or reload) forgets an answer still waiting for a 
   await eng($).tool.call({ tool: OPEN, question: 'Waiting?', accept: 'Yes' })
   const pane = await mount($, PANE, 'terminal')
   await pane.press({ key: 'accept-d1' })
-  // The submit of d2 never ends here, as when the process behind it is gone.
-  world.promptGate = new Promise<void>(() => undefined)
-  void pane.press({ key: 'accept-d2' })
+  // The submit of d2 is lost with the old load: it ends in a rejection, after the restart.
+  let lose: () => void = () => undefined
+  world.promptGate = new Promise<void>((_, reject) => (lose = () => reject(new Error('the engine reloaded'))))
+  const lost = pane.press({ key: 'accept-d2' })
   await new Promise(r => setTimeout(r, 20))
   expect(await sentIds($)).toEqual(['d1', 'd2'])
   expect(await textsOf(pane)).toContain('Sent: Yes. Claude Code reads it after its current turn.')
@@ -658,6 +663,27 @@ test('a session start (restart or reload) forgets an answer still waiting for a 
   world.promptGate = undefined
   await pane.press({ key: 'accept-d2' })
   expect(world.sent).toEqual(['Answer to decision d1 ("Delivered?"): Yes', 'Answer to decision d2 ("Waiting?"): Yes'])
+  // The lost submit ends now; it neither throws nor takes back the new, delivered mark.
+  lose()
+  await lost
+  expect(await sentIds($)).toEqual(['d1', 'd2'])
+  await pane.unmount()
+})
+
+test('a submit the engine rejects is treated like a drop: a toast, and the buttons come back', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', accept: 'Yes' })
+  const pane = await mount($, PANE, 'terminal')
+  world.rejectPrompts = true
+  await pane.press({ key: 'accept-d1' })
+  expect(world.toasts.length).toBe(1)
+  expect(world.toasts[0]).toContain('Answer not sent')
+  expect(await sentIds($)).toEqual([])
+  expect((await pane.findAll({ type: 'Button' })).map(x => x.key)).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
+  world.rejectPrompts = false
+  await pane.press({ key: 'accept-d1' })
+  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes'])
   await pane.unmount()
 })
 
