@@ -93,6 +93,8 @@ type World = {
   // When set, prompt.submit rejects.
   rejectPrompts: boolean
   toasts: string[]
+  // The turn.step inputs that reached the bottom of the chain.
+  steps: unknown[]
   // When set, $.session.usage() throws.
   usageFails: boolean
 }
@@ -122,6 +124,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
     dropPrompts: false,
     rejectPrompts: false,
     toasts: [],
+    steps: [],
     usageFails: false,
   }
   let active = 0
@@ -137,6 +140,10 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
   onFn('agent.list', () => ({ value: world.agents }))
   onFn('agent.spawn', (_$: unknown, e: { tool_use_id: string }) => ({ model: 'claude-opus-4-8', agentId: e.tool_use_id }))
   onFn('turn.complete', (_$: unknown, e: { answer: string }) => ({ text: e.answer }))
+  onFn('turn.step', async function* (_$: unknown, e: { turnId: string; index: number }) {
+    world.steps.push(e)
+    return { turnId: e.turnId, index: e.index, answer: 'ok', toolUses: [] }
+  })
   onFn('session.usage', () => {
     if (world.usageFails) throw new Error('no usage')
 
@@ -269,7 +276,7 @@ const eng = ($: never) =>
     command: { run: (a: { command: string; args: string }) => Promise<{ text?: string }> }
     session: { start: (a: unknown) => Promise<unknown> }
     agent: { spawn: (a: unknown) => Promise<{ agentId?: string }> }
-    turn: { complete: (a: unknown) => Promise<unknown> }
+    turn: { complete: (a: unknown) => Promise<unknown>; step: (a: unknown) => AsyncGenerator<unknown, unknown> }
   }
 const startSession = ($: never) => eng($).session.start({ cwd: '/work/r', surface: 'terminal', isInteractive: true })
 const bash = (w: World, $: never, command: string, stdout = '', extra: object = {}) => {
@@ -293,6 +300,12 @@ const spawn = (n: string, description = 'Check the docs', type = 'general-purpos
   ({ tool_use_id: n, prompt: 'p', description, subagentType: type, provider: { plugin: 'engine', tier: 'core' } })
 const turnDone = (agentId: string, usage?: object) =>
   ({ answer: 'ok', durationMs: 1, isAborted: false, turnId: `turn-${agentId}`, agentId, reason: 'end_turn', usage })
+// One model request of an agent's loop (or of the main session, without agentId), run to its end.
+const step = async ($: never, agentId: string | undefined, effort?: string | number, index = 0) => {
+  const input = { turnId: `turn-${agentId ?? 'main'}`, index, model: 'claude-opus-4-8', messageCount: 3, ...(effort === undefined ? {} : { effort }), ...(agentId === undefined ? {} : { agentId }) }
+  const stream = eng($).turn.step(input)
+  for (;;) if ((await stream.next()).done) return input
+}
 
 // ---- decisions (ported from tests/decisions-pane.test.tsx) ----------------------------
 
@@ -1468,6 +1481,17 @@ test('a result for a pull request that is no longer followed is dropped', async 
 
 // ---- agents ----------------------------------------------------------------------------------------------
 
+// Waits for the agents' row to show the fact, on the surface.
+const untilFacts = async ($: never, surface: 'terminal' | 'desktop', description: string, fact: string) => {
+  let last: string[] = []
+  for (let i = 0; i < 300; i++) {
+    last = await paneTexts($, surface)
+    if (last.some(x => x.includes(fact)) && last.includes(description)) return last
+    await new Promise(r => setTimeout(r, 5))
+  }
+  throw new Error(`the ${surface} pane never showed "${fact}"; it showed ${JSON.stringify(last)}`)
+}
+
 const rowFor = (t: string[], description: string) => {
   const i = t.indexOf(description)
 
@@ -1551,6 +1575,126 @@ test('an agent that vanishes from the engine\'s list is shown as ended, not as f
   await clock.advance(1_000)
   await new Promise(r => setTimeout(r, 30))
   expect(rowFor(await paneTexts($), 'Gone one')).toBe('general-purpose · Opus 4.8 · ended · 5s')
+})
+
+// ---- the effort of each agent, and finished agents dimmed ---------------------------------------------------
+
+test('a subagent\'s requests set the effort of its row on both surfaces; the Agent call\'s effort shows until then', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  const id = await callAgent(world, $, 'low')
+  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
+  await eng($).agent.spawn(spawn(id))
+  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('general-purpose · Opus 4.8 · low · running · 0s')
+
+  await step($, id, 'high')
+  await until(() => world.steps.length === 1, 'the step')
+  for (const surface of SURFACES) {
+    const t = await untilFacts($, surface, 'Check the docs', 'high')
+    if (surface === 'terminal') expect(rowFor(t, 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · running · 0s')
+    else expect(t).toContain('·  Opus 4.8  ·  high')
+  }
+
+  await step($, id, 'xhigh', 1)
+  for (const surface of SURFACES) {
+    const t = await untilFacts($, surface, 'Check the docs', 'xhigh')
+    expect(t.join('|')).not.toMatch(/(^|[^x])high/)
+  }
+
+  // A number is a budget.
+  await step($, id, 8000, 2)
+  expect(rowFor(await untilFacts($, 'terminal', 'Check the docs', '8.0k budget'), 'Check the docs')).toContain('· 8.0k budget ·')
+})
+
+test('a request of the main session changes no row, and a request of an agent without effort changes nothing', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  const id = await callAgent(world, $, 'medium')
+  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
+  await eng($).agent.spawn(spawn(id))
+  await step($, undefined, 'max')
+  await step($, id, undefined, 1)
+  // The next request, which does change the row, shows the two before it changed nothing.
+  await step($, id, 'high', 2)
+  const t = await untilFacts($, 'terminal', 'Check the docs', 'high')
+  expect(rowFor(t, 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · running · 0s')
+  expect(t.join('|')).not.toContain('max')
+})
+
+test('a request that comes before the agent\'s row is kept for the row', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await step($, 'a1', 'xhigh')
+  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Late row', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Late row'))
+  expect(rowFor(await paneTexts($), 'Late row')).toBe('general-purpose · Opus 4.8 · xhigh · running · 0s')
+})
+
+test('an agent the mod never saw spawn takes the effort its requests used when the engine\'s list brings it in', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  // z9 steps before it is listed, and a reload lists it.
+  await step($, 'z9', 'xhigh')
+  await until(() => world.steps.length === 1, 'the step')
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
+  await startSession($)
+  expect(rowFor(await untilFacts($, 'terminal', 'Unseen one', 'xhigh'), 'Unseen one')).toBe('Explore · xhigh · running')
+  expect(await untilFacts($, 'desktop', 'Unseen one', 'xhigh')).toContain('·  xhigh')
+
+  // y8 steps, and the engine's next check of its list (once a second, while an agent runs) brings it in.
+  await step($, 'y8', 'low')
+  await until(() => world.steps.length === 2, 'the step')
+  world.agents = [...world.agents, { id: 'y8', type: 'Plan', description: 'Other one', status: 'running' }]
+  await clock.advance(1_000)
+  expect(rowFor(await untilFacts($, 'terminal', 'Other one', 'low'), 'Other one')).toBe('Plan · low · running')
+})
+
+test('turn.step passes the request on unchanged and returns what is beneath', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  const id = await callAgent(world, $, 'low')
+  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
+  await eng($).agent.spawn(spawn(id))
+  const input = await step($, id, 'high')
+  await step($, undefined, 'max', 1)
+  expect(world.steps).toEqual([input, expect.objectContaining({ effort: 'max', index: 1 })])
+  expect(world.steps[0]).toEqual(input)
+})
+
+test('finished agents are drawn dimmed, on the desktop in the muted color and on the terminal with dimColor; running ones are not', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  world.agents = [
+    { id: 'r1', type: 'general-purpose', description: 'Still going', status: 'running' },
+    { id: 'c1', type: 'general-purpose', description: 'Finished fine', status: 'completed' },
+    { id: 'f1', type: 'general-purpose', description: 'Finished badly', status: 'failed' },
+  ]
+  for (const [n, d] of [['r1', 'Still going'], ['c1', 'Finished fine'], ['f1', 'Finished badly']] as const) await eng($).agent.spawn(spawn(n, d))
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+
+  const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const agentsSvg = (await svgsOf(desktop)).find(v => v.alt.endsWith('agents'))!
+  await desktop.unmount()
+  const classOf = (title: string) => new RegExp(`<text class="(\\w+)"[^>]*>${title}</text>`).exec(agentsSvg.source)?.[1]
+  expect(classOf('Still going')).toBe('t')
+  expect(classOf('Finished fine')).toBe('m')
+  expect(classOf('Finished badly')).toBe('m')
+  // The time, and the model and the facts after the type, are muted too; the mark keeps its color.
+  expect(agentsSvg.source).toMatch(/<tspan class="m">/)
+  expect(agentsSvg.source).toMatch(/<tspan class="s">/)
+  expect(agentsSvg.source).toMatch(/<text class="m"[^>]*text-anchor="end"/)
+  expect(agentsSvg.source).toMatch(/<text class="s"[^>]*text-anchor="end"/)
+  expect(agentsSvg.source).toContain('stroke="#')
+
+  const terminal = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  const texts = await terminal.findAll({ type: 'Text' })
+  await terminal.unmount()
+  const dim = (t: string) => texts.find(x => x.text === t)?.props?.dimColor
+  expect(dim('Still going')).toBeFalsy()
+  expect(dim('Finished fine')).toBe(true)
+  expect(dim('Finished badly')).toBe(true)
+  expect(texts.find(x => x.text?.startsWith('general-purpose · Opus 4.8 · running'))?.props?.dimColor).toBe(true)
 })
 
 // ---- the session card and width --------------------------------------------------------------------------------

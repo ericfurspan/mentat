@@ -52,6 +52,8 @@ const duration = (ms: number): string => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
 const kTokens = (n: number): string => (n < 1000 ? `${n}` : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`)
+// An effort level as the row shows it; a number is a budget.
+const showEffort = (effort: string | number): string => (typeof effort === 'number' ? `${kTokens(effort)} budget` : effort)
 const ago = (ms: number): string => {
   const m = Math.floor(Math.max(0, ms) / 60_000)
   return m < 1 ? 'just now' : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`
@@ -262,9 +264,10 @@ const isActive = (s: AgentStatus): boolean => s === 'running' || s === 'waiting'
 
 type AgentInfoLike = { id: string; type: string; description: string; status: AgentStatus }
 // Fits the rows to what the engine lists: statuses follow the engine, an end freezes
-// the elapsed time, an agent the mod never saw is added without a model or start,
+// the elapsed time, an agent the mod never saw is added without a model or start (with the
+// effort its requests used, if any were seen),
 // and one the engine no longer lists is ended (unknown), never finished.
-const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): AgentRow[] => {
+const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number, efforts: ReadonlyMap<string, string>): AgentRow[] => {
   const next = rows.map(row => {
     const info = infos.find(i => i.id === row.id)
     if (info === undefined) return isEnded(row.status) ? row : { ...row, status: 'unknown' as const, endedAt: now }
@@ -274,7 +277,15 @@ const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): Agent
   })
   for (const info of infos) {
     if (rows.some(r => r.id === info.id)) continue
-    next.push({ id: info.id, type: info.type, description: info.description, status: info.status, ...(isEnded(info.status) ? { endedAt: now } : {}) })
+    const effort = efforts.get(info.id)
+    next.push({
+      id: info.id,
+      type: info.type,
+      description: info.description,
+      status: info.status,
+      ...(effort === undefined ? {} : { effort }),
+      ...(isEnded(info.status) ? { endedAt: now } : {}),
+    })
   }
   return next.slice(-30)
 }
@@ -351,20 +362,20 @@ async function run($: EngineInterface, argv: string[], cwd?: string): Promise<st
   }
 }
 
-async function syncAgents($: EngineInterface): Promise<void> {
+async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
   try {
     const infos = (await $.agent.list()) as AgentInfoLike[]
     const now = await $.clock.now()
-    await inTurn(() => update($, agents, rows => reconcile(rows, infos, now)))
+    await inTurn(() => update($, agents, rows => reconcile(rows, infos, now, efforts)))
   } catch {
     // the next check tries again
   }
 }
 
-async function agentTick($: EngineInterface): Promise<void> {
+async function agentTick($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
   const rows = await read($, agents)
   if (!rows.some(r => !isEnded(r.status))) return
-  await syncAgents($)
+  await syncAgents($, efforts)
   await invalidate($)
 }
 
@@ -720,10 +731,12 @@ const agentsSvg = (W: number, rows: { status: AgentStatus; title: string; type: 
     const rightW = textW(r.right, 11.5) + 4
     const tx = 40
     const typeW = textW(r.type, 11.5)
+    // A finished agent is drawn in the muted color, so running work stands out; its mark keeps its own.
+    const done = isEnded(r.status)
     return `${agentMark(24, y + 18, r.status)}
-<text class="t" x="${tx}" y="${y + 16}" font-family="${FONT}" font-size="13.5" font-weight="${isActive(r.status) ? 600 : 500}">${xml(fit(r.title, 13.5, W - tx - rightW - 22))}</text>
-<text class="s" x="${W - 14}" y="${y + 16}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.right)}</text>
-<text x="${tx}" y="${y + 33}" font-family="${FONT}" font-size="11.5"><tspan fill="${HUE.violet}">${xml(r.type)}</tspan><tspan class="s">${xml(fit(r.meta === '' ? '' : `  ·  ${r.meta}`, 11.5, W - tx - typeW - 16))}</tspan></text>
+<text class="${done ? 'm' : 't'}" x="${tx}" y="${y + 16}" font-family="${FONT}" font-size="13.5" font-weight="${isActive(r.status) ? 600 : 500}">${xml(fit(r.title, 13.5, W - tx - rightW - 22))}</text>
+<text class="${done ? 'm' : 's'}" x="${W - 14}" y="${y + 16}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.right)}</text>
+<text x="${tx}" y="${y + 33}" font-family="${FONT}" font-size="11.5"><tspan fill="${HUE.violet}">${xml(r.type)}</tspan><tspan class="${done ? 'm' : 's'}">${xml(fit(r.meta === '' ? '' : `  ·  ${r.meta}`, 11.5, W - tx - typeW - 16))}</tspan></text>
 ${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + rowH - 3.5}" x2="${W - 14}" y2="${y + rowH - 3.5}"/>` : ''}`
   })
   return svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${label(14, 20, `Agents  ${rows.length}${running > 0 ? `  ·  ${running} running` : ''}`)}${body.join('')}`)
@@ -753,6 +766,9 @@ const bandSvg = (W: number, left: { kind: 'question'; text: string } | { kind: '
 export const register: Register = (on, _options) => {
   // The effort an Agent call asked for, until the agent it spawns is recorded.
   const effortByCall = new Map<string, string>()
+  // The effort an agent's latest model request used, by agent id. It also holds a value that
+  // arrived before the agent's row did; agent.spawn applies it when the row appears.
+  const effortByAgent = new Map<string, string>()
   let agentTimer: { cancel: () => void } | undefined
   let refreshTimer: { cancel: () => void } | undefined
 
@@ -809,8 +825,8 @@ export const register: Register = (on, _options) => {
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()
-    await syncAgents($)
-    agentTimer = $.clock.every(1000, () => void agentTick($))
+    await syncAgents($, effortByAgent)
+    agentTimer = $.clock.every(1000, () => void agentTick($, effortByAgent))
     refreshTimer = $.clock.every(60_000, () => void refresh($))
     void refresh($)
 
@@ -935,13 +951,33 @@ export const register: Register = (on, _options) => {
     }
     const model = out.model ?? e.model
     if (model !== undefined && model !== '') row.model = model
-    const effort = effortByCall.get(e.tool_use_id)
+    const effort = effortByAgent.get(id) ?? effortByCall.get(e.tool_use_id)
     if (effort !== undefined) row.effort = effort
     effortByCall.delete(e.tool_use_id)
     await inTurn(() => update($, agents, list => [...list.filter(a => a.id !== id), row].slice(-30)))
     await invalidate($)
 
     return out
+  })
+
+  // The effort each of a subagent's requests uses, which the Agent call's own effort often
+  // leaves out. The request passes through as it came, and the write never waits for it.
+  on('turn.step', async function* ($, e, next) {
+    const id = e.agentId
+    if (id !== undefined && e.effort !== undefined) {
+      const shown = showEffort(e.effort)
+      if (effortByAgent.get(id) !== shown) {
+        effortByAgent.set(id, shown)
+        void inTurn(async () => {
+          const rows = await read($, agents)
+          if (!rows.some(r => r.id === id && r.effort !== shown)) return
+          await update($, agents, list => list.map(r => (r.id === id ? { ...r, effort: shown } : r)))
+          await invalidate($)
+        }).catch(() => undefined)
+      }
+    }
+
+    return yield* next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -954,7 +990,7 @@ export const register: Register = (on, _options) => {
         await inTurn(() => update($, agents, rows => rows.map(r => (r.id === id ? { ...r, tokens } : r))))
       }
       // A subagent's turn is not its end: only the engine's list says that.
-      await syncAgents($)
+      await syncAgents($, effortByAgent)
       await invalidate($)
     }
 
@@ -1332,7 +1368,7 @@ export const register: Register = (on, _options) => {
                 <Box key={a.id} flexDirection="column" marginTop={i === 0 ? 0 : 1}>
                   <Box flexDirection="row" gap={1}>
                     <Text color={color}>{isActive(a.status) ? '●' : a.status === 'completed' ? '✓' : a.status === 'failed' || a.status === 'killed' ? '✕' : '○'}</Text>
-                    <Text bold={isActive(a.status)} wrap="truncate-end">
+                    <Text bold={isActive(a.status)} dimColor={isEnded(a.status)} wrap="truncate-end">
                       {a.description}
                     </Text>
                   </Box>
