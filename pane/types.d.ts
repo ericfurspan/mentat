@@ -75,6 +75,8 @@ declare module 'claude-code' {
       // session; until then it is held for the end of the running turn.
       decisionsSent: { id: string; text: string; isDelivered?: boolean }[]
       agents: AgentRow[]
+      // True while the pane's Finished group of agents is collapsed (default: open).
+      agentsFinishedHidden: boolean
       // The session's pull request as owner/repo#N, or '' for none.
       prRef: string
       pr: PrSnapshot | null
