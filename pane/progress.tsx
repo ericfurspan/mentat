@@ -1140,10 +1140,12 @@ export const register: Register = (on, _options) => {
 
     if (Svg !== undefined) {
       const W = Math.max(220, Math.min(900, cols * 8 - 24))
-      const ciChip = pr === null ? undefined : pr.checks.failed > 0 ? { text: `CI ${pr.checks.failed} failed`, hue: HUE.red } : pr.checks.running > 0 ? { text: 'CI running', hue: HUE.blue } : pr.checks.passed > 0 ? { text: 'CI passed', hue: HUE.green } : { text: 'No CI', hue: HUE.grey }
+      // The app already shows the pull request's number, repository, branch, diff and CI, so
+      // this card adds only what it lacks: CI only when it failed, and the final check.
+      const ciChip = pr !== null && pr.checks.failed > 0 ? [{ text: `CI ${pr.checks.failed} failed`, hue: HUE.red }] : []
+      const finalChip = pr !== null && isReviewed && review.isFinalChecked ? [{ text: `Final check posted · ${sha7(pr.head)}`, hue: HUE.green }] : []
       const codex = pr !== null && (isReviewed || rm.failedAt > 0) ? (isReviewed ? codexText(review) : 'unknown') : undefined
       const foot = [
-        ...(others !== undefined && others.count > 0 ? [{ text: others.isLimit ? '100+ other open PRs in this repository' : `${others.count} other open PR${others.count === 1 ? '' : 's'} in this repository`, hue: HUE.grey }] : []),
         ...(prFresh === undefined ? [] : [{ text: prFresh, hue: HUE.amber }]),
         ...(reviewFresh === undefined ? [] : [{ text: reviewFresh, hue: HUE.amber }]),
       ]
@@ -1152,8 +1154,9 @@ export const register: Register = (on, _options) => {
         title: cleanTitle(pr.title),
         facts: [
           { text: githubLine(pr), hue: githubHue(githubLine(pr)) },
-          ciChip!,
           ...(codex === undefined ? [] : [{ text: `Codex · ${codex}`, hue: codexHue(codex) }]),
+          ...finalChip,
+          ...ciChip,
         ],
         foot,
       })

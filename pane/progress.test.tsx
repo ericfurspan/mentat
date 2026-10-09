@@ -396,7 +396,9 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   ])
   expect(alt('Context')!.drawn).toEqual(expect.arrayContaining(['CONTEXT', '41', '5-HOUR', '85', '1h 0m']))
   expect(alt('Question')!.drawn).toEqual(expect.arrayContaining(['Open it?', '→ Yes']))
-  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'CI passed', 'Codex · 1 finding · 0 replied · 415e6d9', '1 other open PR in this repository']))
+  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'Codex · 1 finding · 0 replied · 415e6d9', 'Final check posted · 415e6d9']))
+  // The app's own chip shows CI and the other pull requests, so the desktop card leaves them out.
+  expect(alt('#109')!.drawn.some(x => x.startsWith('CI') || x.includes('other open'))).toBe(false)
   expect(alt('1 agents')!.drawn).toEqual(expect.arrayContaining(['Check the docs', 'general-purpose']))
   // The buttons stay native, under the question card.
   expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
@@ -410,7 +412,7 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   const tPane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await tPane.findAll({ type: 'Svg' })).length).toBe(0)
   const t = await textsOf(tPane)
-  for (const x of ['Open it?', 'Approval required', '✓', 'Check the docs', 'Context', '41%']) expect(t).toContain(x)
+  for (const x of ['Open it?', 'Approval required', '✓', '1 other open PR in this repository', 'Check the docs', 'Context', '41%']) expect(t).toContain(x)
   expect(t.some(x => /[█░]/.test(x))).toBe(true)
   await tPane.unmount()
 })
@@ -1238,6 +1240,76 @@ test('other open pull requests say 100+ when the list hit its limit', async ($, 
   expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'list') && a.includes('--limit') && a.includes('100') && a.includes('open'))).toBe(true)
 })
 
+// ---- the desktop card shows only what the app's own pull request chip lacks ----------------------------
+
+const cardOf = async ($: never, surface: 'terminal' | 'desktop') => {
+  const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+  const drawn = surface === 'desktop' ? ((await svgsOf(pane)).find(v => v.alt.startsWith('#109'))?.drawn ?? []) : await textsOf(pane)
+  await pane.unmount()
+
+  return drawn
+}
+const untilCard = async ($: never, surface: 'terminal' | 'desktop', cond: (t: string[]) => boolean, what: string) => {
+  let last: string[] = []
+  for (let i = 0; i < 300; i++) {
+    last = await cardOf($, surface)
+    if (cond(last)) return last
+    await new Promise(r => setTimeout(r, 5))
+  }
+  throw new Error(`card never showed ${what}; it showed ${JSON.stringify(last)}`)
+}
+
+test('desktop card: CI shows only when checks failed, and the terminal card shows it always', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  await untilCard($, 'desktop', t => t.includes('Approval required'), 'the card')
+  for (const [rollup, terminal] of [[[CHECK_OK], '✓'], [[CHECK_OK, { __typename: 'CheckRun', status: 'IN_PROGRESS', conclusion: null }], 'running'], [[], 'none']] as [unknown[], string][]) {
+    world.pr = ok(prJson({ statusCheckRollup: rollup }))
+    await bash(world, $, 'gh pr ready 109', '')
+    await untilCard($, 'terminal', t => t.includes(terminal), `CI ${terminal}`)
+    expect((await cardOf($, 'desktop')).some(t => t.startsWith('CI') || t === 'No CI' || t === 'running')).toBe(false)
+  }
+
+  world.pr = ok(prJson({ statusCheckRollup: [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' }, CHECK_OK] }))
+  await bash(world, $, 'gh pr ready 109', '')
+  expect(await untilCard($, 'desktop', t => t.includes('CI 1 failed'), 'CI 1 failed')).toContain('Approval required')
+  expect(await untilCard($, 'terminal', t => t.includes('✕ 1 failed'), 'the terminal CI')).toContain('CI')
+})
+
+test('desktop card: the final check chip shows only when the final check is on the current head', async ($, on) => {
+  const { world } = boot(on)
+  world.issueComments = ok(pages([summary(H1)]))
+  await follow109($)
+  await untilCard($, 'desktop', t => t.some(x => x.startsWith('Codex')), 'the Codex chip')
+  expect((await cardOf($, 'desktop')).some(t => t.includes('Final check'))).toBe(false)
+
+  world.issueComments = ok(pages([summary(H1), finalCheck(H2)]))
+  await bash(world, $, 'mentat review 109', '')
+  await until(() => world.calls.filter(a => a.join(' ').includes('/issues/109/comments')).length >= 2, 'a second review read')
+  await new Promise(r => setTimeout(r, 50))
+  expect((await cardOf($, 'desktop')).some(t => t.includes('Final check'))).toBe(false)
+
+  world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
+  await bash(world, $, 'mentat review 109', '')
+  const t = await untilCard($, 'desktop', x => x.includes('Final check posted · 415e6d9'), 'the final check chip')
+  expect(t).toContain('Approval required')
+  // The terminal card keeps its own lines; the final check is the band's business there.
+  expect((await cardOf($, 'terminal')).some(x => x.startsWith('Final check posted ·'))).toBe(false)
+})
+
+test('desktop card: no line for other open pull requests, while the terminal card keeps it; freshness stays', async ($, on) => {
+  const { world, clock } = boot(on)
+  world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }, { number: 8 }]))
+  await follow109($)
+  await untilPane($, '2 other open PRs in this repository')
+  expect((await cardOf($, 'desktop')).some(t => t.includes('other open'))).toBe(false)
+
+  world.pr = failed
+  await clock.advance(60_000)
+  const t = await untilCard($, 'desktop', x => x.includes('PR read failed (last ok 1m ago)'), 'the freshness line')
+  expect(t.some(x => x.includes('other open'))).toBe(false)
+})
+
 test('a failed first read shows the pull request as named and says the read failed', async ($, on) => {
   const { world } = boot(on)
   world.pr = failed
@@ -1702,7 +1774,7 @@ test('a long pull request title is wrapped whole on the desktop card, which grow
   await bash(world, $, 'gh pr ready 109', '')
   for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).includes('Finale'); i++) await new Promise(r => setTimeout(r, 5))
   const long = await heightOf()
-  const shown = long.drawn.filter(t => !/^(#109|CI|Codex|Approval|Merge|Draft)/.test(t) && !t.includes('open PR')).join(' ')
+  const shown = long.drawn.filter(t => !/^(#109|CI|Codex|Final check|Approval|Merge|Draft)/.test(t)).join(' ')
   expect(shown).toBe(title.replace(/^feat: /, '').replace(/^\w/, c => c.toUpperCase()))
   expect(shown).toContain('finale')
   expect(shown).not.toContain('…')

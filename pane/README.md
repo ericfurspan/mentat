@@ -13,7 +13,7 @@ The band's Details button opens the pane, as does `/mentat`. When there is no op
 The pane shows, in this order:
 
 1. The open questions (the agent records each one itself; nothing forces it to), with a button for its recommended answer when it has one, a text field and Dismiss. An answer goes to chat as a message. While Claude Code is in a turn the message waits for it to end, so after the first press the card shows a "Sent" line in place of the answer buttons and field (it says so while the message waits), keeps Dismiss, and ignores further presses.
-2. The session's pull request, as facts read directly from GitHub: its state, CI, Codex's review of the current head, and the number of other open pull requests in this repository.
+2. The session's pull request, as facts read directly from GitHub. The desktop app already shows its own chip with the pull request's number, branch, diff size and CI, so the desktop card adds only what that chip lacks: GitHub's approval state, Codex's review of the current head, and whether the final check is posted on it (CI appears only when checks failed). The terminal has no such chip, so the terminal card shows the full set: state, CI, Codex's review and the number of other open pull requests in this repository.
 3. The agents, with their status and elapsed time.
 4. The context window and rate limits.
 
