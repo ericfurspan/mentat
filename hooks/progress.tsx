@@ -20,6 +20,10 @@ const CODEX_APP = 'chatgpt-codex-connector[bot]'
 const SUMMARY_MARK = '<!-- codex-pull-request-review-summary -->'
 const STALE_MS = 5 * 60_000
 const LIST_LIMIT = 100
+// A rate limit this far gone raises the band; the tiles and meters turn amber here too.
+const WARN_PERCENT = 80
+// Rows between the desktop pane's sections.
+const SECTION_GAP = 2
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
@@ -63,6 +67,41 @@ const resetIn = (at: string | undefined, now: number): string => {
 const textMeter = (cells: number, percent: number): string => {
   const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * cells)
   return '█'.repeat(filled) + '░'.repeat(cells - filled)
+}
+
+type Meter = { kind: string; label: string; percent: number; reset: string }
+type Usage = Awaited<ReturnType<EngineInterface['session']['usage']>>
+
+// The session budget as the pane, the band and `/mentat` all read it: the context
+// window and each rate limit, with their percent and the time to the reset.
+const metersOf = (usage: Usage | undefined, now: number): { meters: Meter[]; limits: Meter[] } => {
+  const limits = (usage?.rateLimits ?? []).map(r => ({
+    kind: r.kind,
+    label: r.kind === 'five_hour' ? '5-hour' : r.kind === 'seven_day' ? 'Week' : r.kind,
+    percent: Math.round(r.percentUsed),
+    reset: resetIn(r.resetsAt, now),
+  }))
+  const context = usage?.context.percent
+  return {
+    limits,
+    meters: [...(context === undefined ? [] : [{ kind: 'context', label: 'Context', percent: Math.round(context), reset: '' }]), ...limits],
+  }
+}
+
+// One line of the budget: `Context 10% · 5-hour 12% (1h 29m) · Week 8% (6d)`.
+const budgetLine = (meters: Meter[]): string =>
+  meters.map(m => `${m.label} ${m.percent}%${m.reset === '' ? '' : ` (${m.reset.replace(/^resets in /, '')})`}`).join(' · ')
+
+// The band's budget text, for the most used of the 5-hour and weekly limits when it
+// is at WARN_PERCENT or more. The context window never raises the band.
+const budgetAlert = (limits: Meter[]): string | undefined => {
+  const over = limits
+    .filter(m => (m.kind === 'five_hour' || m.kind === 'seven_day') && m.percent >= WARN_PERCENT)
+    .sort((a, b) => b.percent - a.percent)[0]
+  if (over === undefined) return undefined
+  const reset = over.reset.replace(/^resets in /, '')
+
+  return `${over.label} limit ${over.percent}%${reset === '' ? '' : ` · resets ${reset}`}`
 }
 
 // `gh api --paginate` prints each page as its own JSON array, one after the other.
@@ -289,6 +328,15 @@ async function invalidate($: EngineInterface): Promise<void> {
     $.ui.invalidate('ui.render')
   } catch {
     // drawing is best effort
+  }
+}
+
+// The session's usage, or undefined when the engine cannot say.
+async function readUsage($: EngineInterface): Promise<Usage | undefined> {
+  try {
+    return await $.session.usage()
+  } catch {
+    return undefined
   }
 }
 
@@ -561,10 +609,10 @@ const wrap = (s: string, size: number, maxW: number, lines: number): string[] =>
     const next = cur === '' ? w : `${cur} ${w}`
     if (textW(next, size) <= maxW) { cur = next; continue }
     if (out.length === lines - 1) { out.push(fit(`${cur} ${words.slice(i).join(' ')}`.trim(), size, maxW)); return out }
-    out.push(cur === '' ? fit(w, size, maxW) : cur)
+    out.push(fit(cur === '' ? w : cur, size, maxW))
     cur = cur === '' ? '' : w
   }
-  if (cur !== '') out.push(cur)
+  if (cur !== '') out.push(fit(cur, size, maxW))
   return out
 }
 const svgOf = (W: number, H: number, body: string): string =>
@@ -600,7 +648,7 @@ const codexHue = (text: string): string =>
   text.startsWith('No findings') ? HUE.green : text.startsWith('Running') ? HUE.blue : text.startsWith('Failed') || text === 'unknown' ? HUE.red : /finding/i.test(text) ? HUE.amber : HUE.grey
 
 // Session tiles: neutral cards with a big number and a bar; the bar turns amber
-// from 80% and red from 95%, the only color they carry.
+// from WARN_PERCENT and red from 95%, the only color they carry.
 const SESSION_H = 86
 const sessionSvg = (W: number, meters: { label: string; percent: number; reset: string }[]): string => {
   const gap = 8
@@ -608,7 +656,7 @@ const sessionSvg = (W: number, meters: { label: string; percent: number; reset: 
   const tw = (W - gap * (n - 1)) / n
   const tiles = meters.map((m, i) => {
     const x = i * (tw + gap)
-    const hue = m.percent >= 95 ? HUE.red : m.percent >= 80 ? HUE.amber : undefined
+    const hue = m.percent >= 95 ? HUE.red : m.percent >= WARN_PERCENT ? HUE.amber : undefined
     const fill = Math.max(6, ((tw - 24) * Math.min(100, m.percent)) / 100)
     const reset = m.reset.replace(/^resets in /, '')
     return `<rect class="card" x="${x}" y="0" width="${tw}" height="${SESSION_H}" rx="12"/>
@@ -637,9 +685,11 @@ const prSvg = (W: number, p: { number: number; title: string; facts: { text: str
   const pad = 14
   const num = `#${p.number}`
   const numW = Math.round(14 + textW(num, 12))
-  const title = fit(p.title, 14, W - pad * 2 - numW - 8)
-  const c = chips(pad, 46, W - pad, p.facts)
-  let y = 46 + c.h + 8
+  // The title wraps (up to three lines) beside the number chip, under its first line's left edge.
+  const titleLines = wrap(p.title, 14, W - pad * 2 - numW - 8, 3)
+  const top = 46 + (titleLines.length - 1) * 19
+  const c = chips(pad, top, W - pad, p.facts)
+  let y = top + c.h + 8
   const foot = p.foot.map(f => {
     y += 16
     return `<text fill="${f.hue}" x="${pad}" y="${y}" font-family="${FONT}" font-size="11.5">${xml(fit(f.text, 11.5, W - pad * 2))}</text>`
@@ -647,7 +697,7 @@ const prSvg = (W: number, p: { number: number; title: string; facts: { text: str
   const h = y + 14
   const body = `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>
 <rect class="chip" x="${pad}" y="13" width="${numW}" height="22" rx="6"/><text class="s" x="${pad + 7}" y="28" font-family="${FONT}" font-size="12" font-weight="600" font-variant-numeric="tabular-nums">${num}</text>
-<text class="t" x="${pad + numW + 8}" y="29" font-family="${FONT}" font-size="14" font-weight="600">${xml(title)}</text>
+${titleLines.map((l, i) => `<text class="t" x="${pad + numW + 8}" y="${29 + i * 19}" font-family="${FONT}" font-size="14" font-weight="600">${xml(l)}</text>`).join('')}
 ${c.svg}${foot.join('')}`
   return { svg: svgOf(W, h, body), h }
 }
@@ -678,13 +728,13 @@ ${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + rowH - 3.5}" x2="
   return svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${label(14, 20, `Agents  ${rows.length}${running > 0 ? `  ·  ${running} running` : ''}`)}${body.join('')}`)
 }
 
-const bandSvg = (W: number, left: { kind: 'question'; text: string } | { kind: 'pr'; number: number; title: string }, count: number): string => {
+const bandSvg = (W: number, left: { kind: 'question'; text: string } | { kind: 'budget'; text: string } | { kind: 'pr'; number: number; title: string }, count: number): string => {
   const pillText = count > 0 ? `${count} question${count === 1 ? '' : 's'}` : ''
   const pillW = pillText === '' ? 0 : Math.round(20 + textW(pillText, 12))
   const room = W - pillW - 16
   let leftSvg: string
-  if (left.kind === 'question') {
-    leftSvg = `<circle cx="11" cy="14" r="8" fill="${HUE.amber}" opacity="0.18"/><text fill="${HUE.amber}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">?</text>
+  if (left.kind === 'question' || left.kind === 'budget') {
+    leftSvg = `<circle cx="11" cy="14" r="8" fill="${HUE.amber}" opacity="0.18"/><text fill="${HUE.amber}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${left.kind === 'budget' ? '!' : '?'}</text>
 <text class="t" x="27" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(fit(left.text, 13, room - 30))}</text>`
   } else {
     const num = `#${left.number}`
@@ -708,7 +758,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show what needs you, the pull request, the agents and the session budget in a pane',
+      description: 'Show what needs you, the pull request, the agents and the session budget in a pane; with only budget to show, one line of it',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -783,6 +833,14 @@ export const register: Register = (on, _options) => {
   on('command.run', { command: 'mentat' }, async ($, e) => {
     const args = e.args.trim()
     if (args === '') {
+      // With nothing but budget to show, a pane would be mostly empty: say it in a line.
+      const isEmpty =
+        (await read($, items)).length === 0 && (await read($, prRef)) === '' && (await read($, agents)).length === 0
+      if (isEmpty) {
+        const { meters } = metersOf(await readUsage($), await $.clock.now())
+
+        return { text: meters.length === 0 ? 'Nothing waiting on you; session budget unavailable.' : budgetLine(meters) }
+      }
       await $.ui.open({ id: PANE, title: TITLE })
 
       return { text: 'Mentat pane opened.' }
@@ -915,7 +973,10 @@ export const register: Register = (on, _options) => {
     const isChecked =
       pr !== null && pr.state === 'OPEN' && review !== null && review.head === pr.head && review.isFinalChecked &&
       isCurrent(pm) && isCurrent(rm)
-    if (open.length === 0 && !isChecked) {
+    // Budget raises it only when neither of those does. Nothing redraws the band for a
+    // change of usage alone; it is read when the band is drawn (see the report).
+    const budget = open.length === 0 && !isChecked ? budgetAlert(metersOf(await readUsage($), now).limits) : undefined
+    if (open.length === 0 && !isChecked && budget === undefined) {
       return next(e)
     }
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -926,8 +987,10 @@ export const register: Register = (on, _options) => {
       const W = Math.max(200, (e.props.bodyColumns ?? 80) * 8 - 96)
       const left = isChecked
         ? { kind: 'pr' as const, number: pr.number, title: cleanTitle(pr.title) }
-        : { kind: 'question' as const, text: open[open.length - 1]!.question }
-      const alt = isChecked ? `#${pr.number} final check posted` : `Question: ${open[open.length - 1]!.question}`
+        : budget !== undefined
+          ? { kind: 'budget' as const, text: budget }
+          : { kind: 'question' as const, text: open[open.length - 1]!.question }
+      const alt = isChecked ? `#${pr.number} final check posted` : budget !== undefined ? budget : `Question: ${open[open.length - 1]!.question}`
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
@@ -946,8 +1009,9 @@ export const register: Register = (on, _options) => {
             {isChecked && <Text bold>{`#${pr.number}`}</Text>}
             {isChecked && <Text wrap="truncate-end">{cleanTitle(pr.title)}</Text>}
             {isChecked && <Text color="warning">· Final check posted</Text>}
-            {!isChecked && <Text dimColor>?</Text>}
-            {!isChecked && <Text wrap="truncate-end">{open[open.length - 1]!.question}</Text>}
+            {budget !== undefined && <Text color="warning" wrap="truncate-end">{budget}</Text>}
+            {!isChecked && budget === undefined && <Text dimColor>?</Text>}
+            {!isChecked && budget === undefined && <Text wrap="truncate-end">{open[open.length - 1]!.question}</Text>}
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
             {open.length > 0 && (
@@ -980,12 +1044,7 @@ export const register: Register = (on, _options) => {
       if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
       return (b.startedAt ?? 0) - (a.startedAt ?? 0)
     })
-    let usage: Awaited<ReturnType<typeof $.session.usage>> | undefined
-    try {
-      usage = await $.session.usage()
-    } catch {
-      usage = undefined
-    }
+    const usage = await readUsage($)
 
     const Card = ({ tint, children }: { tint?: string; children?: RenderChildren }) => (
       <Box flexDirection="column" backgroundColor={tint ?? TINT.surface} paddingX={2} paddingY={1.5} marginTop={1}>
@@ -1037,22 +1096,14 @@ export const register: Register = (on, _options) => {
     const ci = pr === null ? undefined : ciLine(pr.checks)
     const others = pr?.others
     const cells = isNarrow ? 6 : 10
-    const limits = (usage?.rateLimits ?? []).map(r => ({
-      label: r.kind === 'five_hour' ? '5-hour' : r.kind === 'seven_day' ? 'Week' : r.kind,
-      percent: Math.round(r.percentUsed),
-      reset: resetIn(r.resetsAt, now),
-    }))
-    const meters = [
-      ...(usage?.context.percent === undefined ? [] : [{ label: 'Context', percent: Math.round(usage.context.percent), reset: '' }]),
-      ...limits,
-    ]
+    const { meters } = metersOf(usage, now)
 
     if (Svg !== undefined) {
       const W = Math.max(220, Math.min(900, cols * 8 - 24))
       const ciChip = pr === null ? undefined : pr.checks.failed > 0 ? { text: `CI ${pr.checks.failed} failed`, hue: HUE.red } : pr.checks.running > 0 ? { text: 'CI running', hue: HUE.blue } : pr.checks.passed > 0 ? { text: 'CI passed', hue: HUE.green } : { text: 'No CI', hue: HUE.grey }
       const codex = pr !== null && (isReviewed || rm.failedAt > 0) ? (isReviewed ? codexText(review) : 'unknown') : undefined
       const foot = [
-        ...(others !== undefined && others.count > 0 ? [{ text: others.isLimit ? '100+ more open PRs' : `+${others.count} more open PR${others.count === 1 ? '' : 's'}`, hue: HUE.grey }] : []),
+        ...(others !== undefined && others.count > 0 ? [{ text: others.isLimit ? '100+ other open PRs in this repository' : `${others.count} other open PR${others.count === 1 ? '' : 's'} in this repository`, hue: HUE.grey }] : []),
         ...(prFresh === undefined ? [] : [{ text: prFresh, hue: HUE.amber }]),
         ...(reviewFresh === undefined ? [] : [{ text: reviewFresh, hue: HUE.amber }]),
       ]
@@ -1079,16 +1130,16 @@ export const register: Register = (on, _options) => {
       return (
         <Box flexDirection="column" paddingX={1}>
           {meters.length > 0 && (
-            <Box marginTop={1}>
+            <Box marginTop={SECTION_GAP}>
               <Svg source={sessionSvg(W, meters)} alt={meters.map(m => `${m.label} ${m.percent}%`).join(', ')} width={W} height={SESSION_H} />
             </Box>
           )}
           {open.map(d => {
             const q = questionSvg(W, d.question, d.recommendation)
             return (
-              <Box key={d.id} flexDirection="column" marginTop={1}>
+              <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
                 <Svg source={q.svg} alt={`Question: ${d.question}`} width={W} height={q.h} />
-                <Box flexDirection="row" gap={1} marginTop={0.5}>
+                <Box flexDirection="row" gap={1} marginTop={1}>
                   {d.accept !== undefined && (
                     <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
                   )}
@@ -1105,9 +1156,10 @@ export const register: Register = (on, _options) => {
                   />
                 </Box>
                 {openAnswers.includes(d.id) && (
-                  <Box marginTop={0.5}>
+                  <Box marginTop={0.5} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
                     <Input
                       key={`answer-${d.id}`}
+                      autoFocus
                       placeholder="Your answer"
                       submitLabel="Send"
                       onSubmit={async (answer: string) => {
@@ -1122,12 +1174,12 @@ export const register: Register = (on, _options) => {
             )
           })}
           {card !== undefined && (
-            <Box marginTop={1}>
+            <Box marginTop={SECTION_GAP}>
               <Svg source={card.svg} alt={`#${pr!.number} ${githubLine(pr!)}`} width={W} height={card.h} />
             </Box>
           )}
           {agentRows.length > 0 && (
-            <Box marginTop={1}>
+            <Box marginTop={SECTION_GAP}>
               <Svg source={agentsSvg(W, agentRows)} alt={`${agentRows.length} agents`} width={W} height={30 + agentRows.length * 46 + 4} />
             </Box>
           )}
@@ -1159,9 +1211,10 @@ export const register: Register = (on, _options) => {
               />
             </Box>
             {openAnswers.includes(d.id) && (
-              <Box marginTop={1}>
+              <Box marginTop={1} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
                 <Input
                   key={`answer-${d.id}`}
+                  autoFocus
                   placeholder="Your answer"
                   submitLabel="Send"
                   onSubmit={async (answer: string) => {
@@ -1203,7 +1256,7 @@ export const register: Register = (on, _options) => {
             {others !== undefined && others.count > 0 && (
               <Box marginTop={1}>
                 <Text dimColor wrap="truncate-end">
-                  {others.isLimit ? '100+ more open PRs' : `+${others.count} more open PR${others.count === 1 ? '' : 's'}`}
+                  {others.isLimit ? '100+ other open PRs in this repository' : `${others.count} other open PR${others.count === 1 ? '' : 's'} in this repository`}
                 </Text>
               </Box>
             )}
@@ -1263,7 +1316,7 @@ export const register: Register = (on, _options) => {
                 <Box width={8}>
                   <Text dimColor>{m.label}</Text>
                 </Box>
-                <Text color={m.percent >= 80 ? 'warning' : 'suggestion'}>{textMeter(cells, m.percent)}</Text>
+                <Text color={m.percent >= WARN_PERCENT ? 'warning' : 'suggestion'}>{textMeter(cells, m.percent)}</Text>
                 <Box width={5}>
                   <Text>{`${m.percent}%`}</Text>
                 </Box>

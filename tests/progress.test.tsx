@@ -89,6 +89,8 @@ type World = {
   // When set, prompt.submit answers that the prompt did not enter.
   dropPrompts: boolean
   toasts: string[]
+  // When set, $.session.usage() throws.
+  usageFails: boolean
 }
 
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
@@ -115,6 +117,7 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
     agentCallId: '',
     dropPrompts: false,
     toasts: [],
+    usageFails: false,
   }
   let active = 0
   onFn('command.register', () => ({ value: { command: 'mentat' } }))
@@ -129,13 +132,17 @@ const boot = (on: never, opts: { band?: boolean } = {}) => {
   onFn('agent.list', () => ({ value: world.agents }))
   onFn('agent.spawn', (_$: unknown, e: { tool_use_id: string }) => ({ model: 'claude-opus-4-8', agentId: e.tool_use_id }))
   onFn('turn.complete', (_$: unknown, e: { answer: string }) => ({ text: e.answer }))
-  onFn('session.usage', () => ({
-    value: {
-      startedAt: T0,
-      context: { window: 200000, percent: world.usage.context },
-      rateLimits: world.usage.limits ?? [],
-    },
-  }))
+  onFn('session.usage', () => {
+    if (world.usageFails) throw new Error('no usage')
+
+    return {
+      value: {
+        startedAt: T0,
+        context: { window: 200000, percent: world.usage.context },
+        rateLimits: world.usage.limits ?? [],
+      },
+    }
+  })
   onFn('tool.call', { tool: 'Bash' }, async () => {
     await world.bashGate
     return { result: { stdout: world.bash, stderr: '' } }
@@ -382,7 +389,7 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   ])
   expect(alt('Context')!.drawn).toEqual(expect.arrayContaining(['CONTEXT', '41', '5-HOUR', '85', '1h 0m']))
   expect(alt('Question')!.drawn).toEqual(expect.arrayContaining(['Open it?', '→ Yes']))
-  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'CI passed', 'Codex · 1 finding · 0 replied · 415e6d9', '+1 more open PR']))
+  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'CI passed', 'Codex · 1 finding · 0 replied · 415e6d9', '1 other open PR in this repository']))
   expect(alt('1 agents')!.drawn).toEqual(expect.arrayContaining(['Check the docs', 'general-purpose']))
   // The buttons stay native, under the question card.
   expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
@@ -980,18 +987,18 @@ test('other open pull requests are counted without this one, singular and plural
   const { world } = boot(on)
   world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }]))
   await follow109($)
-  await untilPane($, '+1 more open PR')
+  await untilPane($, '1 other open PR in this repository')
 
   world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }, { number: 8 }]))
   await bash(world, $, 'gh pr ready 109', '')
-  await untilPane($, '+2 more open PRs')
+  await untilPane($, '2 other open PRs in this repository')
 })
 
 test('other open pull requests say 100+ when the list hit its limit', async ($, on) => {
   const { world } = boot(on)
   world.prList = ok(JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i + 1 }))))
   await follow109($)
-  await untilPane($, '100+ more open PRs')
+  await untilPane($, '100+ other open PRs in this repository')
   expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'list') && a.includes('--limit') && a.includes('100') && a.includes('open'))).toBe(true)
 })
 
@@ -1293,10 +1300,195 @@ test('no card is drawn for what there is not: no pull request, no agents, no que
   expect(t).toContain('Context')
 })
 
-test('/mentat opens the pane at once', async ($, on) => {
+const RESET_5H = () => new Date(T0 + 3600_000 + 29 * 60_000).toISOString()
+const RESET_WEEK = () => new Date(T0 + 6 * 86400_000).toISOString()
+const limit = (kind: string, percentUsed: number, resetsAt?: string) => ({ kind, percentUsed, resetsAt })
+
+test('/mentat opens the pane at once when there is something to show', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Anything?' })
   const ran = await eng($).command.run({ command: 'mentat', args: '' })
   expect(world.opened).toContain('mentat')
   expect(ran.text ?? '').not.toBe('')
+})
+
+test('/mentat with nothing but budget answers in one line and opens no pane', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
+  await startSession($)
+  const ran = await eng($).command.run({ command: 'mentat', args: '' })
+  expect(ran.text).toBe('Context 10% · 5-hour 12% (1h 29m) · Week 8% (6d)')
+  expect(world.opened).toEqual([])
+})
+
+test('/mentat with nothing to show and no usage says so, and opens no pane', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { limits: [] }
+  await startSession($)
+  const ran = await eng($).command.run({ command: 'mentat', args: '' })
+  expect(ran.text).toBe('Nothing waiting on you; session budget unavailable.')
+  expect(world.opened).toEqual([])
+
+  // The same when the engine cannot answer.
+  world.usageFails = true
+  const failed = await eng($).command.run({ command: 'mentat', args: '' })
+  expect(failed.text).toBe('Nothing waiting on you; session budget unavailable.')
+  expect(world.opened).toEqual([])
+})
+
+test('/mentat opens the pane for an open question, a followed pull request or an agent row', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
+  await eng($).command.run({ command: 'mentat', args: '' })
+  expect(world.opened).toEqual(['mentat'])
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+
+  // An agent row, ended or not, is something the pane lists.
+  const id = await callAgent(world, $, 'high')
+  world.agents = [{ id, type: 'general-purpose', description: 'Done already', status: 'completed' }]
+  await eng($).agent.spawn(spawn(id, 'Done already'))
+  world.opened.length = 0
+  const withAgent = await eng($).command.run({ command: 'mentat', args: '' })
+  expect(world.opened).toEqual(['mentat'])
+  expect(withAgent.text).toBe('Mentat pane opened.')
+})
+
+test('/mentat opens the pane for a followed pull request', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  world.opened.length = 0
+  await eng($).command.run({ command: 'mentat', args: '' })
+  expect(world.opened).toEqual(['mentat'])
+})
+
+// ---- the band for budget ------------------------------------------------------------
+
+test('the band shows for a rate limit at 80 and not at 79, on both surfaces', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 5, limits: [limit('five_hour', 79, RESET_5H()), limit('seven_day', 10)] }
+  for (const surface of SURFACES) expect((await bandTexts($, surface)).some(t => t.includes('limit'))).toBe(false)
+
+  world.usage = { context: 5, limits: [limit('five_hour', 80, RESET_5H()), limit('seven_day', 10)] }
+  for (const surface of SURFACES) {
+    const t = await bandTexts($, surface)
+    expect(t).toContain('5-hour limit 80% · resets 1h 29m')
+    // The row keeps its Details button.
+    const d = await mount($, BAND, surface)
+    expect((await d.findAll({ type: 'Button' })).length).toBe(1)
+    await d.unmount()
+  }
+
+  world.usage = { context: 5, limits: [limit('five_hour', 40), limit('seven_day', 91, RESET_WEEK())] }
+  expect(await bandTexts($)).toContain('Week limit 91% · resets 6d')
+
+  // Both over: the higher one.
+  world.usage = { context: 5, limits: [limit('five_hour', 84), limit('seven_day', 91)] }
+  const both = await bandTexts($)
+  expect(both).toContain('Week limit 91%')
+  expect(both.some(t => t.includes('5-hour'))).toBe(false)
+})
+
+test('the context meter alone does not raise the band, and a failed usage read means no budget band', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 90, limits: [limit('five_hour', 12), limit('seven_day', 8)] }
+  for (const surface of SURFACES) expect((await bandTexts($, surface)).some(t => t.includes('%'))).toBe(false)
+  const d = await mount($, BAND, 'terminal')
+  expect((await d.findAll({ type: 'Button' })).length).toBe(0)
+  await d.unmount()
+
+  world.usageFails = true
+  const failed = await mount($, BAND, 'terminal')
+  expect((await failed.findAll({ type: 'Button' })).length).toBe(0)
+  await failed.unmount()
+})
+
+test('a question comes before budget in the band, and so does a final-checked pull request', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+  world.issueComments = ok(pages([finalCheck(H1)]))
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Ask first?' })
+  for (const surface of SURFACES) {
+    const t = await bandTexts($, surface)
+    expect(t.some(x => x.includes('limit'))).toBe(false)
+    expect(t).toContain('Ask first?')
+  }
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  expect((await bandTexts($)).some(x => x.includes('limit'))).toBe(true)
+
+  await follow($)
+  await untilPane($, '#109')
+  for (const surface of SURFACES) {
+    const t = await bandTexts($, surface)
+    expect(t).toContain(surface === 'terminal' ? '· Final check posted' : 'Final check posted')
+    expect(t.some(x => x.includes('limit'))).toBe(false)
+  }
+})
+
+// ---- the answer field -------------------------------------------------------------------
+
+test('the answer field starts focused and sits in a full-width box tinted like the question card', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Keep it?' })
+  const opener = await mount($, PANE, 'terminal')
+  expect(await opener.findAll({ type: 'Input' })).toEqual([])
+  await opener.press({ key: 'answer-open-d1' })
+  await opener.unmount()
+  for (const surface of SURFACES) {
+    const pane = await mount($, PANE, surface)
+    const [input] = await pane.findAll({ type: 'Input' })
+    expect(input?.props?.autoFocus).toBe(true)
+    const boxes = (await pane.findAll({ type: 'Box' })).filter(b => b.props?.width === '100%')
+    expect(boxes.length).toBe(1)
+    expect(boxes[0]!.props?.backgroundColor).toBe('#d2992224')
+    await pane.unmount()
+  }
+})
+
+test('a long pull request title is wrapped whole on the desktop card, which grows to hold it', async ($, on) => {
+  const { world } = boot(on)
+  const title = 'feat: ' + 'make the pull request title long enough to need several lines of the card '.repeat(2).trim() + ' finale'
+  expect(title.length).toBeGreaterThan(140)
+  await follow109($)
+  const heightOf = async () => {
+    const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+    const svg = (await pane.findAll({ type: 'Svg' })).find(x => String(x.props?.alt ?? '').startsWith('#109'))!
+    const drawn = (await svgsOf(pane)).find(v => v.alt.startsWith('#109'))!.drawn
+    await pane.unmount()
+
+    return { height: Number(svg.props?.height), drawn }
+  }
+  const short = await heightOf()
+
+  world.pr = ok(prJson({ title }))
+  await bash(world, $, 'gh pr ready 109', '')
+  for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).includes('Finale'); i++) await new Promise(r => setTimeout(r, 5))
+  const long = await heightOf()
+  const shown = long.drawn.filter(t => !/^(#109|CI|Codex|Approval|Merge|Draft)/.test(t) && !t.includes('open PR')).join(' ')
+  expect(shown).toBe(title.replace(/^feat: /, '').replace(/^\w/, c => c.toUpperCase()))
+  expect(shown).toContain('finale')
+  expect(shown).not.toContain('…')
+  expect(long.height).toBeGreaterThan(short.height)
+})
+
+test('a pull request title ending in a word wider than the card is cut with an ellipsis, not left to overflow', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  const token = 'hooks/' + 'a'.repeat(120) + '.tsx'
+  world.pr = ok(prJson({ title: `fix: handle ${token}` }))
+  await bash(world, $, 'gh pr ready 109', '')
+  for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).some(t => t.startsWith('Handle')); i++) await new Promise(r => setTimeout(r, 5))
+  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const drawn = (await svgsOf(pane)).find(v => v.alt.startsWith('#109'))!.drawn
+  await pane.unmount()
+  const lines = drawn.filter(t => t.startsWith('Handle') || t.includes('aaaa'))
+  expect(lines.length).toBeGreaterThan(0)
+  expect(lines.some(t => t.includes('aaaa'))).toBe(true)
+  expect(lines.some(t => t.includes('.tsx'))).toBe(false)
+  for (const t of lines.filter(t => t.includes('aaaa'))) {
+    expect(t.endsWith('…')).toBe(true)
+    expect(t.length).toBeLessThan(token.length)
+  }
 })
