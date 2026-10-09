@@ -12,7 +12,7 @@ The band's Details button opens the pane, as does `/mentat`. When there is no op
 
 The pane shows, in this order:
 
-1. The open questions (the agent records each one itself; nothing forces it to), with a button for its recommended answer when it has one, a text field and Dismiss. An answer goes to chat as a message.
+1. The open questions (the agent records each one itself; nothing forces it to), with a button for its recommended answer when it has one, a text field and Dismiss. An answer goes to chat as a message. While Claude Code is in a turn the message waits for it to end, so after the first press the card shows a "Sent" line in place of the buttons, and further presses do nothing.
 2. The session's pull request, as facts read directly from GitHub: its state, CI, Codex's review of the current head, and the number of other open pull requests in this repository.
 3. The agents, with their status and elapsed time.
 4. The context window and rate limits.

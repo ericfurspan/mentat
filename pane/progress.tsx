@@ -28,6 +28,7 @@ const SECTION_GAP = 2
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const answering = atom({ plugin: 'mentat', key: 'decisionsAnswering' } as const, [])
+const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const prRef = atom({ plugin: 'mentat', key: 'prRef' } as const, '')
 const prAtom = atom({ plugin: 'mentat', key: 'pr' } as const, null)
@@ -823,6 +824,7 @@ export const register: Register = (on, _options) => {
       await inTurn(async () => {
         await update($, items, () => [])
         await update($, answering, () => [])
+        await update($, sentAtom, () => [])
       })
       await invalidate($)
     }
@@ -889,6 +891,7 @@ export const register: Register = (on, _options) => {
       }
       // A closed decision is dropped: nothing shows settled ones.
       await update($, items, all => all.filter(d => d.id !== id))
+      await update($, sentAtom, sent => sent.filter(x => x.id !== id))
       return true
     })
     if (!isClosed) {
@@ -1035,6 +1038,7 @@ export const register: Register = (on, _options) => {
     const isNarrow = cols < 48
     const open = (await read($, items))
     const openAnswers = await read($, answering)
+    const sentList = await read($, sentAtom)
     const ref = await read($, prRef)
     const pr = await read($, prAtom)
     const review = await read($, reviewAtom)
@@ -1069,16 +1073,37 @@ export const register: Register = (on, _options) => {
       </Box>
     )
 
-    // True when the answer entered the conversation. When the prompt did not enter
-    // (for example while a turn is running), say so: a press that vanishes looks broken.
+    // True when the answer was taken (queued or in the conversation). The prompt of a
+    // plugin runs once Claude Code is idle, so while a turn runs this waits for the turn:
+    // the question is marked sent first, and a second press for it does nothing.
+    // When the prompt did not enter, say so: a press that vanishes looks broken.
     const send = async (d: { id: string; question: string }, text: string): Promise<boolean> => {
+      const isFirst = await inTurn(async () => {
+        if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
+        await update($, sentAtom, list => [...list, { id: d.id, text }])
+        return true
+      })
+      if (!isFirst) return false
       const sent = await $.prompt.submit({ text: `Answer to decision ${d.id} ("${d.question}"): ${text}` })
       if (sent.drop !== undefined) {
+        await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id)))
         $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
         return false
       }
       return true
     }
+    // The line that takes the place of the buttons once an answer is sent.
+    const sentLine = (id: string): string | undefined => {
+      const text = sentList.find(x => x.id === id)?.text
+      if (text === undefined) return undefined
+      return `Sent: ${text.length > 60 ? `${text.slice(0, 59)}…` : text}. Claude Code reads it after its current turn.`
+    }
+    const dismiss = (id: string) =>
+      inTurn(async () => {
+        await update($, items, all => all.filter(x => x.id !== id))
+        await update($, answering, ids => ids.filter(x => x !== id))
+        await update($, sentAtom, list => list.filter(x => x.id !== id))
+      })
     const setAnswering = (id: string, isOn: boolean) =>
       inTurn(() => update($, answering, ids => (isOn ? [...ids.filter(x => x !== id), id] : ids.filter(x => x !== id))))
 
@@ -1139,23 +1164,20 @@ export const register: Register = (on, _options) => {
             return (
               <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
                 <Svg source={q.svg} alt={`Question: ${d.question}`} width={W} height={q.h} />
-                <Box flexDirection="row" gap={1} marginTop={1}>
-                  {d.accept !== undefined && (
-                    <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
-                  )}
-                  <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
-                  <Button
-                    key={`dismiss-${d.id}`}
-                    label="Dismiss"
-                    onPress={() =>
-                      inTurn(async () => {
-                        await update($, items, all => all.filter(x => x.id !== d.id))
-                        await update($, answering, ids => ids.filter(x => x !== d.id))
-                      })
-                    }
-                  />
-                </Box>
-                {openAnswers.includes(d.id) && (
+                {sentLine(d.id) !== undefined ? (
+                  <Box marginTop={1}>
+                    <Text dimColor>{sentLine(d.id)}</Text>
+                  </Box>
+                ) : (
+                  <Box flexDirection="row" gap={1} marginTop={1}>
+                    {d.accept !== undefined && (
+                      <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
+                    )}
+                    <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
+                    <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
+                  </Box>
+                )}
+                {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
                   <Box marginTop={0.5} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
                     <Input
                       key={`answer-${d.id}`}
@@ -1194,23 +1216,20 @@ export const register: Register = (on, _options) => {
             <Heading label="Question for you" color="warning" />
             <Text bold>{d.question}</Text>
             {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
-            <Box flexDirection="row" gap={1} marginTop={1}>
-              {d.accept !== undefined && (
-                <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
-              )}
-              <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
-              <Button
-                key={`dismiss-${d.id}`}
-                label="Dismiss"
-                onPress={() =>
-                  inTurn(async () => {
-                    await update($, items, all => all.filter(x => x.id !== d.id))
-                    await update($, answering, ids => ids.filter(x => x !== d.id))
-                  })
-                }
-              />
-            </Box>
-            {openAnswers.includes(d.id) && (
+            {sentLine(d.id) !== undefined ? (
+              <Box marginTop={1}>
+                <Text dimColor>{sentLine(d.id)}</Text>
+              </Box>
+            ) : (
+              <Box flexDirection="row" gap={1} marginTop={1}>
+                {d.accept !== undefined && (
+                  <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
+                )}
+                <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
+                <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
+              </Box>
+            )}
+            {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
               <Box marginTop={1} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
                 <Input
                   key={`answer-${d.id}`}
