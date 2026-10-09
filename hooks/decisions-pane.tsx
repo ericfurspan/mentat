@@ -1,10 +1,11 @@
 // The decisions pane: a /decisions command, two tools the model calls to record questions, a band above the prompt and a pane to answer them.
+// The band's first line also shows the result of the agent's last `mentat check`, read from its Bash result.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules"); it approves, denies or changes no other tool call.
 
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Decision } from '../types'
+import type { CheckResult, Decision } from '../types'
 
 const PLUGIN = 'mentat'
 const PANE = 'decisions'
@@ -13,6 +14,29 @@ const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
+const lastCheck = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
+
+// `mentat check` as words anywhere in a command: after a `cd ... &&`, with a
+// path or quotes around mentat, before `2>&1` or a pipe.
+const CHECK_COMMAND = /(?:^|[\s;&|(/"'])mentat["']?\s+check(?=$|[\s;&|)"'])/
+
+// The OK / WARN / PROBLEM lines and the final line of `mentat check`'s output.
+// The final line says whether it passed; without one (an interrupted run, a
+// usage error, output cut by a pipe) there is nothing to record.
+const parseCheck = (output: string): CheckResult | undefined => {
+  const lines = [...new Set(output.replace(/\r/g, '').split('\n').map(l => l.trimEnd()))]
+  const passed = lines.some(l => /^Check OK \(\d+ warning\(s\)\)$/.test(l))
+  const failed = lines.some(l => /^Check failed: \d+ problem\(s\)$/.test(l))
+  if (passed === failed) {
+    return undefined
+  }
+  const after = (tag: string) => lines.filter(l => l.startsWith(`${tag}: `)).map(l => l.slice(tag.length + 2))
+  const codex = after('OK')
+    .map(l => /^codex is installed \((.+)\)$/.exec(l)?.[1])
+    .find(v => v !== undefined && v !== 'version unknown')
+
+  return { passed, codex, warnings: after('WARN'), problems: after('PROBLEM') }
+}
 
 const isOpen = (d: Decision) => d.closedAt === undefined
 // Settled decisions, most recently settled first.
@@ -121,30 +145,76 @@ export const register: Register = on => {
     return { result: `Closed decision ${id}.` }
   })
 
+  // Records the agent's `mentat check`. A failing check exits 1, so the Bash
+  // result may be an error: its stdout is then in `text` (what the model read)
+  // and not in a typed record. Both are read; a duplicate line counts once.
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const ran = await next(e)
+    const command = (e as unknown as { command?: unknown }).command
+    if (typeof command !== 'string' || !CHECK_COMMAND.test(command) || ran.deny !== undefined) {
+      return ran
+    }
+    const record = ran.result as { stdout?: unknown; stderr?: unknown; interrupted?: unknown } | string | undefined
+    const typed = typeof record === 'object' && record !== null ? record : undefined
+    if (typed?.interrupted === true) {
+      return ran
+    }
+    const output = [typed?.stdout, typed?.stderr, typeof record === 'string' ? record : undefined, ran.text]
+      .filter((part): part is string => typeof part === 'string')
+      .join('\n')
+    const parsed = parseCheck(output)
+    if (parsed !== undefined) {
+      await update($, lastCheck, () => parsed)
+    }
+
+    return ran
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) {
       return next(e)
     }
     const open = (await read($, items)).filter(isOpen)
-    if (open.length === 0) {
-      return next(e)
-    }
+    const check = await read($, lastCheck)
     const { Box, Button, Text } = $.ui.resolve(e)
-    const latest = open[open.length - 1]!
-    // The band is shared: what the plugins beneath draw stays, under this row.
+    const latest = open[open.length - 1]
+    // The band is shared: what the plugins beneath draw stays, under these rows.
     const beneath = await next(e)
 
     return (
       <Box flexDirection="column">
-        <Box>
-          <Text bold color="claude">
-            {open.length === 1 ? '1 decision waits on you' : `${open.length} decisions wait on you`}
+        {check === null && <Text dimColor>Mentat loaded</Text>}
+        {check !== null && check.passed && (
+          <Text bold color="success">
+            ● Mentat engaged{check.codex !== undefined ? ` · ${check.codex}` : ''}
           </Text>
-          <Text color="text" wrap="truncate-end">
-            {' '}· {latest.question}{' '}
+        )}
+        {check !== null && check.passed && check.warnings.map((w, i) => (
+          <Text key={`warn-${i}`} color="warning">
+            {'  '}{w}
           </Text>
-          <Button key="show" label="Show" onPress={() => $.ui.open({ id: PANE, title: 'Decisions' })} />
-        </Box>
+        ))}
+        {check !== null && !check.passed && (
+          <Text bold color="error">
+            ● Mentat check failed
+          </Text>
+        )}
+        {check !== null && !check.passed && check.problems.map((p, i) => (
+          <Text key={`problem-${i}`} color="error">
+            {'  '}{p}
+          </Text>
+        ))}
+        {latest !== undefined && (
+          <Box>
+            <Text bold color="claude">
+              {open.length === 1 ? '1 decision waits on you' : `${open.length} decisions wait on you`}
+            </Text>
+            <Text color="text" wrap="truncate-end">
+              {' '}· {latest.question}{' '}
+            </Text>
+            <Button key="show" label="Show" onPress={() => $.ui.open({ id: PANE, title: 'Decisions' })} />
+          </Box>
+        )}
         {beneath}
       </Box>
     )
