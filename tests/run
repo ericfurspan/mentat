@@ -169,7 +169,7 @@ else
 fi
 
 # The Mentat band and pane is a Claude Code mod: the plugin validates (warnings are fine,
-# only a failure counts) and the mod's own tests, tests/*.test.tsx, pass.
+# only a failure counts) and the mod's own tests, pane/*.test.tsx, pass.
 if command -v claude >/dev/null 2>&1; then
   for sub in validate test; do
     if out=$(claude plugin "$sub" . 2>&1); then
