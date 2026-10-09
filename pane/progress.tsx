@@ -803,6 +803,9 @@ export const register: Register = (on, _options) => {
     // The former decisions pane kept settled entries (with closedAt) in this state;
     // nothing shows them now, so they must not come back as open questions.
     await inTurn(() => update($, items, withoutSettled))
+    // A submit that was still waiting for a turn is lost with the old load: its question
+    // offers its buttons again. A delivered answer stays marked.
+    await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()

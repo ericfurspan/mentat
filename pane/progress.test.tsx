@@ -634,6 +634,33 @@ test('Dismiss on a sent card removes the question and its sent entry, while the 
   }
 })
 
+test('a session start (restart or reload) forgets an answer still waiting for a turn and keeps a delivered one', async ($, on) => {
+  const { world } = boot(on)
+  const sentIds = watchSent(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Delivered?', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, question: 'Waiting?', accept: 'Yes' })
+  const pane = await mount($, PANE, 'terminal')
+  await pane.press({ key: 'accept-d1' })
+  // The submit of d2 never ends here, as when the process behind it is gone.
+  world.promptGate = new Promise<void>(() => undefined)
+  void pane.press({ key: 'accept-d2' })
+  await new Promise(r => setTimeout(r, 20))
+  expect(await sentIds($)).toEqual(['d1', 'd2'])
+  expect(await textsOf(pane)).toContain('Sent: Yes. Claude Code reads it after its current turn.')
+
+  await startSession($)
+  await new Promise(r => setTimeout(r, 20))
+  expect(await sentIds($)).toEqual(['d1'])
+  const keys = (await pane.findAll({ type: 'Button' })).map(x => x.key)
+  expect(keys).toEqual(['dismiss-d1', 'accept-d2', 'answer-open-d2', 'dismiss-d2'])
+  expect(await textsOf(pane)).toContain('Sent: Yes.')
+  // The waiting one can be answered again.
+  world.promptGate = undefined
+  await pane.press({ key: 'accept-d2' })
+  expect(world.sent).toEqual(['Answer to decision d1 ("Delivered?"): Yes', 'Answer to decision d2 ("Waiting?"): Yes'])
+  await pane.unmount()
+})
+
 test('closing a question, or a new conversation, forgets that it was sent', async ($, on) => {
   const { world } = boot(on)
   const sentIds = watchSent(on)
