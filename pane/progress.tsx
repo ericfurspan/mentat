@@ -1,7 +1,8 @@
 // Mentat's band and pane. On the desktop the band is always there, one line: what waits on the
-// maintainer, else a warning that a rate limit runs low, else the newest note, else a quiet line; the
-// pane holds the Log and the agents. On the terminal there is no band: the footer label counts what waits
-// and opens the pane, which has two sections, Waiting on you and the Feed.
+// maintainer, else a warning that a rate limit runs low, else the newest note, else a quiet line. On the
+// terminal there is no band: the footer label counts what waits and opens the pane. The pane, on both, has
+// two sections, Waiting on you and the Feed (the agents that have not ended, then the log); the desktop
+// draws them as two cards of native rows, the terminal as framed text.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -21,16 +22,13 @@ const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
 const NOTE_TOOL = `mcp__${PLUGIN}__note`
 // A rate limit this far gone raises the band.
 const WARN_PERCENT = 80
-// Rows between the desktop pane's sections.
-const SECTION_GAP = 2
 // The terminal pane's width classes, in body columns: sections are framed from FRAME_COLUMNS, headed by a
 // rule from RULE_COLUMNS, and below that also drop the times, the recommendation and the WARN lines.
 const FRAME_COLUMNS = 60
 const RULE_COLUMNS = 40
-// The Log keeps this many entries and cuts a line at LOG_WIDTH characters. The desktop pane's Log card
-// shows the newest LOG_SHOWN until `Show all`; the terminal's Feed shows the newest FEED_SHOWN.
+// The Log keeps this many entries and cuts a line at LOG_WIDTH characters. The Feed shows the newest
+// FEED_SHOWN until `Show all`.
 const LOG_LIMIT = 200
-const LOG_SHOWN = 5
 const FEED_SHOWN = 10
 const LOG_WIDTH = 80
 // The record of items that left without close_decision keeps this many entries.
@@ -40,7 +38,6 @@ const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
-const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
 // Counts the conversations; see classic.SessionStart and sendAnswer.
@@ -91,20 +88,15 @@ type LogDraft = { kind: LogKind; text: string } | { kind: EventKind; text: strin
 const eventDraft = (kind: EventKind, text: string, mark?: EventMark): LogDraft => ({ kind, text, source: 'event', ...(mark === undefined ? {} : { mark }) })
 // An agent's role as an event line names it: Builder, Explore, Plan, else the type as given.
 const roleName = (type: string): string => {
-  const { role } = roleOf(type)
+  const role = roleOf(type)
 
   return role === 'builder' ? 'Builder' : role === 'explore' ? 'Explore' : role === 'plan' ? 'Plan' : type
 }
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-const shortModel = (model: string): string =>
-  model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, ' $1.$2').replace(/^\w/, c => c.toUpperCase())
 const duration = (ms: number): string => {
   const s = Math.max(0, Math.round(ms / 1000))
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
-const kTokens = (n: number): string => (n < 1000 ? `${n}` : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`)
-// An effort level as the row shows it; a number is a budget.
-const showEffort = (effort: string | number): string => (typeof effort === 'number' ? `${kTokens(effort)} budget` : effort)
 const resetIn = (at: string | undefined, now: number): string => {
   if (at === undefined) return ''
   const ms = Date.parse(at) - now
@@ -181,10 +173,9 @@ const isActive = (s: AgentStatus): boolean => s === 'running' || s === 'waiting'
 
 type AgentInfoLike = { id: string; type: string; description: string; status: AgentStatus }
 // Fits the rows to what the engine lists: statuses follow the engine, an end freezes
-// the elapsed time, an agent the mod never saw is added without a model or start (with the
-// effort its requests used, if any were seen),
+// the elapsed time, an agent the mod never saw is added without a start,
 // and one the engine no longer lists is ended (unknown), never finished.
-const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number, efforts: ReadonlyMap<string, string>): AgentRow[] => {
+const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): AgentRow[] => {
   const next = rows.map(row => {
     const info = infos.find(i => i.id === row.id)
     if (info === undefined) return isEnded(row.status) ? row : { ...row, status: 'unknown' as const, endedAt: now }
@@ -194,13 +185,11 @@ const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number, effort
   })
   for (const info of infos) {
     if (rows.some(r => r.id === info.id)) continue
-    const effort = efforts.get(info.id)
     next.push({
       id: info.id,
       type: info.type,
       description: info.description,
       status: info.status,
-      ...(effort === undefined ? {} : { effort }),
       ...(isEnded(info.status) ? { endedAt: now } : {}),
     })
   }
@@ -218,16 +207,14 @@ const httpsLink = (v: unknown): string | undefined => {
   const link = typeof v === 'string' ? v.trim() : ''
   return link.length <= 2048 && /^https:\/\/[^\s/]\S*$/.test(link) ? link : undefined
 }
-// The words an item's link is drawn with: the address without its scheme.
-const linkLabel = (link: string): string => link.replace(/^https:\/\//, '')
-// The words a link is drawn with on the terminal, where a row is tight: `#160` for a GitHub issue or pull
+// The words a link is drawn with, where a row is tight: `#160` for a GitHub issue or pull
 // request (always the bare number: knowing whether it is this session's repository would need a read, and the
 // pane reads nothing), else the host (`example.com`). The Link still opens the whole address.
 const shortLink = (link: string): string => {
   const github = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/(?:issues|pull)\/(\d+)(?:[/?#]\S*)?$/.exec(link)
   if (github !== null) return `#${github[1]}`
 
-  return /^https:\/\/([^/?#\s]+)/.exec(link)?.[1] ?? linkLabel(link)
+  return /^https:\/\/([^/?#\s]+)/.exec(link)?.[1] ?? link.replace(/^https:\/\//, '')
 }
 
 // `mentat check` as words anywhere in a command: after a `cd ... &&`, with a path or quotes
@@ -346,13 +333,13 @@ const agentEvents = (before: AgentRow[], after: AgentRow[]): LogDraft[] => {
   return drafts
 }
 
-async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
+async function syncAgents($: EngineInterface): Promise<void> {
   try {
     const infos = (await $.agent.list()) as AgentInfoLike[]
     const now = await $.clock.now()
     await inTurn(async () => {
       const before = await read($, agents)
-      const after = reconcile(before, infos, now, efforts)
+      const after = reconcile(before, infos, now)
       await update($, agents, () => after)
       await addLog($, now, agentEvents(before, after))
     })
@@ -361,10 +348,10 @@ async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, strin
   }
 }
 
-async function agentTick($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
+async function agentTick($: EngineInterface): Promise<void> {
   const rows = await read($, agents)
   if (!rows.some(r => !isEnded(r.status))) return
-  await syncAgents($, efforts)
+  await syncAgents($)
   await invalidate($)
 }
 
@@ -470,13 +457,13 @@ async function startCheck($: EngineInterface, cwd?: string): Promise<void> {
 
 // ---- the module -----------------------------------------------------------------------------
 
-// ---- Drawn desktop design: each card is one themed Svg; buttons stay native. ----
+// ---- Drawn desktop pieces: the band's one-line Svg and the pane's small marks; buttons and text rows are native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
 const CSS = `<style>
-.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}
-@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}}
+.t{fill:#1d1d1b}.m{fill:#9b9b96}
+@media (prefers-color-scheme: dark){.t{fill:#ededeb}.m{fill:#7c7c78}}
 </style>`
-const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', teal: '#1E9E9A', grey: '#8f8f8a' }
+const HUE = { amber: '#C98A0E', blue: '#3D7FE6', red: '#D0453F', grey: '#8f8f8a' }
 
 const xml = (s: string): string => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
 const charEm = (ch: string): number => (/[\s.,:;'|!il1()[\]]/.test(ch) ? 0.3 : /[A-Z@%mw#]/.test(ch) ? 0.72 : 0.56)
@@ -492,84 +479,17 @@ const fit = (s: string, size: number, maxW: number): string => {
 }
 const svgOf = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${CSS}${body}</svg>`
-const agentMark = (x: number, y: number, status: AgentStatus): string => {
-  if (isActive(status)) return `<circle cx="${x}" cy="${y}" r="7" fill="${HUE.blue}" opacity="0.18"/><circle cx="${x}" cy="${y}" r="3.5" fill="${HUE.blue}"/>`
-  if (status === 'completed') return `<circle cx="${x}" cy="${y}" r="8" fill="${HUE.green}" opacity="0.14"/><path d="M${x - 3.5} ${y}l2.5 2.5 4.5-5" fill="none" stroke="${HUE.green}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
-  if (status === 'failed' || status === 'killed') return `<circle cx="${x}" cy="${y}" r="8" fill="${HUE.red}" opacity="0.14"/><path d="M${x - 3} ${y - 3}l6 6M${x + 3} ${y - 3}l-6 6" stroke="${HUE.red}" stroke-width="1.7" stroke-linecap="round"/>`
-  return `<circle cx="${x}" cy="${y}" r="7" fill="none" class="m" stroke="${HUE.grey}" stroke-width="1.3"/>`
-}
-
-// The role of an agent by its type: the label shown, its color and its glyph.
+// The role of an agent by its type.
 type Role = 'builder' | 'explore' | 'plan' | 'other'
-const ROLE_HUE: Record<Role, string> = { builder: HUE.violet, explore: HUE.blue, plan: HUE.teal, other: HUE.grey }
-const roleOf = (type: string): { role: Role; label: string } => {
+const roleOf = (type: string): Role => {
   const t = type.toLowerCase()
-  if (t === 'builder' || t === 'mentat:builder') return { role: 'builder', label: 'builder' }
-  if (t === 'explore') return { role: 'explore', label: 'explore' }
-  if (t === 'plan') return { role: 'plan', label: 'plan' }
-  return { role: 'other', label: type }
+  if (t === 'builder' || t === 'mentat:builder') return 'builder'
+  if (t === 'explore') return 'explore'
+  if (t === 'plan') return 'plan'
+  return 'other'
 }
 // The terminal's one-character mark for a role, where the desktop draws its glyph.
 const ROLE_MARK: Record<Role, string> = { builder: '◆', explore: '◎', plan: '◇', other: '·' }
-// Glyphs on a 24 by 24 grid, drawn in the role color: a wrench, a magnifier, a compass, a dot.
-const GLYPH: Record<Role, string> = {
-  builder: '<path d="M13 11L5 19"/><path d="M16.7 3.9A4.2 4.2 0 1 0 20.1 7.3"/>',
-  explore: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
-  plan: '<circle cx="12" cy="12" r="8.5"/><path d="M15.8 8.2l-2.1 5.5-5.5 2.1 2.1-5.5z"/>',
-  other: '<circle cx="12" cy="12" r="4" stroke="none" fill="HUE"/>',
-}
-// A tinted tile with the role's glyph, centered on (cx, cy); a finished agent's is dimmed.
-const roleIcon = (cx: number, cy: number, role: Role, isDone: boolean): string => {
-  const hue = ROLE_HUE[role]
-
-  return `<g opacity="${isDone ? 0.55 : 1}"><rect x="${cx - 12}" y="${cy - 12}" width="24" height="24" rx="7" fill="${hue}" opacity="0.14"/><g data-role="${role}" transform="translate(${cx - 7.2} ${cy - 7.2}) scale(0.6)" fill="none" stroke="${hue}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${GLYPH[role].replace('HUE', hue)}</g></g>`
-}
-
-type AgentCardRow = { status: AgentStatus; title: string; type: string; model: string; stats: string }
-export const AGENT_ROW_H = 34
-export const AGENT_HEAD_H = 30
-// One group of agents as its own card: an optional header, then one-line rows. Left to right a row
-// has the role icon, the title, the model and effort (dimmer) after it, the stats (tokens and
-// elapsed time, right-aligned) and the status mark on the right edge. A long title is cut with an
-// ellipsis, and the model after it when there is still not room. The role is in the alt text.
-const agentsSvg = (W: number, header: string | undefined, rows: AgentCardRow[]): { svg: string; h: number } => {
-  const top = header === undefined ? 4 : AGENT_HEAD_H
-  const h = top + rows.length * AGENT_ROW_H + 4
-  const tx = 48
-  const gap = 10
-  const body = rows.map((r, i) => {
-    const y = top + i * AGENT_ROW_H
-    const cy = y + AGENT_ROW_H / 2
-    const done = isEnded(r.status)
-    const { role } = roleOf(r.type)
-    const statsX = W - 44
-    const statsW = r.stats === '' ? 0 : textW(r.stats, 11.5)
-    // The room from the title's left edge to the stats (or the mark, when there are no stats).
-    const room = statsX - tx - (statsW === 0 ? 0 : statsW + 14)
-    const modelW = r.model === '' ? 0 : textW(r.model, 12)
-    let title = r.title
-    let model = r.model
-    if (textW(title, 14) + (modelW === 0 ? 0 : gap + modelW) > room) {
-      title = fit(r.title, 14, Math.max(room * 0.6, room - (modelW === 0 ? 0 : gap + modelW)))
-      const left = room - textW(title, 14) - gap
-      model = left < 40 ? '' : fit(r.model, 12, left)
-    }
-    // A finished agent is drawn in the muted color, so running work stands out; its mark keeps its own.
-    return `${roleIcon(24, cy, role, done)}
-<text class="${done ? 'm' : 't'}" x="${tx}" y="${cy + 5}" font-family="${FONT}" font-size="14" font-weight="${isActive(r.status) ? 600 : 500}">${xml(title)}</text>
-${model === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${Math.round(tx + textW(title, 14) + gap)}" y="${cy + 4.5}" font-family="${FONT}" font-size="12">${xml(model)}</text>`}
-${r.stats === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${statsX}" y="${cy + 4}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.stats)}</text>`}
-${agentMark(W - 26, cy, r.status)}
-${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2="${W - 16}" y2="${y + AGENT_ROW_H}"/>` : ''}`
-  })
-  const head = header === undefined ? '' : `<text class="s" x="16" y="21" font-family="${FONT}" font-size="12.5" font-weight="600">${xml(header)}</text>`
-
-  return { svg: svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${head}${body.join('')}`), h }
-}
-// The alt text of a group: its heading and count, then each agent's role and title (the role is not drawn as text).
-const agentsAlt = (heading: string, rows: AgentCardRow[]): string =>
-  `${heading}: ${rows.length} (${rows.map(r => `${roleOf(r.type).label}: ${r.title}`).join('; ')})`
-
 // What the band's left side shows, in this order: the item that waits on the maintainer (the most
 // urgent: alert, question, check warning, action; the newest within a kind), a budget warning,
 // the newest Log note, and last a quiet `Mentat` line.
@@ -854,7 +774,7 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     const state = ran === undefined ? a.status : `${a.status} · ${ran}`
 
     return row(`agent-${a.id}`, [
-      <Text key="mark">{ROLE_MARK[roleOf(a.type).role]}</Text>,
+      <Text key="mark">{ROLE_MARK[roleOf(a.type)]}</Text>,
       <Box key="text" flexGrow={1} flexShrink={1}>
         <Text bold wrap="truncate-end">
           {a.description}
@@ -915,12 +835,140 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   )
 }
 
+// ---- the desktop pane: Waiting on you, then the Feed, as two cards of native rows ----
+
+// The card surface: a faint neutral tint (grey at about 8%), light on a light theme and dark on a dark one.
+// Whether the desktop app draws a Box background and a rounded border is not verified; change or drop it here.
+export const CARD_TINT = '#80808014'
+// The mark column of an item row, in cells (the Svg inside is 20px), and the indent of the lines under the text.
+const MARK_CELLS = 3
+const TEXT_INDENT = MARK_CELLS + 1
+// A small round tinted mark with a glyph, a fixed 20px Svg; it is the only picture in the pane, and it does
+// not take part in the reflow when the divider moves.
+const MARK_SIZE = 20
+const markSvg = (char: string, hue: string): string =>
+  svgOf(MARK_SIZE, MARK_SIZE, `<circle cx="10" cy="10" r="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="10" y="14.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(char)}</text>`)
+
+// The pane on the desktop: the same sections, entries and order as the terminal's, drawn as rows of native
+// Box and Text. Nothing here is measured: the text row grows and shrinks (and is cut with an ellipsis), so
+// the rows follow the divider without a redraw from the mod.
+async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0]) {
+  const { Box, Button, Link, Svg, Text } = $.ui.resolve(e)
+  const data = await paneData($)
+  const { now, zone, open, live, logList, budget } = data
+
+  const card = (key: string, title: string, color: string, count: number, body: RenderElement) => (
+    <Box key={key} flexDirection="column" gap={1} borderStyle="round" borderDimColor backgroundColor={CARD_TINT} paddingX={1}>
+      <Box key={`${key}-head`} flexDirection="row" gap={1}>
+        <Text bold color={color}>
+          {title}
+        </Text>
+        <Text dimColor>{count}</Text>
+      </Box>
+      {body}
+    </Box>
+  )
+  // The text of a row: the only part that shrinks.
+  const cut = (text: string, props: { bold?: boolean; dimColor?: boolean } = {}) => (
+    <Box flexGrow={1} flexShrink={1}>
+      <Text wrap="truncate-end" {...props}>
+        {text}
+      </Text>
+    </Box>
+  )
+
+  const waiting = open.map(d => {
+    const { kind, sent, answer, link, detail, warns } = itemView(d, data)
+    const mark = MARK[kind]
+
+    return (
+      <Box key={`item-${d.id}`} flexDirection="column">
+        <Box flexDirection="row" alignItems="center" gap={1}>
+          <Box width={MARK_CELLS} flexShrink={0}>
+            <Svg source={markSvg(mark.char, mark.hue)} alt={ITEM_ALT[kind]} width={MARK_SIZE} height={MARK_SIZE} />
+          </Box>
+          {cut(d.question)}
+          <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
+            {link !== undefined && (
+              <Text>
+                <Link href={link} label={shortLink(link)} />
+              </Text>
+            )}
+            {answer !== undefined && <Button key={`accept-${d.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, d, answer)} />}
+            {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
+            <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismissItem($, d.id)} />
+          </Box>
+        </Box>
+        {[detail, ...warns].map((line, i) => (
+          <Box key={`detail-${i}`} paddingLeft={TEXT_INDENT} flexDirection="row">
+            {cut(line, { dimColor: true })}
+          </Box>
+        ))}
+      </Box>
+    )
+  })
+
+  // The time column is a fixed width and right-aligned: an agent's state word sits in it, a log line's time.
+  const timeColumn = (child: RenderElement) => (
+    <Box width={8} flexShrink={0} justifyContent="flex-end">
+      {child}
+    </Box>
+  )
+  const agentRows = live.map(a => {
+    const ran = agentClock(a, now)
+
+    return (
+      <Box key={`agent-${a.id}`} flexDirection="row" alignItems="center" gap={1}>
+        {timeColumn(<Text color="suggestion">{a.status}</Text>)}
+        <Text color="suggestion">●</Text>
+        {cut(a.description, { bold: true })}
+        {ran !== undefined && <Text dimColor>{ran}</Text>}
+      </Box>
+    )
+  })
+  const logRows = data.entries.map(({ entry, n }) => {
+    const { icon, color } = styleOf(entry)
+
+    return (
+      <Box key={`log-${n}`} flexDirection="row" alignItems="center" gap={1}>
+        {timeColumn(<Text dimColor>{clockAt(entry.at, zone)}</Text>)}
+        <Text color={color}>{icon}</Text>
+        {cut(entry.text, isNote(entry) ? {} : { dimColor: true })}
+      </Box>
+    )
+  })
+  const feed = (
+    <Box flexDirection="column">
+      {agentRows}
+      {logRows.length > 0 && (
+        <Box key="log" flexDirection="column" marginTop={agentRows.length > 0 ? 1 : 0}>
+          {logRows}
+        </Box>
+      )}
+      {data.toggle !== undefined && (
+        <Box key="log-more" flexDirection="row" marginTop={1}>
+          <Button key="log-toggle" label={data.toggle} onPress={() => toggleLogAll($)} />
+        </Box>
+      )}
+    </Box>
+  )
+  const hasFeed = live.length > 0 || logList.length > 0
+
+  return (
+    <Box flexDirection="column" gap={1} paddingX={1}>
+      {budget !== undefined && (
+        <Text color="warning" wrap="truncate-end">
+          {budget}
+        </Text>
+      )}
+      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box flexDirection="column" gap={1}>{waiting}</Box>)}
+      {hasFeed && card('card-feed', 'FEED', 'subtle', live.length + logList.length, feed)}
+      {open.length === 0 && !hasFeed && <Text dimColor>Nothing waiting on you.</Text>}
+    </Box>
+  )
+}
+
 export const register: Register = (on, _options) => {
-  // The effort an Agent call asked for, until the agent it spawns is recorded.
-  const effortByCall = new Map<string, string>()
-  // The effort an agent's latest model request used, by agent id. It also holds a value that
-  // arrived before the agent's row did; agent.spawn applies it when the row appears.
-  const effortByAgent = new Map<string, string>()
   let agentTimer: { cancel: () => void } | undefined
   let refreshTimer: { cancel: () => void } | undefined
 
@@ -1003,8 +1051,8 @@ export const register: Register = (on, _options) => {
     await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
     agentTimer?.cancel()
     refreshTimer?.cancel()
-    await syncAgents($, effortByAgent)
-    agentTimer = $.clock.every(1000, () => void agentTick($, effortByAgent))
+    await syncAgents($)
+    agentTimer = $.clock.every(1000, () => void agentTick($))
     // A minute tick only redraws, so an idle session shows a rate limit that crossed the warning line.
     refreshTimer = $.clock.every(60_000, () => void invalidate($))
     void startCheck($, e.cwd)
@@ -1128,10 +1176,6 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', async ($, e, next) => {
-    if (e.tool === 'Agent') {
-      const effort = (e as unknown as { effort?: unknown }).effort
-      if (typeof effort === 'string') effortByCall.set(e.tool_use_id, effort)
-    }
     const isMainBash = e.tool === 'Bash' && e.agentId === undefined && typeof e.command === 'string'
     const ran = await next(e)
     if (isMainBash) {
@@ -1155,11 +1199,6 @@ export const register: Register = (on, _options) => {
       status: 'running',
       startedAt,
     }
-    const model = out.model ?? e.model
-    if (model !== undefined && model !== '') row.model = model
-    const effort = effortByAgent.get(id) ?? effortByCall.get(e.tool_use_id)
-    if (effort !== undefined) row.effort = effort
-    effortByCall.delete(e.tool_use_id)
     await inTurn(async () => {
       await update($, agents, list => [...list.filter(a => a.id !== id), row].slice(-30))
     })
@@ -1168,37 +1207,11 @@ export const register: Register = (on, _options) => {
     return out
   })
 
-  // The effort each of a subagent's requests uses, which the Agent call's own effort often
-  // leaves out. The request passes through as it came, and the write never waits for it.
-  on('turn.step', async function* ($, e, next) {
-    const id = e.agentId
-    if (id !== undefined && e.effort !== undefined) {
-      const shown = showEffort(e.effort)
-      if (effortByAgent.get(id) !== shown) {
-        effortByAgent.set(id, shown)
-        void inTurn(async () => {
-          const rows = await read($, agents)
-          if (!rows.some(r => r.id === id && r.effort !== shown)) return
-          await update($, agents, list => list.map(r => (r.id === id ? { ...r, effort: shown } : r)))
-          await invalidate($)
-        }).catch(() => undefined)
-      }
-    }
-
-    return yield* next(e)
-  })
-
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId
     if (id !== undefined) {
-      const u = e.usage
-      const tokens =
-        u === undefined ? undefined : (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.output_tokens ?? 0)
-      if (tokens !== undefined) {
-        await inTurn(() => update($, agents, rows => rows.map(r => (r.id === id ? { ...r, tokens } : r))))
-      }
       // A subagent's turn is not its end: only the engine's list says that.
-      await syncAgents($, effortByAgent)
+      await syncAgents($)
       await invalidate($)
     }
 
@@ -1292,7 +1305,7 @@ export const register: Register = (on, _options) => {
         {urgent !== undefined && <Button key={`dismiss-${urgent.id}`} label="Dismiss" onPress={() => dismissItem($, urgent.id)} />}
         {link !== undefined && (
           <Text>
-            <Link href={link} label={linkLabel(link)} />
+            <Link href={link} label={shortLink(link)} />
           </Text>
         )}
         <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
@@ -1306,7 +1319,7 @@ export const register: Register = (on, _options) => {
       (urgent === undefined ? 0 : buttonW('Dismiss') + 8) +
       (answer === undefined ? 0 : buttonW(answer) + 8) +
       (sent === undefined ? 0 : Math.round(textW(sentLine(sent), 12)) + 8) +
-      (link === undefined ? 0 : Math.round(textW(linkLabel(link), 13)) + 8)
+      (link === undefined ? 0 : Math.round(textW(shortLink(link), 13)) + 8)
     const W = Math.max(160, (e.props.bodyColumns ?? 80) * 8 - 96 - beside)
     const alt = `${left.kind === 'budget' || left.kind === 'quiet' ? '' : left.kind === 'note' ? 'Note: ' : `${ITEM_ALT[left.kind]}: `}${left.text}${more === '' ? '' : ` (${more})`}`
 
@@ -1322,99 +1335,8 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const cols = e.props.bodyColumns ?? 50
-    if (e.surface !== 'desktop') return terminalPane($, e, cols)
-    const { Box, Button, Svg, Text } = $.ui.resolve(e)
-    const now = await $.clock.now()
-    // What waits on the maintainer is in the band, not here; the pane only knows whether anything does.
-    const open = await read($, items)
-    const rows = [...(await read($, agents))].sort((a, b) => {
-      if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
-      return (b.startedAt ?? 0) - (a.startedAt ?? 0)
-    })
-    const isHidden = await read($, finishedHidden)
-    // Agents that have not ended (running, waiting, idle) first, then the finished ones.
-    const liveRows = rows.filter(a => !isEnded(a.status))
-    const doneRows = rows.filter(a => isEnded(a.status))
-    const toggleFinished = () => inTurn(() => update($, finishedHidden, v => !v))
-    const Heading = ({ label, color }: { label: string; color?: string }) => (
-      <Box flexDirection="row" marginBottom={1}>
-        <Text bold color={color ?? 'subtle'}>
-          {label.toUpperCase()}
-        </Text>
-      </Box>
-    )
+    if (e.surface !== 'desktop') return terminalPane($, e, e.props.bodyColumns ?? 50)
 
-    // The Log card: the newest entries first, the last LOG_SHOWN of them until `Show all`. Plain text
-    // rows on both surfaces, with no background: an 8-digit hex tint renders as solid grey in a terminal.
-    const logList = await read($, logAtom)
-    const isLogAll = await read($, logAll)
-    const zone = await readZone($)
-    const toggleLog = () => inTurn(() => update($, logAll, v => !v))
-    const logRows = logList.map((entry, n) => ({ entry, n })).reverse()
-    const logCard = (marginTop: number) =>
-      logList.length === 0 ? undefined : (
-        <Box flexDirection="column" marginTop={marginTop}>
-          <Heading label="Log" />
-          {(isLogAll ? logRows : logRows.slice(0, LOG_SHOWN)).map(({ entry, n }) => (
-            <Box key={`log-${n}`} flexDirection="row" gap={1}>
-              <Box width={8} flexShrink={0} justifyContent="flex-end">
-                <Text dimColor>{clockAt(entry.at, zone)}</Text>
-              </Box>
-              <Text color={styleOf(entry).color}>{styleOf(entry).icon}</Text>
-              <Text wrap="truncate-end" {...(isNote(entry) ? {} : { dimColor: true })}>
-                {entry.text}
-              </Text>
-            </Box>
-          ))}
-          {logList.length > LOG_SHOWN && (
-            <Box flexDirection="row" marginTop={1}>
-              <Button key="log-toggle" label={isLogAll ? 'Show fewer' : `Show all ${logList.length}`} onPress={toggleLog} />
-            </Box>
-          )}
-        </Box>
-      )
-    const W = Math.max(220, Math.min(900, cols * 8 - 24))
-    const agentRow = (a: AgentRow): AgentCardRow => {
-      const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
-      const elapsed = ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms)
-
-      return {
-        status: a.status,
-        title: a.description,
-        type: a.type,
-        model: [a.model === undefined ? undefined : shortModel(a.model), a.effort].filter(Boolean).join(' · '),
-        stats: [a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`, elapsed === '' ? undefined : elapsed].filter(Boolean).join(' · '),
-      }
-    }
-    const liveRowsSvg = liveRows.map(agentRow)
-    const doneRowsSvg = doneRows.map(agentRow)
-    const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRowsSvg)
-    const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRowsSvg)
-    return (
-      <Box flexDirection="column" paddingX={1}>
-        {open.length === 0 && logList.length === 0 && rows.length === 0 && (
-          <Box marginTop={SECTION_GAP}>
-            <Text dimColor>Nothing waiting on you.</Text>
-          </Box>
-        )}
-        {logCard(SECTION_GAP)}
-        {rows.length > 0 && (
-          <Box flexDirection="column" marginTop={SECTION_GAP}>
-            {liveCard !== undefined && <Svg source={liveCard.svg} alt={agentsAlt('Running agents', liveRowsSvg)} width={W} height={liveCard.h} />}
-            {doneRows.length > 0 && (
-              <Box flexDirection="row" marginTop={liveCard === undefined ? 0 : 1}>
-                <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
-              </Box>
-            )}
-            {doneCard !== undefined && (
-              <Box marginTop={1}>
-                <Svg source={doneCard.svg} alt={agentsAlt('Finished agents', doneRowsSvg)} width={W} height={doneCard.h} />
-              </Box>
-            )}
-          </Box>
-        )}
-      </Box>
-    )
+    return desktopPane($, e)
   })
 }
