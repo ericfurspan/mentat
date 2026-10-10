@@ -1222,7 +1222,6 @@ export const register: Register = (on, _options) => {
       await update($, items, list =>
         [...list, { id: `d${n}`, ...(kind === 'question' ? {} : { kind }), question, ...(link === undefined ? {} : { link }), recommendation, accept, openedAt }],
       )
-      await addLog($, openedAt, [eventDraft('asked', `Asked you: ${question}`, kind)])
       return `d${n}`
     })
     await invalidate($)

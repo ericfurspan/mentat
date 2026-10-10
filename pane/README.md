@@ -64,7 +64,7 @@ The Log holds the notes the agent adds with the `note` tool and the event lines 
 - The kinds: `decision` (`◆`, a decision the maintainer made), `plan` (`▸`, a change of plan or what comes next), `surprise` (`!`, amber, something surprising found), `waiting` (`◌`, dim, what the agent now waits on) and `done` (`✓`, green, a piece of work finished).
 - The event lines, one per real state change, each one line like a note, with a mark in the color shown:
   - An agent ends: `✓ <Role> finished: <description>` (green, with no time), `✕ <Role> failed: <description>` or `✕ <Role> stopped: <description>` (red, for a failed or a killed agent). The role is `Builder` (for `builder` and `mentat:builder`), `Explore`, `Plan` or the type as given. An agent whose end is not known, or one the pane first sees already ended, adds no line.
-  - `Asked you: <question>` when `open_decision` opens an item, marked like the item: `?` amber for a question, `→` blue for an action, `!` red for an alert.
+  - `open_decision` writes no line: the answered, dismissed and closed lines name the question. (A log kept from an earlier version may hold `Asked you: <question>` lines; they are still drawn.)
   - `✓ You answered "<text>": <question>` when the answer button's message has entered the session (not while it waits, and not when it is dropped).
   - `✓ Closed: <question>`, with ` · <outcome>` when one is given, when `close_decision` closes an open item (none for an item that was already dismissed or cleared).
   - `· You dismissed: <question>` when Dismiss removes an open item.

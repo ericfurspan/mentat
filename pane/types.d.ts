@@ -33,6 +33,7 @@ export type AgentRow = {
 export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
 // The kinds of event line the pane writes to the Log itself. The `note` tool never takes one.
+// (`asked` is no longer written; a log kept from an earlier version may still hold it.)
 export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'dismissed' | 'check' | 'prOpened'
 
 // What an `asked` or `check` event line is marked with: the kind of the item asked, or the result of the check.

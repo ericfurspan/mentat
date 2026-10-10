@@ -2275,8 +2275,8 @@ test('only the pane\'s own events are logged: a ready, a close, an issue, a Code
   await eng($).turn.complete(turnDone('b1'))
   await bash(world, $, 'git push', '')
   await new Promise(r => setTimeout(r, 30))
-  // Only the pane's own events: the PR opened, the item asked and closed, the builder done.
-  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
+  // Only the pane's own events: the PR opened, the item closed, the builder done.
+  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '✓ Closed: Merge the log card now? · Yes, merge', '↗ Opened PR #130'])
   // The commands still ran as before.
   expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-on'])
 })
@@ -2375,8 +2375,8 @@ test('the log rows are plain native rows on both surfaces, with no Svg; the live
     expect(t.indexOf('Look around')).toBeLessThan(t.indexOf('A decision'))
     expect(t.indexOf('Open one?')).toBeLessThan(t.indexOf('FEED'))
     const rows = (await pane.findAll({ type: 'Box' })).filter(b => String(b.key).startsWith('log-'))
-    // The note, and the line for the question the pane saw opened.
-    expect(rows.length).toBeGreaterThanOrEqual(2)
+    // The note alone: opening a question writes no line.
+    expect(rows.length).toBe(1)
     expect(rows.every(b => b.props?.backgroundColor === undefined)).toBe(true)
     // The log's marks are Text glyphs, not pictures.
     expect((await svgsOf(pane)).map(v => v.alt)).toEqual(surface === 'desktop' ? ['Question'] : [])
@@ -2487,8 +2487,8 @@ test('from 60 columns each section is a Box with a dim round border and its head
       expect(head.props?.flexDirection).toBe('row')
       expect(boxes.indexOf(head)).toBe(boxes.indexOf(section) + 1)
     }
-    // The title is bold and its count dim, side by side: `WAITING ON YOU 2`, `FEED 4`.
-    for (const [title, count] of [['WAITING ON YOU', '2'], ['FEED', '4']] as const) {
+    // The title is bold and its count dim, side by side: `WAITING ON YOU 2`, `FEED 3`.
+    for (const [title, count] of [['WAITING ON YOU', '2'], ['FEED', '3']] as const) {
       const i = texts.findIndex(x => x.text === title)
       expect(texts[i]!.props?.bold).toBe(true)
       expect(texts[i + 1]).toMatchObject({ text: count, props: { dimColor: true } })
@@ -2548,7 +2548,7 @@ test('from 40 to 59 columns each section is headed by a rule to the full width, 
     expect(waiting.startsWith('── WAITING ON YOU 2 ─')).toBe(true)
     expect([...waiting]).toHaveLength(cols)
     expect([...rule('FEED')]).toHaveLength(cols)
-    expect(rule('FEED').startsWith('── FEED 4 ─')).toBe(true)
+    expect(rule('FEED').startsWith('── FEED 3 ─')).toBe(true)
     expect(t.some(x => x === '│ ' || x === ' │' || x.startsWith('╰') || x.startsWith('╭'))).toBe(false)
     // The times, the recommendation and the WARN lines are still there.
     expect(t).toContain('Recommended: Yes, it passed · 8:00 AM')
@@ -2888,22 +2888,20 @@ test('an agent first listed already ended writes no line, and two agents with th
   expect(await written($)).toEqual(['✓ Explore finished: Check the docs', '✓ Explore finished: Check the docs'])
 })
 
-test('open_decision writes an Asked line marked by the kind of item; two questions with the same text each get one', async ($, on) => {
+test('open_decision writes no Feed line, whatever the kind; the answer, dismissal and closing lines name the question', async ($, on) => {
   boot(on)
   await open(undefined, 'Ship it?')($)
   await open('question', 'Ship it?')($)
   await open('action', 'Merge #5 when ready')($)
   await open('alert', 'CI is red')($)
-  expect(await written($)).toEqual(['? Asked you: Ship it?', '? Asked you: Ship it?', '→ Asked you: Merge #5 when ready', '! Asked you: CI is red'])
-  // A refused call writes nothing.
+  expect(await written($)).toEqual([])
+  // A refused call writes nothing either.
   expect((await open('warning', 'Not allowed')($)).deny).toBeDefined()
   expect((await open(undefined, '  ')($)).deny).toBeDefined()
-  expect(await lines($)).toHaveLength(4)
-  for (const surface of SURFACES) {
-    expect((await drawnRow($, surface, '?', 'Asked you: Ship it?')).colors).toContain('warning')
-    expect((await drawnRow($, surface, '→', 'Asked you: Merge #5 when ready')).colors).toContain('suggestion')
-    expect((await drawnRow($, surface, '!', 'Asked you: CI is red')).colors).toContain('error')
-  }
+  expect(await lines($)).toEqual([])
+  for (const surface of SURFACES) expect((await paneTexts($, surface)).some(x => x.startsWith('Asked you'))).toBe(false)
+  await eng($).tool.call({ tool: CLOSE, id: 'd3', outcome: 'merged' })
+  expect(await written($)).toEqual(['✓ Closed: Merge #5 when ready · merged'])
 })
 
 test('the mod\'s own check items are not asked: a check writes its result line and no Asked line', async ($, on) => {
@@ -2983,14 +2981,14 @@ test('pressing the answer button writes one You answered line once the prompt is
   // Three presses, the last two before the drawing could have changed.
   const presses = [band.press({ key: 'accept-d1' }), band.press({ key: 'accept-d1' }), band.press({ key: 'accept-d1' })]
   await new Promise(r => setTimeout(r, 20))
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual([])
   turn.release()
   await Promise.all(presses)
   expect(world.sent).toHaveLength(1)
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: Mock it?', '✓ You answered "Yes": Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual(['✓ You answered "Yes": Mock it?'])
   // Pressing again after the delivery does nothing more (the answered item has no answer button).
   expect(await bandKeys(band)).toEqual(['dismiss-d1'])
-  expect(await feedLines(band)).toHaveLength(2)
+  expect(await feedLines(band)).toHaveLength(1)
   await band.unmount()
   for (const surface of SURFACES) expect((await drawnRow($, surface, '✓', 'You answered "Yes": Mock it?')).colors).toContain('success')
 })
@@ -3005,10 +3003,10 @@ test('a submit that is dropped or rejected writes no answered line; the press th
   world.rejectPrompts = true
   await band.press({ key: 'accept-d1' })
   expect(world.sent).toEqual([])
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual([])
   world.rejectPrompts = false
   await band.press({ key: 'accept-d1' })
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: Mock it?', '✓ You answered "Yes": Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual(['✓ You answered "Yes": Mock it?'])
   await band.unmount()
 })
 
@@ -3037,7 +3035,7 @@ test('an answer whose delivery lands after a /clear, /resume or /branch writes n
   const band = await mount($, TERM, 'terminal')
   await startSession($)
   await band.press({ key: 'accept-d4' })
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: After the reload?', '✓ You answered "Yes": After the reload?'])
+  expect((await feedLines(band)).reverse()).toEqual(['✓ You answered "Yes": After the reload?'])
   await band.unmount()
 })
 
@@ -3050,10 +3048,10 @@ test('dismissing a question while its answer waits writes the dismissal now and 
   const press = band.press({ key: 'accept-d1' })
   await new Promise(r => setTimeout(r, 20))
   await band.press({ key: 'dismiss-d1' })
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: Mock it?', '· You dismissed: Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual(['· You dismissed: Mock it?'])
   turn.release()
   await press
-  expect((await feedLines(band)).reverse()).toEqual(['? Asked you: Mock it?', '· You dismissed: Mock it?', '✓ You answered "Yes": Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual(['· You dismissed: Mock it?', '✓ You answered "Yes": Mock it?'])
   await band.unmount()
 })
 
@@ -3064,7 +3062,7 @@ test('Dismiss writes a dim You dismissed line, once; the dismissal of a check it
   await band.press({ key: 'dismiss-d1' })
   await band.press({ key: 'dismiss-d1' }).catch(() => undefined)
   await band.unmount()
-  expect(await written($)).toEqual(['? Asked you: Gone soon?', '· You dismissed: Gone soon?'])
+  expect(await written($)).toEqual(['· You dismissed: Gone soon?'])
   await bash(world, $, 'mentat check', FAILED_RUN)
   const alert = await mount($, TERM, 'terminal')
   await alert.press({ key: 'dismiss-check' })
@@ -3149,7 +3147,7 @@ test('the Feed lists a note and an event line alike, newest first, with the even
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Merge it?' })
   await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'yes' })
-  for (const surface of SURFACES) expect((await lines($, surface)).length).toBe(2)
+  for (const surface of SURFACES) expect((await lines($, surface)).length).toBe(1)
   await note($, 'Keep this one', 'decision')
   await eng($).tool.call({ tool: OPEN, question: 'Another?' })
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
@@ -3180,9 +3178,10 @@ test('an entry stored without a source is a note; a note written now has none, a
   })
   await note($, 'Plain')
   await eng($).tool.call({ tool: OPEN, question: 'Asked?', kind: 'alert' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   expect(stored).toEqual([
     { at: T0, kind: 'plan', text: 'Plain' },
-    { at: T0, kind: 'asked', text: 'Asked you: Asked?', source: 'event', mark: 'alert' },
+    { at: T0, kind: 'answered', text: 'Closed: Asked?', source: 'event' },
   ])
 })
 
@@ -3192,27 +3191,33 @@ test('an equal note straight after another is added once; an event between two e
   await note($, 'Same', 'waiting')
   expect(await written($)).toEqual(['◌ Same'])
   await eng($).tool.call({ tool: OPEN, question: 'Q?' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   await note($, 'Same', 'waiting')
-  expect(await written($)).toEqual(['◌ Same', '? Asked you: Q?', '◌ Same'])
+  expect(await written($)).toEqual(['◌ Same', '✓ Closed: Q?', '◌ Same'])
 })
 
 test('an event line is kept in full and wrapped, cut only past 1000 characters, and events count toward the 200-line cap', async ($, on) => {
   boot(on)
   const question = 'Draft the desktop pane next, or finish the Feed icons first? This question is long on purpose so it has to wrap'
   await eng($).tool.call({ tool: OPEN, question })
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   for (const surface of SURFACES) {
     const [row] = (await logOf($, surface)).rows
-    expect(row!.text).toBe(`Asked you: ${question}`)
+    expect(row!.text).toBe(`Closed: ${question}`)
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     expect((await pane.findAll({ type: 'Text', text: row!.text }))[0]!.props?.wrap).toBe('wrap')
     await pane.unmount()
   }
   await eng($).tool.call({ tool: OPEN, question: `Should we ${'really '.repeat(300)}go?` })
+  await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   const cut = (await logOf($)).rows[0]!.text
   expect([...cut]).toHaveLength(1000)
-  expect(cut.startsWith('Asked you: Should we really')).toBe(true)
+  expect(cut.startsWith('Closed: Should we really')).toBe(true)
   expect(cut.endsWith('…')).toBe(true)
-  for (let i = 0; i < 204; i++) await eng($).tool.call({ tool: OPEN, question: `Q${i}?` })
+  for (let i = 0; i < 204; i++) {
+    await eng($).tool.call({ tool: OPEN, question: `Q${i}?` })
+    await eng($).tool.call({ tool: CLOSE, id: `d${i + 3}` })
+  }
   expect((await logOf($)).toggle).toEqual(['Show all 200'])
 })
 
@@ -3257,7 +3262,7 @@ test('the desktop pane has a Waiting on you card and a Feed card, each with its 
   expect(texts[head('WAITING ON YOU')]!.props).toMatchObject({ bold: true, color: 'warning' })
   expect(texts[head('WAITING ON YOU') + 1]).toMatchObject({ text: '2', props: { dimColor: true } })
   expect(texts[head('FEED')]!.props).toMatchObject({ bold: true, color: 'subtle' })
-  expect(texts[head('FEED') + 1]).toMatchObject({ text: '4', props: { dimColor: true } })
+  expect(texts[head('FEED') + 1]).toMatchObject({ text: '3', props: { dimColor: true } })
   expect(head('WAITING ON YOU')).toBeLessThan(head('FEED'))
   await d.unmount()
   // A card is left out when it has nothing: no open item, no Waiting on you card.
@@ -3338,14 +3343,15 @@ test('the desktop Feed shows the newest ten with Show all N and Show fewer as a 
   await startSession($)
   for (let i = 1; i <= 12; i++) await note($, `Note ${i}`)
   await eng($).tool.call({ tool: OPEN, question: 'An event comes?' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   const d = await mount($, DESK, 'desktop')
   const buttons = await d.findAll({ type: 'Button' })
   const toggle = buttons.find(b => b.key === 'log-toggle')!
   expect(toggle.props?.label).toBe('Show all 13')
   expect((await d.findAll({ type: 'Text' })).filter(t => /^Note \d+$/.test(t.text ?? '')).length).toBe(9)
   const texts = await d.findAll({ type: 'Text' })
-  // The newest entry is the Asked line (an event, muted); notes are in the full text color.
-  expect(texts.find(t => t.text === 'Asked you: An event comes?')?.props?.dimColor).toBe(true)
+  // The newest entry is the Closed line (an event, muted); notes are in the full text color.
+  expect(texts.find(t => t.text === 'Closed: An event comes?')?.props?.dimColor).toBe(true)
   expect(texts.find(t => t.text === 'Note 12')?.props?.dimColor).toBeUndefined()
   await d.press({ key: 'log-toggle' })
   await d.unmount()
@@ -3591,7 +3597,7 @@ test('a resume of this conversation inside the same process keeps everything and
   await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
   await classicOf($).SessionStart({ source: 'compact' })
   expect(await waitTexts($, 'terminal')).toContain('Stay?')
-  expect(await lines($)).toEqual(['▸ Before', '? Asked you: Stay?'])
+  expect(await lines($)).toEqual(['▸ Before'])
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Closed decision d1.')
   expect((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).deny).toContain('no record')
   expect(sessionsOf(world).S1!.items).toEqual([])
@@ -3622,7 +3628,7 @@ test('a resume to a different id that has stored state loads that state, and goi
   await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
   expect(await waitTexts($, 'terminal')).toContain('Alpha?')
   expect(await waitTexts($, 'terminal')).not.toContain('Beta?')
-  expect(await lines($)).toEqual(['▸ Alpha note', '? Asked you: Alpha?'])
+  expect(await lines($)).toEqual(['▸ Alpha note'])
   // Beta's item went as cleared (by /resume); numbering does not reuse an id that left.
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd2' })).result)).toBe('Decision d2 was already cleared when a new conversation started (/resume).')
   expect(String((await eng($).tool.call({ tool: OPEN, question: 'Gamma?' })).result)).toBe('Opened decision d3.')
@@ -3643,7 +3649,7 @@ test('the store keeps one key per conversation, `conv:<session id>`, and a save 
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   expect(Object.keys(world.store).sort()).toEqual(['conv:LIVE', 'conv:OTHER', 'conv:S1'])
   expect(world.store['conv:LIVE']).toEqual({ ...LEFT_BEHIND, savedAt: T0 + 1 })
-  expect((world.store['conv:S1'] as { log: unknown[] }).log.length).toBe(3)
+  expect((world.store['conv:S1'] as { log: unknown[] }).log.length).toBe(2)
   // A conversation that ends up empty has no key.
   await classicOf($).SessionStart({ source: 'clear', session_id: 'S2' })
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
@@ -3664,7 +3670,7 @@ test('the store keeps what a conversation holds under its session id, and at mos
   expect(last.items.map(d => d.question)).toEqual(['Question 22?'])
   expect(last.nextId).toBe(23)
   expect(last.savedAt).toBe(T0 + 22_000)
-  expect(last.log.map(l => l.text)).toEqual(['Asked you: Question 22?'])
+  expect(last.log).toEqual([])
   // The agent rows and the view toggles are not kept.
   expect(JSON.stringify(world.store)).not.toContain('logAll')
   // An old conversation that is changed again is the newest.
@@ -3749,7 +3755,8 @@ test('an item\'s buttons are in a row under its text, the detail at the left of 
   const keysOf = async (d: Drawing, from: string, to: string) => {
     const boxes = await d.findAll({ type: 'Box' })
     const i = boxes.findIndex(b => b.key === from)
-    return boxes.slice(i, boxes.findIndex(b => b.key === to, i + 1)).map(b => b.key)
+    const end = boxes.findIndex(b => b.key === to, i + 1)
+    return boxes.slice(i, end === -1 ? undefined : end).map(b => b.key)
   }
   // Terminal at a width that draws the detail: the first row is the mark and the text alone.
   const wide = await mount($, PANE, 'terminal', { bodyColumns: 60 })
