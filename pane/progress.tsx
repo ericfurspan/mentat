@@ -697,6 +697,8 @@ async function paneData($: EngineInterface): Promise<PaneData> {
   return { now, zone, open, sentList, result, live, logList, isLogAll, entries: isLogAll ? newest : newest.slice(0, FEED_SHOWN), toggle, budget }
 }
 const toggleLogAll = ($: EngineInterface) => inTurn(() => update($, logAll, v => !v))
+// True when the recommendation only repeats the answer button's label (trimmed, case-insensitive).
+const isSameWords = (a: string, b: string | undefined): boolean => b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase()
 // What an open item shows besides its text: the answer button or the sent line, the link, the line under it
 // (`Recommended: <text> · <time>`, else the time) and, for the check's warning item, the WARN lines.
 const itemView = (d: Decision, data: PaneData) => {
@@ -709,7 +711,7 @@ const itemView = (d: Decision, data: PaneData) => {
     sent,
     answer: kind === 'question' && sent === undefined ? d.accept : undefined,
     link: kind !== 'question' ? d.link : undefined,
-    detail: d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`,
+    detail: d.recommendation === undefined || isSameWords(d.recommendation, d.accept) ? time : `Recommended: ${d.recommendation} · ${time}`,
     warns: d.id === CHECK_ID && kind === 'warning' ? (data.result?.warnings ?? []).map(w => `WARN: ${w}`) : [],
   }
 }

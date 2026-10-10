@@ -3726,3 +3726,17 @@ test('a startup session start runs no check of its own (the mod load does), and 
   expect(world.calls.filter(a => isCall(a, 'mentat', 'check')).length).toBe(2)
   expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '● Mentat', color: 'success', dim: false })
 })
+
+// ---- refinements: the detail line, the layout of an item, the Feed's marks ----------------------------------
+
+test('a recommendation equal to the answer button label (trimmed, any case) is not repeated: the detail is only the time', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Same?', recommendation: ' yes ', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, question: 'Longer?', recommendation: 'Yes, after the release', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, question: 'No button?', recommendation: 'Yes' })
+  for (const surface of SURFACES) {
+    // Newest item first: No button? and Longer? keep their Recommended line; Same? has the time alone.
+    const t = await paneTexts($, surface)
+    expect(t.filter(x => x.startsWith('Recommended:'))).toEqual(['Recommended: Yes · 8:00 AM', 'Recommended: Yes, after the release · 8:00 AM'])
+  }
+})
