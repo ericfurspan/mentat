@@ -1546,10 +1546,10 @@ test('a terminal row with a link keeps the mark and the space after it, and the 
     expect(boxes.find(b => b.key === 'controls')?.props?.flexShrink).toBe(0)
     const texts = await d.findAll({ type: 'Text' })
     expect(texts.find(t => t.text === 'Rotate the token that the deploy job reads from the secrets store')?.props?.wrap).toBe('wrap')
-    // Left to right: the mark, the text, the short link, Dismiss.
+    // The first row is the mark and the text; under it, the time and then the short link and Dismiss.
     const all = texts.map(t => t.text)
     const i = all.indexOf('→')
-    expect(all.slice(i, i + 4)).toEqual(['→', 'Rotate the token that the deploy job reads from the secrets store', '#160', 'Dismiss'])
+    expect(all.slice(i, i + 5)).toEqual(['→', 'Rotate the token that the deploy job reads from the secrets store', '8:00 AM', '#160', 'Dismiss'])
     await d.unmount()
   }
 })
@@ -2518,10 +2518,11 @@ test('the text of an item, its detail lines, a Feed entry and an agent wraps und
     ]) expect(texts.find(x => x.text === line)?.props?.wrap).toBe('wrap')
     for (const x of texts.filter(x => /^(Recommended: |WARN: )/.test(x.text ?? ''))) expect(x.props).toMatchObject({ wrap: 'wrap', dimColor: true })
     expect(texts.filter(x => x.props?.wrap === 'truncate-end').map(x => x.text)).toEqual([])
-    // The item's first line is top-aligned: the mark at the left, the buttons at the right, neither shrinking.
+    // The item's first row is top-aligned: the mark at the left and the text, neither holding buttons.
     const first = boxes.find(b => b.key === 'item-d1')!
     const row = surface === 'terminal' ? first : boxes[boxes.indexOf(first) + 1]!
     expect(row.props).toMatchObject({ flexDirection: 'row', alignItems: 'flex-start' })
+    // The row under it holds the detail at the left and the buttons at the right, which do not shrink.
     const parts = boxes.filter(b => b.key === 'mark-box' || b.key === 'controls' || (surface === 'desktop' && b.props?.flexShrink === 0 && b.props?.flexDirection === 'row'))
     expect(parts.length).toBeGreaterThan(0)
     for (const b of parts) expect(b.props?.flexShrink).toBe(0)
@@ -2772,7 +2773,8 @@ test('a terminal pane row ends in its buttons without width arithmetic: a growin
   expect(controls[0]!.props?.flexDirection).toBe('row')
   expect(controls[0]!.props?.flexShrink).toBe(0)
   const texts = await textsOf(d)
-  expect(texts.slice(texts.indexOf('?'), texts.indexOf('Dismiss') + 1)).toEqual(['?', 'Ship it?', 'Yes', 'Dismiss'])
+  // The mark and the text, then under it the time and the buttons.
+  expect(texts.slice(texts.indexOf('?'), texts.indexOf('Dismiss') + 1)).toEqual(['?', 'Ship it?', '8:00 AM', 'Yes', 'Dismiss'])
   expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1'])
   expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1'])
   await d.unmount()
@@ -3739,4 +3741,44 @@ test('a recommendation equal to the answer button label (trimmed, any case) is n
     const t = await paneTexts($, surface)
     expect(t.filter(x => x.startsWith('Recommended:'))).toEqual(['Recommended: Yes · 8:00 AM', 'Recommended: Yes, after the release · 8:00 AM'])
   }
+})
+
+test('an item\'s buttons are in a row under its text, the detail at the left of them; under 40 terminal columns that row holds the buttons alone', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Ship it?', recommendation: 'After the release', accept: 'Yes' })
+  const keysOf = async (d: Drawing, from: string, to: string) => {
+    const boxes = await d.findAll({ type: 'Box' })
+    const i = boxes.findIndex(b => b.key === from)
+    return boxes.slice(i, boxes.findIndex(b => b.key === to, i + 1)).map(b => b.key)
+  }
+  // Terminal at a width that draws the detail: the first row is the mark and the text alone.
+  const wide = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  expect(await keysOf(wide, 'item-d1', 'actions-d1')).toEqual(['item-d1', 'mark-box', 'text'])
+  expect((await keysOf(wide, 'actions-d1', 'zzz')).slice(0, 3)).toEqual(['actions-d1', 'detail', 'controls'])
+  const wideBoxes = await wide.findAll({ type: 'Box' })
+  expect(wideBoxes.find(b => b.key === 'detail')!.props).toMatchObject({ flexGrow: 1, flexShrink: 1, paddingLeft: 2 })
+  expect(wideBoxes.find(b => b.key === 'controls')!.props?.flexShrink).toBe(0)
+  const wideTexts = await textsOf(wide)
+  expect(wideTexts.slice(wideTexts.indexOf('?'), wideTexts.indexOf('Dismiss') + 1)).toEqual(['?', 'Ship it?', 'Recommended: After the release · 8:00 AM', 'Yes', 'Dismiss'])
+  await wide.unmount()
+  // Under 40 columns the time and the recommendation are left out; the buttons stay, at the right.
+  const narrow = await mount($, PANE, 'terminal', { bodyColumns: 30 })
+  expect((await keysOf(narrow, 'actions-d1', 'zzz')).slice(0, 2)).toEqual(['actions-d1', 'controls'])
+  const narrowBoxes = await narrow.findAll({ type: 'Box' })
+  expect(narrowBoxes.some(b => b.key === 'detail')).toBe(false)
+  expect(narrowBoxes.find(b => b.key === 'actions-d1')!.props).toMatchObject({ justifyContent: 'flex-end' })
+  const narrowTexts = await textsOf(narrow)
+  expect(narrowTexts.slice(narrowTexts.indexOf('?'), narrowTexts.indexOf('Dismiss') + 1)).toEqual(['?', 'Ship it?', 'Yes', 'Dismiss'])
+  await narrow.unmount()
+  // The desktop: the text row, then a row indented to the text with the detail at the left and the buttons.
+  const desk = await mount($, DESK, 'desktop')
+  const deskBoxes = await desk.findAll({ type: 'Box' })
+  const actions = deskBoxes.find(b => b.key === 'actions')!
+  expect(actions.props).toMatchObject({ flexDirection: 'row', paddingLeft: 4 })
+  // (The mark is an Svg, drawn apart from the Texts.)
+  const deskTexts = (await desk.findAll({ type: 'Text' })).map(t => t.text)
+  const at = deskTexts.indexOf('Ship it?')
+  expect(deskTexts.slice(at, at + 2)).toEqual(['Ship it?', 'Recommended: After the release · 8:00 AM'])
+  expect(await bandKeys(desk)).toEqual(['accept-d1', 'dismiss-d1'])
+  await desk.unmount()
 })

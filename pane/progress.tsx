@@ -775,14 +775,16 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     )
   }
 
-  // Waiting on you: every open item, most urgent first. The first line holds the mark, the text and the buttons;
-  // under it, dim, the recommendation and the time, and for the check's warning item its WARN lines.
+  // Waiting on you: every open item, most urgent first. The first row holds the mark and the text, full width.
+  // Under it a row holds the detail (the recommendation and the time), wrapped at the left, and the buttons at
+  // the right; then, for the check's warning item, its WARN lines. Under 40 columns the time and the
+  // recommendation are left out and the row holds only the buttons, at the right.
   const waiting = open.flatMap(d => {
     const { kind, sent, answer, link, detail: recommended, warns } = itemView(d, data)
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
       // The mark never shrinks and keeps its space after it (a margin, which a tight row cannot take away);
-      // the text is what wraps. The controls keep their size and their space before them.
+      // the text is what wraps.
       row(`item-${d.id}`, [
         <Box key="mark-box" flexShrink={0} marginRight={1}>
           {mark.color === undefined ? <Text key="mark" dimColor>{mark.char}</Text> : <Text key="mark" color={mark.color}>{mark.char}</Text>}
@@ -790,7 +792,17 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
         <Box key="text" flexGrow={1} flexShrink={1}>
           <Text wrap="wrap">{d.question}</Text>
         </Box>,
-        <Box key="controls" flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
+      ], 0),
+      // The detail grows and shrinks and wraps under itself; the controls keep their size at the right.
+      <Box key={`actions-${d.id}`} flexDirection="row" alignItems="flex-start" justifyContent="flex-end" gap={1}>
+        {!isShort && (
+          <Box key="detail" flexGrow={1} flexShrink={1} paddingLeft={2}>
+            <Text dimColor wrap="wrap">
+              {recommended}
+            </Text>
+          </Box>
+        )}
+        <Box key="controls" flexDirection="row" gap={1} flexShrink={0}>
           {answer !== undefined && (
             <Button key={`accept-${d.id}`} plain label={answer} onPress={() => sendAnswer($, d, answer)}>
               <Text bold color="suggestion">
@@ -807,13 +819,10 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
           <Button key={`dismiss-${d.id}`} plain label="Dismiss" onPress={() => dismissItem($, d.id)}>
             <Text color="suggestion">Dismiss</Text>
           </Button>
-        </Box>,
-      ], 0),
+        </Box>
+      </Box>,
     ]
-    if (!isShort) {
-      lines.push(detail(`detail-${d.id}`, recommended))
-      warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
-    }
+    if (!isShort) warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
 
     return lines
   })
@@ -943,6 +952,9 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
             <Svg source={markSvg(mark.char, mark.hue)} alt={ITEM_ALT[kind]} width={MARK_SIZE} height={MARK_SIZE} />
           </Box>
           {cut(d.question)}
+        </Box>
+        <Box key="actions" paddingLeft={TEXT_INDENT} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+          {cut(detail, { dimColor: true })}
           <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
             {link !== undefined && (
               <Text>
@@ -954,7 +966,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
             <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismissItem($, d.id)} />
           </Box>
         </Box>
-        {[detail, ...warns].map((line, i) => (
+        {warns.map((line, i) => (
           <Box key={`detail-${i}`} paddingLeft={TEXT_INDENT} flexDirection="row" minWidth={0}>
             {cut(line, { dimColor: true })}
           </Box>
