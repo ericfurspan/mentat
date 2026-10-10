@@ -857,8 +857,11 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
   const data = await paneData($)
   const { now, zone, open, live, logList, budget } = data
 
+  // The desktop lays rows out with CSS flexbox, where a flex item's min-width is `auto` (its content's width),
+  // so a Box never shrinks below its text however its flexShrink is set. Every Box between the card and the
+  // text that must be cut therefore has minWidth 0, and the text Box also hides its overflow.
   const card = (key: string, title: string, color: string, count: number, body: RenderElement) => (
-    <Box key={key} flexDirection="column" gap={1} borderStyle="round" borderDimColor backgroundColor={CARD_TINT} paddingX={1}>
+    <Box key={key} flexDirection="column" gap={1} minWidth={0} borderStyle="round" borderDimColor backgroundColor={CARD_TINT} paddingX={1}>
       <Box key={`${key}-head`} flexDirection="row" gap={1}>
         <Text bold color={color}>
           {title}
@@ -870,7 +873,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
   )
   // The text of a row: the only part that shrinks.
   const cut = (text: string, props: { bold?: boolean; dimColor?: boolean } = {}) => (
-    <Box flexGrow={1} flexShrink={1}>
+    <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
       <Text wrap="truncate-end" {...props}>
         {text}
       </Text>
@@ -882,8 +885,8 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
     const mark = MARK[kind]
 
     return (
-      <Box key={`item-${d.id}`} flexDirection="column">
-        <Box flexDirection="row" alignItems="center" gap={1}>
+      <Box key={`item-${d.id}`} flexDirection="column" minWidth={0}>
+        <Box flexDirection="row" alignItems="center" gap={1} minWidth={0}>
           <Box width={MARK_CELLS} flexShrink={0}>
             <Svg source={markSvg(mark.char, mark.hue)} alt={ITEM_ALT[kind]} width={MARK_SIZE} height={MARK_SIZE} />
           </Box>
@@ -900,7 +903,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
           </Box>
         </Box>
         {[detail, ...warns].map((line, i) => (
-          <Box key={`detail-${i}`} paddingLeft={TEXT_INDENT} flexDirection="row">
+          <Box key={`detail-${i}`} paddingLeft={TEXT_INDENT} flexDirection="row" minWidth={0}>
             {cut(line, { dimColor: true })}
           </Box>
         ))}
@@ -918,11 +921,17 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
     const ran = agentClock(a, now)
 
     return (
-      <Box key={`agent-${a.id}`} flexDirection="row" alignItems="center" gap={1}>
+      <Box key={`agent-${a.id}`} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
         {timeColumn(<Text color="suggestion">{a.status}</Text>)}
-        <Text color="suggestion">●</Text>
+        <Box flexShrink={0}>
+          <Text color="suggestion">●</Text>
+        </Box>
         {cut(a.description, { bold: true })}
-        {ran !== undefined && <Text dimColor>{ran}</Text>}
+        {ran !== undefined && (
+          <Box flexShrink={0}>
+            <Text dimColor>{ran}</Text>
+          </Box>
+        )}
       </Box>
     )
   })
@@ -930,18 +939,20 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
     const { icon, color } = styleOf(entry)
 
     return (
-      <Box key={`log-${n}`} flexDirection="row" alignItems="center" gap={1}>
+      <Box key={`log-${n}`} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
         {timeColumn(<Text dimColor>{clockAt(entry.at, zone)}</Text>)}
-        <Text color={color}>{icon}</Text>
+        <Box flexShrink={0}>
+          <Text color={color}>{icon}</Text>
+        </Box>
         {cut(entry.text, isNote(entry) ? {} : { dimColor: true })}
       </Box>
     )
   })
   const feed = (
-    <Box flexDirection="column">
+    <Box flexDirection="column" minWidth={0}>
       {agentRows}
       {logRows.length > 0 && (
-        <Box key="log" flexDirection="column" marginTop={agentRows.length > 0 ? 1 : 0}>
+        <Box key="log" flexDirection="column" minWidth={0} marginTop={agentRows.length > 0 ? 1 : 0}>
           {logRows}
         </Box>
       )}
@@ -955,13 +966,13 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
   const hasFeed = live.length > 0 || logList.length > 0
 
   return (
-    <Box flexDirection="column" gap={1} paddingX={1}>
+    <Box flexDirection="column" gap={1} paddingX={1} minWidth={0}>
       {budget !== undefined && (
         <Text color="warning" wrap="truncate-end">
           {budget}
         </Text>
       )}
-      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box flexDirection="column" gap={1}>{waiting}</Box>)}
+      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box flexDirection="column" gap={1} minWidth={0}>{waiting}</Box>)}
       {hasFeed && card('card-feed', 'FEED', 'subtle', live.length + logList.length, feed)}
       {open.length === 0 && !hasFeed && <Text dimColor>Nothing waiting on you.</Text>}
     </Box>

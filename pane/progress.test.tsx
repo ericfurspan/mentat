@@ -3472,3 +3472,32 @@ test('the desktop pane puts the budget warning first, says Nothing waiting on yo
   }
   expect(new Set(drawn).size).toBe(1)
 })
+
+test('every desktop Box that can shrink has minWidth 0, and the text Boxes hide their overflow, so a narrow pane cuts the text and not the card', async ($, on) => {
+  const { world } = boot(on)
+  await deskWorld($, world)
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Rotate the token that the deploy job reads from the secrets store', link: 'https://github.com/o/r/issues/160' })
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  await d.unmount()
+  // Why: the desktop lays rows out with CSS flexbox, where a flex item's min-width is `auto` (its content's
+  // width), so flexShrink alone never shrinks a Box below its text. minWidth 0 is what lets the text be cut
+  // with an ellipsis, on the Box itself and on every Box between it and the card.
+  const fixed = (b: { key?: string; props?: Record<string, unknown> }) =>
+    b.props?.flexShrink === 0 || b.props?.width !== undefined || String(b.key).endsWith('-head') || b.key === 'log-more'
+  const shrinking = boxes.filter(b => !fixed(b))
+  expect(shrinking.length).toBeGreaterThan(10)
+  for (const b of shrinking) expect({ key: b.key, minWidth: b.props?.minWidth }).toEqual({ key: b.key, minWidth: 0 })
+  // The text Boxes are the ones that grow and shrink: they also hide the overflow.
+  const text = boxes.filter(b => b.props?.flexShrink === 1)
+  expect(text.length).toBeGreaterThanOrEqual(8)
+  for (const b of text) expect(b.props).toMatchObject({ flexGrow: 1, minWidth: 0, overflow: 'hidden' })
+  // The cards and the pane's outer column are among those with minWidth 0.
+  for (const key of ['card-waiting', 'card-feed', 'item-d1', 'item-d2', 'item-check']) expect(boxes.find(b => b.key === key)?.props?.minWidth).toBe(0)
+  // Marks (the 3-cell column), time columns and the button groups never shrink; a group holds the link.
+  const widths = boxes.filter(b => b.props?.width !== undefined)
+  expect(widths.length).toBeGreaterThan(0)
+  for (const b of widths) expect(b.props?.flexShrink).toBe(0)
+  const groups = boxes.filter(b => b.props?.flexShrink === 0 && b.props?.flexDirection === 'row')
+  expect(groups.length).toBeGreaterThanOrEqual(3)
+})
