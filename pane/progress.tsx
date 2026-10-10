@@ -48,16 +48,20 @@ const TINT = { surface: '#8b949e14', you: '#d2992224', alert: '#d0453f24', actio
 // warning card after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The pane's Commands card: the commands the maintainer types, each with when to use it. Plain
-// text; nothing in the card runs a command. A new maintainer command is one line here (a
-// `/mentat:<skill>` needs `skills/<skill>/SKILL.md`, which a test checks).
-export const COMMANDS: { names: string[]; use: string }[] = [
-  { names: ['/mentat', '/mentat pr <n>'], use: 'open this pane, or follow a pull request' },
-  { names: ['/mentat:come-again'], use: 'restate the last message' },
-  { names: ['/mentat:retro'], use: 'look back at a session that went badly' },
-  { names: ['/mentat:codex-review-off', '/mentat:codex-review-on'], use: 'Codex reviews off or back on for the session' },
-  { names: ['mentat check (in a terminal)'], use: 'check what Mentat needs' },
+// The pane's Commands card: the commands the maintainer types, one per row, each with when to use
+// it. Drawn as a markdown table; nothing in the card runs a command. A new maintainer command is
+// one line here (a `/mentat:<skill>` needs `skills/<skill>/SKILL.md`, which tests/run checks).
+export const COMMANDS: { name: string; use: string }[] = [
+  { name: '/mentat', use: 'open this pane' },
+  { name: '/mentat pr <n>', use: 'follow a pull request' },
+  { name: '/mentat:come-again', use: 'restate the last message' },
+  { name: '/mentat:retro', use: 'look back at a session that went badly' },
+  { name: '/mentat:codex-review-off', use: 'turn Codex reviews off for the session' },
+  { name: '/mentat:codex-review-on', use: 'turn Codex reviews back on for the session' },
+  { name: 'mentat check', use: 'in a terminal: check what Mentat needs' },
 ]
+const commandsTable = (): string =>
+  ['| Command | Use |', '| --- | --- |', ...COMMANDS.map(c => `| \`${c.name}\` | ${c.use} |`)].join('\n')
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
@@ -1290,7 +1294,7 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Input, Link, Text } = $.ui.resolve(e)
+    const { Box, Button, Input, Link, Markdown, Text } = $.ui.resolve(e)
     const Svg = e.surface === 'desktop' ? $.ui.resolve(e as typeof e & { surface: 'desktop' }).Svg : undefined
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
@@ -1422,7 +1426,7 @@ export const register: Register = (on, _options) => {
       return undefined
     }
     // The Commands card, above everything else on both surfaces: a toggle (collapsed at first, the
-    // choice kept) and, when open, one plain line per command (no background, the command bold and its use dim). No button here runs a command.
+    // choice kept) and, when open, a markdown table of the commands (no background). No button here runs a command.
     const isCommandsShown = await read($, commandsShown)
     const toggleCommands = () => inTurn(() => update($, commandsShown, v => !v))
     const commandsCard = (
@@ -1432,12 +1436,7 @@ export const register: Register = (on, _options) => {
         </Box>
         {isCommandsShown && (
           <Box flexDirection="column" paddingLeft={2} marginTop={1}>
-            {COMMANDS.map(c => (
-              <Box key={c.names.join(' ')} flexDirection="row" gap={2}>
-                <Text bold>{c.names.join(' · ')}</Text>
-                <Text dimColor>{c.use}</Text>
-              </Box>
-            ))}
+            <Markdown text={commandsTable()} />
           </Box>
         )}
       </Box>

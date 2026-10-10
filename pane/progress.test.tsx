@@ -2904,19 +2904,22 @@ test('a long list of problems is cut to six lines, the last counting the rest, o
 
 // ---- the Commands card -------------------------------------------------------------------
 
-// The card's lines: the command(s) in bold, then when to use it, dim; each is its own Text.
-const LINES = [
-  ['/mentat · /mentat pr <n>', 'open this pane, or follow a pull request'],
-  ['/mentat:come-again', 'restate the last message'],
-  ['/mentat:retro', 'look back at a session that went badly'],
-  ['/mentat:codex-review-off · /mentat:codex-review-on', 'Codex reviews off or back on for the session'],
-  ['mentat check (in a terminal)', 'check what Mentat needs'],
-]
-const LINE_TEXTS = LINES.flat()
+// The card is one Markdown element: a two-column table, a header row and one row per command.
+const TABLE = [
+  '| Command | Use |',
+  '| --- | --- |',
+  '| `/mentat` | open this pane |',
+  '| `/mentat pr <n>` | follow a pull request |',
+  '| `/mentat:come-again` | restate the last message |',
+  '| `/mentat:retro` | look back at a session that went badly |',
+  '| `/mentat:codex-review-off` | turn Codex reviews off for the session |',
+  '| `/mentat:codex-review-on` | turn Codex reviews back on for the session |',
+  '| `mentat check` | in a terminal: check what Mentat needs |',
+].join('\n')
 const toggleLabel = async (d: Drawing) =>
   (await d.findAll({ type: 'Button' })).filter(b => b.key === 'commands-toggle').map(b => String(b.text ?? b.props?.label ?? ''))
-// The card's lines among the drawing's texts.
-const commandLines = async (d: Drawing) => (await textsOf(d)).filter(t => LINE_TEXTS.includes(t))
+// The text of each Markdown element of the drawing.
+const commandLines = async (d: Drawing) => (await d.findAll({ type: 'Markdown' })).map(m => String(m.props?.text ?? ''))
 
 test('the Commands card starts collapsed on both surfaces: only the toggle shows, above the open items and beside the empty-pane line', async ($, on) => {
   boot(on)
@@ -2952,7 +2955,7 @@ test('pressing the toggle shows every command line, pressing again hides them, a
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     await pane.press({ key: 'commands-toggle' })
     expect(await toggleLabel(pane)).toEqual(['▾ Commands'])
-    expect(await commandLines(pane)).toEqual(LINE_TEXTS)
+    expect(await commandLines(pane)).toEqual([TABLE])
     // No background tint on the card: nothing drawn behind the lines.
     const around = (await pane.findAll({ type: 'Box' })).filter(b => (b.text ?? '').includes('/mentat:retro') && !(b.text ?? '').includes('SESSION'))
     expect(around.length).toBeGreaterThan(0)
@@ -2963,7 +2966,7 @@ test('pressing the toggle shows every command line, pressing again hides them, a
 
     const again = await mount($, PANE, surface, { bodyColumns: 60 })
     expect(await toggleLabel(again)).toEqual(['▾ Commands'])
-    expect(await commandLines(again)).toEqual(LINE_TEXTS)
+    expect(await commandLines(again)).toEqual([TABLE])
     await again.press({ key: 'commands-toggle' })
     expect(await toggleLabel(again)).toEqual(['▸ Commands'])
     expect(await commandLines(again)).toEqual([])
@@ -2976,9 +2979,9 @@ test('pressing the toggle shows every command line, pressing again hides them, a
   expect(world.commands).toEqual([])
 })
 
-test('the card lists the same lines the mod exports, and the pane never calls $.command.run', async ($, on) => {
+test('the card lists the commands the mod exports, and the pane never calls $.command.run', async ($, on) => {
   const { world } = boot(on)
-  expect(COMMANDS.map(c => [c.names.join(' · '), c.use])).toEqual(LINES)
+  expect(COMMANDS.map(c => c.name)).toEqual(TABLE.split('\n').slice(2).map(r => r.split('`')[1]))
   for (const surface of SURFACES) {
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     await pane.press({ key: 'commands-toggle' })
