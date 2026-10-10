@@ -1,7 +1,6 @@
-// Mentat's band and pane. On the desktop the band is always there, one line: what waits on the
-// maintainer, else a warning that a rate limit runs low, else the newest note, else a quiet line; the
-// pane holds the Log and the agents. On the terminal there is no band: the footer label counts what waits
-// and opens the pane, which has two sections, Waiting on you and the Feed.
+// Mentat's pane. There is no band: on both surfaces the footer label counts what waits and opens the pane.
+// The pane has two sections, Waiting on you and the Feed (the agents that have not ended, then the log); the
+// desktop draws them as two cards of native rows, the terminal as bordered text.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -11,7 +10,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
+import type { AgentRow, AgentStatus, CheckResult, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -19,20 +18,18 @@ const TITLE = 'Mentat'
 const OPEN_TOOL = `mcp__${PLUGIN}__open_decision`
 const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
 const NOTE_TOOL = `mcp__${PLUGIN}__note`
-// A rate limit this far gone raises the band.
+// A rate limit this far gone is warned at the top of the pane.
 const WARN_PERCENT = 80
-// Rows between the desktop pane's sections.
-const SECTION_GAP = 2
-// The terminal pane's width classes, in body columns: sections are framed from FRAME_COLUMNS, headed by a
+// The terminal pane's width classes, in body columns: sections have a border from FRAME_COLUMNS, headed by a
 // rule from RULE_COLUMNS, and below that also drop the times, the recommendation and the WARN lines.
 const FRAME_COLUMNS = 60
 const RULE_COLUMNS = 40
-// The Log keeps this many entries and cuts a line at LOG_WIDTH characters. The desktop pane's Log card
-// shows the newest LOG_SHOWN until `Show all`; the terminal's Feed shows the newest FEED_SHOWN.
+// The Log keeps this many entries; a line is one line of whitespace-collapsed text, cut only past
+// LOG_TEXT_LIMIT characters (a safety limit: the Feed wraps text, it does not cut it). The Feed shows the
+// newest FEED_SHOWN until `Show all`.
 const LOG_LIMIT = 200
-const LOG_SHOWN = 5
 const FEED_SHOWN = 10
-const LOG_WIDTH = 80
+const LOG_TEXT_LIMIT = 1000
 // The record of items that left without close_decision keeps this many entries.
 const GONE_LIMIT = 50
 
@@ -40,7 +37,6 @@ const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
-const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
 // Counts the conversations; see classic.SessionStart and sendAnswer.
@@ -52,20 +48,19 @@ const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The notes Claude Code adds with the `note` tool, in the pane's Log and as the desktop band's line: each kind has an
-// icon and a color. The color is a theme color, so the line reads on the terminal and the desktop; the hue is
-// the same color for the desktop band's drawing.
-const LOG_STYLE: Record<LogKind, { icon: string; color: string; hue: string }> = {
-  decision: { icon: '◆', color: 'suggestion', hue: '#3D7FE6' },
-  plan: { icon: '▸', color: 'text', hue: '#8f8f8a' },
-  surprise: { icon: '!', color: 'warning', hue: '#C98A0E' },
-  waiting: { icon: '◌', color: 'subtle', hue: '#8f8f8a' },
-  done: { icon: '✓', color: 'success', hue: '#2F9461' },
+// The notes Claude Code adds with the `note` tool, in the pane's Feed: each kind has an icon and a color. The
+// color is a theme color, so the line reads on the terminal and the desktop.
+const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
+  decision: { icon: '◆', color: 'suggestion' },
+  plan: { icon: '▸', color: 'text' },
+  surprise: { icon: '!', color: 'warning' },
+  waiting: { icon: '◌', color: 'subtle' },
+  done: { icon: '✓', color: 'success' },
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
 // The event lines the pane writes to the Log itself, drawn dim: each has a mark and a theme color. An
-// `asked` line takes the mark of the item's kind (the band's marks) and a `check` line that of the result.
+// `asked` line takes the mark of the item's kind (the pane's marks) and a `check` line that of the result.
 const EVENT_STYLE: Record<Exclude<EventKind, 'asked' | 'check'> | EventMark, { icon: string; color: string }> = {
   agentDone: { icon: '✓', color: 'success' },
   agentFailed: { icon: '✕', color: 'error' },
@@ -91,20 +86,15 @@ type LogDraft = { kind: LogKind; text: string } | { kind: EventKind; text: strin
 const eventDraft = (kind: EventKind, text: string, mark?: EventMark): LogDraft => ({ kind, text, source: 'event', ...(mark === undefined ? {} : { mark }) })
 // An agent's role as an event line names it: Builder, Explore, Plan, else the type as given.
 const roleName = (type: string): string => {
-  const { role } = roleOf(type)
+  const role = roleOf(type)
 
   return role === 'builder' ? 'Builder' : role === 'explore' ? 'Explore' : role === 'plan' ? 'Plan' : type
 }
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-const shortModel = (model: string): string =>
-  model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, ' $1.$2').replace(/^\w/, c => c.toUpperCase())
 const duration = (ms: number): string => {
   const s = Math.max(0, Math.round(ms / 1000))
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
-const kTokens = (n: number): string => (n < 1000 ? `${n}` : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`)
-// An effort level as the row shows it; a number is a budget.
-const showEffort = (effort: string | number): string => (typeof effort === 'number' ? `${kTokens(effort)} budget` : effort)
 const resetIn = (at: string | undefined, now: number): string => {
   if (at === undefined) return ''
   const ms = Date.parse(at) - now
@@ -141,8 +131,8 @@ const clockAt = (at: number, zone?: string): string => {
 
   return `${part('hour')}:${part('minute')} ${part('dayPeriod')}`
 }
-// One line, at most `max` characters, cut with an ellipsis.
-const oneLine = (text: string, max: number = LOG_WIDTH): string => {
+// One line (whitespace collapsed), at most `max` characters, cut with an ellipsis only past that.
+const oneLine = (text: string, max: number = LOG_TEXT_LIMIT): string => {
   const chars = [...text.replace(/\s+/g, ' ').trim()]
 
   return chars.length <= max ? chars.join('') : `${chars.slice(0, max - 1).join('').trimEnd()}…`
@@ -151,7 +141,7 @@ const oneLine = (text: string, max: number = LOG_WIDTH): string => {
 type Meter = { kind: string; label: string; percent: number; reset: string }
 type Usage = Awaited<ReturnType<EngineInterface['session']['usage']>>
 
-// The rate limits as the band reads them, each with its percent and the reset: a countdown for the
+// The rate limits as the pane reads them, each with its percent and the reset: a countdown for the
 // 5-hour limit, the weekday and local time for the weekly one.
 const limitsOf = (usage: Usage | undefined, now: number, zone?: string): Meter[] =>
   (usage?.rateLimits ?? []).map(r => ({
@@ -161,8 +151,8 @@ const limitsOf = (usage: Usage | undefined, now: number, zone?: string): Meter[]
     reset: r.kind === 'seven_day' ? resetAt(r.resetsAt, now, zone) : resetIn(r.resetsAt, now),
   }))
 
-// The band's budget text, for the most used of the 5-hour and weekly limits when it
-// is at WARN_PERCENT or more. The context window never raises the band.
+// The pane's budget text, for the most used of the 5-hour and weekly limits when it
+// is at WARN_PERCENT or more. The context window never raises it.
 const budgetAlert = (limits: Meter[]): string | undefined => {
   const over = limits
     .filter(m => (m.kind === 'five_hour' || m.kind === 'seven_day') && m.percent >= WARN_PERCENT)
@@ -180,27 +170,25 @@ const isEnded = (s: AgentStatus): boolean => s === 'completed' || s === 'failed'
 const isActive = (s: AgentStatus): boolean => s === 'running' || s === 'waiting' || s === 'pending'
 
 type AgentInfoLike = { id: string; type: string; description: string; status: AgentStatus }
-// Fits the rows to what the engine lists: statuses follow the engine, an end freezes
-// the elapsed time, an agent the mod never saw is added without a model or start (with the
-// effort its requests used, if any were seen),
-// and one the engine no longer lists is ended (unknown), never finished.
-const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number, efforts: ReadonlyMap<string, string>): AgentRow[] => {
+// Fits the rows to what the engine lists: statuses follow the engine, an agent the mod never saw is added
+// without a start, and one the engine no longer lists is ended (unknown), never finished. An agent that
+// goes from ended back to live (a builder resumed with a message) starts its time over at the moment the
+// mod saw it, so the time it sat idle is not counted.
+const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): AgentRow[] => {
   const next = rows.map(row => {
     const info = infos.find(i => i.id === row.id)
     if (info === undefined) return isEnded(row.status) ? row : { ...row, status: 'unknown' as const, endedAt: now }
     if (isEnded(info.status)) return { ...row, status: info.status, endedAt: row.endedAt ?? now }
     const { endedAt: _endedAt, ...rest } = row
-    return { ...rest, status: info.status }
+    return { ...rest, status: info.status, ...(isEnded(row.status) ? { startedAt: now } : {}) }
   })
   for (const info of infos) {
     if (rows.some(r => r.id === info.id)) continue
-    const effort = efforts.get(info.id)
     next.push({
       id: info.id,
       type: info.type,
       description: info.description,
       status: info.status,
-      ...(effort === undefined ? {} : { effort }),
       ...(isEnded(info.status) ? { endedAt: now } : {}),
     })
   }
@@ -218,16 +206,14 @@ const httpsLink = (v: unknown): string | undefined => {
   const link = typeof v === 'string' ? v.trim() : ''
   return link.length <= 2048 && /^https:\/\/[^\s/]\S*$/.test(link) ? link : undefined
 }
-// The words an item's link is drawn with: the address without its scheme.
-const linkLabel = (link: string): string => link.replace(/^https:\/\//, '')
-// The words a link is drawn with on the terminal, where a row is tight: `#160` for a GitHub issue or pull
+// The words a link is drawn with, where a row is tight: `#160` for a GitHub issue or pull
 // request (always the bare number: knowing whether it is this session's repository would need a read, and the
 // pane reads nothing), else the host (`example.com`). The Link still opens the whole address.
 const shortLink = (link: string): string => {
   const github = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/(?:issues|pull)\/(\d+)(?:[/?#]\S*)?$/.exec(link)
   if (github !== null) return `#${github[1]}`
 
-  return /^https:\/\/([^/?#\s]+)/.exec(link)?.[1] ?? linkLabel(link)
+  return /^https:\/\/([^/?#\s]+)/.exec(link)?.[1] ?? link.replace(/^https:\/\//, '')
 }
 
 // `mentat check` as words anywhere in a command: after a `cd ... &&`, with a path or quotes
@@ -337,22 +323,22 @@ const agentEvents = (before: AgentRow[], after: AgentRow[]): LogDraft[] => {
     const was = before.find(r => r.id === row.id)
     if (was === undefined || isEnded(was.status)) continue
     const who = `${roleName(row.type)} ${row.status === 'completed' ? 'finished' : row.status === 'failed' ? 'failed' : 'stopped'}: ${row.description}`
+    // No duration: an agent resumed after it finished keeps no honest start to measure from.
     if (row.status === 'completed') {
-      const ms = row.startedAt === undefined || row.endedAt === undefined ? undefined : row.endedAt - row.startedAt
-      drafts.push(eventDraft('agentDone', ms === undefined ? who : `${who} · ${duration(ms)}`))
+      drafts.push(eventDraft('agentDone', who))
     } else if (row.status === 'failed' || row.status === 'killed') drafts.push(eventDraft('agentFailed', who))
   }
 
   return drafts
 }
 
-async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
+async function syncAgents($: EngineInterface): Promise<void> {
   try {
     const infos = (await $.agent.list()) as AgentInfoLike[]
     const now = await $.clock.now()
     await inTurn(async () => {
       const before = await read($, agents)
-      const after = reconcile(before, infos, now, efforts)
+      const after = reconcile(before, infos, now)
       await update($, agents, () => after)
       await addLog($, now, agentEvents(before, after))
     })
@@ -361,10 +347,10 @@ async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, strin
   }
 }
 
-async function agentTick($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
+async function agentTick($: EngineInterface): Promise<void> {
   const rows = await read($, agents)
   if (!rows.some(r => !isEnded(r.status))) return
-  await syncAgents($, efforts)
+  await syncAgents($)
   await invalidate($)
 }
 
@@ -470,144 +456,37 @@ async function startCheck($: EngineInterface, cwd?: string): Promise<void> {
 
 // ---- the module -----------------------------------------------------------------------------
 
-// ---- Drawn desktop design: each card is one themed Svg; buttons stay native. ----
+// ---- Drawn desktop pieces: the small round marks of the pane; text, rows and buttons are native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
-const CSS = `<style>
-.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}
-@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}}
-</style>`
-const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', teal: '#1E9E9A', grey: '#8f8f8a' }
+const HUE = { amber: '#C98A0E', blue: '#3D7FE6', red: '#D0453F' }
 
 const xml = (s: string): string => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
-const charEm = (ch: string): number => (/[\s.,:;'|!il1()[\]]/.test(ch) ? 0.3 : /[A-Z@%mw#]/.test(ch) ? 0.72 : 0.56)
-const textW = (s: string, size: number): number => [...s].reduce((w, ch) => w + charEm(ch) * size, 0)
-const fit = (s: string, size: number, maxW: number): string => {
-  if (textW(s, size) <= maxW) return s
-  let out = ''
-  for (const ch of s) {
-    if (textW(out + ch + '…', size) > maxW) break
-    out += ch
-  }
-  return out + '…'
-}
 const svgOf = (W: number, H: number, body: string): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${CSS}${body}</svg>`
-const agentMark = (x: number, y: number, status: AgentStatus): string => {
-  if (isActive(status)) return `<circle cx="${x}" cy="${y}" r="7" fill="${HUE.blue}" opacity="0.18"/><circle cx="${x}" cy="${y}" r="3.5" fill="${HUE.blue}"/>`
-  if (status === 'completed') return `<circle cx="${x}" cy="${y}" r="8" fill="${HUE.green}" opacity="0.14"/><path d="M${x - 3.5} ${y}l2.5 2.5 4.5-5" fill="none" stroke="${HUE.green}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
-  if (status === 'failed' || status === 'killed') return `<circle cx="${x}" cy="${y}" r="8" fill="${HUE.red}" opacity="0.14"/><path d="M${x - 3} ${y - 3}l6 6M${x + 3} ${y - 3}l-6 6" stroke="${HUE.red}" stroke-width="1.7" stroke-linecap="round"/>`
-  return `<circle cx="${x}" cy="${y}" r="7" fill="none" class="m" stroke="${HUE.grey}" stroke-width="1.3"/>`
-}
-
-// The role of an agent by its type: the label shown, its color and its glyph.
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`
+// The role of an agent by its type.
 type Role = 'builder' | 'explore' | 'plan' | 'other'
-const ROLE_HUE: Record<Role, string> = { builder: HUE.violet, explore: HUE.blue, plan: HUE.teal, other: HUE.grey }
-const roleOf = (type: string): { role: Role; label: string } => {
+const roleOf = (type: string): Role => {
   const t = type.toLowerCase()
-  if (t === 'builder' || t === 'mentat:builder') return { role: 'builder', label: 'builder' }
-  if (t === 'explore') return { role: 'explore', label: 'explore' }
-  if (t === 'plan') return { role: 'plan', label: 'plan' }
-  return { role: 'other', label: type }
+  if (t === 'builder' || t === 'mentat:builder') return 'builder'
+  if (t === 'explore') return 'explore'
+  if (t === 'plan') return 'plan'
+  return 'other'
 }
 // The terminal's one-character mark for a role, where the desktop draws its glyph.
 const ROLE_MARK: Record<Role, string> = { builder: '◆', explore: '◎', plan: '◇', other: '·' }
-// Glyphs on a 24 by 24 grid, drawn in the role color: a wrench, a magnifier, a compass, a dot.
-const GLYPH: Record<Role, string> = {
-  builder: '<path d="M13 11L5 19"/><path d="M16.7 3.9A4.2 4.2 0 1 0 20.1 7.3"/>',
-  explore: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
-  plan: '<circle cx="12" cy="12" r="8.5"/><path d="M15.8 8.2l-2.1 5.5-5.5 2.1 2.1-5.5z"/>',
-  other: '<circle cx="12" cy="12" r="4" stroke="none" fill="HUE"/>',
-}
-// A tinted tile with the role's glyph, centered on (cx, cy); a finished agent's is dimmed.
-const roleIcon = (cx: number, cy: number, role: Role, isDone: boolean): string => {
-  const hue = ROLE_HUE[role]
-
-  return `<g opacity="${isDone ? 0.55 : 1}"><rect x="${cx - 12}" y="${cy - 12}" width="24" height="24" rx="7" fill="${hue}" opacity="0.14"/><g data-role="${role}" transform="translate(${cx - 7.2} ${cy - 7.2}) scale(0.6)" fill="none" stroke="${hue}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${GLYPH[role].replace('HUE', hue)}</g></g>`
-}
-
-type AgentCardRow = { status: AgentStatus; title: string; type: string; model: string; stats: string }
-export const AGENT_ROW_H = 34
-export const AGENT_HEAD_H = 30
-// One group of agents as its own card: an optional header, then one-line rows. Left to right a row
-// has the role icon, the title, the model and effort (dimmer) after it, the stats (tokens and
-// elapsed time, right-aligned) and the status mark on the right edge. A long title is cut with an
-// ellipsis, and the model after it when there is still not room. The role is in the alt text.
-const agentsSvg = (W: number, header: string | undefined, rows: AgentCardRow[]): { svg: string; h: number } => {
-  const top = header === undefined ? 4 : AGENT_HEAD_H
-  const h = top + rows.length * AGENT_ROW_H + 4
-  const tx = 48
-  const gap = 10
-  const body = rows.map((r, i) => {
-    const y = top + i * AGENT_ROW_H
-    const cy = y + AGENT_ROW_H / 2
-    const done = isEnded(r.status)
-    const { role } = roleOf(r.type)
-    const statsX = W - 44
-    const statsW = r.stats === '' ? 0 : textW(r.stats, 11.5)
-    // The room from the title's left edge to the stats (or the mark, when there are no stats).
-    const room = statsX - tx - (statsW === 0 ? 0 : statsW + 14)
-    const modelW = r.model === '' ? 0 : textW(r.model, 12)
-    let title = r.title
-    let model = r.model
-    if (textW(title, 14) + (modelW === 0 ? 0 : gap + modelW) > room) {
-      title = fit(r.title, 14, Math.max(room * 0.6, room - (modelW === 0 ? 0 : gap + modelW)))
-      const left = room - textW(title, 14) - gap
-      model = left < 40 ? '' : fit(r.model, 12, left)
-    }
-    // A finished agent is drawn in the muted color, so running work stands out; its mark keeps its own.
-    return `${roleIcon(24, cy, role, done)}
-<text class="${done ? 'm' : 't'}" x="${tx}" y="${cy + 5}" font-family="${FONT}" font-size="14" font-weight="${isActive(r.status) ? 600 : 500}">${xml(title)}</text>
-${model === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${Math.round(tx + textW(title, 14) + gap)}" y="${cy + 4.5}" font-family="${FONT}" font-size="12">${xml(model)}</text>`}
-${r.stats === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${statsX}" y="${cy + 4}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.stats)}</text>`}
-${agentMark(W - 26, cy, r.status)}
-${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2="${W - 16}" y2="${y + AGENT_ROW_H}"/>` : ''}`
-  })
-  const head = header === undefined ? '' : `<text class="s" x="16" y="21" font-family="${FONT}" font-size="12.5" font-weight="600">${xml(header)}</text>`
-
-  return { svg: svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${head}${body.join('')}`), h }
-}
-// The alt text of a group: its heading and count, then each agent's role and title (the role is not drawn as text).
-const agentsAlt = (heading: string, rows: AgentCardRow[]): string =>
-  `${heading}: ${rows.length} (${rows.map(r => `${roleOf(r.type).label}: ${r.title}`).join('; ')})`
-
-// What the band's left side shows, in this order: the item that waits on the maintainer (the most
-// urgent: alert, question, check warning, action; the newest within a kind), a budget warning,
-// the newest Log note, and last a quiet `Mentat` line.
-type BandKind = DecisionKind | 'budget'
-type BandLeft = { kind: BandKind; text: string } | { kind: 'note'; text: string; icon: string; hue: string } | { kind: 'quiet'; text: string }
-const MARK: Record<BandKind, { char: string; hue: string }> = {
+// The mark of each kind of open item on the desktop: its glyph and hue.
+const MARK: Record<DecisionKind, { char: string; hue: string }> = {
   alert: { char: '!', hue: HUE.red },
   question: { char: '?', hue: HUE.amber },
   warning: { char: '!', hue: HUE.amber },
   action: { char: '→', hue: HUE.blue },
-  budget: { char: '!', hue: HUE.amber },
 }
-// The description of an item in the desktop band's alt text.
+// The description of an item in the alt text of its mark.
 const ITEM_ALT: Record<DecisionKind, string> = { question: 'Question', action: 'Waiting on you', alert: 'Alert', warning: 'Check warnings' }
 // The items that wait on the maintainer, most urgent first: alert, then question, check warning, action; the
-// newest of a kind first. The desktop band shows the first and counts the rest in `+N more`; the terminal
-// pane lists them all.
+// newest of a kind first. Both panes list them all.
 const urgentFirst = (list: Decision[]): Decision[] =>
   [...list].reverse().sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
-const mostUrgent = (list: Decision[]): Decision | undefined => urgentFirst(list)[0]
-
-// One line, drawn as a single Svg on the desktop: a mark and the text, and at the right the `+N more` pill
-// when more than one item waits. The buttons are native, beside it.
-const bandSvg = (W: number, left: BandLeft, more: string): string => {
-  const pillW = more === '' ? 0 : Math.round(20 + textW(more, 12))
-  const room = W - pillW - 16
-  const mark = left.kind === 'quiet' ? undefined : left.kind === 'note' ? { char: left.icon, hue: left.hue } : MARK[left.kind]
-  const leftSvg =
-    mark === undefined
-      ? `<text class="m" x="2" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(left.text)}</text>`
-      : `<circle cx="11" cy="14" r="8" fill="${mark.hue}" opacity="0.18"/><text fill="${mark.hue}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(mark.char)}</text>
-<text class="t" x="27" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(fit(left.text, 13, room - 30))}</text>`
-  const hue = mark?.hue ?? HUE.grey
-  const pill = more === '' ? '' : `<rect x="${W - pillW}" y="4" width="${pillW}" height="20" rx="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="${W - pillW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600">${xml(more)}</text>`
-  return svgOf(W, 28, leftSvg + pill)
-}
-// The width a native button takes beside the band's Svg, roughly.
-const buttonW = (text: string): number => Math.round(textW(text, 13) + 40)
 
 // The short line that takes the place of a question's answer button once the answer is sent; it says
 // the answer is queued until the prompt has entered the session.
@@ -678,16 +557,15 @@ const SOURCE_WORDS: Record<string, string> = { clear: '/clear', resume: '/resume
 
 type Layout = 'frame' | 'rule' | 'narrow'
 const layoutOf = (cols: number): Layout => (cols >= FRAME_COLUMNS ? 'frame' : cols >= RULE_COLUMNS ? 'rule' : 'narrow')
-// The pieces of a section's top edge, which together are exactly `cols` characters wide: `╭─ TITLE 3 ───╮`
-// in a frame, `── TITLE 3 ───` as a rule. The title is drawn bold and the count dim, so they are apart.
-const topEdge = (layout: Layout, title: string, count: number, cols: number): { head: string; title: string; count: string; fill: string } => {
-  const head = layout === 'frame' ? '╭─ ' : '── '
+// The pieces of a heading rule, which together are exactly `cols` characters wide: `── TITLE 3 ───`. The title is
+// drawn bold and the count dim, so they are apart. (A frame has a real Box border and a plain heading row.)
+const ruleEdge = (title: string, count: number, cols: number): { head: string; title: string; count: string; fill: string } => {
+  const head = '── '
   const shown = ` ${count}`
-  const room = cols - head.length - title.length - shown.length - 1 - (layout === 'frame' ? 1 : 0)
+  const room = cols - head.length - title.length - shown.length - 1
 
-  return { head, title, count: shown, fill: ` ${'─'.repeat(Math.max(0, room))}${layout === 'frame' ? '╮' : ''}` }
+  return { head, title, count: shown, fill: ` ${'─'.repeat(Math.max(0, room))}` }
 }
-const bottomEdge = (cols: number): string => `╰${'─'.repeat(Math.max(0, cols - 2))}╯`
 // The mark of each kind of open item and its theme color.
 const ITEM_MARK: Record<DecisionKind, { char: string; color: string | undefined }> = {
   question: { char: '?', color: undefined },
@@ -696,13 +574,28 @@ const ITEM_MARK: Record<DecisionKind, { char: string; color: string | undefined 
   action: { char: '→', color: 'suggestion' },
 }
 
-// The pane on the terminal. `e` is the Pane's own render argument; `cols` its body width.
-async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], cols: number) {
-  const { Box, Button, Link, Text } = $.ui.resolve(e)
+// What both panes draw, read once: the same sections, entries and order on the terminal and the desktop, so
+// the two cannot drift. Each drawer only lays it out.
+type PaneData = {
+  now: number
+  zone: string | undefined
+  // Open items, most urgent first.
+  open: Decision[]
+  sentList: { id: string; text: string; isDelivered?: boolean }[]
+  result: CheckResult | null
+  // Agents that have not ended: working ones first, then the newest start first.
+  live: AgentRow[]
+  logList: LogEntry[]
+  isLogAll: boolean
+  // The Feed's log lines, newest first (`n` is the entry's place in the stored log), cut to FEED_SHOWN unless all.
+  entries: { entry: LogEntry; n: number }[]
+  // The toggle's label, when the log is longer than FEED_SHOWN.
+  toggle: string | undefined
+  budget: string | undefined
+}
+async function paneData($: EngineInterface): Promise<PaneData> {
   const now = await $.clock.now()
   const zone = await readZone($)
-  const layout = layoutOf(cols)
-  const isShort = layout === 'narrow'
   const open = urgentFirst(await read($, items))
   const sentList = await read($, sentAtom)
   const result = await read($, checkResult)
@@ -715,45 +608,84 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   const logList = await read($, logAtom)
   const isLogAll = await read($, logAll)
   const budget = budgetAlert(limitsOf(await readUsage($), now, zone))
-  const toggleLog = () => inTurn(() => update($, logAll, v => !v))
+  const newest = logList.map((entry, n) => ({ entry, n })).reverse()
+  const toggle = logList.length > FEED_SHOWN ? (isLogAll ? 'Show fewer' : `Show all ${logList.length}`) : undefined
 
-  // One body row: in a frame between the dim side lines, else bare. The middle grows and shrinks, so a row
-  // that ends in Buttons needs no width arithmetic and the right edge stays where it is.
+  return { now, zone, open, sentList, result, live, logList, isLogAll, entries: isLogAll ? newest : newest.slice(0, FEED_SHOWN), toggle, budget }
+}
+const toggleLogAll = ($: EngineInterface) => inTurn(() => update($, logAll, v => !v))
+// What an open item shows besides its text: the answer button or the sent line, the link, the line under it
+// (`Recommended: <text> · <time>`, else the time) and, for the check's warning item, the WARN lines.
+const itemView = (d: Decision, data: PaneData) => {
+  const kind = kindOf(d)
+  const sent = data.sentList.find(x => x.id === d.id)
+  const time = clockAt(d.openedAt, data.zone)
+
+  return {
+    kind,
+    sent,
+    answer: kind === 'question' && sent === undefined ? d.accept : undefined,
+    link: kind !== 'question' ? d.link : undefined,
+    detail: d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`,
+    warns: d.id === CHECK_ID && kind === 'warning' ? (data.result?.warnings ?? []).map(w => `WARN: ${w}`) : [],
+  }
+}
+// A live agent's state word as the engine reports it, and the time it has run when its start is known.
+const agentClock = (a: AgentRow, now: number): string | undefined => (a.startedAt === undefined ? undefined : duration(now - a.startedAt))
+
+// The pane on the terminal. `e` is the Pane's own render argument; `cols` its body width.
+async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], cols: number) {
+  const { Box, Button, Link, Text } = $.ui.resolve(e)
+  const data = await paneData($)
+  const { now, zone, open, live, logList, budget } = data
+  const layout = layoutOf(cols)
+  const isShort = layout === 'narrow'
+  const toggleLog = () => toggleLogAll($)
+
+  // One body row. The text Box grows and shrinks and wraps under itself, so a row that ends in Buttons needs no
+  // width arithmetic and the right edge stays where it is; the other parts are top-aligned beside it.
   const row = (key: string, children: RenderElement[], gap = 1) => (
-    <Box key={key} flexDirection="row">
-      {layout === 'frame' && <Text dimColor>│ </Text>}
-      <Box flexGrow={1} flexShrink={1} flexDirection="row" gap={gap}>
-        {children}
-      </Box>
-      {layout === 'frame' && <Text dimColor> │</Text>}
+    <Box key={key} flexDirection="row" alignItems="flex-start" gap={gap}>
+      {children}
     </Box>
   )
-  // A dim line under an item's text, indented to it.
+  // A dim line under an item's text, indented to it (the mark and the space after it), wrapped.
   const detail = (key: string, text: string) =>
     row(key, [
       <Box key="text" flexGrow={1} flexShrink={1} paddingLeft={2}>
-        <Text dimColor wrap="truncate-end">
+        <Text dimColor wrap="wrap">
           {text}
         </Text>
       </Box>,
     ])
+  // A section: in a frame (from FRAME_COLUMNS) a Box with a dim round border and the heading as its first row;
+  // below that the heading is a rule of exactly `cols` characters, with no border.
   const section = (key: string, title: string, count: number, rows: RenderElement[], gap: boolean) => {
-    const edge = topEdge(layout, title, count, cols)
-
-    return (
-      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0}>
+    const edge = ruleEdge(title, count, cols)
+    const heading =
+      layout === 'frame' ? (
+        <Box key={`${key}-top`} flexDirection="row" gap={1}>
+          <Text bold>{title}</Text>
+          <Text dimColor>{count}</Text>
+        </Box>
+      ) : (
         <Box key={`${key}-top`} flexDirection="row">
           <Text dimColor>{edge.head}</Text>
           <Text bold>{edge.title}</Text>
           <Text dimColor>{edge.count}</Text>
           <Text dimColor>{edge.fill}</Text>
         </Box>
+      )
+
+    return layout === 'frame' ? (
+      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0} borderStyle="round" borderDimColor paddingX={1}>
+        {heading}
         {rows}
-        {layout === 'frame' && (
-          <Box key={`${key}-bottom`} flexDirection="row">
-            <Text dimColor>{bottomEdge(cols)}</Text>
-          </Box>
-        )}
+      </Box>
+    ) : (
+      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0}>
+        {heading}
+        {rows}
       </Box>
     )
   }
@@ -761,20 +693,17 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   // Waiting on you: every open item, most urgent first. The first line holds the mark, the text and the buttons;
   // under it, dim, the recommendation and the time, and for the check's warning item its WARN lines.
   const waiting = open.flatMap(d => {
-    const kind = kindOf(d)
-    const sent = sentList.find(x => x.id === d.id)
-    const answer = kind === 'question' && sent === undefined ? d.accept : undefined
-    const link = kind !== 'question' ? d.link : undefined
+    const { kind, sent, answer, link, detail: recommended, warns } = itemView(d, data)
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
       // The mark never shrinks and keeps its space after it (a margin, which a tight row cannot take away);
-      // the text is what is cut. The controls keep their size and their space before them.
+      // the text is what wraps. The controls keep their size and their space before them.
       row(`item-${d.id}`, [
         <Box key="mark-box" flexShrink={0} marginRight={1}>
           {mark.color === undefined ? <Text key="mark" dimColor>{mark.char}</Text> : <Text key="mark" color={mark.color}>{mark.char}</Text>}
         </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
-          <Text wrap="truncate-end">{d.question}</Text>
+          <Text wrap="wrap">{d.question}</Text>
         </Box>,
         <Box key="controls" flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
           {answer !== undefined && (
@@ -797,11 +726,8 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
       ], 0),
     ]
     if (!isShort) {
-      const time = clockAt(d.openedAt, zone)
-      lines.push(detail(`detail-${d.id}`, d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`))
-      if (d.id === CHECK_ID && kind === 'warning') {
-        ;(result?.warnings ?? []).forEach((w, i) => lines.push(detail(`warn-${i}`, `WARN: ${w}`)))
-      }
+      lines.push(detail(`detail-${d.id}`, recommended))
+      warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
     }
 
     return lines
@@ -809,24 +735,25 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
 
   // The Feed: the agents that have not ended, pinned, then the log newest first.
   const feedRows: RenderElement[] = live.map(a => {
-    const ms = a.startedAt === undefined ? undefined : now - a.startedAt
-    const state = ms === undefined ? a.status : `${a.status} · ${duration(ms)}`
+    const ran = agentClock(a, now)
+    const state = ran === undefined ? a.status : `${a.status} · ${ran}`
 
     return row(`agent-${a.id}`, [
-      <Text key="mark">{ROLE_MARK[roleOf(a.type).role]}</Text>,
+      <Box key="mark" flexShrink={0}>
+        <Text>{ROLE_MARK[roleOf(a.type)]}</Text>
+      </Box>,
       <Box key="text" flexGrow={1} flexShrink={1}>
-        <Text bold wrap="truncate-end">
+        <Text bold wrap="wrap">
           {a.description}
         </Text>
       </Box>,
-      <Text key="state" dimColor>
-        {state}
-      </Text>,
+      <Box key="state" flexShrink={0}>
+        <Text dimColor>{state}</Text>
+      </Box>,
     ])
   })
   if (live.length > 0 && logList.length > 0) feedRows.push(row('feed-gap', [<Text key="gap"> </Text>]))
-  const entries = logList.map((entry, n) => ({ entry, n })).reverse()
-  for (const { entry, n } of isLogAll ? entries : entries.slice(0, FEED_SHOWN)) {
+  for (const { entry, n } of data.entries) {
     const { icon, color } = styleOf(entry)
     feedRows.push(
       row(`log-${n}`, [
@@ -837,19 +764,19 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
                 <Text dimColor>{clockAt(entry.at, zone)}</Text>
               </Box>,
             ]),
-        <Text key="icon" color={color}>
-          {icon}
-        </Text>,
+        <Box key="icon" flexShrink={0}>
+          <Text color={color}>{icon}</Text>
+        </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
-          <Text wrap="truncate-end" {...(isNote(entry) ? {} : { dimColor: true })}>
+          <Text wrap="wrap" {...(isNote(entry) ? {} : { dimColor: true })}>
             {entry.text}
           </Text>
         </Box>,
       ]),
     )
   }
-  if (logList.length > FEED_SHOWN) {
-    const label = isLogAll ? 'Show fewer' : `Show all ${logList.length}`
+  if (data.toggle !== undefined) {
+    const label = data.toggle
     feedRows.push(
       row('log-toggle-row', [
         <Button key="log-toggle" plain label={label} onPress={toggleLog}>
@@ -875,12 +802,151 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   )
 }
 
+// ---- the desktop pane: Waiting on you, then the Feed, as two cards of native rows ----
+
+// The card surface: a faint neutral tint (grey at about 8%), light on a light theme and dark on a dark one.
+// Whether the desktop app draws a Box background and a rounded border is not verified; change or drop it here.
+export const CARD_TINT = '#80808014'
+// The mark column of an item row, in cells (the Svg inside is 20px), and the indent of the lines under the text.
+const MARK_CELLS = 3
+const TEXT_INDENT = MARK_CELLS + 1
+// A small round tinted mark with a glyph, a fixed 20px Svg; it is the only picture in the pane, and it does
+// not take part in the reflow when the divider moves.
+const MARK_SIZE = 20
+const markSvg = (char: string, hue: string): string =>
+  svgOf(MARK_SIZE, MARK_SIZE, `<circle cx="10" cy="10" r="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="10" y="14.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(char)}</text>`)
+
+// The pane on the desktop: the same sections, entries and order as the terminal's, drawn as rows of native
+// Box and Text. Nothing here is measured: the text Box grows and shrinks (and the text wraps under itself), so
+// the rows follow the divider without a redraw from the mod.
+async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0] & { surface: 'desktop' }) {
+  const { Box, Button, Link, Svg, Text } = $.ui.resolve(e)
+  const data = await paneData($)
+  const { now, zone, open, live, logList, budget } = data
+
+  // The desktop lays rows out with CSS flexbox, where a flex item's min-width is `auto` (its content's width),
+  // so a Box never shrinks below its text however its flexShrink is set. Every Box between the card and the
+  // text that must be cut therefore has minWidth 0, and the text Box also hides its overflow.
+  const card = (key: string, title: string, color: string, count: number, body: RenderElement) => (
+    <Box key={key} flexDirection="column" gap={1} minWidth={0} borderStyle="round" borderDimColor backgroundColor={CARD_TINT} paddingX={1}>
+      <Box key={`${key}-head`} flexDirection="row" gap={1}>
+        <Text bold color={color}>
+          {title}
+        </Text>
+        <Text dimColor>{count}</Text>
+      </Box>
+      {body}
+    </Box>
+  )
+  // The text of a row: the only part that shrinks. It wraps under itself, so no overflow is hidden.
+  const cut = (text: string, props: { bold?: boolean; dimColor?: boolean } = {}) => (
+    <Box flexGrow={1} flexShrink={1} minWidth={0}>
+      <Text wrap="wrap" {...props}>
+        {text}
+      </Text>
+    </Box>
+  )
+
+  const waiting = open.map(d => {
+    const { kind, sent, answer, link, detail, warns } = itemView(d, data)
+    const mark = MARK[kind]
+
+    return (
+      <Box key={`item-${d.id}`} flexDirection="column" minWidth={0}>
+        <Box flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
+          <Box width={MARK_CELLS} flexShrink={0}>
+            <Svg source={markSvg(mark.char, mark.hue)} alt={ITEM_ALT[kind]} width={MARK_SIZE} height={MARK_SIZE} />
+          </Box>
+          {cut(d.question)}
+          <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
+            {link !== undefined && (
+              <Text>
+                <Link href={link} label={shortLink(link)} />
+              </Text>
+            )}
+            {answer !== undefined && <Button key={`accept-${d.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, d, answer)} />}
+            {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
+            <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismissItem($, d.id)} />
+          </Box>
+        </Box>
+        {[detail, ...warns].map((line, i) => (
+          <Box key={`detail-${i}`} paddingLeft={TEXT_INDENT} flexDirection="row" minWidth={0}>
+            {cut(line, { dimColor: true })}
+          </Box>
+        ))}
+      </Box>
+    )
+  })
+
+  // The time column is a fixed width and right-aligned: an agent's state word sits in it, a log line's time.
+  const timeColumn = (child: RenderElement) => (
+    <Box width={8} flexShrink={0} justifyContent="flex-end">
+      {child}
+    </Box>
+  )
+  const agentRows = live.map(a => {
+    const ran = agentClock(a, now)
+
+    return (
+      <Box key={`agent-${a.id}`} flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
+        {timeColumn(<Text color="suggestion">{a.status}</Text>)}
+        <Box flexShrink={0}>
+          <Text color="suggestion">●</Text>
+        </Box>
+        {cut(a.description, { bold: true })}
+        {ran !== undefined && (
+          <Box flexShrink={0}>
+            <Text dimColor>{ran}</Text>
+          </Box>
+        )}
+      </Box>
+    )
+  })
+  const logRows = data.entries.map(({ entry, n }) => {
+    const { icon, color } = styleOf(entry)
+
+    return (
+      <Box key={`log-${n}`} flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
+        {timeColumn(<Text dimColor>{clockAt(entry.at, zone)}</Text>)}
+        <Box flexShrink={0}>
+          <Text color={color}>{icon}</Text>
+        </Box>
+        {cut(entry.text, isNote(entry) ? {} : { dimColor: true })}
+      </Box>
+    )
+  })
+  const feed = (
+    <Box flexDirection="column" minWidth={0}>
+      {agentRows}
+      {logRows.length > 0 && (
+        <Box key="log" flexDirection="column" minWidth={0} marginTop={agentRows.length > 0 ? 1 : 0}>
+          {logRows}
+        </Box>
+      )}
+      {data.toggle !== undefined && (
+        <Box key="log-more" flexDirection="row" marginTop={1}>
+          <Button key="log-toggle" label={data.toggle} onPress={() => toggleLogAll($)} />
+        </Box>
+      )}
+    </Box>
+  )
+  const hasFeed = live.length > 0 || logList.length > 0
+
+  return (
+    <Box flexDirection="column" gap={1} paddingX={1} minWidth={0}>
+      {budget !== undefined && (
+        <Text color="warning" wrap="truncate-end">
+          {budget}
+        </Text>
+      )}
+      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box flexDirection="column" gap={1} minWidth={0}>{waiting}</Box>)}
+      {hasFeed && card('card-feed', 'FEED', 'subtle', live.length + logList.length, feed)}
+      {open.length === 0 && !hasFeed && <Text dimColor>Nothing waiting on you.</Text>}
+    </Box>
+  )
+}
+
 export const register: Register = (on, _options) => {
-  // The effort an Agent call asked for, until the agent it spawns is recorded.
-  const effortByCall = new Map<string, string>()
-  // The effort an agent's latest model request used, by agent id. It also holds a value that
-  // arrived before the agent's row did; agent.spawn applies it when the row appears.
-  const effortByAgent = new Map<string, string>()
   let agentTimer: { cancel: () => void } | undefined
   let refreshTimer: { cancel: () => void } | undefined
 
@@ -942,7 +1008,7 @@ export const register: Register = (on, _options) => {
       inputSchema: {
         type: 'object',
         properties: {
-          text: { type: 'string', description: 'One plain line, about 80 characters at most; longer text is cut with an ellipsis' },
+          text: { type: 'string', description: 'One plain line, about 80 characters at most' },
           kind: {
             type: 'string',
             enum: [...NOTE_KINDS],
@@ -963,8 +1029,8 @@ export const register: Register = (on, _options) => {
     await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
     agentTimer?.cancel()
     refreshTimer?.cancel()
-    await syncAgents($, effortByAgent)
-    agentTimer = $.clock.every(1000, () => void agentTick($, effortByAgent))
+    await syncAgents($)
+    agentTimer = $.clock.every(1000, () => void agentTick($))
     // A minute tick only redraws, so an idle session shows a rate limit that crossed the warning line.
     refreshTimer = $.clock.every(60_000, () => void invalidate($))
     void startCheck($, e.cwd)
@@ -1073,7 +1139,7 @@ export const register: Register = (on, _options) => {
 
   on('tool.call', { tool: NOTE_TOOL }, async ($, e) => {
     const input = e as unknown as { text?: unknown; kind?: unknown }
-    const text = typeof input.text === 'string' ? oneLine(input.text, LOG_WIDTH) : ''
+    const text = typeof input.text === 'string' ? oneLine(input.text) : ''
     if (text === '') {
       return { deny: 'note needs a line of text.' }
     }
@@ -1088,10 +1154,6 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', async ($, e, next) => {
-    if (e.tool === 'Agent') {
-      const effort = (e as unknown as { effort?: unknown }).effort
-      if (typeof effort === 'string') effortByCall.set(e.tool_use_id, effort)
-    }
     const isMainBash = e.tool === 'Bash' && e.agentId === undefined && typeof e.command === 'string'
     const ran = await next(e)
     if (isMainBash) {
@@ -1115,11 +1177,6 @@ export const register: Register = (on, _options) => {
       status: 'running',
       startedAt,
     }
-    const model = out.model ?? e.model
-    if (model !== undefined && model !== '') row.model = model
-    const effort = effortByAgent.get(id) ?? effortByCall.get(e.tool_use_id)
-    if (effort !== undefined) row.effort = effort
-    effortByCall.delete(e.tool_use_id)
     await inTurn(async () => {
       await update($, agents, list => [...list.filter(a => a.id !== id), row].slice(-30))
     })
@@ -1128,37 +1185,11 @@ export const register: Register = (on, _options) => {
     return out
   })
 
-  // The effort each of a subagent's requests uses, which the Agent call's own effort often
-  // leaves out. The request passes through as it came, and the write never waits for it.
-  on('turn.step', async function* ($, e, next) {
-    const id = e.agentId
-    if (id !== undefined && e.effort !== undefined) {
-      const shown = showEffort(e.effort)
-      if (effortByAgent.get(id) !== shown) {
-        effortByAgent.set(id, shown)
-        void inTurn(async () => {
-          const rows = await read($, agents)
-          if (!rows.some(r => r.id === id && r.effort !== shown)) return
-          await update($, agents, list => list.map(r => (r.id === id ? { ...r, effort: shown } : r)))
-          await invalidate($)
-        }).catch(() => undefined)
-      }
-    }
-
-    return yield* next(e)
-  })
-
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId
     if (id !== undefined) {
-      const u = e.usage
-      const tokens =
-        u === undefined ? undefined : (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.output_tokens ?? 0)
-      if (tokens !== undefined) {
-        await inTurn(() => update($, agents, rows => rows.map(r => (r.id === id ? { ...r, tokens } : r))))
-      }
       // A subagent's turn is not its end: only the engine's list says that.
-      await syncAgents($, effortByAgent)
+      await syncAgents($)
       await invalidate($)
     }
 
@@ -1168,9 +1199,7 @@ export const register: Register = (on, _options) => {
   // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.
   // `● Mentat`: dim until a `mentat check` has run, then green, amber with the warning count, or red. While
   // items wait it reads `● Mentat · N waiting` instead, N counting every open item, only the dot in the
-  // check's color. On the terminal the label is a
-  // Button that opens the pane (there is no band there); on the desktop it is the same text, and the
-  // band is there.
+  // check's color. On both surfaces the label is a Button that opens the pane (there is no band).
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     const result = await read($, checkResult)
@@ -1192,14 +1221,10 @@ export const register: Register = (on, _options) => {
       waiting === 0
         ? [mark(text)]
         : [mark('●'), <Text key="name">{' Mentat'}</Text>, <Text key="sep" dimColor>{' · '}</Text>, <Text key="count" color="warning">{`${waiting} waiting`}</Text>]
-    const label = e.surface === 'terminal' ? (
+    const label = (
       <Button key="mentat-open" plain label={waiting === 0 ? text : `● Mentat · ${waiting} waiting`} onPress={() => $.ui.open({ id: PANE, title: TITLE })}>
         {parts}
       </Button>
-    ) : (
-      <Box key="mentat-label" flexDirection="row">
-        {parts}
-      </Box>
     )
 
     return (
@@ -1210,171 +1235,9 @@ export const register: Register = (on, _options) => {
     )
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    // The terminal has no band of Mentat's: the footer label opens the pane. What is beneath stays.
-    if (e.props.hasSurvey || e.surface !== 'desktop') {
-      return next(e)
-    }
-    // The desktop band is always there: what waits on the maintainer, else a budget warning, else the newest
-    // Log note, else a quiet line. Nothing in it comes from GitHub.
-    const open = await read($, items)
-    const now = await $.clock.now()
-    const urgent = mostUrgent(open)
-    // Budget raises it only when no item waits. It is read when the band is drawn, and the minute timer
-    // draws the band again, so a change of usage alone shows within a minute.
-    const budget = urgent === undefined ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
-    const logList = urgent === undefined && budget === undefined ? await read($, logAtom) : []
-    // Only a note is the band's line, never an event line.
-    const note = [...logList].reverse().find(isNote)
-    const left: BandLeft =
-      urgent !== undefined
-        ? { kind: kindOf(urgent), text: urgent.question }
-        : budget !== undefined
-          ? { kind: 'budget', text: budget }
-          : note !== undefined
-            ? { kind: 'note', text: note.text, icon: LOG_STYLE[note.kind].icon, hue: LOG_STYLE[note.kind].hue }
-            : { kind: 'quiet', text: TITLE }
-    const more = open.length > 1 ? `+${open.length - 1} more` : ''
-    // The urgent item's controls: a question with a recommended answer has a one-press button (a line
-    // in its place once sent), every item has Dismiss, and an action or alert may carry a link.
-    const sent = urgent === undefined ? undefined : (await read($, sentAtom)).find(x => x.id === urgent.id)
-    const answer = urgent !== undefined && kindOf(urgent) === 'question' && sent === undefined ? urgent.accept : undefined
-    const link = urgent !== undefined && kindOf(urgent) !== 'question' ? urgent.link : undefined
-    const { Box, Button, Link, Text } = $.ui.resolve(e)
-    // One row, never wrapped: the answer button (or the sent line), Dismiss, the link, then Details. It
-    // is one Box with every child its own, not a fragment: a fragment's children are not laid out as one row.
-    const controls = () => (
-      <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
-        {answer !== undefined && urgent !== undefined && (
-          <Button key={`accept-${urgent.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, urgent, answer)} />
-        )}
-        {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
-        {urgent !== undefined && <Button key={`dismiss-${urgent.id}`} label="Dismiss" onPress={() => dismissItem($, urgent.id)} />}
-        {link !== undefined && (
-          <Text>
-            <Link href={link} label={linkLabel(link)} />
-          </Text>
-        )}
-        <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
-      </Box>
-    )
-    // The band is shared: what the plugins beneath draw stays, under this row.
-    const beneath = await next(e)
-    const { Svg } = $.ui.resolve(e)
-    // The Svg leaves room for the native buttons beside it.
-    const beside =
-      (urgent === undefined ? 0 : buttonW('Dismiss') + 8) +
-      (answer === undefined ? 0 : buttonW(answer) + 8) +
-      (sent === undefined ? 0 : Math.round(textW(sentLine(sent), 12)) + 8) +
-      (link === undefined ? 0 : Math.round(textW(linkLabel(link), 13)) + 8)
-    const W = Math.max(160, (e.props.bodyColumns ?? 80) * 8 - 96 - beside)
-    const alt = `${left.kind === 'budget' || left.kind === 'quiet' ? '' : left.kind === 'note' ? 'Note: ' : `${ITEM_ALT[left.kind]}: `}${left.text}${more === '' ? '' : ` (${more})`}`
-
-    return (
-      <Box flexDirection="column">
-        <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-          <Svg source={bandSvg(W, left, more)} alt={alt} width={W} height={28} />
-          {controls()}
-        </Box>
-        {beneath}
-      </Box>
-    )
-  })
-
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const cols = e.props.bodyColumns ?? 50
-    if (e.surface !== 'desktop') return terminalPane($, e, cols)
-    const { Box, Button, Svg, Text } = $.ui.resolve(e)
-    const now = await $.clock.now()
-    // What waits on the maintainer is in the band, not here; the pane only knows whether anything does.
-    const open = await read($, items)
-    const rows = [...(await read($, agents))].sort((a, b) => {
-      if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
-      return (b.startedAt ?? 0) - (a.startedAt ?? 0)
-    })
-    const isHidden = await read($, finishedHidden)
-    // Agents that have not ended (running, waiting, idle) first, then the finished ones.
-    const liveRows = rows.filter(a => !isEnded(a.status))
-    const doneRows = rows.filter(a => isEnded(a.status))
-    const toggleFinished = () => inTurn(() => update($, finishedHidden, v => !v))
-    const Heading = ({ label, color }: { label: string; color?: string }) => (
-      <Box flexDirection="row" marginBottom={1}>
-        <Text bold color={color ?? 'subtle'}>
-          {label.toUpperCase()}
-        </Text>
-      </Box>
-    )
+    if (e.surface !== 'desktop') return terminalPane($, e, e.props.bodyColumns ?? 50)
 
-    // The Log card: the newest entries first, the last LOG_SHOWN of them until `Show all`. Plain text
-    // rows on both surfaces, with no background: an 8-digit hex tint renders as solid grey in a terminal.
-    const logList = await read($, logAtom)
-    const isLogAll = await read($, logAll)
-    const zone = await readZone($)
-    const toggleLog = () => inTurn(() => update($, logAll, v => !v))
-    const logRows = logList.map((entry, n) => ({ entry, n })).reverse()
-    const logCard = (marginTop: number) =>
-      logList.length === 0 ? undefined : (
-        <Box flexDirection="column" marginTop={marginTop}>
-          <Heading label="Log" />
-          {(isLogAll ? logRows : logRows.slice(0, LOG_SHOWN)).map(({ entry, n }) => (
-            <Box key={`log-${n}`} flexDirection="row" gap={1}>
-              <Box width={8} flexShrink={0} justifyContent="flex-end">
-                <Text dimColor>{clockAt(entry.at, zone)}</Text>
-              </Box>
-              <Text color={styleOf(entry).color}>{styleOf(entry).icon}</Text>
-              <Text wrap="truncate-end" {...(isNote(entry) ? {} : { dimColor: true })}>
-                {entry.text}
-              </Text>
-            </Box>
-          ))}
-          {logList.length > LOG_SHOWN && (
-            <Box flexDirection="row" marginTop={1}>
-              <Button key="log-toggle" label={isLogAll ? 'Show fewer' : `Show all ${logList.length}`} onPress={toggleLog} />
-            </Box>
-          )}
-        </Box>
-      )
-    const W = Math.max(220, Math.min(900, cols * 8 - 24))
-    const agentRow = (a: AgentRow): AgentCardRow => {
-      const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
-      const elapsed = ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms)
-
-      return {
-        status: a.status,
-        title: a.description,
-        type: a.type,
-        model: [a.model === undefined ? undefined : shortModel(a.model), a.effort].filter(Boolean).join(' · '),
-        stats: [a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`, elapsed === '' ? undefined : elapsed].filter(Boolean).join(' · '),
-      }
-    }
-    const liveRowsSvg = liveRows.map(agentRow)
-    const doneRowsSvg = doneRows.map(agentRow)
-    const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRowsSvg)
-    const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRowsSvg)
-    return (
-      <Box flexDirection="column" paddingX={1}>
-        {open.length === 0 && logList.length === 0 && rows.length === 0 && (
-          <Box marginTop={SECTION_GAP}>
-            <Text dimColor>Nothing waiting on you.</Text>
-          </Box>
-        )}
-        {logCard(SECTION_GAP)}
-        {rows.length > 0 && (
-          <Box flexDirection="column" marginTop={SECTION_GAP}>
-            {liveCard !== undefined && <Svg source={liveCard.svg} alt={agentsAlt('Running agents', liveRowsSvg)} width={W} height={liveCard.h} />}
-            {doneRows.length > 0 && (
-              <Box flexDirection="row" marginTop={liveCard === undefined ? 0 : 1}>
-                <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
-              </Box>
-            )}
-            {doneCard !== undefined && (
-              <Box marginTop={1}>
-                <Svg source={doneCard.svg} alt={agentsAlt('Finished agents', doneRowsSvg)} width={W} height={doneCard.h} />
-              </Box>
-            )}
-          </Box>
-        )}
-      </Box>
-    )
+    return desktopPane($, e)
   })
 }

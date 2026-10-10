@@ -23,17 +23,13 @@ export type AgentRow = {
   id: string
   type: string
   description: string
-  // Model, effort and start are known only for agents spawned while this mod was loaded.
-  model?: string
-  effort?: string
   status: AgentStatus
+  // Known only for agents spawned while this mod was loaded.
   startedAt?: number
   endedAt?: number
-  // As last reported by a turn.complete of the agent: input + cache write + output.
-  tokens?: number
 }
 
-// The kinds of note in the pane's Log card; each has its own icon and color.
+// The kinds of note in the pane's Log; each has its own icon and color.
 export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
 // The kinds of event line the pane writes to the Log itself. The `note` tool never takes one.
@@ -42,7 +38,7 @@ export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'di
 // What an `asked` or `check` event line is marked with: the kind of the item asked, or the result of the check.
 export type EventMark = 'question' | 'action' | 'alert' | 'pass' | 'warn' | 'fail'
 
-// One line of the Log card (the Feed): when (clock time), its kind and its text (one line). A note is one
+// One line of the Log (the Feed): when (clock time), its kind and its text (one line). A note is one
 // Claude Code added; an event is one the pane wrote, drawn dim. A line stored without a source is a note.
 export type NoteEntry = { at: number; kind: LogKind; text: string; source?: 'note' }
 export type EventEntry = { at: number; kind: EventKind; text: string; source: 'event'; mark?: EventMark }
@@ -64,8 +60,6 @@ declare module 'claude-code' {
       // session; until then it is held for the end of the running turn.
       decisionsSent: { id: string; text: string; isDelivered?: boolean }[]
       agents: AgentRow[]
-      // True while the pane's Finished group of agents is collapsed (default: open).
-      agentsFinishedHidden: boolean
       // The last `mentat check` run this conversation; null until one has run.
       checkResult: CheckResult | null
       // The session's log, oldest first (the pane shows it newest first); capped.
@@ -73,7 +67,7 @@ declare module 'claude-code' {
       // Counts the conversations: bumped where a /clear, /resume or /branch empties the log, so a write
       // that waited for the engine can tell it began in an earlier conversation.
       conversation: number
-      // True while the pane's Log card shows every entry (default: the last five).
+      // True while the Feed shows every log entry (default: the newest ten).
       logAll: boolean
       // Items that left without close_decision, oldest first; capped at 50, never drawn.
       decisionsGone: GoneEntry[]

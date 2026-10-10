@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { AGENT_HEAD_H, AGENT_ROW_H, isNote, resetAt, withoutSettled } from './progress'
+import { CARD_TINT, isNote, resetAt, withoutSettled } from './progress'
 
 // Tests for pane/progress.tsx. The test's hooks stand for the engine: `git` and `mentat check` are
 // canned answers (nothing talks to GitHub), `$.agent.list` and `$.session.usage` are tables too, and the
@@ -9,10 +9,13 @@ import { AGENT_HEAD_H, AGENT_ROW_H, isNote, resetAt, withoutSettled } from './pr
 const OPEN = 'mcp__mentat__open_decision'
 const CLOSE = 'mcp__mentat__close_decision'
 const NOTE = 'mcp__mentat__note'
+// The band above the prompt: Mentat draws nothing there, so this is only what the engine and other plugins draw.
 const BAND = { plugin: 'mentat', component: 'AbovePrompt', props: { hasSurvey: false } }
 const PANE = { plugin: 'mentat', component: 'Pane', requestId: 'mentat' }
 // The terminal pane at a width that draws frames.
 const TERM = { ...PANE, props: { bodyColumns: 80 } }
+// The desktop pane.
+const DESK = { ...PANE, props: { bodyColumns: 60 } }
 const SURFACES = ['terminal', 'desktop'] as const
 
 const T0 = Date.parse('2026-10-09T12:00:00Z')
@@ -45,7 +48,6 @@ type World = {
   peak: number
   opened: string[]
   sent: string[]
-  agentCallId: string
   // When set, a Bash call does not return until it resolves.
   bashGate?: Promise<void>
   // When set, prompt.submit answers that the prompt did not enter.
@@ -86,7 +88,6 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     peak: 0,
     opened: [],
     sent: [],
-    agentCallId: '',
     dropPrompts: false,
     rejectPrompts: false,
     toasts: [],
@@ -135,10 +136,6 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     return { result: { stdout: world.bash, stderr: world.bashErr } }
   })
   onFn('classic.SessionStart', (_$: unknown, e: unknown) => e)
-  onFn('tool.call', { tool: 'Agent' }, (_$: unknown, e: { tool_use_id: string }) => {
-    world.agentCallId = e.tool_use_id
-    return { result: {} }
-  })
   onFn('prompt.submit', async (_$: unknown, e: { text: string }) => {
     await world.promptGate
     if (world.rejectPrompts) throw new Error('the engine reloaded')
@@ -202,7 +199,7 @@ const mount = async ($: never, spec: object, surface: 'terminal' | 'desktop', pr
   })) as Drawing
 // The keys of a drawing's buttons.
 const cardKeys = async (d: Drawing) => (await d.findAll({ type: 'Button' })).map(b => b.key)
-// The keys of the answer buttons and Dismiss buttons of a drawing (the desktop band's, or the terminal pane's).
+// The keys of the answer buttons and Dismiss buttons of a drawing (of the terminal pane or the desktop pane).
 const bandKeys = async (d: Drawing) => (await d.findAll({ type: 'Button' })).map(b => b.key).filter(k => /^(accept|dismiss)-/.test(String(k)))
 // What each Svg element of the drawing says: its alt text and the text drawn in it.
 const svgsOf = async (d: Drawing) =>
@@ -226,7 +223,7 @@ const paneTexts = async ($: never, surface: 'terminal' | 'desktop' = 'terminal',
 
   return t
 }
-// The band's own texts. On the terminal Mentat draws no band, so this is only what the engine draws there.
+// What the band above the prompt draws: nothing of Mentat's on either surface, so only what is beneath it.
 const bandTexts = async ($: never, surface: 'terminal' | 'desktop' = 'desktop') => {
   const d = await mount($, BAND, surface)
   const t = await textsOf(d)
@@ -234,11 +231,11 @@ const bandTexts = async ($: never, surface: 'terminal' | 'desktop' = 'desktop') 
 
   return t
 }
-// Where each surface shows what waits on the maintainer, with its buttons: the desktop in its band, the
-// terminal in the Waiting on you section of its pane.
-const WAITS = { terminal: TERM, desktop: BAND } as const
-// Where each surface shows a budget warning: the desktop in its band, the terminal at the top of its pane.
-const budgetTexts = ($: never, surface: 'terminal' | 'desktop') => (surface === 'terminal' ? paneTexts($, 'terminal', 60) : bandTexts($, 'desktop'))
+// Where each surface shows what waits on the maintainer, with its buttons: the Waiting on you section of its pane
+// (a card on the desktop, a bordered section on the terminal).
+const WAITS = { terminal: TERM, desktop: DESK } as const
+// Where each surface shows a budget warning: at the top of its pane.
+const budgetTexts = ($: never, surface: 'terminal' | 'desktop') => paneTexts($, surface, 60)
 const mountWaits = ($: never, surface: 'terminal' | 'desktop') => mount($, WAITS[surface], surface)
 const waitTexts = async ($: never, surface: 'terminal' | 'desktop') => {
   const d = await mountWaits($, surface)
@@ -270,11 +267,6 @@ const bash = (w: World, $: never, command: string, stdout = '', extra: object = 
 
   return eng($).tool.call({ tool: 'Bash', command, ...extra })
 }
-// An Agent call with an effort, as the model makes it; resolves with the id the engine gave it.
-const callAgent = async (w: World, $: never, effort: string) => {
-  await eng($).tool.call({ tool: 'Agent', effort })
-  return w.agentCallId
-}
 const spawn = (n: string, description = 'Check the docs', type = 'general-purpose') =>
   ({ tool_use_id: n, prompt: 'p', description, subagentType: type, provider: { plugin: 'engine', tier: 'core' } })
 const turnDone = (agentId: string, usage?: object) =>
@@ -288,30 +280,30 @@ const step = async ($: never, agentId: string | undefined, effort?: string | num
 
 // ---- decisions (ported from tests/decisions-pane.test.tsx) ----------------------------
 
-test('an opened question shows in the desktop band and in the terminal pane\'s Waiting on you, and closing it leaves the quiet line', async ($, on) => {
+test('an opened question shows in Waiting on you on both surfaces, and closing it leaves it out', async ($, on) => {
   boot(on)
   const opened = await eng($).tool.call({ tool: OPEN, question: 'Open the issue?', recommendation: 'yes' })
   expect(String(opened.result)).toContain('d1')
 
-  // The terminal has no band of Mentat's.
-  expect(await bandTexts($, 'terminal')).toEqual([])
+  // Mentat draws no band on either surface.
+  for (const surface of SURFACES) expect(await bandTexts($, surface)).toEqual([])
   for (const surface of SURFACES) {
     const t = await waitTexts($, surface)
     expect(t).toContain('Open the issue?')
     expect(t.some(x => x.includes('more'))).toBe(false)
   }
-  // The desktop pane has no card of its own for it; its Log holds only its `Asked you:` line.
-  expect((await paneTexts($, 'desktop')).some(x => x === 'Open the issue?' || x.includes('→ yes'))).toBe(false)
+  // Both panes have the recommendation under it.
+  for (const surface of SURFACES) expect((await paneTexts($, surface)).some(x => x.startsWith('Recommended: yes · '))).toBe(true)
 
   await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'opened' })
-  expect(await bandTexts($, 'desktop')).toContain('Mentat')
-  expect(await bandTexts($, 'desktop')).not.toContain('Open the issue?')
-  const term = await paneTexts($, 'terminal')
-  expect(term).not.toContain('Open the issue?')
-  expect(term).not.toContain('WAITING ON YOU')
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(t).not.toContain('Open the issue?')
+    expect(t).not.toContain('WAITING ON YOU')
+  }
 })
 
-test('the terminal draws no band of Mentat\'s, whatever is open, near a limit or noted; what is beneath stays', async ($, on) => {
+test('AbovePrompt draws nothing of Mentat\'s on either surface, whatever is open, near a limit or noted; what is beneath stays, and so does a survey', async ($, on) => {
   const { world } = boot(on, { band: false })
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -320,13 +312,15 @@ test('the terminal draws no band of Mentat\'s, whatever is open, near a limit or
   world.usage = { context: 5, limits: [{ kind: 'five_hour', percentUsed: 95, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
   await eng($).tool.call({ tool: NOTE, text: 'A note' })
   await eng($).tool.call({ tool: OPEN, question: 'Keep both?', accept: 'Yes' })
-  const d = await mount($, BAND, 'terminal')
-  expect(await textsOf(d)).toEqual(["another plugin's band"])
-  expect((await d.findAll({ type: 'Button' })).length).toBe(0)
-  await d.unmount()
-  // The desktop band is there beside it.
-  expect(await bandTexts($, 'desktop')).toContain('Keep both?')
-  expect(await bandTexts($, 'desktop')).toContain("another plugin's band")
+  for (const surface of SURFACES) {
+    for (const hasSurvey of [false, true]) {
+      const d = await mount($, BAND, surface, { hasSurvey })
+      expect(await textsOf(d)).toEqual(["another plugin's band"])
+      expect((await d.findAll({ type: 'Button' })).length).toBe(0)
+      expect((await d.findAll({ type: 'Svg' })).length).toBe(0)
+      await d.unmount()
+    }
+  }
 })
 
 test('settled entries a former decisions pane stored are dropped on load', async ($, on) => {
@@ -345,87 +339,48 @@ test('settled entries a former decisions pane stored are dropped on load', async
   await startSession($)
   await startSession($)
   expect(await waitTexts($, 'terminal')).toContain('Open before the load')
-  expect(await bandTexts($)).toContain('Open before the load')
+  expect(await waitTexts($, 'desktop')).toContain('Open before the load')
 })
 
-test('with only questions raising it, the band shows the newest question on the left, and the terminal pane lists all of them, newest first', async ($, on) => {
+test('both panes list all the questions, newest first', async ($, on) => {
   boot(on)
   await eng($).tool.call({ tool: OPEN, question: 'First one?' })
   await eng($).tool.call({ tool: OPEN, question: 'Newest one?' })
-  const t = await bandTexts($, 'desktop')
-  expect(t).toContain('Newest one?')
-  expect(t).not.toContain('First one?')
-  expect(t).toContain('+1 more')
-  const d = await mount($, BAND, 'desktop')
-  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toContain('open')
-  await d.unmount()
-
-  const pane = await waitTexts($, 'terminal')
-  expect(pane.indexOf('Newest one?')).toBeGreaterThan(-1)
-  expect(pane.indexOf('Newest one?')).toBeLessThan(pane.indexOf('First one?'))
-  expect(pane.some(x => x.includes('more'))).toBe(false)
+  for (const surface of SURFACES) {
+    const pane = await waitTexts($, surface)
+    expect(pane.indexOf('Newest one?')).toBeGreaterThan(-1)
+    expect(pane.indexOf('Newest one?')).toBeLessThan(pane.indexOf('First one?'))
+    expect(pane.some(x => x.includes('more'))).toBe(false)
+  }
 })
 
-test('on the desktop the band and the agents card are drawn Svgs, found by alt text; the terminal draws text', async ($, on) => {
+test('the desktop pane is native rows with small Svg marks found by alt text; the terminal draws text; neither has a band', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 41, limits: [{ kind: 'five_hour', percentUsed: 85, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
-  // Desktop band with nothing waiting: the budget warning is drawn, with a native Details button.
-  const budgetBand = await mount($, BAND, 'desktop')
-  const budgetSvg = await svgsOf(budgetBand)
-  expect(budgetSvg.map(v => v.alt)).toEqual(['5-hour limit 85% · resets in 1h 0m'])
-  expect((await budgetBand.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
-  await budgetBand.unmount()
   await eng($).tool.call({ tool: OPEN, question: 'Open it?', recommendation: 'Yes', accept: 'Yes' })
-  const id = await callAgent(world, $, 'high')
-  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
-  await eng($).agent.spawn(spawn(id))
+  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Check the docs', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1'))
 
-  // Desktop band with the question open: it is the question that is drawn, with its answer button, Dismiss and Details.
-  const band = await mount($, BAND, 'desktop')
-  const bandSvg = await svgsOf(band)
-  expect(bandSvg.map(v => v.alt)).toEqual(['Question: Open it?'])
-  expect(bandSvg[0]!.drawn).toEqual(['?', 'Open it?'])
-  expect((await band.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1', 'open'])
-  await band.unmount()
-
-  // Desktop pane: the agents card only; no question card, no PR card (the app has its own chip) and no usage tiles (its own popover shows those).
-  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const svgs = await svgsOf(pane)
-  const alt = (prefix: string) => svgs.find(v => v.alt.startsWith(prefix))
-  expect(svgs.map(v => v.alt)).toEqual(['Running agents: 1 (general-purpose: Check the docs)'])
-  expect(svgs.flatMap(v => v.drawn).some(x => /context|5-hour|%/i.test(x))).toBe(false)
-  expect(alt('Running agents')!.drawn).toEqual(expect.arrayContaining(['Running · 1', 'Check the docs', 'Opus 4.8 · high']))
-  expect(await cardKeys(pane)).toEqual([])
+  // Desktop pane: native rows. The only Svg is the item's small mark; the agent is text. No usage tiles (the app's own popover shows those).
+  const pane = await mount($, DESK, 'desktop')
+  expect((await svgsOf(pane)).map(v => v.alt)).toEqual(['Question'])
+  expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1'])
+  const t = await textsOf(pane)
+  expect(t).toEqual(expect.arrayContaining(['WAITING ON YOU', 'Open it?', 'FEED', 'Check the docs']))
+  // The budget is one warning line at the top, as in the terminal; no meters or tiles.
+  expect(t.filter(x => /context|%/i.test(x))).toEqual(['5-hour limit 85% · resets in 1h 0m'])
   await pane.unmount()
 
-  // The terminal draws no Svg at all, only text, and no band: the question and the agent are in its pane.
-  const tBand = await mount($, BAND, 'terminal')
-  expect(await textsOf(tBand)).toEqual([])
-  await tBand.unmount()
+  // The terminal draws no Svg at all, only text: the question and the agent are in its pane.
   const tPane = await mount($, TERM, 'terminal')
   expect((await tPane.findAll({ type: 'Svg' })).length).toBe(0)
-  const t = await textsOf(tPane)
-  expect(t).toContain('Check the docs')
-  expect(t).toContain('Open it?')
-  expect(t.some(x => /[█░]|Context/.test(x))).toBe(false)
+  const tt = await textsOf(tPane)
+  expect(tt).toContain('Check the docs')
+  expect(tt).toContain('Open it?')
+  expect(tt.some(x => /[█░]|Context/.test(x))).toBe(false)
   await tPane.unmount()
-})
-
-test('the desktop band says +N more only when more than one item waits', async ($, on) => {
-  boot(on)
-  await eng($).tool.call({ tool: OPEN, question: 'Only one?' })
-  let band = await mount($, BAND, 'desktop')
-  let drawn = (await svgsOf(band)).flatMap(v => v.drawn)
-  expect(drawn).toContain('Only one?')
-  expect(drawn.some(x => x.includes('more'))).toBe(false)
-  await band.unmount()
-
-  await eng($).tool.call({ tool: OPEN, question: 'And another?' })
-  band = await mount($, BAND, 'desktop')
-  drawn = (await svgsOf(band)).flatMap(v => v.drawn)
-  expect(drawn).toContain('And another?')
-  expect(drawn).toContain('+1 more')
-  await band.unmount()
+  // Neither surface has a band of Mentat's.
+  for (const surface of SURFACES) expect(await bandTexts($, surface)).toEqual([])
 })
 
 test('a new conversation (clear, resume, branch) drops the open questions too; a reload and a compaction keep them', async ($, on) => {
@@ -434,14 +389,17 @@ test('a new conversation (clear, resume, branch) drops the open questions too; a
   for (const source of ['clear', 'resume', 'fork']) {
     await eng($).tool.call({ tool: OPEN, question: `Asked before ${source}?` })
     await classic.SessionStart({ source })
-    expect((await bandTexts($)).some(t => t.includes('Asked before'))).toBe(false)
-    expect(await bandTexts($)).toContain('Mentat')
+    for (const surface of SURFACES) {
+      const t = await paneTexts($, surface)
+      expect(t.some(x => x.includes('Asked before'))).toBe(false)
+      expect(t).toContain('Nothing waiting on you.')
+    }
   }
   await eng($).tool.call({ tool: OPEN, question: 'Kept?' })
   await startSession($)
   await classic.SessionStart({ source: 'startup' })
   await classic.SessionStart({ source: 'compact' })
-  expect(await bandTexts($)).toContain('Kept?')
+  for (const surface of SURFACES) expect(await waitTexts($, surface)).toContain('Kept?')
 })
 
 test('an answer the conversation did not take raises a toast and can be sent again', async ($, on) => {
@@ -655,7 +613,7 @@ test('a submit the engine rejects is treated like a drop: a toast, and the butto
 test('closing a question, or a new conversation, forgets that it was sent', async ($, on) => {
   const { world } = boot(on)
   const sentIds = watchSent(on)
-  // Each question is the newest when it is answered, so its button is the one the band shows.
+  // Each question is the newest when it is answered.
   for (const [i, q] of ['One?', 'Two?', 'Three?'].entries()) {
     await eng($).tool.call({ tool: OPEN, question: q, accept: 'Yes' })
     const band = await mount($, TERM, 'terminal')
@@ -689,7 +647,7 @@ test('closing an unknown id is refused', async ($, on) => {
 const newConversation = ($: never, source: string) =>
   ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic.SessionStart({ source })
 
-test('close_decision on an item dismissed in the band succeeds and names the time, on both surfaces', async ($, on) => {
+test('close_decision on an item dismissed in the pane succeeds and names the time, on both surfaces', async ($, on) => {
   const { clock } = boot(on)
   for (const [i, surface] of SURFACES.entries()) {
     const id = `d${i + 1}`
@@ -748,7 +706,7 @@ test('a startup or compaction keeps the open items and records nothing', async (
 test('the record of items that left keeps the last 50, oldest dropped, and survives a reload of the pane', async ($, on) => {
   boot(on)
   for (let i = 1; i <= 52; i++) await eng($).tool.call({ tool: OPEN, question: `Question ${i}?` })
-  // The band shows the newest item, so Dismiss takes d52, d51 ... d33 in turn; then /clear takes d1..d32.
+  // The pane lists the newest item first, so Dismiss takes d52, d51 ... d33 in turn; then /clear takes d1..d32.
   // That is 52 records in this order, so the first two (d52, d51) fall out of the 50 kept.
   const band = await mount($, TERM, 'terminal')
   for (let i = 52; i >= 33; i--) await band.press({ key: `dismiss-d${i}` })
@@ -773,7 +731,7 @@ test('the record survives a reload of the pane (a session start) and is never dr
   await startSession($)
   await startSession($)
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Decision d1 was already dismissed in the pane at 8:00 AM.')
-  expect(await bandTexts($, 'desktop')).toEqual(['Mentat'])
+  expect(await waitTexts($, 'desktop')).not.toContain('WAITING ON YOU')
   expect(await waitTexts($, 'terminal')).not.toContain('WAITING ON YOU')
   for (const surface of SURFACES) {
     // The record itself is never drawn; the Log's `You dismissed:` line is the only trace.
@@ -789,32 +747,29 @@ test('a check alert replaced or removed by a later run is not recorded', async (
   expect((await eng($).tool.call({ tool: CLOSE, id: 'check' })).deny).toContain('no record')
 })
 
-test('the accept button sends its label as the answer, once; the desktop band offers it for the most urgent question', async ($, on) => {
+test('the accept button sends its label as the answer, once, in either pane; a sent question keeps only Dismiss', async ($, on) => {
   const { world } = boot(on)
-  // d1 for the terminal pane and d2 for the desktop band; d3 has no one-press answer.
+  // d1 for the terminal pane and d2 for the desktop pane; d3 has no one-press answer.
   await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
   const first = await mount($, TERM, 'terminal')
   expect(await bandKeys(first)).toEqual(['accept-d1', 'dismiss-d1'])
   await first.press({ key: 'accept-d1' })
   await first.unmount()
   await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
-  const second = await mount($, BAND, 'desktop')
-  expect(await bandKeys(second)).toEqual(['accept-d2', 'dismiss-d2'])
+  const second = await mount($, DESK, 'desktop')
+  expect(await bandKeys(second)).toEqual(['accept-d2', 'dismiss-d2', 'dismiss-d1'])
   await second.press({ key: 'accept-d2' })
   await second.unmount()
   expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes', 'Answer to decision d2 ("Mock it?"): Yes'])
 
   await eng($).tool.call({ tool: OPEN, question: 'No one-press answer?' })
-  // The desktop band shows only the newest item, and counts the others.
-  const band = await mount($, BAND, 'desktop')
-  expect(await bandKeys(band)).toEqual(['dismiss-d3'])
-  await band.unmount()
-  // Sending an answer does not settle the question: the model closes it.
-  expect(await bandTexts($, 'desktop')).toContain('+2 more')
-  // The terminal pane lists all three; the two sent ones have only Dismiss.
-  const pane = await mount($, TERM, 'terminal')
-  expect(await bandKeys(pane)).toEqual(['dismiss-d3', 'dismiss-d2', 'dismiss-d1'])
-  await pane.unmount()
+  // Sending an answer does not settle the question: the model closes it. Both panes list all three; the two sent
+  // ones have only Dismiss.
+  for (const [surface, spec] of [['terminal', TERM], ['desktop', DESK]] as const) {
+    const pane = await mount($, spec, surface)
+    expect(await bandKeys(pane)).toEqual(['dismiss-d3', 'dismiss-d2', 'dismiss-d1'])
+    await pane.unmount()
+  }
 })
 
 test('every unsent question with an answer has its own answer button in the terminal pane, and no other kind has one', async ($, on) => {
@@ -839,7 +794,7 @@ test('dismiss settles a question', async ($, on) => {
   const band = await mount($, TERM, 'terminal')
   await band.press({ key: 'dismiss-d1' })
   await band.unmount()
-  expect((await bandTexts($)).includes('Drop it?')).toBe(false)
+  for (const surface of SURFACES) expect((await paneTexts($, surface)).includes('Drop it?')).toBe(false)
   const again = await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   expect(again.deny).toBeUndefined()
   expect(again.result).toBe('Decision d1 was already dismissed in the pane at 8:00 AM.')
@@ -852,7 +807,7 @@ test('two questions opened at once get different ids and both are kept', async (
     eng($).tool.call({ tool: OPEN, question: 'Second?' }),
   ])
   expect([a, b].map(r => String(r.result)).sort()).toEqual(['Opened decision d1.', 'Opened decision d2.'])
-  expect(await bandTexts($)).toContain('+1 more')
+  for (const surface of SURFACES) expect(await bandKeys(await mountWaits($, surface))).toEqual(['dismiss-d2', 'dismiss-d1'])
 })
 
 test('an open question is kept however many come after it', async ($, on) => {
@@ -864,74 +819,36 @@ test('an open question is kept however many come after it', async ($, on) => {
   expect(String(closed.result)).toBe('Closed decision d1.')
 })
 
-test('the desktop band keeps what other plugins draw there, and stays out of a survey', async ($, on) => {
-  boot(on, { band: false })
-  on('ui.render', ($, e) => {
-    const { Text } = $.ui.resolve(e)
-    return <Text>another plugin's band</Text>
-  })
-  await eng($).tool.call({ tool: OPEN, question: 'Keep both?' })
-
-  const shown = await bandTexts($, 'desktop')
-  expect(shown).toContain('Keep both?')
-  expect(shown).toContain("another plugin's band")
-  const survey = await mount($, BAND, 'desktop', { hasSurvey: true })
-  const surveyTexts = await textsOf(survey)
-  expect(surveyTexts).not.toContain('Keep both?')
-  expect(surveyTexts).toContain("another plugin's band")
-  await survey.unmount()
-  // On the terminal a survey draws only what is beneath too.
-  const terminalSurvey = await mount($, BAND, 'terminal', { hasSurvey: true })
-  expect(await textsOf(terminalSurvey)).toEqual(["another plugin's band"])
-  await terminalSurvey.unmount()
-})
-
-test('with nothing to show the desktop band is a quiet Mentat line with Details; the terminal pane says nothing waits', async ($, on) => {
-  boot(on)
-  const d = await mount($, BAND, 'desktop')
-  expect(await bandKeys(d)).toEqual([])
-  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
-  expect(await textsOf(d)).toEqual(['Mentat'])
-  expect((await svgsOf(d)).map(v => v.alt)).toEqual(['Mentat'])
-  await d.unmount()
-  const term = await mount($, TERM, 'terminal')
-  expect(await textsOf(term)).toEqual(['Nothing waiting on you.'])
-  expect((await term.findAll({ type: 'Button' })).length).toBe(0)
-  await term.unmount()
-})
-
-test('Details in the desktop band opens the pane, in every state of the band; on the terminal the footer label does', async ($, on) => {
+test('the footer label is a Button that opens the pane on both surfaces, in every state', async ($, on) => {
   const { world } = boot(on)
-  const quiet = await mount($, BAND, 'desktop')
-  await quiet.press({ key: 'open' })
-  await quiet.unmount()
-  expect(world.opened).toEqual(['mentat'])
+  for (const surface of SURFACES) {
+    world.opened.length = 0
+    const footer = await mount($, SESSION_MODE, surface, { modes: [] })
+    expect((await footer.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['mentat-open'])
+    await footer.press({ key: 'mentat-open' })
+    await footer.unmount()
+    expect(world.opened).toEqual(['mentat'])
+  }
+  // With items open the label says so and still opens the pane.
   await eng($).tool.call({ tool: OPEN, question: 'Open it?' })
-  world.opened.length = 0
-  const band = await mount($, BAND, 'desktop')
-  await band.press({ key: 'open' })
-  await band.unmount()
-  expect(world.opened).toContain('mentat')
-
-  world.opened.length = 0
-  const footer = await mount($, SESSION_MODE, 'terminal', { modes: [] })
-  await footer.press({ key: 'mentat-open' })
-  await footer.unmount()
-  expect(world.opened).toEqual(['mentat'])
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'And this' })
+  for (const surface of SURFACES) {
+    world.opened.length = 0
+    const footer = await mount($, SESSION_MODE, surface, { modes: [] })
+    const [button] = await footer.findAll({ type: 'Button' })
+    expect(button).toMatchObject({ key: 'mentat-open', props: { plain: true, label: '● Mentat · 2 waiting' } })
+    expect(await textsOf(footer)).toEqual(['●', ' Mentat', ' · ', '2 waiting'])
+    await footer.press({ key: 'mentat-open' })
+    await footer.unmount()
+    expect(world.opened).toEqual(['mentat'])
+  }
+  // The pane says so when nothing waits.
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd2' })
+  for (const surface of SURFACES) expect((await paneTexts($, surface)).includes('WAITING ON YOU')).toBe(false)
 })
 
 // ---- agents ----------------------------------------------------------------------------------------------
-
-// Waits for the agents' row to show the fact, on the surface.
-const untilFacts = async ($: never, surface: 'terminal' | 'desktop', description: string, fact: string) => {
-  let last: string[] = []
-  for (let i = 0; i < 300; i++) {
-    last = await paneTexts($, surface)
-    if (last.some(x => x.includes(fact)) && last.includes(description)) return last
-    await new Promise(r => setTimeout(r, 5))
-  }
-  throw new Error(`the ${surface} pane never showed "${fact}"; it showed ${JSON.stringify(last)}`)
-}
 
 // The state text of an agent's line in the terminal Feed (`running · 1m 05s`): the Text after its description.
 // undefined when the agent has no line there (an ended agent is not in the Feed).
@@ -945,40 +862,39 @@ const isEndedStatus = (status: string) => ['completed', 'failed', 'killed', 'unk
 test('a live agent is pinned in the Feed with its state and elapsed time; when it ends it leaves the Feed, and the desktop freezes its time', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
-  const id = await callAgent(world, $, 'high')
-  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
-  await eng($).agent.spawn(spawn(id))
+  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Check the docs', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1'))
   await clock.advance(65_000)
   await new Promise(r => setTimeout(r, 30))
   expect(stateOf(await paneTexts($), 'Check the docs')).toBe('running · 1m 05s')
-  await untilFacts($, 'desktop', 'Check the docs', 'Opus 4.8 · high')
+  expect(deskLine(await paneTexts($, 'desktop'), 'Check the docs')).toEqual({ state: 'running', elapsed: '1m 05s' })
 
-  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'completed' }]
+  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Check the docs', status: 'completed' }]
   await clock.advance(1_000)
   await new Promise(r => setTimeout(r, 30))
-  // Ended: not in the Feed as an agent (its end is an event line), and the desktop shows the frozen time.
+  // Ended: not in the Feed as an agent on either surface (its end is an event line, with the time it took).
   const t = await paneTexts($)
   expect(stateOf(t, 'Check the docs')).toBeUndefined()
-  expect(t).toContain('general-purpose finished: Check the docs · 1m 06s')
-  await clock.advance(120_000)
-  await new Promise(r => setTimeout(r, 30))
-  expect(await untilFacts($, 'desktop', 'Check the docs', '1m 06s')).toContain('1m 06s')
+  expect(t).toContain('general-purpose finished: Check the docs')
+  const desk = await paneTexts($, 'desktop')
+  expect(deskLine(desk, 'Check the docs')).toBeUndefined()
+  expect(desk).toContain('general-purpose finished: Check the docs')
 })
 
-test('a turn that completes is not the end of a waiting agent; the desktop shows the tokens last reported', async ($, on) => {
+test('a turn that completes is not the end of a waiting agent', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'waiting' }]
   await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
-  await eng($).turn.complete(turnDone('a1', { input_tokens: 100, cache_creation_input_tokens: 400, output_tokens: 500, cache_read_input_tokens: 99999, model: 'm' }))
+  await eng($).turn.complete(turnDone('a1', { input_tokens: 100, cache_creation_input_tokens: 400, output_tokens: 500 }))
   await clock.advance(10_000)
   expect(stateOf(await paneTexts($), 'Look around')).toBe('waiting · 10s')
-  expect(await untilFacts($, 'desktop', 'Look around', '1.0k tokens · 10s')).toContain('1.0k tokens · 10s')
+  expect(deskLine(await paneTexts($, 'desktop'), 'Look around')).toEqual({ state: 'waiting', elapsed: '10s' })
 
-  await eng($).turn.complete(turnDone('a1', { input_tokens: 1, cache_creation_input_tokens: 2, output_tokens: 12000, cache_read_input_tokens: 0, model: 'm' }))
+  await eng($).turn.complete(turnDone('a1'))
   await clock.advance(114_000)
   expect(stateOf(await paneTexts($), 'Look around')).toBe('waiting · 2m 04s')
-  expect(await untilFacts($, 'desktop', 'Look around', '12k tokens · 2m 04s')).toContain('12k tokens · 2m 04s')
+  expect(deskLine(await paneTexts($, 'desktop'), 'Look around')).toEqual({ state: 'waiting', elapsed: '2m 04s' })
 })
 
 test('every live agent status is shown as it is in the Feed, running and waiting first; ended agents are not there', async ($, on) => {
@@ -998,6 +914,11 @@ test('every live agent status is shown as it is in the Feed, running and waiting
   expect(order[3]).toBe('Agent idle')
   for (const s of ['running', 'waiting', 'idle', 'pending']) expect(stateOf(t, `Agent ${s}`)).toMatch(new RegExp(`^${s} · \\d+s$`))
   for (const s of ['completed', 'failed', 'killed']) expect(stateOf(t, `Agent ${s}`)).toBeUndefined()
+  // The desktop Feed lists the same agents in the same order, each with its state word in the time column.
+  const d = await paneTexts($, 'desktop')
+  expect(d.filter(x => x.startsWith('Agent '))).toEqual(order)
+  for (const s of ['running', 'waiting', 'idle', 'pending']) expect(deskLine(d, `Agent ${s}`)?.state).toBe(s)
+  for (const s of ['completed', 'failed', 'killed']) expect(deskLine(d, `Agent ${s}`)).toBeUndefined()
 })
 
 test('after a reload the mod keeps what it knew, shows unknown agents without an elapsed time, and notices ends', async ($, on) => {
@@ -1017,13 +938,14 @@ test('after a reload the mod keeps what it knew, shows unknown agents without an
   const t = await paneTexts($)
   // The known one ended (the Feed has its event line, with the time it took); the unseen one has no start, so no time.
   expect(stateOf(t, 'Known one')).toBeUndefined()
-  expect(t).toContain('general-purpose finished: Known one · 30s')
+  expect(t).toContain('general-purpose finished: Known one')
   expect(stateOf(t, 'Unseen one')).toBe('running')
-  const d = await untilFacts($, 'desktop', 'Known one', 'Opus 4.8')
-  expect(d).toContain('Opus 4.8')
+  const d = await paneTexts($, 'desktop')
+  expect(deskLine(d, 'Known one')).toBeUndefined()
+  expect(deskLine(d, 'Unseen one')).toEqual({ state: 'running', elapsed: undefined })
 })
 
-test('an agent that vanishes from the engine\'s list is ended, not finished: it leaves the Feed and the desktop says ended', async ($, on) => {
+test('an agent that vanishes from the engine\'s list is ended, not finished: it leaves the Feed on both surfaces and writes no line', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Gone one', status: 'running' }]
@@ -1039,87 +961,9 @@ test('an agent that vanishes from the engine\'s list is ended, not finished: it 
   await untilRowsAre($, [{ description: 'Gone one', status: 'unknown' }])
 })
 
-// ---- the effort of each agent, and finished agents dimmed ---------------------------------------------------
+// ---- the desktop Feed's agent rows ---------------------------------------------------
 
-test('a subagent\'s requests set the effort of its desktop row; the Agent call\'s effort shows until then; the terminal Feed does not show it', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  const id = await callAgent(world, $, 'low')
-  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
-  await eng($).agent.spawn(spawn(id))
-  expect(await untilFacts($, 'desktop', 'Check the docs', 'Opus 4.8 · low')).toContain('Opus 4.8 · low')
-
-  await step($, id, 'high')
-  await until(() => world.steps.length === 1, 'the step')
-  expect(await untilFacts($, 'desktop', 'Check the docs', 'high')).toContain('Opus 4.8 · high')
-  expect(stateOf(await paneTexts($, 'terminal'), 'Check the docs')).toBe('running · 0s')
-
-  await step($, id, 'xhigh', 1)
-  const t = await untilFacts($, 'desktop', 'Check the docs', 'xhigh')
-  expect(t.join('|')).not.toMatch(/(^|[^x])high/)
-
-  // A number is a budget.
-  await step($, id, 8000, 2)
-  expect(await untilFacts($, 'desktop', 'Check the docs', '8.0k budget')).toContain('Opus 4.8 · 8.0k budget')
-})
-
-test('a request of the main session changes no row, and a request of an agent without effort changes nothing', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  const id = await callAgent(world, $, 'medium')
-  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
-  await eng($).agent.spawn(spawn(id))
-  await step($, undefined, 'max')
-  await step($, id, undefined, 1)
-  // The next request, which does change the row, shows the two before it changed nothing.
-  await step($, id, 'high', 2)
-  const t = await untilFacts($, 'desktop', 'Check the docs', 'high')
-  expect(t).toContain('Opus 4.8 · high')
-  expect(t.join('|')).not.toContain('max')
-})
-
-test('a request that comes before the agent\'s row is kept for the row', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await step($, 'a1', 'xhigh')
-  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Late row', status: 'running' }]
-  await eng($).agent.spawn(spawn('a1', 'Late row'))
-  expect(await untilFacts($, 'desktop', 'Late row', 'xhigh')).toContain('Opus 4.8 · xhigh')
-})
-
-test('an agent the mod never saw spawn takes the effort its requests used when the engine\'s list brings it in', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  // z9 steps before it is listed, and a reload lists it.
-  await step($, 'z9', 'xhigh')
-  await until(() => world.steps.length === 1, 'the step')
-  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
-  await startSession($)
-  expect(await untilFacts($, 'desktop', 'Unseen one', 'xhigh')).toContain('xhigh')
-  // The terminal Feed lists it, without a model or effort.
-  expect(stateOf(await paneTexts($, 'terminal'), 'Unseen one')).toBe('running')
-
-  // y8 steps, and the engine's next check of its list (once a second, while an agent runs) brings it in.
-  await step($, 'y8', 'low')
-  await until(() => world.steps.length === 2, 'the step')
-  world.agents = [...world.agents, { id: 'y8', type: 'Plan', description: 'Other one', status: 'running' }]
-  await clock.advance(1_000)
-  expect(await untilFacts($, 'desktop', 'Other one', 'low')).toContain('low')
-})
-
-test('turn.step passes the request on unchanged and returns what is beneath', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  const id = await callAgent(world, $, 'low')
-  world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
-  await eng($).agent.spawn(spawn(id))
-  const input = await step($, id, 'high')
-  await step($, undefined, 'max', 1)
-  expect(world.steps).toEqual([input, expect.objectContaining({ effort: 'max', index: 1 })])
-  expect(world.steps[0]).toEqual(input)
-})
-
-test('finished agents are drawn dimmed on the desktop in the muted color; the terminal Feed lists only the running one, not dimmed', async ($, on) => {
+test('a live agent row on the desktop is the state word in blue, a dot, the bold description and its elapsed time; ended agents have none; the terminal Feed lists only the running one, not dimmed', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   world.agents = [
@@ -1132,53 +976,53 @@ test('finished agents are drawn dimmed on the desktop in the muted color; the te
   await new Promise(r => setTimeout(r, 30))
 
   const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  // The running and the finished agents are two drawings; the muted colors are read over both.
-  const agentsSvg = { source: (await svgsOf(desktop)).filter(v => /^(Running|Finished) agents/.test(v.alt)).map(v => v.source).join('\n') }
+  const texts = await desktop.findAll({ type: 'Text' })
   await desktop.unmount()
-  expect(agentsSvg.source).toContain('Still going')
-  const classOf = (title: string) => new RegExp(`<text class="(\\w+)"[^>]*>${title}</text>`).exec(agentsSvg.source)?.[1]
-  expect(classOf('Still going')).toBe('t')
-  expect(classOf('Finished fine')).toBe('m')
-  expect(classOf('Finished badly')).toBe('m')
-  // The time, and the model and the facts after the type, are muted too; the mark keeps its color.
-  expect(agentsSvg.source).toMatch(/<text class="m"[^>]*font-size="12">Opus 4.8</)
-  expect(agentsSvg.source).toMatch(/<text class="s"[^>]*font-size="12">Opus 4.8</)
-  expect(agentsSvg.source).toMatch(/<text class="m"[^>]*text-anchor="end"/)
-  expect(agentsSvg.source).toMatch(/<text class="s"[^>]*text-anchor="end"/)
-  expect(agentsSvg.source).toContain('stroke="#')
+  const all = texts.map(x => x.text)
+  const i = all.indexOf('Still going')
+  expect(all.slice(i - 2, i + 2)).toEqual(['running', '●', 'Still going', '1s'])
+  const prop = (text: string, name: string) => texts.find(x => x.text === text)?.props?.[name]
+  expect(prop('running', 'color')).toBe('suggestion')
+  expect(prop('●', 'color')).toBe('suggestion')
+  expect(prop('Still going', 'bold')).toBe(true)
+  expect(prop('Still going', 'wrap')).toBe('wrap')
+  expect(prop('1s', 'dimColor')).toBe(true)
+  // Ended agents are not agent rows in the Feed: only their event lines (dim) say how they ended.
+  expect(all).not.toContain('Finished fine')
+  expect(all).not.toContain('Finished badly')
+  expect(texts.find(x => x.text === 'general-purpose failed: Finished badly')?.props?.dimColor).toBe(true)
 
   const terminal = await mount($, PANE, 'terminal', { bodyColumns: 60 })
-  const texts = await terminal.findAll({ type: 'Text' })
+  const tTexts = await terminal.findAll({ type: 'Text' })
   await terminal.unmount()
-  const dim = (t: string) => texts.find(x => x.text === t)?.props?.dimColor
+  const dim = (t: string) => tTexts.find(x => x.text === t)?.props?.dimColor
   expect(dim('Still going')).toBeFalsy()
-  // Ended agents are not agent lines in the Feed: only their event lines (dim) say how they ended.
-  expect(texts.some(x => x.text === 'Finished fine' || x.text === 'Finished badly')).toBe(false)
-  expect(texts.find(x => x.text === 'general-purpose failed: Finished badly')?.props?.dimColor).toBe(true)
+  expect(tTexts.some(x => x.text === 'Finished fine' || x.text === 'Finished badly')).toBe(false)
+  expect(tTexts.find(x => x.text === 'general-purpose failed: Finished badly')?.props?.dimColor).toBe(true)
   // The state text is dim.
-  expect(texts.find(x => /^running · /.test(x.text ?? ''))?.props?.dimColor).toBe(true)
+  expect(tTexts.find(x => /^running · /.test(x.text ?? ''))?.props?.dimColor).toBe(true)
 })
 
-// ---- the agents card: role icon, status on the right, running and finished groups ---------------------------
+// ---- the Feed's agent rows, on both surfaces ---------------------------
 
-const HUES = { violet: '#8B5CF6', blue: '#3D7FE6', teal: '#1E9E9A', grey: '#8f8f8a', green: '#2F9461', red: '#D0453F' }
-const agentSvgs = async (d: Drawing) => {
-  const all = await svgsOf(d)
+// What the desktop Feed draws for an agent: its state word in the time column and, when its start is known,
+// the elapsed time after the description. undefined when the agent has no row.
+const deskLine = (t: string[], description: string) => {
+  const i = t.indexOf(description)
+  if (i === -1) return undefined
+  const next = t[i + 1]
 
-  return { live: all.find(v => v.alt.startsWith('Running agents')), done: all.find(v => v.alt.startsWith('Finished agents')) }
+  return { state: t[i - 2], elapsed: next !== undefined && /^\d+(s|m \d\ds)$/.test(next) ? next : undefined }
 }
-const toggleOf = async (d: Drawing) => (await d.findAll({ type: 'Button' })).find(b => b.key === 'finished-toggle')
-// Waits for the desktop pane to list each agent in its group: Running (not ended) or Finished (ended).
+// Waits for the desktop pane to list each agent as the engine reports it: a live one with its state word, an ended one not at all.
 const untilRowsAre = async ($: never, list: { description: string; status: string }[]) => {
-  let alts: string[] = []
+  let seen: string[] = []
   for (let i = 0; i < 300; i++) {
-    const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-    alts = (await svgsOf(d)).map(v => v.alt)
-    await d.unmount()
-    if (list.every(a => alts.some(x => x.startsWith(isEndedStatus(a.status) ? 'Finished agents' : 'Running agents') && x.includes(`: ${a.description}`)))) return
+    seen = await paneTexts($, 'desktop')
+    if (list.every(a => (isEndedStatus(a.status) ? deskLine(seen, a.description) === undefined : deskLine(seen, a.description)?.state === a.status))) return
     await new Promise(r => setTimeout(r, 5))
   }
-  throw new Error(`the rows never showed ${JSON.stringify(list)}; the desktop pane listed ${JSON.stringify(alts)}`)
+  throw new Error(`the rows never showed ${JSON.stringify(list)}; the desktop pane listed ${JSON.stringify(seen)}`)
 }
 // Puts agents in the world and waits for the engine's next check of its list to bring in their statuses.
 const seedAgents = async (w: World, clock: { advance: (ms: number) => Promise<unknown> }, $: never, list: { id: string; type: string; description: string; status: string }[]) => {
@@ -1188,101 +1032,7 @@ const seedAgents = async (w: World, clock: { advance: (ms: number) => Promise<un
   await untilRowsAre($, list)
 }
 
-test('each agent row has the icon of its role in the role color, no role name drawn, and the role in the alt text', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  await seedAgents(world, clock, $, [
-    { id: 'b1', type: 'mentat:builder', description: 'Build it', status: 'running' },
-    { id: 'b2', type: 'builder', description: 'Build more', status: 'running' },
-    { id: 'e1', type: 'Explore', description: 'Look around', status: 'running' },
-    { id: 'p1', type: 'Plan', description: 'Plan it', status: 'running' },
-    { id: 'o1', type: 'general-purpose', description: 'Do other things', status: 'running' },
-  ])
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const { live } = await agentSvgs(d)
-  await d.unmount()
-  const src = live!.source
-  const count = (re: RegExp) => (src.match(re) ?? []).length
-  // One glyph per row, by role: the wrench is the builder's (both type names), the others each their own.
-  expect(count(/data-role="builder"/g)).toBe(2)
-  for (const role of ['explore', 'plan', 'other']) expect(count(new RegExp(`data-role="${role}"`, 'g'))).toBe(1)
-  expect(count(/data-role=/g)).toBe(5)
-  // The glyph is drawn in the role's color.
-  expect(count(new RegExp(`data-role="builder"[^>]*stroke="${HUES.violet}"`, 'g'))).toBe(2)
-  expect(src).toMatch(new RegExp(`data-role="explore"[^>]*stroke="${HUES.blue}"`))
-  expect(src).toMatch(new RegExp(`data-role="plan"[^>]*stroke="${HUES.teal}"`))
-  expect(src).toMatch(new RegExp(`data-role="other"[^>]*stroke="${HUES.grey}"`))
-  // The third row's icon is centered in its row: the header, then two rows above it.
-  const cy = AGENT_HEAD_H + AGENT_ROW_H * 2 + AGENT_ROW_H / 2
-  expect(src).toContain(`<g data-role="explore" transform="translate(${24 - 7.2} ${cy - 7.2}) scale(0.6)" fill="none" stroke="${HUES.blue}"`)
-  // The role is not drawn as a word; the model and effort are, once per row, in the secondary color.
-  expect(live!.drawn).not.toEqual(expect.arrayContaining(['builder']))
-  expect(live!.drawn.filter(x => ['builder', 'explore', 'plan', 'general-purpose'].includes(x))).toEqual([])
-  expect(live!.drawn.filter(x => x === 'Opus 4.8').length).toBe(5)
-  // It stays in the alt text.
-  expect(live!.alt).toBe('Running agents: 5 (builder: Build it; builder: Build more; explore: Look around; plan: Plan it; general-purpose: Do other things)')
-})
-
-test('an agent row is one line: icon, title, model and effort, then the stats and the status mark at the right', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  const id = await callAgent(world, $, 'high')
-  world.agents = [
-    { id, type: 'builder', description: 'Check the docs', status: 'running' },
-    { id: 'c1', type: 'Explore', description: 'Finished fine', status: 'completed' },
-  ]
-  await eng($).agent.spawn(spawn(id, 'Check the docs', 'builder'))
-  await eng($).agent.spawn(spawn('c1', 'Finished fine', 'Explore'))
-  await eng($).turn.complete(turnDone(id, { input_tokens: 1, cache_creation_input_tokens: 2, output_tokens: 12000, cache_read_input_tokens: 0, model: 'm' }))
-  await clock.advance(65_000)
-  await untilRowsAre($, [{ description: 'Finished fine', status: 'completed' }])
-  const W = 60 * 8 - 24
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const { live, done } = await agentSvgs(d)
-  await d.unmount()
-  // The card is the header and one row high, not three lines.
-  expect(AGENT_ROW_H).toBeLessThan(40)
-  expect(Number(/height="(\d+)"/.exec(live!.source)![1])).toBeLessThan(AGENT_HEAD_H + AGENT_ROW_H + 10)
-  const y = (re: RegExp) => Number(re.exec(live!.source)![1])
-  const titleY = y(/<text class="t"[^>]* y="([\d.]+)"[^>]*>Check the docs</)
-  const modelY = y(/<text class="s"[^>]* y="([\d.]+)"[^>]*>Opus 4.8 · high</)
-  const statsY = y(/<text class="s"[^>]* y="([\d.]+)"[^>]*text-anchor="end"[^>]*>12k tokens · 1m 05s</)
-  // All on one line: the baselines are within two pixels of each other.
-  expect(Math.max(titleY, modelY, statsY) - Math.min(titleY, modelY, statsY)).toBeLessThanOrEqual(2)
-  // Left to right: title, then the model and effort, then the stats, which end before the mark.
-  const titleX = y(/<text class="t" x="([\d.]+)"[^>]*>Check the docs</)
-  const modelX = y(/<text class="s" x="([\d.]+)"[^>]*>Opus 4.8 · high</)
-  const statsX = y(/<text class="s" x="([\d.]+)"[^>]*text-anchor="end"[^>]*>12k/)
-  expect(modelX).toBeGreaterThan(titleX)
-  expect(modelX).toBeLessThan(statsX)
-  expect(statsX).toBeLessThan(W - 26)
-  expect(done!.source).toContain('>Finished fine</text>')
-})
-
-test('a long title is cut with an ellipsis on the desktop, keeping the model, the stats and the mark in the row', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  const long = 'A very long agent description that goes on and on past the end of the row and then some more'
-  await seedAgents(world, clock, $, [{ id: 'r1', type: 'builder', description: long, status: 'running' }])
-  const W = 60 * 8 - 24
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const { live } = await agentSvgs(d)
-  await d.unmount()
-  const title = /<text class="t"[^>]*>([^<]*…)<\/text>/.exec(live!.source)![1]!
-  expect(title.length).toBeLessThan(long.length)
-  expect(long.startsWith(title.slice(0, -1))).toBe(true)
-  const titleX = Number(/<text class="t" x="([\d.]+)"/.exec(live!.source)![1])
-  const modelX = Number(/<text class="s" x="([\d.]+)"[^>]*>Opus 4.8</.exec(live!.source)![1])
-  const statsX = Number(/<text class="s" x="([\d.]+)"[^>]*text-anchor="end"/.exec(live!.source)![1])
-  // The cut title ends before the model, and the model before the stats.
-  expect(modelX).toBeGreaterThan(titleX + 40)
-  expect(modelX).toBeLessThan(statsX)
-  expect(statsX).toBeLessThan(W - 26)
-  // The alt text keeps the whole title.
-  expect(live!.alt).toContain(long)
-})
-
-test('a terminal agent line is one line: role mark, bold truncating title, then its state and elapsed time dim; no background', async ($, on) => {
+test('a terminal agent line: role mark, bold wrapping title, then its state and elapsed time dim; no background', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   await seedAgents(world, clock, $, [
@@ -1295,13 +1045,13 @@ test('a terminal agent line is one line: role mark, bold truncating title, then 
   const boxes = await t.findAll({ type: 'Box' })
   await t.unmount()
   const build = texts.find(x => x.text === 'Build it')!
-  expect(build.props?.wrap).toBe('truncate-end')
+  expect(build.props?.wrap).toBe('wrap')
   expect(build.props?.bold).toBe(true)
   expect(boxes.some(b => b.props?.backgroundColor !== undefined)).toBe(false)
-  // The line reads: role mark, title, state and elapsed time, between the side lines.
+  // The line reads: role mark, title, state and elapsed time.
   const all = texts.map(x => x.text)
   const i = all.indexOf('Build it')
-  expect(all.slice(i - 2, i + 3)).toEqual(['│ ', '◆', 'Build it', 'running · 1s', ' │'])
+  expect(all.slice(i - 1, i + 2)).toEqual(['◆', 'Build it', 'running · 1s'])
   const j = all.indexOf('Look around')
   expect(all.slice(j - 1, j + 2)).toEqual(['◎', 'Look around', 'waiting · 1s'])
   expect(texts.find(x => x.text === 'running · 1s')?.props?.dimColor).toBe(true)
@@ -1309,146 +1059,30 @@ test('a terminal agent line is one line: role mark, bold truncating title, then 
   expect(all).not.toContain('Finished fine')
 })
 
-test('the status mark is at the right edge of the row, after the title; the role icon is at the left', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  await seedAgents(world, clock, $, [
-    { id: 'r1', type: 'general-purpose', description: 'Still going', status: 'running' },
-    { id: 'c1', type: 'general-purpose', description: 'Finished fine', status: 'completed' },
-    { id: 'f1', type: 'general-purpose', description: 'Finished badly', status: 'failed' },
-    { id: 'u1', type: 'general-purpose', description: 'Gone one', status: 'unknown' },
-  ])
-  const W = 60 * 8 - 24
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const { live, done } = await agentSvgs(d)
-  await d.unmount()
-  const titleX = Number(/<text class="t" x="(\d+)"[^>]*>Still going<\/text>/.exec(live!.source)![1])
-  const markX = (src: string, hue: string) => Number(new RegExp(`<circle cx="([\\d.]+)" cy="[\\d.]+" r="[\\d.]+" fill="${hue}"`).exec(src)![1])
-  const iconX = Number(/<g data-role="other" transform="translate\(([\d.]+) /.exec(live!.source)![1])
-  for (const x of [markX(live!.source, HUES.blue), markX(done!.source, HUES.green), markX(done!.source, HUES.red)]) {
-    expect(x).toBeGreaterThan(titleX)
-    expect(x).toBeGreaterThan(W - 40)
-    expect(x).toBeLessThan(W)
-  }
-  // The unknown agent's ring is at the right too, and the icon is left of the title.
-  expect(Number(/<circle cx="([\d.]+)"[^>]*class="m"/.exec(done!.source)![1])).toBeGreaterThan(W - 40)
-  expect(iconX).toBeLessThan(titleX)
-})
-
-test('the desktop has a Running group and a Finished group, each headed with its count; the terminal Feed pins only the live agents', async ($, on) => {
+test('the desktop Feed pins the live agents on top, working ones first, each with its state word, and no ended agent', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   await seedAgents(world, clock, $, [
     { id: 'r1', type: 'Explore', description: 'First running', status: 'running' },
     { id: 'r2', type: 'Plan', description: 'Second running', status: 'waiting' },
+    { id: 'i1', type: 'Plan', description: 'Idle one', status: 'idle' },
     { id: 'c1', type: 'builder', description: 'Finished fine', status: 'completed' },
   ])
+  await eng($).tool.call({ tool: NOTE, text: 'A note' })
   const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const { live, done } = await agentSvgs(d)
-  expect(live!.drawn).toEqual(expect.arrayContaining(['Running · 2', 'First running', 'Second running']))
-  expect(live!.drawn).not.toContain('Finished fine')
-  expect(done!.drawn).toContain('Finished fine')
-  expect((await toggleOf(d))!.props?.label).toBe('▾ Finished · 1')
-  await d.unmount()
-
-  const t = await mount($, PANE, 'terminal', { bodyColumns: 60 })
-  const texts = await textsOf(t)
-  expect(texts).toEqual(expect.arrayContaining(['First running', 'Second running']))
+  const texts = await textsOf(d)
+  const order = texts.filter(x => /^(First|Second) running$|^Idle one$|^A note$/.test(x))
+  // Working agents first (the newest start first), then the idle one, then the log under them.
+  expect(order.slice(0, 2).sort()).toEqual(['First running', 'Second running'])
+  expect(order.slice(2)).toEqual(['Idle one', 'A note'])
   expect(texts).not.toContain('Finished fine')
+  expect(texts[texts.indexOf('FEED') + 1]).toBe('5')
   expect(texts.some(x => x.startsWith('Running') || x.startsWith('Finished'))).toBe(false)
-  expect(await toggleOf(t)).toBeUndefined()
-  await t.unmount()
+  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).not.toContain('finished-toggle')
+  await d.unmount()
 })
 
-test('the Finished button hides the finished rows and shows them again on the desktop; running rows stay; the terminal has no such button', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  await seedAgents(world, clock, $, [
-    { id: 'r1', type: 'Explore', description: 'Still going', status: 'running' },
-    { id: 'c1', type: 'builder', description: 'Finished fine', status: 'completed' },
-    { id: 'f1', type: 'builder', description: 'Finished badly', status: 'failed' },
-  ])
-  let d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const shown = async () => await textsOf(d)
-  expect(await shown()).toEqual(expect.arrayContaining(['Still going', 'Finished fine', 'Finished badly']))
-
-  await d.press({ key: 'finished-toggle' })
-  let t = await shown()
-  expect(t).toContain('Still going')
-  expect(t).not.toContain('Finished fine')
-  expect(t).not.toContain('Finished badly')
-  expect((await toggleOf(d))!.props?.label).toBe('▸ Finished · 2')
-  expect((await agentSvgs(d)).done).toBeUndefined()
-
-  // The choice is kept for the next drawing of the pane.
-  await d.unmount()
-  d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect(await shown()).not.toContain('Finished fine')
-
-  await d.press({ key: 'finished-toggle' })
-  t = await shown()
-  expect(t).toEqual(expect.arrayContaining(['Still going', 'Finished fine', 'Finished badly']))
-  expect((await toggleOf(d))!.props?.label).toBe('▾ Finished · 2')
-  await d.unmount()
-
-  const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
-  expect(await toggleOf(term)).toBeUndefined()
-  expect(await textsOf(term)).toContain('Still going')
-  await term.unmount()
-})
-
-test('a group with no rows is not drawn: no Finished button when none finished, no Running header when none run', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  await seedAgents(world, clock, $, [{ id: 'r1', type: 'Explore', description: 'Only running', status: 'running' }])
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect(await toggleOf(d)).toBeUndefined()
-  const t = await textsOf(d)
-  expect(t).toContain('Only running')
-  expect(t.some(x => x.startsWith('Finished'))).toBe(false)
-  expect((await agentSvgs(d)).done).toBeUndefined()
-  await d.unmount()
-
-  world.agents = [{ id: 'r1', type: 'Explore', description: 'Only running', status: 'completed' }]
-  await clock.advance(1_000)
-  await untilRowsAre($, [{ description: 'Only running', status: 'completed' }])
-  const e = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect((await toggleOf(e))!.props?.label).toBe('▾ Finished · 1')
-  const u = await textsOf(e)
-  expect(u).toContain('Only running')
-  expect(u.some(x => x.startsWith('Running'))).toBe(false)
-  expect((await agentSvgs(e)).live).toBeUndefined()
-  await e.unmount()
-  // The terminal Feed has no agent line for it, only the event line of its end.
-  const term = await paneTexts($, 'terminal')
-  expect(term).not.toContain('Only running')
-  expect(term.some(x => x.includes('finished: Only running'))).toBe(true)
-})
-
-test('the row has the tokens and the elapsed time at the right, and leaves out what is missing', async ($, on) => {
-  const { world, clock } = boot(on)
-  await startSession($)
-  await seedAgents(world, clock, $, [
-    { id: 'a1', type: 'Explore', description: 'With both', status: 'running' },
-    { id: 'a2', type: 'Explore', description: 'Time only', status: 'running' },
-  ])
-  await eng($).turn.complete(turnDone('a1', { input_tokens: 1, cache_creation_input_tokens: 2, output_tokens: 12000, cache_read_input_tokens: 0, model: 'm' }))
-  await clock.advance(124_000)
-  world.agents = [...world.agents, { id: 'z9', type: 'Explore', description: 'Seen after a reload', status: 'running' }]
-  await startSession($)
-  await untilRowsAre($, [{ description: 'Seen after a reload', status: 'running' }])
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const { live } = await agentSvgs(d)
-  await d.unmount()
-  const stats = [...live!.source.matchAll(/<text class="s"[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/g)].map(m => m[1])
-  expect(stats).toContain('12k tokens · 2m 05s')
-  expect(stats).toContain('2m 05s')
-  // An agent with neither has no stats at all.
-  expect(stats.length).toBe(2)
-  expect(live!.source).toMatch(/text-anchor="end"/)
-})
-
-// ---- the session card and width --------------------------------------------------------------------------------
+// ---- agent lines without a start, usage and the empty pane --------------------------------------------------------------------------------
 
 test('an agent line leaves out its elapsed time when the start is not known, and keeps the true state word', async ($, on) => {
   const { world, clock } = boot(on)
@@ -1467,15 +1101,18 @@ test('an agent line leaves out its elapsed time when the start is not known, and
   expect(t[t.indexOf('Never spawned here') - 1]).toBe('◎')
 })
 
-test('the pane shows no usage meters on either surface: no tiles, no bars; the terminal pane carries the budget warning line', async ($, on) => {
+test('the pane shows no usage meters on either surface: no tiles, no bars; both panes carry the budget warning line', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 41, limits: [limit('five_hour', 85, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
   const usage = /context|session|week|[█░]/i
+  // The desktop pane warns at 80% in one line at the top, as the terminal's does, and shows nothing else of usage.
   const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
   expect((await desktop.findAll({ type: 'Svg' })).length).toBe(0)
-  expect((await textsOf(desktop)).some(t => usage.test(t) || /5-hour|resets|%/.test(t))).toBe(false)
+  const deskTexts = await textsOf(desktop)
+  expect(deskTexts).toEqual(['5-hour limit 85% · resets in 1h 29m', 'Nothing waiting on you.'])
+  expect((await desktop.findAll({ type: 'Text', text: '5-hour limit 85% · resets in 1h 29m' }))[0]!.props?.color).toBe('warning')
   await desktop.unmount()
-  // The terminal has no band, so its pane warns at 80%, in one line, and shows nothing else of usage.
+  // The terminal pane warns at 80%, in one line, and shows nothing else of usage.
   const empty = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await empty.findAll({ type: 'Svg' })).length).toBe(0)
   const texts = await textsOf(empty)
@@ -1485,11 +1122,12 @@ test('the pane shows no usage meters on either surface: no tiles, no bars; the t
   const line = (await empty.findAll({ type: 'Text', text: '5-hour limit 85% · resets in 1h 29m' }))[0]!
   expect(line.props?.color).toBe('warning')
   await empty.unmount()
-  // With something to show, still no meters; the desktop draws only its own cards.
+  // With something to show, still no meters; the desktop draws only its marks.
   await eng($).tool.call({ tool: OPEN, question: 'Anything?' })
   const withCard = await mount($, PANE, 'desktop', { bodyColumns: 60 })
   expect((await altsOf(withCard)).filter(a => !a.startsWith('Question'))).toEqual([])
   expect((await textsOf(withCard)).some(t => usage.test(t))).toBe(false)
+  expect((await textsOf(withCard)).filter(t => /limit|resets|%/.test(t))).toEqual(['5-hour limit 85% · resets in 1h 29m'])
   await withCard.unmount()
   const terminal = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await terminal.findAll({ type: 'Svg' })).length).toBe(0)
@@ -1544,31 +1182,29 @@ test('/mentat opens the pane for an open question or an agent row', async ($, on
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
 
   // An agent row, ended or not, is something the pane lists.
-  const id = await callAgent(world, $, 'high')
-  world.agents = [{ id, type: 'general-purpose', description: 'Done already', status: 'completed' }]
-  await eng($).agent.spawn(spawn(id, 'Done already'))
+  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Done already', status: 'completed' }]
+  await eng($).agent.spawn(spawn('a1', 'Done already'))
   world.opened.length = 0
   const withAgent = await eng($).command.run({ command: 'mentat', args: '' })
   expect(world.opened).toEqual(['mentat'])
   expect(withAgent.text).toBe('Mentat pane opened.')
 })
 
-// ---- the band for budget ------------------------------------------------------------
+// ---- the budget warning ------------------------------------------------------------
 
-test('a rate limit at 80 shows in the desktop band and at the top of the terminal pane, and not at 79', async ($, on) => {
+test('a rate limit at 80 shows at the top of both panes, and not at 79', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 79, RESET_5H()), limit('seven_day', 10)] }
   for (const surface of SURFACES) expect((await budgetTexts($, surface)).some(t => t.includes('limit'))).toBe(false)
 
   world.usage = { context: 5, limits: [limit('five_hour', 80, RESET_5H()), limit('seven_day', 10)] }
   for (const surface of SURFACES) expect(await budgetTexts($, surface)).toContain('5-hour limit 80% · resets in 1h 29m')
-  // The desktop band keeps its Details button; the terminal pane has no button at all.
-  const d = await mount($, BAND, 'desktop')
-  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
-  await d.unmount()
-  const t = await mount($, TERM, 'terminal')
-  expect((await t.findAll({ type: 'Button' })).length).toBe(0)
-  await t.unmount()
+  // The warning is text: neither pane has a button for it.
+  for (const surface of SURFACES) {
+    const t = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await t.findAll({ type: 'Button' })).length).toBe(0)
+    await t.unmount()
+  }
 
   world.usage = { context: 5, limits: [limit('five_hour', 40), limit('seven_day', 91, RESET_WEEK())] }
   for (const surface of SURFACES) expect(await budgetTexts($, surface)).toContain('Week limit 91% · resets Thu 7:00 PM')
@@ -1582,29 +1218,25 @@ test('a rate limit at 80 shows in the desktop band and at the top of the termina
   }
 })
 
-test('the context meter alone does not raise a warning, and a failed usage read means none: the quiet line stays', async ($, on) => {
+test('the context meter alone does not raise a warning, and a failed usage read means none: the pane says nothing waits', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 90, limits: [limit('five_hour', 12), limit('seven_day', 8)] }
-  expect(await bandTexts($, 'desktop')).toEqual(['Mentat'])
-  expect(await paneTexts($, 'terminal')).toEqual(['Nothing waiting on you.'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 
   world.usageFails = true
-  expect(await bandTexts($, 'desktop')).toEqual(['Mentat'])
-  expect(await paneTexts($, 'terminal')).toEqual(['Nothing waiting on you.'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 })
 
-test('a budget warning keeps its Details button on the desktop, and shows above the agents in the terminal pane', async ($, on) => {
+test('a budget warning shows above the agents in both panes', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 90, RESET_5H())] }
-  const id = await callAgent(world, $, 'high')
-  world.agents = [{ id, type: 'general-purpose', description: 'Working', status: 'running' }]
-  await eng($).agent.spawn(spawn(id, 'Working'))
-  const d = await mount($, BAND, 'desktop')
-  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
-  await d.unmount()
-  const t = await paneTexts($, 'terminal')
-  expect(t.indexOf('5-hour limit 90% · resets in 1h 29m')).toBe(0)
-  expect(t).toContain('Working')
+  world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Working', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Working'))
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(t.indexOf('5-hour limit 90% · resets in 1h 29m')).toBe(0)
+    expect(t).toContain('Working')
+  }
 })
 
 test('the pane with nothing to show says so in one line, with no buttons, on both surfaces', async ($, on) => {
@@ -1661,20 +1293,18 @@ test('resetAt words the weekly reset in 12-hour time with a short weekday, in th
   expect(resetAt(at, now, 'Not/AZone')).toMatch(/^resets \w{3} \d{1,2}:\d{2} [AP]M$/)
 })
 
-test('an item that waits comes before the budget warning in the desktop band, and the budget returns when it is closed; the terminal pane shows both', async ($, on) => {
+test('an item that waits and the budget warning are both in the pane, the warning on top, and the warning stays when the item is closed', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Ask first?' })
-  const band = await bandTexts($, 'desktop')
-  expect(band.some(x => x.includes('limit'))).toBe(false)
-  expect(band).toContain('Ask first?')
-  // The terminal has no band to give way: its pane has the warning line above the section.
-  const pane = await paneTexts($, 'terminal')
-  expect(pane).toContain('Ask first?')
-  expect(pane.indexOf('5-hour limit 95% · resets in 1h 29m')).toBe(0)
+  for (const surface of SURFACES) {
+    const pane = await paneTexts($, surface)
+    expect(pane).toContain('Ask first?')
+    expect(pane.indexOf('5-hour limit 95% · resets in 1h 29m')).toBe(0)
+  }
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
-  expect((await bandTexts($, 'desktop')).some(x => x.includes('limit'))).toBe(true)
+  for (const surface of SURFACES) expect((await paneTexts($, surface)).some(x => x.includes('limit'))).toBe(true)
 })
 
 test('an idle session whose usage crosses 80% shows the budget line after a minute tick, with no other change', async ($, on) => {
@@ -1709,7 +1339,7 @@ const keysOf = cardKeys
 const hrefsOf = async (d: Drawing) => (await d.findAll({ type: 'Link' })).map(l => String(l.props?.href))
 const altsOf = async (d: Drawing) => (await svgsOf(d)).map(v => v.alt)
 
-test('an alert is red, with Dismiss and no answer button: in the terminal pane\'s Waiting on you and in the desktop band; the desktop pane draws no alert card', async ($, on) => {
+test('an alert is red, with Dismiss and no answer button, in the Waiting on you of both panes', async ($, on) => {
   boot(on)
   await open('alert', 'CI is red and I cannot fix it', { accept: 'Yes', recommendation: 'Look at the log' })($)
   const term = await mount($, TERM, 'terminal')
@@ -1720,20 +1350,18 @@ test('an alert is red, with Dismiss and no answer button: in the terminal pane\'
   expect(await bandKeys(term)).toEqual(['dismiss-d1'])
   await term.unmount()
 
-  const desk = await mount($, BAND, 'desktop')
-  const [card] = await svgsOf(desk)
-  expect(card!.alt).toBe('Alert: CI is red and I cannot fix it')
-  expect(card!.drawn).toEqual(['!', 'CI is red and I cannot fix it'])
-  expect(card!.source).toContain(RED)
-  expect(card!.source).not.toContain(AMBER)
-  expect(await bandKeys(desk)).toEqual(['dismiss-d1'])
-  await desk.unmount()
-
-  const pane = await paneTexts($, 'desktop')
-  expect(pane.some(x => x === 'CI is red and I cannot fix it' || x.toUpperCase() === 'ALERT')).toBe(false)
+  // The desktop pane's Waiting on you card has it: a red mark, the text, Dismiss and no answer button.
+  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const [mark] = await svgsOf(pane)
+  expect(mark!.alt).toBe('Alert')
+  expect(mark!.drawn).toEqual(['!'])
+  expect(mark!.source).toContain(RED)
+  expect(await textsOf(pane)).toEqual(expect.arrayContaining(['CI is red and I cannot fix it', 'Recommended: Look at the log · 8:00 AM']))
+  expect(await bandKeys(pane)).toEqual(['dismiss-d1'])
+  await pane.unmount()
 })
 
-test('an action is blue, with Dismiss and no answer button: in the terminal pane\'s Waiting on you and in the desktop band; the desktop pane draws no action card', async ($, on) => {
+test('an action is blue, with Dismiss and no answer button, in the Waiting on you of both panes', async ($, on) => {
   boot(on)
   await open('action', 'Merge #112 when ready', { accept: 'Yes' })($)
   const term = await mount($, TERM, 'terminal')
@@ -1743,16 +1371,14 @@ test('an action is blue, with Dismiss and no answer button: in the terminal pane
   expect(await bandKeys(term)).toEqual(['dismiss-d1'])
   await term.unmount()
 
-  const desk = await mount($, BAND, 'desktop')
-  const [card] = await svgsOf(desk)
-  expect(card!.alt).toBe('Waiting on you: Merge #112 when ready')
-  expect(card!.drawn).toEqual(['→', 'Merge #112 when ready'])
-  expect(card!.source).toContain(BLUE)
-  expect(await bandKeys(desk)).toEqual(['dismiss-d1'])
-  await desk.unmount()
-
-  const pane = await paneTexts($, 'desktop')
-  expect(pane.some(x => x === 'Merge #112 when ready' || x.toUpperCase() === 'WAITING ON YOU')).toBe(false)
+  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const [mark] = await svgsOf(pane)
+  expect(mark!.alt).toBe('Waiting on you')
+  expect(mark!.drawn).toEqual(['→'])
+  expect(mark!.source).toContain(BLUE)
+  expect(await textsOf(pane)).toContain('Merge #112 when ready')
+  expect(await bandKeys(pane)).toEqual(['dismiss-d1'])
+  await pane.unmount()
 })
 
 test('a question with kind question and one without a kind are the same amber question with an answer button', async ($, on) => {
@@ -1764,7 +1390,9 @@ test('a question with kind question and one without a kind are the same amber qu
     expect(await textsOf(d)).toEqual(expect.arrayContaining(['?', 'Plain?']))
     await d.unmount()
   }
-  const plain = (await svgsOf(await mount($, BAND, 'desktop')))[0]!
+  const plainPane = await mount($, DESK, 'desktop')
+  const plain = (await svgsOf(plainPane))[0]!
+  await plainPane.unmount()
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   await open('question', 'Explicit?', { accept: 'Yes' })($)
   for (const surface of SURFACES) {
@@ -1773,10 +1401,10 @@ test('a question with kind question and one without a kind are the same amber qu
     expect(await textsOf(d)).toEqual(expect.arrayContaining(['?', 'Explicit?']))
     if (surface === 'desktop') {
       const [explicit] = await svgsOf(d)
-      expect(explicit!.alt).toBe('Question: Explicit?')
+      expect(explicit!.alt).toBe('Question')
       expect(explicit!.source).toContain(AMBER)
-      // The same drawing for both: only the text differs.
-      expect(plain.source.replace('Plain?', 'Explicit?')).toBe(explicit!.source)
+      // The same mark for both.
+      expect(plain.source).toBe(explicit!.source)
     }
     await d.unmount()
   }
@@ -1786,43 +1414,31 @@ test('an unknown kind is refused with a message and records nothing', async ($, 
   boot(on)
   const refused = await eng($).tool.call({ tool: OPEN, kind: 'urgent', question: 'Now?' })
   expect(refused.deny).toBe('open_decision kind must be question, action or alert.')
-  expect(await bandTexts($, 'desktop')).toEqual(['Mentat'])
-  expect(await paneTexts($, 'terminal')).toEqual(['Nothing waiting on you.'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 })
 
-test('the desktop pane draws no waiting card of any kind and no answer field; the terminal pane lists every item, most urgent first, with the WARN lines of the check', async ($, on) => {
+test('both panes list every item, most urgent first, with the WARN lines of the check under its item; neither has an answer field', async ($, on) => {
   const { world } = boot(on)
   await open('action', 'Action one', { link: 'https://github.com/o/r/pull/1' })($)
   await open(undefined, 'Question one', { accept: 'Yes' })($)
   await open('alert', 'Alert one')($)
   await bash(world, $, 'mentat check', WARN_RUN)
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const t = await textsOf(d)
-  for (const x of ['Action one', 'Question one', 'Alert one', 'Check passed with 2 warnings', 'gh is old']) expect(t.includes(x)).toBe(false)
-  for (const x of ['ALERT', 'QUESTION FOR YOU', 'WAITING ON YOU', 'CHECK WARNINGS']) expect(t.map(y => y.toUpperCase())).not.toContain(x)
-  expect(await cardKeys(d)).toEqual([])
-  expect((await d.findAll({ type: 'Input' })).length).toBe(0)
-  expect((await d.findAll({ type: 'Link' })).length).toBe(0)
-  expect((await svgsOf(d)).length).toBe(0)
-  // Something waits, and the band says so: the pane does not claim that nothing does.
-  expect(t).not.toContain('Nothing waiting on you.')
-  await d.unmount()
-
-  const term = await mount($, TERM, 'terminal')
-  const texts = await textsOf(term)
-  const at = (x: string) => texts.indexOf(x)
-  // Alert, question, check warning, action.
-  expect([at('Alert one'), at('Question one'), at('Check passed with 2 warnings'), at('Action one')].every((n, i, all) => n > -1 && (i === 0 || n > all[i - 1]!))).toBe(true)
-  // The check item's WARN lines come from the check result, one line each, under its time.
-  expect(texts).toEqual(expect.arrayContaining(['WARN: gh is old', 'WARN: codex is old']))
-  expect(at('Check passed with 2 warnings')).toBeLessThan(at('WARN: gh is old'))
-  expect(at('WARN: gh is old')).toBeLessThan(at('WARN: codex is old'))
-  expect(at('WARN: codex is old')).toBeLessThan(at('Action one'))
-  expect((await term.findAll({ type: 'Input' })).length).toBe(0)
-  expect((await term.findAll({ type: 'Svg' })).length).toBe(0)
-  expect(texts).not.toContain('Nothing waiting on you.')
-  expect(await bandKeys(term)).toEqual(['dismiss-d3', 'accept-d2', 'dismiss-d2', 'dismiss-check', 'dismiss-d1'])
-  await term.unmount()
+  for (const [surface, spec] of [['terminal', TERM], ['desktop', PANE]] as const) {
+    const d = await mount($, spec, surface, { bodyColumns: 60 })
+    const texts = await textsOf(d)
+    const at = (x: string) => texts.indexOf(x)
+    // Alert, question, check warning, action.
+    expect([at('Alert one'), at('Question one'), at('Check passed with 2 warnings'), at('Action one')].every((n, i, all) => n > -1 && (i === 0 || n > all[i - 1]!))).toBe(true)
+    // The check item's WARN lines come from the check result, one line each, under its time.
+    expect(texts).toEqual(expect.arrayContaining(['WARN: gh is old', 'WARN: codex is old']))
+    expect(at('Check passed with 2 warnings')).toBeLessThan(at('WARN: gh is old'))
+    expect(at('WARN: gh is old')).toBeLessThan(at('WARN: codex is old'))
+    expect(at('WARN: codex is old')).toBeLessThan(at('Action one'))
+    expect((await d.findAll({ type: 'Input' })).length).toBe(0)
+    expect(texts).not.toContain('Nothing waiting on you.')
+    expect(await bandKeys(d)).toEqual(['dismiss-d3', 'accept-d2', 'dismiss-d2', 'dismiss-check', 'dismiss-d1'])
+    await d.unmount()
+  }
 })
 
 test('an action or alert shows its link as a Link element beside Dismiss, only when it is an https URL', async ($, on) => {
@@ -1838,15 +1454,14 @@ test('an action or alert shows its link as a Link element beside Dismiss, only w
   for (const surface of SURFACES) {
     const b = await bandOf(surface)
     expect(b.hrefs).toEqual([url])
-    // The desktop band draws the address; the tight terminal row draws `#112`.
-    expect(b.links.every(l => l.props?.label === (surface === 'terminal' ? '#112' : 'github.com/o/r/issues/112'))).toBe(true)
+    // Both draw the link short: `#112`.
+    expect(b.links.map(l => l.props?.label)).toEqual(['#112'])
     // Dismiss is drawn beside the link.
     expect(b.keys).toEqual(['dismiss-d1'])
   }
   await open('alert', 'Alert link', { link: `  ${url}  ` })($)
-  // The desktop band shows the urgent item's link; the terminal pane every item's.
-  expect((await bandOf('desktop')).hrefs).toEqual([url])
-  expect((await bandOf('terminal')).hrefs).toEqual([url, url])
+  // Both panes list every item's, drawn short and opening the whole address.
+  for (const surface of SURFACES) expect((await bandOf(surface)).hrefs).toEqual([url, url])
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   for (const [i, bad] of ['http://github.com/o/r', 'javascript:alert(1)', 'ftp://x/y', 'github.com/o/r', 'https://', 'https:// spaced', 'file:///etc/passwd', ''].entries()) {
@@ -1882,7 +1497,7 @@ test('the terminal pane draws a GitHub issue or pull request link as #<number>, 
   }
 })
 
-test('a terminal row with a link keeps the mark and the space after it, and the text is what is cut', async ($, on) => {
+test('a terminal row with a link keeps the mark and the space after it, and the text is what wraps', async ($, on) => {
   boot(on)
   await open('action', 'Rotate the token that the deploy job reads from the secrets store', { link: 'https://github.com/ericfurspan/mentat/issues/160' })($)
   for (const cols of [60, 85]) {
@@ -1892,15 +1507,15 @@ test('a terminal row with a link keeps the mark and the space after it, and the 
     const mark = boxes.find(b => b.key === 'mark-box')!
     expect(mark.props?.flexShrink).toBe(0)
     expect(mark.props?.marginRight).toBe(1)
-    // The text can shrink and is cut with an ellipsis; the controls do not shrink.
+    // The text can shrink and wraps under itself; the controls do not shrink.
     expect(boxes.find(b => b.key === 'text')?.props?.flexShrink).toBe(1)
     expect(boxes.find(b => b.key === 'controls')?.props?.flexShrink).toBe(0)
     const texts = await d.findAll({ type: 'Text' })
-    expect(texts.find(t => t.text === 'Rotate the token that the deploy job reads from the secrets store')?.props?.wrap).toBe('truncate-end')
-    // Left to right: the side line, the mark, the text, the short link, Dismiss, the side line.
+    expect(texts.find(t => t.text === 'Rotate the token that the deploy job reads from the secrets store')?.props?.wrap).toBe('wrap')
+    // Left to right: the mark, the text, the short link, Dismiss.
     const all = texts.map(t => t.text)
-    const i = all.indexOf('│ ')
-    expect(all.slice(i, i + 6)).toEqual(['│ ', '→', 'Rotate the token that the deploy job reads from the secrets store', '#160', 'Dismiss', ' │'])
+    const i = all.indexOf('→')
+    expect(all.slice(i, i + 4)).toEqual(['→', 'Rotate the token that the deploy job reads from the secrets store', '#160', 'Dismiss'])
     await d.unmount()
   }
 })
@@ -1916,16 +1531,10 @@ test('a question draws no link, and a call without kind or link behaves as befor
   }
 })
 
-// Band priority. A rate limit over 80%, a note and the items open together.
-const bandWith = async ($: never, surface: 'terminal' | 'desktop') => {
-  const d = await mount($, BAND, surface)
-  const out = { texts: await textsOf(d), alts: await altsOf(d) }
-  await d.unmount()
-  return out
-}
-const moreFor = (t: string[]) => t.find(x => /^\+\d+ more$/.test(x))
+// The order of the Waiting on you section, the budget warning above it and the notes in the Feed.
+const indexIn = (t: string[], x: string) => t.indexOf(x)
 
-test('the band shows the newest alert over everything else, then a question, a check warning and an action, then the budget, a note and the quiet line', async ($, on) => {
+test('both panes list what waits most urgent first, newest first within a kind, as each is closed; the budget is above and the notes are in the Feed', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
   await note($, 'A note too', 'done')
@@ -1934,157 +1543,121 @@ test('the band shows the newest alert over everything else, then a question, a c
   await open('alert', 'Old alert')($)
   await open('alert', 'New alert')($)
   const ids = { action: 'd1', question: 'd2', old: 'd3', fresh: 'd4' }
-  const none = (texts: string[], ...words: string[]) => expect(texts.some(x => words.some(w => x.includes(w)))).toBe(false)
+  const order = async (surface: 'terminal' | 'desktop') => {
+    const t = await paneTexts($, surface)
+    return { t, waiting: ['New alert', 'Old alert', 'Ask first?', 'Do the thing'].filter(x => t.includes(x)) }
+  }
 
-  // Everything is open: the alert wins and the other three are counted.
-  {
-    const surface = 'desktop' as const
-    const { texts, alts } = await bandWith($, surface)
-    expect(texts).toContain('New alert')
-    expect(texts).not.toContain('Old alert')
-    none(texts, 'limit', 'Ask first?', 'Do the thing', 'A note too')
-    expect(moreFor(texts)).toBe('+3 more')
-    if (surface === 'desktop') {
-      expect(alts).toEqual(['Alert: New alert (+3 more)'])
-      expect(texts).toContain('!')
-    }
+  // Everything is open: the alerts first (the newest first), then the question, then the action. The budget
+  // line is on top and the note is under the Feed heading.
+  for (const surface of SURFACES) {
+    const { t, waiting } = await order(surface)
+    expect(waiting).toEqual(['New alert', 'Old alert', 'Ask first?', 'Do the thing'])
+    expect(indexIn(t, '5-hour limit 95% · resets in 1h 29m')).toBe(0)
+    expect(indexIn(t, 'A note too')).toBeGreaterThan(indexIn(t, 'FEED'))
+    expect(indexIn(t, 'Do the thing')).toBeLessThan(indexIn(t, 'FEED'))
   }
   const term = await mount($, TERM, 'terminal')
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('error')
   expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   await term.unmount()
-  const desk = await mount($, BAND, 'desktop')
+  const desk = await mount($, DESK, 'desktop')
   expect((await svgsOf(desk))[0]!.source).toContain(RED)
   await desk.unmount()
 
-  // The alerts closed: the question, with the action counted.
+  // The alerts closed: the question, then the action.
   await eng($).tool.call({ tool: CLOSE, id: ids.fresh })
   await eng($).tool.call({ tool: CLOSE, id: ids.old })
-  {
-    const surface = 'desktop' as const
-    const { texts, alts } = await bandWith($, surface)
-    expect(texts).toContain('Ask first?')
-    none(texts, 'limit', 'Do the thing', 'A note too')
-    expect(moreFor(texts)).toBe('+1 more')
-    if (surface === 'desktop') expect(alts).toEqual(['Question: Ask first? (+1 more)'])
-  }
+  for (const surface of SURFACES) expect((await order(surface)).waiting).toEqual(['Ask first?', 'Do the thing'])
 
-  // The question closed: the action, over the budget and the note, with no count.
+  // The question closed: the action alone, with the budget still above it.
   await eng($).tool.call({ tool: CLOSE, id: ids.question })
-  {
-    const surface = 'desktop' as const
-    const { texts, alts } = await bandWith($, surface)
-    expect(texts).toContain('Do the thing')
-    none(texts, 'limit', 'A note too')
-    expect(moreFor(texts)).toBeUndefined()
-    if (surface === 'desktop') expect(alts).toEqual(['Waiting on you: Do the thing'])
+  for (const surface of SURFACES) {
+    const { t, waiting } = await order(surface)
+    expect(waiting).toEqual(['Do the thing'])
+    expect(indexIn(t, '5-hour limit 95% · resets in 1h 29m')).toBe(0)
   }
 
-  // The action closed: the budget warning, over the note.
+  // The action closed: the budget warning and the Feed, and no Waiting on you.
   await eng($).tool.call({ tool: CLOSE, id: ids.action })
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('5-hour limit 95% · resets in 1h 29m')
-    none(texts, 'A note too')
+  for (const surface of SURFACES) {
+    const { t } = await order(surface)
+    expect(t).not.toContain('WAITING ON YOU')
+    expect(t).toContain('5-hour limit 95% · resets in 1h 29m')
   }
 
-  // Under the limit: the newest note.
+  // Under the limit: no warning.
   world.usage = { context: 5, limits: [limit('five_hour', 79, RESET_5H())] }
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('A note too')
-    none(texts, 'limit')
-  }
+  for (const surface of SURFACES) expect((await paneTexts($, surface)).some(x => x.includes('limit'))).toBe(false)
 })
 
-test('a check warning comes before an action, and a question before the warning; an action alone shows over the budget', async ($, on) => {
+test('a check warning comes before an action, and a question before the warning, in both panes', async ($, on) => {
   const { world } = boot(on)
-  world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
   await open('action', 'Do the thing')($)
-  // An action waits on the maintainer, so it outranks a budget warning; nothing else is counted.
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('Do the thing')
-    expect(texts.some(x => x.includes('limit'))).toBe(false)
-    expect(moreFor(texts)).toBeUndefined()
-  }
   await bash(world, $, 'mentat check', WARN_RUN)
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('Check passed with 2 warnings')
-    expect(moreFor(texts)).toBe('+1 more')
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(indexIn(t, 'Check passed with 2 warnings')).toBeGreaterThan(-1)
+    expect(indexIn(t, 'Check passed with 2 warnings')).toBeLessThan(indexIn(t, 'Do the thing'))
   }
   await open(undefined, 'Ask first?')($)
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('Ask first?')
-    expect(texts.some(x => x.includes('limit') || x.includes('Check passed') || x.includes('Do the thing'))).toBe(false)
-    expect(moreFor(texts)).toBe('+2 more')
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(indexIn(t, 'Ask first?')).toBeLessThan(indexIn(t, 'Check passed with 2 warnings'))
   }
 })
 
-test('with no item the band shows the budget warning, else the newest note with its icon, else the quiet line', async ($, on) => {
+test('the Feed of both panes shows the notes newest first, each with its kind\'s icon and color, and a new conversation empties it', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
-  expect((await bandWith($, 'desktop')).texts).toEqual(['Mentat'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 
-  await note($, 'Keep the band for #150', 'decision')
+  await note($, 'Keep the notes for #150', 'decision')
   await note($, 'The tests read the old log', 'surprise')
-  {
-    const surface = 'desktop' as const
-    const { texts, alts } = await bandWith($, surface)
-    // The newest note only, with its kind's icon.
-    expect(texts).toEqual(['!', 'The tests read the old log'])
-    if (surface === 'desktop') expect(alts).toEqual(['Note: The tests read the old log'])
-    expect(moreFor(texts)).toBeUndefined()
+  await note($, 'Merged', 'done')
+  for (const surface of SURFACES) {
+    expect(await lines($, surface)).toEqual(['✓ Merged', '! The tests read the old log', '◆ Keep the notes for #150'])
   }
   const term = await mount($, TERM, 'terminal')
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
   await term.unmount()
-  const desk = await mount($, BAND, 'desktop')
-  expect((await svgsOf(desk))[0]!.source).toContain(AMBER)
+  const desk = await mount($, DESK, 'desktop')
+  expect((await desk.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
   expect(await bandKeys(desk)).toEqual([])
   await desk.unmount()
 
-  await note($, 'Merged', 'done')
-  expect((await bandWith($, 'desktop')).texts).toEqual(['✓', 'Merged'])
-
-  // A budget warning outranks the note; with the limit gone the note is back.
+  // A budget warning is above the Feed, not instead of it.
   world.usage = { context: 5, limits: [limit('seven_day', 91, RESET_WEEK())] }
-  expect((await bandWith($, 'desktop')).texts).toContain('Week limit 91% · resets Thu 7:00 PM')
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(t[0]).toBe('Week limit 91% · resets Thu 7:00 PM')
+    expect(t).toContain('Merged')
+  }
   world.usage = { context: 5, limits: [limit('seven_day', 10)] }
-  expect((await bandWith($, 'desktop')).texts).toEqual(['✓', 'Merged'])
 
-  // A new conversation empties the log, and the band is quiet again.
+  // A new conversation empties the log.
   const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
   await classic.SessionStart({ source: 'clear' })
-  expect((await bandWith($, 'desktop')).texts).toEqual(['Mentat'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 })
 
-test('a lone action raises the desktop band, with its text on the left, its link and Dismiss, and no count; the terminal pane lists it', async ($, on) => {
+test('a lone action is listed with its mark, its link and Dismiss and no count; a second item is listed beside it, in both panes', async ($, on) => {
   boot(on)
   await open('action', 'Run the plugin update', { link: 'https://github.com/o/r/pull/9' })($)
-  const term = await waitTexts($, 'terminal')
-  expect(term).toEqual(expect.arrayContaining(['→', 'Run the plugin update']))
-  expect(moreFor(term)).toBeUndefined()
-  const desk = await bandWith($, 'desktop')
-  expect(desk.alts).toEqual(['Waiting on you: Run the plugin update'])
-  expect(desk.texts).toContain('Run the plugin update')
-  expect(moreFor(desk.texts)).toBeUndefined()
-  // A second item brings the count back to the desktop band, and its Details button stays; the pane lists both.
+  for (const surface of SURFACES) {
+    const t = await waitTexts($, surface)
+    expect(t).toEqual(expect.arrayContaining(['→', 'Run the plugin update']))
+    expect(t.some(x => /^\+\d+ more$/.test(x))).toBe(false)
+    const d = await mountWaits($, surface)
+    expect(await hrefsOf(d)).toEqual(['https://github.com/o/r/pull/9'])
+    await d.unmount()
+  }
   await open('action', 'Another')($)
-  expect(moreFor((await bandWith($, 'desktop')).texts)).toBe('+1 more')
-  const d = await mount($, BAND, 'desktop')
-  expect(await keysOf(d)).toEqual(['dismiss-d2', 'open'])
-  await d.unmount()
-  const pane = await mount($, TERM, 'terminal')
-  expect(await keysOf(pane)).toEqual(['dismiss-d2', 'dismiss-d1'])
-  await pane.unmount()
+  for (const [surface, spec] of [['terminal', TERM], ['desktop', DESK]] as const) {
+    const pane = await mount($, spec, surface)
+    expect(await keysOf(pane)).toEqual(['dismiss-d2', 'dismiss-d1'])
+    await pane.unmount()
+  }
 })
 
 test('/mentat opens the pane for an open action or alert', async ($, on) => {
@@ -2105,35 +1678,35 @@ test('closing an alert or an action by id removes it, and a new conversation dro
     expect(await waitTexts($, surface)).toContain('Do it')
   }
   await classic.SessionStart({ source: 'clear' })
-  expect(await bandTexts($, 'desktop')).toEqual(['Mentat'])
-  expect(await paneTexts($, 'terminal')).toEqual(['Nothing waiting on you.'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 })
 
 // ---- the `mentat check` signal ----------------------------------------------------------------
 
 const FAILED_RUN = 'OK: gh is installed\nPROBLEM: codex is not installed\nPROBLEM: gh is not logged in\nCheck failed: 2 problem(s)\n'
-// The desktop band's drawing when it shows an alert.
+// The marks of the alerts in the desktop pane's Waiting on you card.
 const alertsOf = async ($: never) => {
-  const d = await mount($, BAND, 'desktop')
-  const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Alert'))
+  const d = await mount($, DESK, 'desktop')
+  const cards = (await svgsOf(d)).filter(v => v.alt === 'Alert')
   await d.unmount()
   return cards
 }
 const HUE_AMBER = '#C98A0E'
 const toastTexts = (w: World) => w.toasts.map(t => (JSON.parse(t) as { text: string }).text)
 
-test('a failed mentat check pins one alert, with Dismiss, in the desktop band and the terminal pane; the desktop pane draws nothing of it', async ($, on) => {
+test('a failed mentat check pins one alert, with Dismiss, in both panes', async ($, on) => {
   const { world } = boot(on)
   await bash(world, $, 'cd "a b" && mentat check 2>&1', FAILED_RUN)
   const [card, ...more] = await alertsOf($)
   expect(more).toEqual([])
-  expect(card!.alt).toBe('Alert: Check failed: 2 problem(s)')
-  expect(card!.drawn).toEqual(['!', 'Check failed: 2 problem(s)'])
+  expect(card!.drawn).toEqual(['!'])
   for (const surface of SURFACES) expect((await waitTexts($, surface)).includes('Check failed: 2 problem(s)')).toBe(true)
+  // The desktop pane has it in its Waiting on you card.
   const pane = await paneTexts($, 'desktop')
-  expect(pane.some(x => x.includes('Check failed') || x.includes('codex is not installed') || x.toUpperCase() === 'ALERT')).toBe(false)
-  // The PROBLEM lines are not drawn on the terminal either.
+  expect(pane).toEqual(expect.arrayContaining(['WAITING ON YOU', 'Check failed: 2 problem(s)']))
+  // The PROBLEM lines are not drawn on either pane.
   expect((await waitTexts($, 'terminal')).some(x => x.includes('codex is not installed'))).toBe(false)
+  expect(pane.some(x => x.includes('codex is not installed'))).toBe(false)
   // Only Dismiss: no answer button, no toast for a failure.
   const d = await mount($, TERM, 'terminal')
   expect(await bandKeys(d)).toEqual(['dismiss-check'])
@@ -2148,11 +1721,13 @@ test('a second failed run replaces the alert, so there is still one', async ($, 
   await bash(world, $, '/Users/me/.local/bin/mentat check | cat', 'PROBLEM: gh is not logged in\nCheck failed: 1 problem(s)')
   const cards = await alertsOf($)
   expect(cards.length).toBe(1)
-  // The alert outranks the agent's question, which is counted beside it.
-  expect(cards[0]!.alt).toBe('Alert: Check failed: 1 problem(s) (+1 more)')
-  expect(cards[0]!.drawn).toEqual(['!', 'Check failed: 1 problem(s)', '+1 more'])
+  // The alert is above the agent's question, which stays listed beside it.
+  const t = await paneTexts($, 'desktop')
+  expect(t.indexOf('Check failed: 1 problem(s)')).toBeLessThan(t.indexOf('A question stays?'))
+  expect(t.filter(x => x.startsWith('Check failed'))).toEqual(['Check failed: 1 problem(s)'])
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
-  expect(await bandTexts($)).toEqual(['!', 'Check failed: 1 problem(s)'])
+  expect(await waitTexts($, 'desktop')).toContain('Check failed: 1 problem(s)')
+  expect(await alertsOf($)).toHaveLength(1)
 })
 
 const WARN_RUN = 'OK: gh is installed\nWARN: gh is old\nWARN: codex is old\nCheck OK (2 warning(s))\n'
@@ -2167,10 +1742,10 @@ const footerOf = async ($: never, surface: 'terminal' | 'desktop', modes: string
   await d.unmount()
   return texts
 }
-// The desktop band's drawing when it shows a check warning.
+// The marks of the check warning items in the desktop pane's Waiting on you card.
 const checkItemsOf = async ($: never) => {
-  const d = await mount($, BAND, 'desktop')
-  const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Check warnings'))
+  const d = await mount($, DESK, 'desktop')
+  const cards = (await svgsOf(d)).filter(v => v.alt === 'Check warnings')
   await d.unmount()
   return cards
 }
@@ -2183,7 +1758,7 @@ test('a passing mentat check removes the alert; with no warnings nothing is pinn
   await bash(world, $, 'mentat check', CLEAN_RUN)
   expect(await alertsOf($)).toEqual([])
   expect(await checkItemsOf($)).toEqual([])
-  expect(await bandTexts($)).toEqual(['Mentat'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).not.toContain('WAITING ON YOU')
   expect(toastTexts(world)).toEqual([])
 })
 
@@ -2274,7 +1849,7 @@ test('with items open the footer reads `● Mentat · N waiting` with only the d
   expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'success', dim: false })
 })
 
-test('the footer label counts every open item and, on the terminal only, is a Button that opens the pane', async ($, on) => {
+test('the footer label counts every open item and is a Button that opens the pane, on both surfaces', async ($, on) => {
   const { world } = boot(on)
   const buttonsOf = async (surface: 'terminal' | 'desktop') => {
     const d = await mount($, SESSION_MODE, surface, { modes: [] })
@@ -2283,25 +1858,25 @@ test('the footer label counts every open item and, on the terminal only, is a Bu
     await d.unmount()
     return { found, texts }
   }
-  // Nothing waits: the label is as it was, and still opens the pane on the terminal.
-  expect((await buttonsOf('terminal')).found).toEqual([{ key: 'mentat-open', label: '● Mentat', plain: true }])
-  expect((await buttonsOf('desktop')).found).toEqual([])
+  // Nothing waits: the label is as it was, and opens the pane.
+  for (const surface of SURFACES) expect((await buttonsOf(surface)).found).toEqual([{ key: 'mentat-open', label: '● Mentat', plain: true }])
 
   await eng($).tool.call({ tool: OPEN, question: 'One?' })
   await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Two' })
   await bash(world, $, 'mentat check', WARN_RUN)
   // Every open item counts, the check's warning item included.
-  const terminal = await buttonsOf('terminal')
-  expect(terminal.found).toEqual([{ key: 'mentat-open', label: '● Mentat · 3 waiting', plain: true }])
-  expect(terminal.texts.find(t => t.text === '3 waiting')?.color).toBe('warning')
-  const desktop = await buttonsOf('desktop')
-  expect(desktop.found).toEqual([])
-  expect(desktop.texts.find(t => t.text === '3 waiting')?.color).toBe('warning')
+  for (const surface of SURFACES) {
+    const label = await buttonsOf(surface)
+    expect(label.found).toEqual([{ key: 'mentat-open', label: '● Mentat · 3 waiting', plain: true }])
+    expect(label.texts.find(t => t.text === '3 waiting')?.color).toBe('warning')
 
-  const footer = await mount($, SESSION_MODE, 'terminal', { modes: [] })
-  await footer.press({ key: 'mentat-open' })
-  await footer.unmount()
-  expect(world.opened).toEqual(['mentat'])
+    world.opened.length = 0
+    const footer = await mount($, SESSION_MODE, surface, { modes: [] })
+    await footer.press({ key: 'mentat-open' })
+    await footer.unmount()
+    expect(world.opened).toEqual(['mentat'])
+  }
+  world.opened.length = 0
   // /mentat with no arguments opens it too.
   world.opened.length = 0
   await eng($).command.run({ command: 'mentat', args: '' })
@@ -2321,11 +1896,10 @@ test('a pass with warnings pins one warning item, a clean pass removes it, a fai
   await open('action', 'An action stays?')($)
   await bash(world, $, 'cd "a b" && mentat check 2>&1', WARN_RUN)
 
-  // The warning outranks the agent's action, which is counted beside it.
+  // The warning is above the agent's action, which is listed beside it.
   const [card, ...more] = await checkItemsOf($)
   expect(more).toEqual([])
-  expect(card!.alt).toBe('Check warnings: Check passed with 2 warnings (+1 more)')
-  expect(card!.drawn).toEqual(['!', 'Check passed with 2 warnings', '+1 more'])
+  expect(card!.drawn).toEqual(['!'])
   expect(card!.source).toContain(HUE_AMBER)
   const term = await mount($, TERM, 'terminal')
   // The terminal pane lists the warning first, then the action, with the WARN lines under the warning.
@@ -2338,14 +1912,15 @@ test('a pass with warnings pins one warning item, a clean pass removes it, a fai
   expect(await bandKeys(term)).toEqual(['dismiss-check', 'dismiss-d1'])
   expect(await hrefsOf(term)).toEqual([])
   await term.unmount()
-  // The desktop pane draws neither the warning nor its WARN lines.
+  // The desktop pane lists the warning with its WARN lines under it, one line each, then the action.
   const pane = await paneTexts($, 'desktop')
-  expect(pane.some(x => x.includes('Check passed') || x.includes('gh is old') || x.toUpperCase() === 'CHECK WARNINGS')).toBe(false)
+  const from = pane.indexOf('Check passed with 2 warnings')
+  expect(pane.slice(from).filter(x => /^(WARN: |An action)/.test(x))).toEqual(['WARN: gh is old', 'WARN: codex is old', 'An action stays?'])
   // The next warned run replaces it, so there is still one.
   await bash(world, $, 'mentat check', 'WARN: only one\nCheck OK (1 warning(s))\n')
   const again = await checkItemsOf($)
   expect(again.length).toBe(1)
-  expect(again[0]!.alt).toBe('Check warnings: Check passed with 1 warning (+1 more)')
+  expect((await paneTexts($, 'desktop')).filter(x => x.startsWith('Check passed'))).toEqual(['Check passed with 1 warning'])
 
   // A fail turns it into the red alert; there is one item with the id check.
   await bash(world, $, 'mentat check', FAILED_RUN)
@@ -2358,7 +1933,7 @@ test('a pass with warnings pins one warning item, a clean pass removes it, a fai
   expect((await checkItemsOf($)).length).toBe(1)
   await bash(world, $, 'mentat check', CLEAN_RUN)
   expect(await checkItemsOf($)).toEqual([])
-  expect(await bandTexts($)).toEqual(expect.arrayContaining(['→', 'An action stays?']))
+  expect(await paneTexts($, 'desktop')).toEqual(expect.arrayContaining(['→', 'An action stays?']))
   expect(toastTexts(world)).toEqual([])
 })
 
@@ -2366,8 +1941,8 @@ test('a warning count the output does not show is still counted: in the item and
   const { world } = boot(on)
   await bash(world, $, 'mentat check', 'WARN: seen\nCheck OK (2 warning(s))\n')
   expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
-  const [card] = await checkItemsOf($)
-  expect(card!.alt).toBe('Check warnings: Check passed with 2 warnings')
+  expect((await checkItemsOf($)).length).toBe(1)
+  expect(await paneTexts($, 'desktop')).toContain('Check passed with 2 warnings')
   // The terminal pane lists the line it saw and one for the warning whose text it did not.
   const seen = (await waitTexts($, 'terminal')).filter(t => t.startsWith('WARN: '))
   expect(seen).toEqual(['WARN: seen', 'WARN: A warning whose text was not in the output'])
@@ -2375,85 +1950,72 @@ test('a warning count the output does not show is still counted: in the item and
   const warns = Array.from({ length: 8 }, (_, i) => `warning number ${i + 1}`)
   await bash(world, $, 'mentat check', `${warns.map(w => `WARN: ${w}`).join('\n')}\nCheck OK (8 warning(s))`)
   expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
-  const [many] = await checkItemsOf($)
-  expect(many!.alt).toBe('Check warnings: Check passed with 8 warnings')
+  expect((await checkItemsOf($)).length).toBe(1)
+  expect(await paneTexts($, 'desktop')).toContain('Check passed with 8 warnings')
   expect((await waitTexts($, 'terminal')).filter(t => t.startsWith('WARN: '))).toEqual(warns.map(w => `WARN: ${w}`))
 })
 
-test('the band shows the alert, then the question, then the check warning, then the action, as each is closed in turn', async ($, on) => {
+test('both panes put the alert first, then the question, then the check warning, then the action, as each is closed in turn', async ($, on) => {
   const { world } = boot(on)
   await open('action', 'Do the thing')($)
   await bash(world, $, 'mentat check', WARN_RUN)
   await open(undefined, 'Ask first?')($)
   await open('alert', 'Down')($)
-  const shown = async () => (await bandWith($, 'desktop')).alts[0]
-  expect(await shown()).toBe('Alert: Down (+3 more)')
+  const first = async (surface: 'terminal' | 'desktop') => {
+    const t = await paneTexts($, surface)
+    return ['Down', 'Ask first?', 'Check passed with 2 warnings', 'Do the thing'].filter(x => t.includes(x))
+  }
+  for (const surface of SURFACES) expect(await first(surface)).toEqual(['Down', 'Ask first?', 'Check passed with 2 warnings', 'Do the thing'])
   await eng($).tool.call({ tool: CLOSE, id: 'd3' })
-  expect(await shown()).toBe('Question: Ask first? (+2 more)')
+  for (const surface of SURFACES) expect(await first(surface)).toEqual(['Ask first?', 'Check passed with 2 warnings', 'Do the thing'])
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
-  expect(await shown()).toBe('Check warnings: Check passed with 2 warnings (+1 more)')
+  for (const surface of SURFACES) expect(await first(surface)).toEqual(['Check passed with 2 warnings', 'Do the thing'])
   await bash(world, $, 'mentat check', CLEAN_RUN)
-  expect(await shown()).toBe('Waiting on you: Do the thing')
+  for (const surface of SURFACES) expect(await first(surface)).toEqual(['Do the thing'])
 })
 
 test('the agent cannot open a warning: open_decision refuses the kind and records nothing', async ($, on) => {
   boot(on)
   const refused = await eng($).tool.call({ tool: OPEN, kind: 'warning', question: 'Careful?' })
   expect(refused.deny).toBe('open_decision kind must be question, action or alert.')
-  expect(await bandTexts($, 'desktop')).toEqual(['Mentat'])
-  expect(await paneTexts($, 'terminal')).toEqual(['Nothing waiting on you.'])
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 })
 
-test('the check warning comes after an alert and a question and before an action and the budget', async ($, on) => {
+test('the check warning comes after an alert and a question and before an action, with the budget above them', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
   await open('action', 'Do the thing')($)
   await bash(world, $, 'mentat check', WARN_RUN)
-  const none = (texts: string[], ...words: string[]) => expect(texts.some(x => words.some(w => x.includes(w)))).toBe(false)
+  const order = async (surface: 'terminal' | 'desktop') => {
+    const t = await paneTexts($, surface)
+    return ['Check failed: 2 problem(s)', 'Ask first?', 'Check passed with 2 warnings', 'Do the thing'].filter(x => t.includes(x))
+  }
 
-  // The warning outranks the action and the budget.
-  {
-    const surface = 'desktop' as const
-    const { texts, alts } = await bandWith($, surface)
-    expect(texts).toContain('Check passed with 2 warnings')
-    none(texts, 'limit', 'Do the thing')
-    expect(moreFor(texts)).toBe('+1 more')
-    if (surface === 'desktop') {
-      expect(alts).toEqual(['Check warnings: Check passed with 2 warnings (+1 more)'])
-      expect(texts).toContain('!')
-    }
+  // The warning is above the action; the budget is above both.
+  for (const surface of SURFACES) {
+    expect(await order(surface)).toEqual(['Check passed with 2 warnings', 'Do the thing'])
+    expect((await paneTexts($, surface)).indexOf('5-hour limit 95% · resets in 1h 29m')).toBe(0)
   }
   const term = await mount($, TERM, 'terminal')
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
   expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   await term.unmount()
-  const desk = await mount($, BAND, 'desktop')
+  const desk = await mount($, DESK, 'desktop')
   expect((await svgsOf(desk))[0]!.source).toContain(HUE_AMBER)
   await desk.unmount()
 
-  // A question outranks the warning.
+  // A question is above the warning.
   await open(undefined, 'Ask first?')($)
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('Ask first?')
-    none(texts, 'Check passed')
-    expect(moreFor(texts)).toBe('+2 more')
-  }
-  // An alert (the failed check replaces the warning) outranks the question.
+  for (const surface of SURFACES) expect(await order(surface)).toEqual(['Ask first?', 'Check passed with 2 warnings', 'Do the thing'])
+  // An alert (the failed check replaces the warning) is above the question.
   await bash(world, $, 'mentat check', FAILED_RUN)
-  expect((await bandWith($, 'desktop')).texts).toContain('Check failed: 2 problem(s)')
+  for (const surface of SURFACES) expect(await order(surface)).toEqual(['Check failed: 2 problem(s)', 'Ask first?', 'Do the thing'])
 
-  // Back to the warning, then a clean pass: the question is gone too, so the action shows, not the pull request.
+  // Back to the warning, then a clean pass: the question is gone too, so the action is left.
   await bash(world, $, 'mentat check', WARN_RUN)
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   await bash(world, $, 'mentat check', CLEAN_RUN)
-  {
-    const surface = 'desktop' as const
-    const { texts } = await bandWith($, surface)
-    expect(texts).toContain('Do the thing')
-    none(texts, 'Check passed', 'limit')
-  }
+  for (const surface of SURFACES) expect(await order(surface)).toEqual(['Do the thing'])
 })
 
 test('a new conversation drops the check result and its warning card, and a mod reload keeps them', async ($, on) => {
@@ -2481,11 +2043,11 @@ test('a new conversation drops the check result and its warning card, and a mod 
 test('Dismiss removes the check alert, and a later failed run pins it again', async ($, on) => {
   const { world } = boot(on)
   await bash(world, $, 'mentat check', FAILED_RUN)
-  const d = await mount($, BAND, 'desktop')
+  const d = await mount($, DESK, 'desktop')
   await d.press({ key: 'dismiss-check' })
   await d.unmount()
   expect(await alertsOf($)).toEqual([])
-  expect(await bandTexts($)).toEqual(['Mentat'])
+  expect(await paneTexts($, 'desktop')).not.toContain('WAITING ON YOU')
 
   await bash(world, $, 'mentat check', FAILED_RUN)
   expect((await alertsOf($)).length).toBe(1)
@@ -2524,14 +2086,15 @@ test('the check alert shows only its final line, however many problems there are
   const problems = Array.from({ length: 9 }, (_, i) => `problem number ${i + 1}`)
   await bash(world, $, 'mentat check', `${problems.map(p => `PROBLEM: ${p}`).join('\n')}\nCheck failed: 9 problem(s)`)
   const [card] = await alertsOf($)
-  expect(card!.drawn).toEqual(['!', 'Check failed: 9 problem(s)'])
+  expect(card!.drawn).toEqual(['!'])
   for (const surface of SURFACES) {
-    expect((await paneTexts($, surface)).some(x => x.includes('problem number'))).toBe(false)
-    expect((await bandTexts($, surface)).some(x => x.includes('problem number'))).toBe(false)
+    const t = await paneTexts($, surface)
+    expect(t).toContain('Check failed: 9 problem(s)')
+    expect(t.some(x => x.includes('problem number'))).toBe(false)
   }
 })
 
-// ---- the Log card ---------------------------------------------------------------------------------
+// ---- the Log (the Feed) ---------------------------------------------------------------------------------
 
 const GH = 'https://github.com/o/r'
 // The log rows the pane draws (newest first), as time, icon and text, and the label of the toggle button, if any.
@@ -2542,15 +2105,11 @@ const logOf = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => 
   const hasSvg = (await pane.findAll({ type: 'Svg' })).length > 0
   await pane.unmount()
   const rows: { time: string; icon: string; text: string }[] = []
-  if (surface === 'desktop') {
-    for (let i = t.indexOf('LOG') + 1; i > 0 && i + 2 < t.length && /^\d+:\d\d [AP]M$/.test(t[i]!); i += 3) rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
-  } else {
-    // The terminal's Feed: the pinned agents, then a row of side line, time, icon and text per entry.
-    for (let i = t.indexOf('FEED') + 1; i > 0 && i + 2 < t.length; i++) {
-      if (!/^\d+:\d\d [AP]M$/.test(t[i]!)) continue
-      rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
-      i += 2
-    }
+  // The Feed on either surface: the pinned agents, then a time, an icon and the text per entry.
+  for (let i = t.indexOf('FEED') + 1; i > 0 && i + 2 < t.length; i++) {
+    if (!/^\d+:\d\d [AP]M$/.test(t[i]!)) continue
+    rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
+    i += 2
   }
 
   return { rows, toggle, hasSvg }
@@ -2598,7 +2157,7 @@ test('a note adds one entry with its time, kind icon and line; the kind defaults
   await note($, 'Waiting on your merge of #148', 'waiting')
   await note($, 'The Log card is built', 'done')
   await note($, 'Next: the rules', 'plan')
-  expect(await lines($, 'desktop')).toEqual(['▸ Next: the rules', '✓ The Log card is built', '◌ Waiting on your merge of #148', '! The mod tests also read the old log', '◆ Keep the band for #150'])
+  expect(await lines($, 'desktop')).toEqual(['▸ Next: the rules', '✓ The Log card is built', '◌ Waiting on your merge of #148', '! The mod tests also read the old log', '◆ Keep the band for #150', '▸ Only the Log changes in this pull request'])
 })
 
 test('each kind has its own icon and color on both surfaces', async ($, on) => {
@@ -2615,20 +2174,31 @@ test('each kind has its own icon and color on both surfaces', async ($, on) => {
   }
 })
 
-test('a note is one line of at most 80 characters, cut with an ellipsis', async ($, on) => {
+test('a note is one line, kept in full and wrapped; only past the 1000 character limit is it cut with an ellipsis', async ($, on) => {
   boot(on)
   await startSession($)
-  await note($, `Moving the ${'very long '.repeat(20)}plan`)
-  const [row] = (await logOf($)).rows
-  expect([...row!.text]).toHaveLength(80)
-  expect(row!.text.startsWith('Moving the very long very long')).toBe(true)
-  expect(row!.text.endsWith('…')).toBe(true)
-  // Exactly 80 characters is kept whole; runs of spaces and line breaks make one line.
-  await note($, 'x'.repeat(80))
-  expect([...(await logOf($)).rows[0]!.text]).toHaveLength(80)
-  expect((await logOf($)).rows[0]!.text.endsWith('…')).toBe(false)
+  const long = `Moving the ${'very long '.repeat(20)}plan`
+  await note($, long)
+  for (const surface of SURFACES) {
+    const [row] = (await logOf($, surface)).rows
+    expect(row!.text).toBe(long.replace(/\s+$/, ''))
+    expect([...row!.text].length).toBeGreaterThan(80)
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await pane.findAll({ type: 'Text', text: row!.text }))[0]!.props?.wrap).toBe('wrap')
+    await pane.unmount()
+  }
+  // Runs of spaces and line breaks make one line.
   await note($, 'two   words\nand a third line')
   expect((await lines($))[0]).toBe('▸ two words and a third line')
+  // Exactly the limit is kept whole; past it the line is cut with an ellipsis.
+  await note($, 'x'.repeat(1000))
+  expect([...(await logOf($)).rows[0]!.text]).toHaveLength(1000)
+  expect((await logOf($)).rows[0]!.text.endsWith('…')).toBe(false)
+  await note($, 'y'.repeat(2000))
+  const cut = (await logOf($)).rows[0]!.text
+  expect([...cut]).toHaveLength(1000)
+  expect(cut.startsWith('yyyy')).toBe(true)
+  expect(cut.endsWith('…')).toBe(true)
 })
 
 test('a note without text, or with a kind that is not one of the five, is refused and adds nothing', async ($, on) => {
@@ -2671,21 +2241,21 @@ test('only the pane\'s own events are logged: a ready, a close, an issue, a Code
   await bash(world, $, 'git push', '')
   await new Promise(r => setTimeout(r, 30))
   // Only the pane's own events: the PR opened, the item asked and closed, the builder done.
-  expect(await lines($)).toEqual(['✓ Builder finished: Build the log · 0s', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
+  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
   // The commands still ran as before.
   expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-on'])
 })
 
-// How many entries each surface shows before `Show all`: the desktop's Log card five, the terminal's Feed ten.
-const SHOWN = { terminal: 10, desktop: 5 } as const
+// How many entries the Feed shows before `Show all`, on either surface.
+const SHOWN = 10
 
-test('the log shows the newest five on the desktop and the newest ten in the terminal Feed; Show all N shows the rest, Show fewer goes back, and the choice is kept', async ($, on) => {
+test('the Feed shows the newest ten on both surfaces; Show all N shows the rest, Show fewer goes back, and the choice is kept', async ($, on) => {
   boot(on)
   await startSession($)
   for (let i = 1; i <= 12; i++) await note($, `Note ${i}`)
   for (const surface of SURFACES) {
     const first = await logOf($, surface)
-    expect(first.rows.map(r => r.text)).toEqual(Array.from({ length: SHOWN[surface] }, (_, k) => `Note ${12 - k}`))
+    expect(first.rows.map(r => r.text)).toEqual(Array.from({ length: SHOWN }, (_, k) => `Note ${12 - k}`))
     expect(first.toggle).toEqual(['Show all 12'])
   }
   for (const surface of SURFACES) {
@@ -2701,7 +2271,7 @@ test('the log shows the newest five on the desktop and the newest ten in the ter
     await again.press({ key: 'log-toggle' })
     await again.unmount()
     const fewer = await logOf($, surface)
-    expect(fewer.rows).toHaveLength(SHOWN[surface])
+    expect(fewer.rows).toHaveLength(SHOWN)
     expect(fewer.toggle).toEqual(['Show all 12'])
   }
 })
@@ -2710,15 +2280,15 @@ test('with no more entries than a surface shows there is no toggle; with none th
   boot(on)
   await startSession($)
   expect(await paneTexts($)).not.toContain('FEED')
-  expect(await paneTexts($, 'desktop')).not.toContain('LOG')
+  expect(await paneTexts($, 'desktop')).not.toContain('FEED')
   for (let i = 0; i < 10; i++) await note($, `Note ${i}`)
   const got = await logOf($)
   expect(got.rows).toHaveLength(10)
   expect(got.toggle).toEqual([])
-  // The desktop shows five, so it has the toggle already.
-  expect((await logOf($, 'desktop')).toggle).toEqual(['Show all 10'])
+  expect((await logOf($, 'desktop')).toggle).toEqual([])
   await note($, 'Note 10')
   expect((await logOf($)).toggle).toEqual(['Show all 11'])
+  expect((await logOf($, 'desktop')).toggle).toEqual(['Show all 11'])
 })
 
 test('the log keeps the last 200 entries', async ($, on) => {
@@ -2755,7 +2325,7 @@ test('the time is the entry\'s clock time in the TZ zone, as h:mm AM or PM', asy
   expect((await logOf($)).rows.map(r => r.time)).toEqual(['9:12 AM', '10:12 PM', '5:37 PM', '5:30 PM'])
 })
 
-test('the log is plain text rows on both surfaces, with no Svg and no tint; in the terminal Feed the live agents are pinned above the rows', async ($, on) => {
+test('the log rows are plain native rows on both surfaces, with no Svg; the live agents are pinned above them', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
@@ -2765,22 +2335,18 @@ test('the log is plain text rows on both surfaces, with no Svg and no tint; in t
   for (const surface of SURFACES) {
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     const t = await textsOf(pane)
-    // On the terminal the pinned agent sits above the Log rows (the desktop draws the agents as Svg, which textsOf lists last).
-    if (surface === 'terminal') {
-      expect(t.indexOf('Look around')).toBeGreaterThan(t.indexOf('FEED'))
-      expect(t.indexOf('Look around')).toBeLessThan(t.indexOf('A decision'))
-      expect(t).toContain('Open one?')
-    } else expect(t.includes('Open one?')).toBe(false)
+    // The pinned agent sits above the Log rows, both under the Feed heading; the open item is in the section above.
+    expect(t.indexOf('Look around')).toBeGreaterThan(t.indexOf('FEED'))
+    expect(t.indexOf('Look around')).toBeLessThan(t.indexOf('A decision'))
+    expect(t.indexOf('Open one?')).toBeLessThan(t.indexOf('FEED'))
     const rows = (await pane.findAll({ type: 'Box' })).filter(b => String(b.key).startsWith('log-'))
     // The note, and the line for the question the pane saw opened.
-    expect(rows).toHaveLength(2)
+    expect(rows.length).toBeGreaterThanOrEqual(2)
     expect(rows.every(b => b.props?.backgroundColor === undefined)).toBe(true)
+    // The log's marks are Text glyphs, not pictures.
+    expect((await svgsOf(pane)).map(v => v.alt)).toEqual(surface === 'desktop' ? ['Question'] : [])
     await pane.unmount()
   }
-  // On the desktop the log is not an Svg: the only Svg element is the agents.
-  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect((await svgsOf(d)).map(v => v.alt)).toEqual(['Running agents: 1 (explore: Look around)'])
-  await d.unmount()
 })
 
 test('the desktop pane with only a note draws it and not the empty line', async ($, on) => {
@@ -2845,7 +2411,7 @@ test('no terminal Box has a backgroundColor: a terminal draws an 8-digit hex tin
   await note($, 'A note')
   world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
   await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
-  for (const [spec, props] of [[PANE, { bodyColumns: 60 }], [BAND, {}]] as const) {
+  for (const [spec, props] of [[PANE, { bodyColumns: 60 }]] as const) {
     const term = await mount($, spec, 'terminal', props)
     const boxes = await term.findAll({ type: 'Box' })
     expect(boxes.length).toBeGreaterThan(0)
@@ -2869,37 +2435,64 @@ const layoutWorld = async ($: never, w: World) => {
 // The pieces of the edge that starts at `start` (the title's section), joined.
 const edgeAt = (t: string[], start: string, parts: number) => t.slice(t.indexOf(start), t.indexOf(start) + parts).join('')
 
-test('from 60 columns each section is a frame: edges exactly as wide as the body, the title bold in the top edge, side lines on every row', async ($, on) => {
+test('from 60 columns each section is a Box with a dim round border and its heading as the first row; no edge strings or side lines', async ($, on) => {
   const { world } = boot(on)
   await layoutWorld($, world)
   for (const cols of [60, 72, 100]) {
     const d = await mount($, PANE, 'terminal', { bodyColumns: cols })
     const t = await textsOf(d)
     const texts = await d.findAll({ type: 'Text' })
-    const top = (title: string) => {
-      const i = t.indexOf(title)
-      return t.slice(i - 1, i + 3).join('')
+    const boxes = await d.findAll({ type: 'Box' })
+    for (const key of ['waiting', 'feed']) {
+      const section = boxes.find(b => b.key === key)!
+      expect(section.props).toMatchObject({ flexDirection: 'column', borderStyle: 'round', borderDimColor: true, paddingX: 1 })
+      // The heading row is the first thing inside it.
+      const head = boxes.find(b => b.key === `${key}-top`)!
+      expect(head.props?.flexDirection).toBe('row')
+      expect(boxes.indexOf(head)).toBe(boxes.indexOf(section) + 1)
     }
-    // `╭─ WAITING ON YOU 2 ───…╮` and `╭─ FEED 4 ───…╮`.
-    const waiting = top('WAITING ON YOU')
-    expect(waiting.startsWith('╭─ WAITING ON YOU 2 ─')).toBe(true)
-    expect(waiting.endsWith('─╮')).toBe(true)
-    expect([...waiting]).toHaveLength(cols)
-    const feed = top('FEED')
-    expect(feed.startsWith('╭─ FEED 4 ─')).toBe(true)
-    expect([...feed]).toHaveLength(cols)
-    // The bottom edges.
-    const bottoms = t.filter(x => x.startsWith('╰'))
-    expect(bottoms).toEqual([`╰${'─'.repeat(cols - 2)}╯`, `╰${'─'.repeat(cols - 2)}╯`])
-    // The title is bold and its count dim, the lines dim.
-    expect(texts.find(x => x.text === 'WAITING ON YOU')?.props?.bold).toBe(true)
-    expect(texts.find(x => x.text === ' 2')?.props?.dimColor).toBe(true)
-    expect(texts.find(x => x.text === '│ ')?.props?.dimColor).toBe(true)
-    // Every body row has both side lines: Waiting on you has 2 items (with details and WARN lines), the Feed 4 rows.
-    expect(t.filter(x => x === '│ ').length).toBe(t.filter(x => x === ' │').length)
-    expect(t.filter(x => x === '│ ').length).toBeGreaterThanOrEqual(8)
-    // The middle of a row grows and shrinks, and its text is cut with an ellipsis rather than wrapped.
-    expect(texts.find(x => x.text === 'Ship the change now?')?.props?.wrap).toBe('truncate-end')
+    // The title is bold and its count dim, side by side: `WAITING ON YOU 2`, `FEED 4`.
+    for (const [title, count] of [['WAITING ON YOU', '2'], ['FEED', '4']] as const) {
+      const i = texts.findIndex(x => x.text === title)
+      expect(texts[i]!.props?.bold).toBe(true)
+      expect(texts[i + 1]).toMatchObject({ text: count, props: { dimColor: true } })
+    }
+    // The border is the Box's own: no edge or side-line strings are drawn as text.
+    expect(t.some(x => /[╭╮╰╯│]/.test(x))).toBe(false)
+    await d.unmount()
+  }
+})
+
+test('the text of an item, its detail lines, a Feed entry and an agent wraps under itself on both surfaces, beside a top-aligned mark and buttons that do not shrink', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Rotate the token that the deploy job reads from the secrets store', recommendation: 'Do it after the release, not before', accept: 'Yes' })
+  await bash(world, $, 'mentat check', WARN_RUN)
+  await note($, 'A long note that goes on and on past the end of the row, wrapped under itself')
+  world.agents = [{ id: 'a1', type: 'Explore', description: 'A long agent description that goes on and on past the end of the row', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'A long agent description that goes on and on past the end of the row', 'Explore'))
+  for (const [surface, spec] of [['terminal', TERM], ['desktop', DESK]] as const) {
+    const d = await mount($, spec, surface)
+    const texts = await d.findAll({ type: 'Text' })
+    const boxes = await d.findAll({ type: 'Box' })
+    for (const line of [
+      'Rotate the token that the deploy job reads from the secrets store',
+      'A long note that goes on and on past the end of the row, wrapped under itself',
+      'A long agent description that goes on and on past the end of the row',
+    ]) expect(texts.find(x => x.text === line)?.props?.wrap).toBe('wrap')
+    for (const x of texts.filter(x => /^(Recommended: |WARN: )/.test(x.text ?? ''))) expect(x.props).toMatchObject({ wrap: 'wrap', dimColor: true })
+    expect(texts.filter(x => x.props?.wrap === 'truncate-end').map(x => x.text)).toEqual([])
+    // The item's first line is top-aligned: the mark at the left, the buttons at the right, neither shrinking.
+    const first = boxes.find(b => b.key === 'item-d1')!
+    const row = surface === 'terminal' ? first : boxes[boxes.indexOf(first) + 1]!
+    expect(row.props).toMatchObject({ flexDirection: 'row', alignItems: 'flex-start' })
+    const parts = boxes.filter(b => b.key === 'mark-box' || b.key === 'controls' || (surface === 'desktop' && b.props?.flexShrink === 0 && b.props?.flexDirection === 'row'))
+    expect(parts.length).toBeGreaterThan(0)
+    for (const b of parts) expect(b.props?.flexShrink).toBe(0)
+    // The text Box takes the rest; Feed rows are top-aligned too.
+    for (const b of boxes.filter(b => /^(agent|log)-/.test(String(b.key)))) expect(b.props?.alignItems).toBe('flex-start')
+    for (const b of boxes.filter(b => b.key === 'text' && surface === 'terminal')) expect(b.props).toMatchObject({ flexGrow: 1, flexShrink: 1 })
+    if (surface === 'desktop') for (const b of boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1)) expect(b.props).toMatchObject({ minWidth: 0 })
     await d.unmount()
   }
 })
@@ -2982,7 +2575,7 @@ test('live agents are pinned above the log with a blank row between; ended agent
   expect(stateOf(t, 'Running one')).toBe('running · 2s')
   expect(t).not.toContain('Ended one')
   // Its end is an event line, in the log below (the engine's next check of its list found it ended).
-  expect(t).toContain('Explore finished: Ended one · 1s')
+  expect(t).toContain('Explore finished: Ended one')
 })
 
 // ---- the check at session start -----------------------------------------------------
@@ -3027,7 +2620,7 @@ test('a session start with warnings pins the warning item and turns the label am
   await untilFooter($, 'terminal', '●', 'warning')
   const cards = await checkItemsOf($)
   expect(cards.length).toBe(1)
-  expect(cards[0]!.alt).toBe('Check warnings: Check passed with 2 warnings')
+  expect(await paneTexts($, 'desktop')).toContain('Check passed with 2 warnings')
 })
 
 test('a session start with a failing check (exit 1) pins the alert and turns the label red', async ($, on) => {
@@ -3038,7 +2631,7 @@ test('a session start with a failing check (exit 1) pins the alert and turns the
   await untilFooter($, 'terminal', '●', 'error')
   const cards = await alertsOf($)
   expect(cards.length).toBe(1)
-  expect(cards[0]!.alt).toBe('Alert: Check failed: 1 problem(s)')
+  expect(await paneTexts($, 'desktop')).toContain('Check failed: 1 problem(s)')
 })
 
 test('outside a git work tree a session start runs no check', async ($, on) => {
@@ -3127,28 +2720,9 @@ test('after /clear the label goes dim, then the new conversation is checked; a r
   expect(world.calls.filter(a => isCall(a, 'mentat', 'check')).length).toBe(2)
 })
 
-// ---- the band is one row; an open question survives what happens around it ----------------------------------
+// ---- an open question survives what happens around it ----------------------------------
 
-test('the desktop band is one row: the text, then one Box that holds the answer button, Dismiss, the link and Details', async ($, on) => {
-  boot(on)
-  await open('question', 'Ship it?', { accept: 'Yes' })($)
-  const d = await mount($, BAND, 'desktop')
-  // The buttons are in one Box that does not shrink or wrap; there is no second row of controls.
-  const controls = (await d.findAll({ type: 'Box' })).filter(b => b.props?.flexShrink === 0)
-  expect(controls).toHaveLength(1)
-  expect(controls[0]!.props?.flexDirection).toBe('row')
-  expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1'])
-  expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1', 'open'])
-  await d.unmount()
-  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
-  // The same in every state: a quiet band has just Details in that Box.
-  const quiet = await mount($, BAND, 'desktop')
-  expect((await quiet.findAll({ type: 'Box' })).filter(b => b.props?.flexShrink === 0)).toHaveLength(1)
-  expect((await quiet.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
-  await quiet.unmount()
-})
-
-test('a terminal pane row ends in its buttons without width arithmetic: side lines, a growing middle and one controls Box that does not shrink', async ($, on) => {
+test('a terminal pane row ends in its buttons without width arithmetic: a growing middle and one controls Box that does not shrink', async ($, on) => {
   boot(on)
   await open('question', 'Ship it?', { accept: 'Yes' })($)
   const d = await mount($, TERM, 'terminal')
@@ -3156,13 +2730,13 @@ test('a terminal pane row ends in its buttons without width arithmetic: side lin
   const row = boxes.find(b => b.key === 'item-d1')!
   expect(row.props?.flexDirection).toBe('row')
   // The middle grows and shrinks; the controls keep their size.
-  expect(boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1 && b.props?.flexDirection === 'row')).not.toHaveLength(0)
+  expect(boxes.filter(b => b.key === 'text' && b.props?.flexGrow === 1 && b.props?.flexShrink === 1)).not.toHaveLength(0)
   const controls = boxes.filter(b => b.key === 'controls')
   expect(controls).toHaveLength(1)
   expect(controls[0]!.props?.flexDirection).toBe('row')
   expect(controls[0]!.props?.flexShrink).toBe(0)
   const texts = await textsOf(d)
-  expect(texts.slice(texts.indexOf('│ '), texts.indexOf(' │') + 1)).toEqual(['│ ', '?', 'Ship it?', 'Yes', 'Dismiss', ' │'])
+  expect(texts.slice(texts.indexOf('?'), texts.indexOf('Dismiss') + 1)).toEqual(['?', 'Ship it?', 'Yes', 'Dismiss'])
   expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1'])
   expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1'])
   await d.unmount()
@@ -3182,12 +2756,12 @@ test('with the pane open, a question opened by the agent is still open after the
   await startSession($)
   await classic.SessionStart({ source: 'startup' })
   await classic.SessionStart({ source: 'compact' })
-  expect(await bandTexts($)).toContain('Ship it?')
+  expect(await waitTexts($, 'desktop')).toContain('Ship it?')
   expect(await textsOf(pane)).toContain('Ship it?')
   const closed = await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'No, do not ship' })
   expect(closed.deny).toBeUndefined()
   expect(String(closed.result)).toBe('Closed decision d1.')
-  expect(await bandTexts($)).toEqual(['Mentat'])
+  expect(await paneTexts($, 'desktop')).not.toContain('Ship it?')
   expect(await textsOf(pane)).not.toContain('Ship it?')
   expect(world.sent).toEqual([])
   await pane.unmount()
@@ -3215,7 +2789,7 @@ const drawnRow = async ($: never, surface: 'terminal' | 'desktop', icon: string,
 }
 const classicOf = ($: never) => ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
 
-test('an agent that ends writes one line: finished with the time it took, failed, or stopped; an unknown end writes none', async ($, on) => {
+test('an agent that ends writes one line: finished (with no time), failed, or stopped; an unknown end writes none', async ($, on) => {
   const { world, clock } = boot(on)
   const row = (id: string, type: string, description: string, status = 'running') => ({ id, type, description, status })
   // z1 is listed by the engine before the pane ever sees it spawn: it has no start time.
@@ -3250,10 +2824,10 @@ test('an agent that ends writes one line: finished with the time it took, failed
   await clock.advance(5_000)
   expect(await written($)).toEqual([
     '✓ Explore finished: Never spawned here',
-    '✓ Builder finished: Build it · 1m 23s',
-    '✓ Explore finished: Look · 1m 23s',
-    '✓ Plan finished: Map it · 1m 23s',
-    '✓ general-purpose finished: Other thing · 1m 23s',
+    '✓ Builder finished: Build it',
+    '✓ Explore finished: Look',
+    '✓ Plan finished: Map it',
+    '✓ general-purpose finished: Other thing',
     '✕ Builder failed: Broke',
     '✕ Plan stopped: Halted',
   ])
@@ -3273,7 +2847,7 @@ test('an agent first listed already ended writes no line, and two agents with th
   await eng($).agent.spawn(spawn('a2', 'Check the docs', 'Explore'))
   world.agents = world.agents.map(a => ({ ...a, status: 'completed' }))
   await eng($).turn.complete(turnDone('a1'))
-  expect(await written($)).toEqual(['✓ Explore finished: Check the docs · 0s', '✓ Explore finished: Check the docs · 0s'])
+  expect(await written($)).toEqual(['✓ Explore finished: Check the docs', '✓ Explore finished: Check the docs'])
 })
 
 test('open_decision writes an Asked line marked by the kind of item; two questions with the same text each get one', async ($, on) => {
@@ -3517,7 +3091,7 @@ test('events draw their text dim with their own mark and notes draw as before, o
   await note($, 'A plain note', 'done')
   await note($, 'Another note')
   for (const surface of SURFACES) {
-    const done = await drawnRow($, surface, '✓', 'Builder finished: Build it · 0s')
+    const done = await drawnRow($, surface, '✓', 'Builder finished: Build it')
     expect(done.colors).toContain('success')
     expect(done.dim).toEqual([true])
     const failedRow = await drawnRow($, surface, '✕', 'Builder failed: Break it')
@@ -3532,22 +3106,26 @@ test('events draw their text dim with their own mark and notes draw as before, o
   await pane.unmount()
 })
 
-test('the desktop band\'s line is the newest note, never an event; with only events it is the quiet Mentat line', async ($, on) => {
+test('the Feed lists a note and an event line alike, newest first, with the event muted and the note not', async ($, on) => {
   boot(on)
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Merge it?' })
   await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'yes' })
-  expect((await lines($)).length).toBe(2)
-  expect((await bandWith($, 'desktop')).texts).toEqual(['Mentat'])
+  for (const surface of SURFACES) expect((await lines($, surface)).length).toBe(2)
   await note($, 'Keep this one', 'decision')
   await eng($).tool.call({ tool: OPEN, question: 'Another?' })
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
-  expect((await lines($))[0]).toBe('✓ Closed: Another?')
-  const { texts, alts } = await bandWith($, 'desktop')
-  expect(texts).toEqual(['◆', 'Keep this one'])
-  expect(alts).toEqual(['Note: Keep this one'])
-  // The terminal has no band, so no line of Mentat's there.
-  expect(await bandTexts($, 'terminal')).toEqual([])
+  for (const surface of SURFACES) {
+    expect((await lines($, surface))[0]).toBe('✓ Closed: Another?')
+    expect(await lines($, surface)).toContain('◆ Keep this one')
+  }
+  const d = await mount($, DESK, 'desktop')
+  const texts = await d.findAll({ type: 'Text' })
+  expect(texts.find(t => t.text === 'Keep this one')?.props?.dimColor).toBeUndefined()
+  expect(texts.find(t => t.text === 'Closed: Another?')?.props?.dimColor).toBe(true)
+  await d.unmount()
+  // Mentat draws no band on either surface.
+  for (const surface of SURFACES) expect(await bandTexts($, surface)).toEqual([])
 })
 
 test('an entry stored without a source is a note; a note written now has none, and an event says so', async ($, on) => {
@@ -3580,13 +3158,22 @@ test('an equal note straight after another is added once; an event between two e
   expect(await written($)).toEqual(['◌ Same', '? Asked you: Q?', '◌ Same'])
 })
 
-test('an event line is one line of at most 80 characters, and events count toward the 200-line cap', async ($, on) => {
+test('an event line is kept in full and wrapped, cut only past 1000 characters, and events count toward the 200-line cap', async ($, on) => {
   boot(on)
-  await eng($).tool.call({ tool: OPEN, question: `Should we ${'really '.repeat(30)}go?` })
-  const [row] = (await logOf($)).rows
-  expect([...row!.text]).toHaveLength(80)
-  expect(row!.text.startsWith('Asked you: Should we really')).toBe(true)
-  expect(row!.text.endsWith('…')).toBe(true)
+  const question = 'Draft the desktop pane next, or finish the Feed icons first? This question is long on purpose so it has to wrap'
+  await eng($).tool.call({ tool: OPEN, question })
+  for (const surface of SURFACES) {
+    const [row] = (await logOf($, surface)).rows
+    expect(row!.text).toBe(`Asked you: ${question}`)
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await pane.findAll({ type: 'Text', text: row!.text }))[0]!.props?.wrap).toBe('wrap')
+    await pane.unmount()
+  }
+  await eng($).tool.call({ tool: OPEN, question: `Should we ${'really '.repeat(300)}go?` })
+  const cut = (await logOf($)).rows[0]!.text
+  expect([...cut]).toHaveLength(1000)
+  expect(cut.startsWith('Asked you: Should we really')).toBe(true)
+  expect(cut.endsWith('…')).toBe(true)
   for (let i = 0; i < 204; i++) await eng($).tool.call({ tool: OPEN, question: `Q${i}?` })
   expect((await logOf($)).toggle).toEqual(['Show all 200'])
 })
@@ -3598,4 +3185,284 @@ test('note still refuses every event kind', async ($, on) => {
     expect((await note($, 'A line', kind)).deny).toBe('note kind must be decision, plan, surprise, waiting, done.')
   }
   expect(await lines($)).toEqual([])
+})
+
+// ---- the desktop pane: two cards of native rows -----------------------------------------------------------------
+
+// Opens two items (one with a recommendation and an answer, the check's warning item), an agent and some log.
+const deskWorld = async ($: never, w: World) => {
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Ship the change now?', recommendation: 'Yes, it passed', accept: 'Yes' })
+  await bash(w, $, 'mentat check', WARN_RUN)
+  await note($, 'A note for the Feed', 'decision')
+  w.agents = [{ id: 'a1', type: 'builder', description: 'Build the pane', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Build the pane', 'builder'))
+}
+
+test('the desktop pane has a Waiting on you card and a Feed card, each with its heading and count and the card tint', async ($, on) => {
+  const { world } = boot(on)
+  await deskWorld($, world)
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  const waiting = boxes.find(b => b.key === 'card-waiting')!
+  const feed = boxes.find(b => b.key === 'card-feed')!
+  // The card surface is the one tint constant, on each card and nowhere else.
+  expect(waiting.props?.backgroundColor).toBe(CARD_TINT)
+  expect(feed.props?.backgroundColor).toBe(CARD_TINT)
+  expect(boxes.filter(b => b.props?.backgroundColor !== undefined)).toHaveLength(2)
+  expect(waiting.props?.flexDirection).toBe('column')
+  expect(waiting.props?.borderStyle).toBe('round')
+  // Headings: bold, Waiting on you in the warning color and Feed muted, the count dim. Two items; the agent, the
+  // Asked line, the check line and the note make four Feed entries.
+  const texts = await d.findAll({ type: 'Text' })
+  const head = (title: string) => texts.findIndex(t => t.text === title)
+  expect(texts[head('WAITING ON YOU')]!.props).toMatchObject({ bold: true, color: 'warning' })
+  expect(texts[head('WAITING ON YOU') + 1]).toMatchObject({ text: '2', props: { dimColor: true } })
+  expect(texts[head('FEED')]!.props).toMatchObject({ bold: true, color: 'subtle' })
+  expect(texts[head('FEED') + 1]).toMatchObject({ text: '4', props: { dimColor: true } })
+  expect(head('WAITING ON YOU')).toBeLessThan(head('FEED'))
+  await d.unmount()
+  // A card is left out when it has nothing: no open item, no Waiting on you card.
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  const t = await paneTexts($, 'desktop')
+  expect(t).not.toContain('WAITING ON YOU')
+  expect(t).toContain('FEED')
+})
+
+test('a desktop item row is a mark, the text that shrinks, the controls that do not, and under it the recommendation and the time', async ($, on) => {
+  const { world } = boot(on)
+  await deskWorld($, world)
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  const texts = await d.findAll({ type: 'Text' })
+  // The text Box grows and shrinks and the Text is cut with an ellipsis; the controls keep their size.
+  const row = boxes.find(b => b.key === 'item-d1')!
+  expect(row.props?.flexDirection).toBe('column')
+  expect(texts.find(t => t.text === 'Ship the change now?')?.props?.wrap).toBe('wrap')
+  expect(boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1).length).toBeGreaterThan(0)
+  expect(boxes.filter(b => b.props?.flexShrink === 0 && b.props?.flexDirection === 'row').length).toBeGreaterThan(0)
+  // The line under the text is muted and cut; the check's item has its WARN lines each on one muted line.
+  for (const line of ['Recommended: Yes, it passed · 8:00 AM', '8:00 AM', 'WARN: gh is old', 'WARN: codex is old']) {
+    const t = texts.find(x => x.text === line)
+    expect(t?.props).toMatchObject({ dimColor: true, wrap: 'wrap' })
+  }
+  // The pane reads left to right: the mark, the text, then the buttons, in the terminal's order.
+  expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1', 'dismiss-check'])
+  const marks = await svgsOf(d)
+  expect(marks.map(v => v.alt)).toEqual(['Question', 'Check warnings'])
+  expect(marks.map(v => v.drawn)).toEqual([['?'], ['!']])
+  expect(marks[0]!.source).toContain(AMBER)
+  await d.unmount()
+})
+
+test('the desktop answer button is primary and sends the answer once; a sent answer shows its line in place of the button; Dismiss removes the item', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, question: 'Drop it?' })
+  const d = await mount($, DESK, 'desktop')
+  const buttons = await d.findAll({ type: 'Button' })
+  const accept = buttons.find(b => b.key === 'accept-d1')!
+  expect(accept.props).toMatchObject({ label: 'Yes', variant: 'primary' })
+  // Dismiss is a plain native button; only the answer is primary.
+  expect(buttons.filter(b => b.props?.variant === 'primary')).toHaveLength(1)
+  expect(buttons.find(b => b.key === 'dismiss-d1')?.props?.variant).toBeUndefined()
+  await d.press({ key: 'accept-d1' })
+  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes'])
+  await d.unmount()
+  const after = await mount($, DESK, 'desktop')
+  expect(await bandKeys(after)).toEqual(['dismiss-d2', 'dismiss-d1'])
+  expect(await textsOf(after)).toContain('Sent: Yes')
+  // Dismiss removes the item (and its sent line) and leaves a dim event line in the Feed.
+  await after.press({ key: 'dismiss-d2' })
+  await after.unmount()
+  const t = await paneTexts($, 'desktop')
+  expect(t).not.toContain('Drop it?')
+  expect(t).toContain('Mock it?')
+  expect(t).toContain('You dismissed: Drop it?')
+})
+
+test('the desktop pane draws a GitHub link as #<number> and any other as its host', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Merge it', link: 'https://github.com/ericfurspan/mentat/issues/160' })
+  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'Read this', link: 'https://example.com/some/long/path' })
+  const d = await mount($, DESK, 'desktop')
+  expect((await d.findAll({ type: 'Link' })).map(l => [l.props?.href, l.props?.label])).toEqual([
+    ['https://example.com/some/long/path', 'example.com'],
+    ['https://github.com/ericfurspan/mentat/issues/160', '#160'],
+  ])
+  await d.unmount()
+})
+
+test('the desktop Feed shows the newest ten with Show all N and Show fewer as a native button; notes are plain and events muted', async ($, on) => {
+  boot(on)
+  await startSession($)
+  for (let i = 1; i <= 12; i++) await note($, `Note ${i}`)
+  await eng($).tool.call({ tool: OPEN, question: 'An event comes?' })
+  const d = await mount($, DESK, 'desktop')
+  const buttons = await d.findAll({ type: 'Button' })
+  const toggle = buttons.find(b => b.key === 'log-toggle')!
+  expect(toggle.props?.label).toBe('Show all 13')
+  expect((await d.findAll({ type: 'Text' })).filter(t => /^Note \d+$/.test(t.text ?? '')).length).toBe(9)
+  const texts = await d.findAll({ type: 'Text' })
+  // The newest entry is the Asked line (an event, muted); notes are in the full text color.
+  expect(texts.find(t => t.text === 'Asked you: An event comes?')?.props?.dimColor).toBe(true)
+  expect(texts.find(t => t.text === 'Note 12')?.props?.dimColor).toBeUndefined()
+  await d.press({ key: 'log-toggle' })
+  await d.unmount()
+  const all = await mount($, DESK, 'desktop')
+  expect((await textsOf(all)).filter(t => /^Note \d+$/.test(t))).toHaveLength(12)
+  expect((await all.findAll({ type: 'Button' })).find(b => b.key === 'log-toggle')?.props?.label).toBe('Show fewer')
+  await all.press({ key: 'log-toggle' })
+  await all.unmount()
+  expect((await textsOf(await mount($, DESK, 'desktop'))).filter(t => /^Note \d+$/.test(t))).toHaveLength(9)
+})
+
+test('the desktop pane puts the budget warning first, says Nothing waiting on you only when there is nothing else, and has no Svg wider than a mark', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 41, limits: [limit('five_hour', 91, RESET_5H())] }
+  const empty = await mount($, DESK, 'desktop')
+  expect(await textsOf(empty)).toEqual(['5-hour limit 91% · resets in 1h 29m', 'Nothing waiting on you.'])
+  expect((await empty.findAll({ type: 'Text', text: 'Nothing waiting on you.' }))[0]!.props?.dimColor).toBe(true)
+  await empty.unmount()
+  world.usage = { context: 41, limits: [] }
+  await deskWorld($, world)
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'A very long action that goes on and on past the end of the row, the way a real one can, and then some more words', link: 'https://github.com/o/r/pull/5' })
+  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'An alert' })
+  for (let i = 0; i < 15; i++) await note($, `Note ${i}`)
+  const drawn: string[] = []
+  for (const cols of [30, 60, 140]) {
+    const d = await mount($, PANE, 'desktop', { bodyColumns: cols })
+    const svgs = await d.findAll({ type: 'Svg' })
+    // One small mark per open item (four) and no picture of a card: the rows are native, so they follow the divider.
+    expect(svgs).toHaveLength(4)
+    for (const v of svgs) {
+      expect(Number(v.props?.width)).toBeLessThanOrEqual(24)
+      expect(Number(v.props?.height)).toBeLessThanOrEqual(24)
+      expect(String(v.props?.alt)).not.toBe('')
+    }
+    // Nothing in the pane is measured from the width: the drawing is the same at any width.
+    drawn.push(JSON.stringify(await textsOf(d)))
+    await d.unmount()
+  }
+  expect(new Set(drawn).size).toBe(1)
+})
+
+test('every desktop Box that can shrink has minWidth 0, so a narrow pane wraps the text and does not push past the card', async ($, on) => {
+  const { world } = boot(on)
+  await deskWorld($, world)
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Rotate the token that the deploy job reads from the secrets store', link: 'https://github.com/o/r/issues/160' })
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  await d.unmount()
+  // Why: the desktop lays rows out with CSS flexbox, where a flex item's min-width is `auto` (its content's
+  // width), so flexShrink alone never shrinks a Box below its text. minWidth 0 is what lets the text be cut
+  // with an ellipsis, on the Box itself and on every Box between it and the card.
+  const fixed = (b: { key?: string; props?: Record<string, unknown> }) =>
+    b.props?.flexShrink === 0 || b.props?.width !== undefined || String(b.key).endsWith('-head') || b.key === 'log-more'
+  const shrinking = boxes.filter(b => !fixed(b))
+  expect(shrinking.length).toBeGreaterThan(10)
+  for (const b of shrinking) expect({ key: b.key, minWidth: b.props?.minWidth }).toEqual({ key: b.key, minWidth: 0 })
+  // The text Boxes are the ones that grow and shrink; the text wraps under itself, so none hides its overflow.
+  const text = boxes.filter(b => b.props?.flexShrink === 1)
+  expect(text.length).toBeGreaterThanOrEqual(8)
+  for (const b of text) expect(b.props).toMatchObject({ flexGrow: 1, minWidth: 0 })
+  for (const b of text) expect(b.props?.overflow).toBeUndefined()
+  // The cards and the pane's outer column are among those with minWidth 0.
+  for (const key of ['card-waiting', 'card-feed', 'item-d1', 'item-d2', 'item-check']) expect(boxes.find(b => b.key === key)?.props?.minWidth).toBe(0)
+  // Marks (the 3-cell column), time columns and the button groups never shrink; a group holds the link.
+  const widths = boxes.filter(b => b.props?.width !== undefined)
+  expect(widths.length).toBeGreaterThan(0)
+  for (const b of widths) expect(b.props?.flexShrink).toBe(0)
+  const groups = boxes.filter(b => b.props?.flexShrink === 0 && b.props?.flexDirection === 'row')
+  expect(groups.length).toBeGreaterThanOrEqual(3)
+})
+
+// ---- no band: the footer label opens the pane ------------------------------------------------------------------
+
+test('AbovePrompt draws no Svg, Box or Button of Mentat\'s in any state: quiet, a note, the budget, an item, a survey', async ($, on) => {
+  const { world } = boot(on)
+  const states: (() => Promise<unknown>)[] = [
+    async () => undefined,
+    async () => note($, 'A note', 'done'),
+    async () => {
+      world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+    },
+    async () => {
+      await open('action', 'Rotate the token', { link: 'https://github.com/o/r/issues/160' })($)
+      await open('alert', 'An alert')($)
+    },
+  ]
+  for (const setup of states) {
+    await setup()
+    for (const surface of SURFACES) {
+      for (const hasSurvey of [false, true]) {
+        const d = await mount($, BAND, surface, { hasSurvey, bodyColumns: 60 })
+        // Only the engine's own node (the mock draws one Box keyed engine-own) is there.
+        expect((await d.findAll({ type: 'Box' })).map(b => b.key)).toEqual(['engine-own'])
+        expect((await d.findAll({ type: 'Text' })).length + (await d.findAll({ type: 'Svg' })).length + (await d.findAll({ type: 'Button' })).length).toBe(0)
+        await d.unmount()
+      }
+    }
+  }
+})
+
+// ---- times that are not inaccurate ------------------------------------------------------------------------------
+
+test('a finished or failed line has no duration', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  world.agents = [
+    { id: 'a1', type: 'builder', description: 'Build it', status: 'running' },
+    { id: 'a2', type: 'builder', description: 'Break it', status: 'running' },
+  ]
+  for (const id of ['a1', 'a2']) await eng($).agent.spawn(spawn(id, id === 'a1' ? 'Build it' : 'Break it', 'builder'))
+  await clock.advance(30 * 60_000)
+  world.agents = [
+    { id: 'a1', type: 'builder', description: 'Build it', status: 'completed' },
+    { id: 'a2', type: 'builder', description: 'Break it', status: 'failed' },
+  ]
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+  for (const surface of SURFACES) expect((await lines($, surface)).sort()).toEqual(['✓ Builder finished: Build it', '✕ Builder failed: Break it'])
+})
+
+test('an agent resumed after it finished counts its time from the resume, not from its first start', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  world.agents = [{ id: 'a1', type: 'builder', description: 'Build it', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Build it', 'builder'))
+  await clock.advance(10 * 60_000)
+  expect(deskLine(await paneTexts($, 'desktop'), 'Build it')).toEqual({ state: 'running', elapsed: '10m 00s' })
+  world.agents = [{ id: 'a1', type: 'builder', description: 'Build it', status: 'completed' }]
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+  expect(deskLine(await paneTexts($, 'desktop'), 'Build it')).toBeUndefined()
+  // It sits idle for an hour, then a message resumes it; the engine's list says so at the agent's next turn.
+  await clock.advance(3_600_000)
+  world.agents = [{ id: 'a1', type: 'builder', description: 'Build it', status: 'running' }]
+  await eng($).turn.complete(turnDone('a1'))
+  await clock.advance(2 * 60_000)
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(surface === 'terminal' ? stateOf(t, 'Build it') : deskLine(t, 'Build it')?.elapsed).toMatch(/^(running · )?2m 0\ds$/)
+  }
+})
+
+test('an agent first seen live after a reload, with no known start, shows no time, and a resume of it starts one', async ($, on) => {
+  const { world, clock } = boot(on)
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
+  await startSession($)
+  await clock.advance(5_000)
+  expect(stateOf(await paneTexts($, 'terminal'), 'Unseen one')).toBe('running')
+  expect(deskLine(await paneTexts($, 'desktop'), 'Unseen one')).toEqual({ state: 'running', elapsed: undefined })
+  // It ends and is resumed: from then on its time is known.
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'completed' }]
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
+  await eng($).turn.complete(turnDone('z9'))
+  await clock.advance(3_000)
+  expect(deskLine(await paneTexts($, 'desktop'), 'Unseen one')?.elapsed).toMatch(/^[34]s$/)
 })
