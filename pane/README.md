@@ -10,14 +10,14 @@ The band above the prompt appears only for something you own. What it shows on i
 2. The newest open question (an amber `?`).
 3. The open check warning, when a `mentat check` passed with warnings (an amber `!`).
 4. This session's pull request, once Claude Code has posted its final check on the current head commit (a comment starting `Final check on <sha>`).
-5. A 5-hour or weekly rate limit at 80% or more (the context window never raises it). It names when the limit resets: a countdown for the 5-hour limit (`5-hour limit 91% · resets in 1h 29m`), the weekday and local time for the weekly one (`Week limit 91% · resets Thu 7:00 PM`, as the desktop app's usage popover words it). On the desktop, a band raised only for budget, with nothing in the pane, has no Details button: the app's usage popover has the detail. The budget band is read each time the band is drawn, so it can lag a change in usage by up to a minute.
+5. A 5-hour or weekly rate limit at 80% or more (the context window never raises it). It names when the limit resets: a countdown for the 5-hour limit (`5-hour limit 91% · resets in 1h 29m`), the weekday and local time for the weekly one (`Week limit 91% · resets Thu 7:00 PM`, as the desktop app's usage popover words it). The budget band is read each time the band is drawn, so it can lag a change in usage by up to a minute.
 6. The newest open action (a blue arrow), so that an action waiting on you is not hidden when nothing else raises the band.
 
 The count at the right counts all open items: `N questions` when every one is a question, otherwise `N items`. It is colored by the most urgent item (red for an alert, amber for a question or a check warning, blue for an action). On the desktop it is left out when the one open item is the one shown.
 
 ## The pane
 
-The band's Details button opens the pane, as does `/mentat`. When there is no open item, no followed pull request and no agent, `/mentat` instead answers with one line of the session budget, such as `Context 10% · 5-hour 12% (1h 29m) · Week 8% (Thu 7:00 PM)`.
+The band's Details button opens the pane, as does `/mentat`. With nothing else to show, the pane still opens, with the actions row.
 
 The pane shows, in this order:
 

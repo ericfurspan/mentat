@@ -2031,28 +2031,20 @@ test('/mentat opens the pane at once when there is something to show', async ($,
   expect(ran.text ?? '').not.toBe('')
 })
 
-test('/mentat with nothing but budget answers in one line and opens no pane', async ($, on) => {
+test('/mentat with nothing else to show opens the pane, so the actions row is reachable', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
   await startSession($)
   const ran = await eng($).command.run({ command: 'mentat', args: '' })
-  expect(ran.text).toBe('Context 10% · 5-hour 12% (1h 29m) · Week 8% (Thu 7:00 PM)')
-  expect(world.opened).toEqual([])
-})
+  expect(ran.text).toBe('Mentat pane opened.')
+  expect(world.opened).toEqual(['mentat'])
 
-test('/mentat with nothing to show and no usage says so, and opens no pane', async ($, on) => {
-  const { world } = boot(on)
+  // The same with no usage, or when the engine cannot answer.
+  world.opened.length = 0
   world.usage = { limits: [] }
-  await startSession($)
-  const ran = await eng($).command.run({ command: 'mentat', args: '' })
-  expect(ran.text).toBe('Nothing waiting on you; session budget unavailable.')
-  expect(world.opened).toEqual([])
-
-  // The same when the engine cannot answer.
   world.usageFails = true
-  const failed = await eng($).command.run({ command: 'mentat', args: '' })
-  expect(failed.text).toBe('Nothing waiting on you; session budget unavailable.')
-  expect(world.opened).toEqual([])
+  expect((await eng($).command.run({ command: 'mentat', args: '' })).text).toBe('Mentat pane opened.')
+  expect(world.opened).toEqual(['mentat'])
 })
 
 test('/mentat opens the pane for an open question, a followed pull request or an agent row', async ($, on) => {
@@ -2092,10 +2084,9 @@ test('the band shows for a rate limit at 80 and not at 79, on both surfaces', as
   for (const surface of SURFACES) {
     const t = await bandTexts($, surface)
     expect(t).toContain('5-hour limit 80% · resets in 1h 29m')
-    // The terminal row keeps its Details button; the desktop's budget-only band has none, the
-    // app's usage popover has the detail.
+    // Both keep their Details button: the pane holds the actions row.
     const d = await mount($, BAND, surface)
-    expect((await d.findAll({ type: 'Button' })).length).toBe(surface === 'terminal' ? 1 : 0)
+    expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
     await d.unmount()
   }
 
@@ -2123,7 +2114,7 @@ test('the context meter alone does not raise the band, and a failed usage read m
   await failed.unmount()
 })
 
-test('a desktop budget band keeps its Details button when the pane has something to show', async ($, on) => {
+test('a budget band keeps its Details button when the pane has agents too', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 90, RESET_5H())] }
   const id = await callAgent(world, $, 'high')
@@ -2154,13 +2145,12 @@ test('the desktop pane with nothing to show says so in one line; the terminal pa
   await busy.unmount()
 })
 
-test('the weekly reset prints as weekday and local time in the band, /mentat and the terminal meters; the 5-hour one stays a countdown', async ($, on) => {
+test('the weekly reset prints as weekday and local time in the band and the terminal meters; the 5-hour one stays a countdown', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 91, RESET_WEEK())] }
   expect(await bandTexts($, 'terminal')).toContain('Week limit 91% · resets Thu 7:00 PM')
   expect(await bandTexts($, 'desktop')).toContain('Week limit 91% · resets Thu 7:00 PM')
   await startSession($)
-  expect((await eng($).command.run({ command: 'mentat', args: '' })).text).toBe('Context 10% · 5-hour 12% (1h 29m) · Week 91% (Thu 7:00 PM)')
   const t = await paneTexts($, 'terminal', 60)
   expect(t).toContain('resets in 1h 29m')
   expect(t).toContain('resets Thu 7:00 PM')

@@ -104,8 +104,6 @@ export const resetAt = (at: string | undefined, now: number, zone?: string): str
 
   return `resets ${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod')}`
 }
-// What follows `resets`: the part the band and `/mentat` print without the word.
-const resetWhen = (reset: string): string => reset.replace(/^resets (in )?/, '')
 
 const textMeter = (cells: number, percent: number): string => {
   const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * cells)
@@ -131,10 +129,6 @@ const metersOf = (usage: Usage | undefined, now: number, zone?: string): { meter
     meters: [...(context === undefined ? [] : [{ kind: 'context', label: 'Context', percent: Math.round(context), reset: '' }]), ...limits],
   }
 }
-
-// One line of the budget: `Context 10% · 5-hour 12% (1h 29m) · Week 8% (Thu 7:00 PM)`.
-const budgetLine = (meters: Meter[]): string =>
-  meters.map(m => `${m.label} ${m.percent}%${m.reset === '' ? '' : ` (${resetWhen(m.reset)})`}`).join(' · ')
 
 // The band's budget text, for the most used of the 5-hour and weekly limits when it
 // is at WARN_PERCENT or more. The context window never raises the band.
@@ -437,11 +431,6 @@ async function readZone($: EngineInterface): Promise<string | undefined> {
   } catch {
     return undefined
   }
-}
-
-// True when the pane would have nothing to show: no open item, no followed pull request, no agent.
-async function isPaneEmpty($: EngineInterface): Promise<boolean> {
-  return (await read($, items)).length === 0 && (await read($, prRef)) === '' && (await read($, agents)).length === 0
 }
 
 // Runs a command; the stdout, or undefined when it failed (nonzero exit or rejection).
@@ -972,7 +961,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show what needs you, the pull request, the agents and the session budget in a pane; with only budget to show, one line of it',
+      description: 'Show the actions, what needs you, the pull request, the agents and the session budget in a pane',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -1063,12 +1052,6 @@ export const register: Register = (on, _options) => {
   on('command.run', { command: 'mentat' }, async ($, e) => {
     const args = e.args.trim()
     if (args === '') {
-      // With nothing but budget to show, a pane would be mostly empty: say it in a line.
-      if (await isPaneEmpty($)) {
-        const { meters } = metersOf(await readUsage($), await $.clock.now(), await readZone($))
-
-        return { text: meters.length === 0 ? 'Nothing waiting on you; session budget unavailable.' : budgetLine(meters) }
-      }
       await $.ui.open({ id: PANE, title: TITLE })
 
       return { text: 'Mentat pane opened.' }
@@ -1291,14 +1274,12 @@ export const register: Register = (on, _options) => {
             ? left.text
             : `${CARD_STYLE[left.kind].alt}: ${left.text}`
       // The count is left out when the one open item is the one shown.
-      // The app's usage popover has the detail of a budget band, so a pane with nothing else in it gets no button.
-      const isBudgetOnly = left.kind === 'budget' && (await isPaneEmpty($))
       const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action')
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
             <Svg source={bandSvg(W, left, isLone ? 0 : open.length, pillLabel(open), pillHue(open))} alt={alt} width={W} height={28} />
-            {!isBudgetOnly && <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />}
+            <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
           </Box>
           {beneath}
         </Box>
