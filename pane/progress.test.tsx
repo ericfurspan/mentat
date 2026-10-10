@@ -3298,3 +3298,177 @@ test('note still refuses every event kind', async ($, on) => {
   }
   expect(await lines($)).toEqual([])
 })
+
+// ---- the desktop pane: two cards of native rows -----------------------------------------------------------------
+
+const DESK = { ...PANE, props: { bodyColumns: 60 } }
+// Opens two items (one with a recommendation and an answer, the check's warning item), an agent and some log.
+const deskWorld = async ($: never, w: World) => {
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Ship the change now?', recommendation: 'Yes, it passed', accept: 'Yes' })
+  await bash(w, $, 'mentat check', WARN_RUN)
+  await note($, 'A note for the Feed', 'decision')
+  w.agents = [{ id: 'a1', type: 'builder', description: 'Build the pane', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Build the pane', 'builder'))
+}
+
+test('the desktop pane has a Waiting on you card and a Feed card, each with its heading and count and the card tint', async ($, on) => {
+  const { world } = boot(on)
+  await deskWorld($, world)
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  const waiting = boxes.find(b => b.key === 'card-waiting')!
+  const feed = boxes.find(b => b.key === 'card-feed')!
+  // The card surface is the one tint constant, on each card and nowhere else.
+  expect(waiting.props?.backgroundColor).toBe(CARD_TINT)
+  expect(feed.props?.backgroundColor).toBe(CARD_TINT)
+  expect(boxes.filter(b => b.props?.backgroundColor !== undefined)).toHaveLength(2)
+  expect(waiting.props?.flexDirection).toBe('column')
+  expect(waiting.props?.borderStyle).toBe('round')
+  // Headings: bold, Waiting on you in the warning color and Feed muted, the count dim. Two items; the agent,
+  // the note, its Asked line and the check line make five Feed entries.
+  const texts = await d.findAll({ type: 'Text' })
+  const head = (title: string) => texts.findIndex(t => t.text === title)
+  expect(texts[head('WAITING ON YOU')]!.props).toMatchObject({ bold: true, color: 'warning' })
+  expect(texts[head('WAITING ON YOU') + 1]).toMatchObject({ text: '2', props: { dimColor: true } })
+  expect(texts[head('FEED')]!.props).toMatchObject({ bold: true, color: 'subtle' })
+  expect(texts[head('FEED') + 1]).toMatchObject({ text: '4', props: { dimColor: true } })
+  expect(head('WAITING ON YOU')).toBeLessThan(head('FEED'))
+  await d.unmount()
+  // A card is left out when it has nothing: no open item, no Waiting on you card.
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  const t = await paneTexts($, 'desktop')
+  expect(t).not.toContain('WAITING ON YOU')
+  expect(t).toContain('FEED')
+})
+
+test('a desktop item row is a mark, the text that shrinks, the controls that do not, and under it the recommendation and the time', async ($, on) => {
+  const { world } = boot(on)
+  await deskWorld($, world)
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  const texts = await d.findAll({ type: 'Text' })
+  // The text Box grows and shrinks and the Text is cut with an ellipsis; the controls keep their size.
+  const row = boxes.find(b => b.key === 'item-d1')!
+  expect(row.props?.flexDirection).toBe('column')
+  expect(texts.find(t => t.text === 'Ship the change now?')?.props?.wrap).toBe('truncate-end')
+  expect(boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1).length).toBeGreaterThan(0)
+  expect(boxes.filter(b => b.props?.flexShrink === 0 && b.props?.flexDirection === 'row').length).toBeGreaterThan(0)
+  // The line under the text is muted and cut; the check's item has its WARN lines each on one muted line.
+  for (const line of ['Recommended: Yes, it passed · 8:00 AM', '8:00 AM', 'WARN: gh is old', 'WARN: codex is old']) {
+    const t = texts.find(x => x.text === line)
+    expect(t?.props).toMatchObject({ dimColor: true, wrap: 'truncate-end' })
+  }
+  // The pane reads left to right: the mark, the text, then the buttons, in the terminal's order.
+  expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1', 'dismiss-check'])
+  const marks = await svgsOf(d)
+  expect(marks.map(v => v.alt)).toEqual(['Question', 'Check warnings'])
+  expect(marks.map(v => v.drawn)).toEqual([['?'], ['!']])
+  expect(marks[0]!.source).toContain(AMBER)
+  await d.unmount()
+})
+
+test('the desktop answer button is primary and sends the answer once; a sent answer shows its line in place of the button; Dismiss removes the item', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', recommendation: 'Yes', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, question: 'Drop it?' })
+  const d = await mount($, DESK, 'desktop')
+  const buttons = await d.findAll({ type: 'Button' })
+  const accept = buttons.find(b => b.key === 'accept-d1')!
+  expect(accept.props).toMatchObject({ label: 'Yes', variant: 'primary' })
+  // Dismiss is a plain native button; only the answer is primary.
+  expect(buttons.filter(b => b.props?.variant === 'primary')).toHaveLength(1)
+  expect(buttons.find(b => b.key === 'dismiss-d1')?.props?.variant).toBeUndefined()
+  await d.press({ key: 'accept-d1' })
+  expect(world.sent).toEqual(['Answer to decision d1 ("Mock it?"): Yes'])
+  await d.unmount()
+  const after = await mount($, DESK, 'desktop')
+  expect(await bandKeys(after)).toEqual(['dismiss-d2', 'dismiss-d1'])
+  expect(await textsOf(after)).toContain('Sent: Yes')
+  // Dismiss removes the item (and its sent line) and leaves a dim event line in the Feed.
+  await after.press({ key: 'dismiss-d2' })
+  await after.unmount()
+  const t = await paneTexts($, 'desktop')
+  expect(t).not.toContain('Drop it?')
+  expect(t).toContain('Mock it?')
+  expect(t).toContain('You dismissed: Drop it?')
+})
+
+test('the desktop pane draws a GitHub link as #<number> and any other as its host; the band does too, and reserves only that width', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Merge it', link: 'https://github.com/ericfurspan/mentat/issues/160' })
+  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'Read this', link: 'https://example.com/some/long/path' })
+  const d = await mount($, DESK, 'desktop')
+  expect((await d.findAll({ type: 'Link' })).map(l => [l.props?.href, l.props?.label])).toEqual([
+    ['https://example.com/some/long/path', 'example.com'],
+    ['https://github.com/ericfurspan/mentat/issues/160', '#160'],
+  ])
+  await d.unmount()
+  // The band shows the most urgent item, the alert, with its link as the host.
+  const band = await mount($, BAND, 'desktop')
+  expect((await band.findAll({ type: 'Link' })).map(l => [l.props?.href, l.props?.label])).toEqual([['https://example.com/some/long/path', 'example.com']])
+  const hostWidth = Number((await band.findAll({ type: 'Svg' }))[0]!.props?.width)
+  await band.unmount()
+  await eng($).tool.call({ tool: CLOSE, id: 'd2' })
+  const github = await mount($, BAND, 'desktop')
+  expect((await github.findAll({ type: 'Link' })).map(l => [l.props?.href, l.props?.label])).toEqual([['https://github.com/ericfurspan/mentat/issues/160', '#160']])
+  // The Svg beside the buttons reserves the room of `#160`, which is less than that of `example.com`.
+  expect(Number((await github.findAll({ type: 'Svg' }))[0]!.props?.width)).toBeGreaterThan(hostWidth)
+  await github.unmount()
+})
+
+test('the desktop Feed shows the newest ten with Show all N and Show fewer as a native button; notes are plain and events muted', async ($, on) => {
+  boot(on)
+  await startSession($)
+  for (let i = 1; i <= 12; i++) await note($, `Note ${i}`)
+  await eng($).tool.call({ tool: OPEN, question: 'An event comes?' })
+  const d = await mount($, DESK, 'desktop')
+  const buttons = await d.findAll({ type: 'Button' })
+  const toggle = buttons.find(b => b.key === 'log-toggle')!
+  expect(toggle.props?.label).toBe('Show all 13')
+  expect((await d.findAll({ type: 'Text' })).filter(t => /^Note \d+$/.test(t.text ?? '')).length).toBe(9)
+  const texts = await d.findAll({ type: 'Text' })
+  // The newest entry is the Asked line (an event, muted); notes are in the full text color.
+  expect(texts.find(t => t.text === 'Asked you: An event comes?')?.props?.dimColor).toBe(true)
+  expect(texts.find(t => t.text === 'Note 12')?.props?.dimColor).toBeUndefined()
+  await d.press({ key: 'log-toggle' })
+  await d.unmount()
+  const all = await mount($, DESK, 'desktop')
+  expect((await textsOf(all)).filter(t => /^Note \d+$/.test(t))).toHaveLength(12)
+  expect((await all.findAll({ type: 'Button' })).find(b => b.key === 'log-toggle')?.props?.label).toBe('Show fewer')
+  await all.press({ key: 'log-toggle' })
+  await all.unmount()
+  expect((await textsOf(await mount($, DESK, 'desktop'))).filter(t => /^Note \d+$/.test(t))).toHaveLength(9)
+})
+
+test('the desktop pane puts the budget warning first, says Nothing waiting on you only when there is nothing else, and has no Svg wider than a mark', async ($, on) => {
+  const { world } = boot(on)
+  world.usage = { context: 41, limits: [limit('five_hour', 91, RESET_5H())] }
+  const empty = await mount($, DESK, 'desktop')
+  expect(await textsOf(empty)).toEqual(['5-hour limit 91% · resets in 1h 29m', 'Nothing waiting on you.'])
+  expect((await empty.findAll({ type: 'Text', text: 'Nothing waiting on you.' }))[0]!.props?.dimColor).toBe(true)
+  await empty.unmount()
+  world.usage = { context: 41, limits: [] }
+  await deskWorld($, world)
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'A very long action that goes on and on past the end of the row, the way a real one can, and then some more words', link: 'https://github.com/o/r/pull/5' })
+  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'An alert' })
+  for (let i = 0; i < 15; i++) await note($, `Note ${i}`)
+  const drawn: string[] = []
+  for (const cols of [30, 60, 140]) {
+    const d = await mount($, PANE, 'desktop', { bodyColumns: cols })
+    const svgs = await d.findAll({ type: 'Svg' })
+    // One small mark per open item (four) and no picture of a card: the rows are native, so they follow the divider.
+    expect(svgs).toHaveLength(4)
+    for (const v of svgs) {
+      expect(Number(v.props?.width)).toBeLessThanOrEqual(24)
+      expect(Number(v.props?.height)).toBeLessThanOrEqual(24)
+      expect(String(v.props?.alt)).not.toBe('')
+    }
+    // Nothing in the pane is measured from the width: the drawing is the same at any width.
+    drawn.push(JSON.stringify(await textsOf(d)))
+    await d.unmount()
+  }
+  expect(new Set(drawn).size).toBe(1)
+})

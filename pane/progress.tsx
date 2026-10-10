@@ -852,7 +852,7 @@ const markSvg = (char: string, hue: string): string =>
 // The pane on the desktop: the same sections, entries and order as the terminal's, drawn as rows of native
 // Box and Text. Nothing here is measured: the text row grows and shrinks (and is cut with an ellipsis), so
 // the rows follow the divider without a redraw from the mod.
-async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0]) {
+async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0] & { surface: 'desktop' }) {
   const { Box, Button, Link, Svg, Text } = $.ui.resolve(e)
   const data = await paneData($)
   const { now, zone, open, live, logList, budget } = data
