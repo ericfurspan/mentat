@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { AGENT_HEAD_H, AGENT_ROW_H, COMMANDS, resetAt, withoutSettled } from './progress'
+import { AGENT_HEAD_H, AGENT_ROW_H, resetAt, withoutSettled } from './progress'
 
 // Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
@@ -257,9 +257,8 @@ const mount = async ($: never, spec: object, surface: 'terminal' | 'desktop', pr
     surface,
     props: { ...(spec as { props?: object }).props, ...props },
   })) as Drawing
-// The keys of a drawing's buttons, without the Commands card's toggle.
-const cardKeys = async (d: Drawing) =>
-  (await d.findAll({ type: 'Button' })).map(b => b.key).filter(k => k !== 'commands-toggle')
+// The keys of a drawing's buttons.
+const cardKeys = async (d: Drawing) => (await d.findAll({ type: 'Button' })).map(b => b.key)
 // The keys of the band's buttons, without Details: the answer button, Dismiss.
 const bandKeys = async (d: Drawing) => (await d.findAll({ type: 'Button' })).map(b => b.key).filter(k => k !== 'open')
 // What each Svg element of the drawing says: its alt text and the text drawn in it.
@@ -2023,7 +2022,7 @@ test('/mentat opens the pane at once when there is something to show', async ($,
   expect(ran.text ?? '').not.toBe('')
 })
 
-test('/mentat with nothing else to show opens the pane, so the Commands card is reachable', async ($, on) => {
+test('/mentat with nothing else to show opens the pane, so the Details button always has something to open', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
   await startSession($)
@@ -2076,7 +2075,7 @@ test('the band shows for a rate limit at 80 and not at 79, on both surfaces', as
   for (const surface of SURFACES) {
     const t = await bandTexts($, surface)
     expect(t).toContain('5-hour limit 80% · resets in 1h 29m')
-    // Both keep their Details button: the pane holds the Commands card.
+    // Both keep their Details button.
     const d = await mount($, BAND, surface)
     expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
     await d.unmount()
@@ -2115,21 +2114,23 @@ test('a budget band keeps its Details button when the pane has agents too', asyn
   }
 })
 
-test('the desktop pane with nothing to show says so in one line; the terminal pane draws no such line', async ($, on) => {
+test('the pane with nothing to show says so in one line, with no buttons, on both surfaces', async ($, on) => {
   boot(on)
-  const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect(await textsOf(desktop)).toEqual(['Nothing waiting on you.'])
-  expect((await desktop.findAll({ type: 'Svg' })).length).toBe(0)
-  // The Commands card's toggle stays beside the line.
-  expect(await cardKeys(desktop)).toEqual([])
-  expect((await desktop.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
-  await desktop.unmount()
+  for (const surface of SURFACES) {
+    const empty = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect(await textsOf(empty)).toEqual(['Nothing waiting on you.'])
+    expect((await empty.findAll({ type: 'Svg' })).length).toBe(0)
+    expect(await cardKeys(empty)).toEqual([])
+    await empty.unmount()
+  }
 
   // Something open: the line goes.
   await eng($).tool.call({ tool: OPEN, question: 'Anything?' })
-  const busy = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect(await textsOf(busy)).not.toContain('Nothing waiting on you.')
-  await busy.unmount()
+  for (const surface of SURFACES) {
+    const busy = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect(await textsOf(busy)).not.toContain('Nothing waiting on you.')
+    await busy.unmount()
+  }
 })
 
 test('the weekly reset prints as weekday and local time in the band; the 5-hour one stays a countdown', async ($, on) => {
@@ -2867,90 +2868,6 @@ test('the check alert shows only its final line, however many problems there are
     expect((await paneTexts($, surface)).some(x => x.includes('problem number'))).toBe(false)
     expect((await bandTexts($, surface)).some(x => x.includes('problem number'))).toBe(false)
   }
-})
-
-// ---- the Commands card -------------------------------------------------------------------
-
-// The card is one Markdown element: a two-column table, a header row and one row per command.
-const TABLE = [
-  '| Command | Use |',
-  '| --- | --- |',
-  '| `/mentat` | open this pane |',
-  '| `/mentat pr <n>` | follow a pull request |',
-  '| `/mentat:come-again` | restate the last message |',
-  '| `/mentat:retro` | look back at a session that went badly |',
-  '| `/mentat:codex-review-off` | turn Codex reviews off for the session |',
-  '| `/mentat:codex-review-on` | turn Codex reviews back on for the session |',
-  '| `mentat check` | in a terminal: check what Mentat needs |',
-].join('\n')
-const toggleLabel = async (d: Drawing) =>
-  (await d.findAll({ type: 'Button' })).filter(b => b.key === 'commands-toggle').map(b => String(b.text ?? b.props?.label ?? ''))
-// The text of each Markdown element of the drawing.
-const commandLines = async (d: Drawing) => (await d.findAll({ type: 'Markdown' })).map(m => String(m.props?.text ?? ''))
-
-test('the Commands card starts collapsed on both surfaces: only the toggle shows, beside the empty-pane line', async ($, on) => {
-  boot(on)
-  for (const surface of SURFACES) {
-    const empty = await mount($, PANE, surface, { bodyColumns: 60 })
-    expect(await toggleLabel(empty)).toEqual(['▸ Commands'])
-    expect((await empty.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
-    expect(await commandLines(empty)).toEqual([])
-    expect((await textsOf(empty)).some(t => t.includes('/mentat'))).toBe(false)
-    // Nothing else to show: the desktop keeps its line.
-    expect((await textsOf(empty)).includes('Nothing waiting on you.')).toBe(surface === 'desktop')
-    await empty.unmount()
-  }
-  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'CI is red' })
-  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', accept: 'Yes' })
-  for (const surface of SURFACES) {
-    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    // The items wait in the band; the pane has only its Commands toggle, and does not say that nothing waits.
-    expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
-    expect(await textsOf(pane)).not.toContain('Nothing waiting on you.')
-    await pane.unmount()
-  }
-})
-
-test('pressing the toggle shows every command line, pressing again hides them, and the choice survives a remount', async ($, on) => {
-  const { world } = boot(on)
-  for (const surface of SURFACES) {
-    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    await pane.press({ key: 'commands-toggle' })
-    expect(await toggleLabel(pane)).toEqual(['▾ Commands'])
-    expect(await commandLines(pane)).toEqual([TABLE])
-    // No background tint on the card: nothing drawn behind the lines.
-    const around = (await pane.findAll({ type: 'Box' })).filter(b => (b.text ?? '').includes('/mentat:retro') && !(b.text ?? '').includes('SESSION'))
-    expect(around.length).toBeGreaterThan(0)
-    expect(around.filter(b => b.props?.backgroundColor !== undefined)).toEqual([])
-    // The toggle is the only Button, and pressing it ran no command.
-    expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
-    await pane.unmount()
-
-    const again = await mount($, PANE, surface, { bodyColumns: 60 })
-    expect(await toggleLabel(again)).toEqual(['▾ Commands'])
-    expect(await commandLines(again)).toEqual([TABLE])
-    await again.press({ key: 'commands-toggle' })
-    expect(await toggleLabel(again)).toEqual(['▸ Commands'])
-    expect(await commandLines(again)).toEqual([])
-    await again.unmount()
-
-    const last = await mount($, PANE, surface, { bodyColumns: 60 })
-    expect(await toggleLabel(last)).toEqual(['▸ Commands'])
-    await last.unmount()
-  }
-  expect(world.commands).toEqual([])
-})
-
-test('the card lists the commands the mod exports, and the pane never calls $.command.run', async ($, on) => {
-  const { world } = boot(on)
-  expect(COMMANDS.map(c => c.name)).toEqual(TABLE.split('\n').slice(2).map(r => r.split('`')[1]))
-  for (const surface of SURFACES) {
-    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    await pane.press({ key: 'commands-toggle' })
-    for (const b of await pane.findAll({ type: 'Button' })) await pane.press({ key: String(b.key) })
-    await pane.unmount()
-  }
-  expect(world.commands).toEqual([])
 })
 
 // ---- the Log card ---------------------------------------------------------------------------------

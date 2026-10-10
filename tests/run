@@ -183,21 +183,6 @@ else
   skip "claude not installed, the Mentat band and pane not validated or tested"
 fi
 
-# Each /mentat:<skill> the pane's Commands card lists (the COMMANDS constant in
-# pane/progress.tsx) has a skill folder. A mod test cannot read files, so this is checked here.
-cmd_names=$(sed -n '/^export const COMMANDS/,/^]/p' pane/progress.tsx | grep -o "'/mentat:[a-z][a-z-]*'" | tr -d "/'" | sed 's/^mentat://')
-if [ -z "$cmd_names" ]; then
-  fail "no /mentat:<skill> found in COMMANDS in pane/progress.tsx"
-else
-  while IFS= read -r skill; do
-    if [ -f "skills/$skill/SKILL.md" ]; then
-      pass "Commands card: /mentat:$skill has skills/$skill/SKILL.md"
-    else
-      fail "Commands card: /mentat:$skill has no skills/$skill/SKILL.md"
-    fi
-  done <<< "$cmd_names"
-fi
-
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck tests/run hooks/session-start hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh; then

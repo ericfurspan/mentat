@@ -93,8 +93,6 @@ declare module 'claude-code' {
       agents: AgentRow[]
       // True while the pane's Finished group of agents is collapsed (default: open).
       agentsFinishedHidden: boolean
-      // True while the pane's Commands card is open (default: collapsed).
-      commandsShown: boolean
       // The session's pull request as owner/repo#N, or '' for none.
       prRef: string
       pr: PrSnapshot | null
