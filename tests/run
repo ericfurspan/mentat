@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The repository's one test command. Runs locally and in CI on macOS.
-# A tool missing locally is reported as SKIP; in CI (CI=true) it fails the run.
+# The repository's one test command. Runs locally on macOS; this repository has no CI.
+# A tool it needs that is missing fails the run.
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
@@ -8,13 +8,6 @@ cd "$(dirname "$0")/.." || exit 1
 failures=0
 pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
-skip() {
-  if [ "${CI:-}" = "true" ]; then
-    fail "$1 (required in CI)"
-  else
-    printf 'SKIP: %s\n' "$1"
-  fi
-}
 
 # JSON and YAML files parse with strict parsers. JSON must be exactly one
 # standard value (no NaN, Infinity or leading zeros); every YAML document counts.
@@ -36,7 +29,7 @@ if command -v ruby >/dev/null 2>&1; then
     done <<< "$data_files"
   fi
 else
-  skip "ruby not installed, JSON and YAML not checked"
+  fail "ruby not installed, JSON and YAML not checked"
 fi
 
 # Codex reads review rules from this heading in AGENTS.md.
@@ -65,7 +58,7 @@ if command -v jq >/dev/null 2>&1; then
     fail ".claude/settings.json does not choose the Mentat style (outputStyle mentat:Mentat)"
   fi
 else
-  skip "jq not installed, plugin setting not checked"
+  fail "jq not installed, plugin setting not checked"
 fi
 
 # hooks.json runs the SessionStart hook, which is what loads the rules.
@@ -76,7 +69,7 @@ if command -v jq >/dev/null 2>&1; then
     fail "hooks.json does not run hooks/session-start on SessionStart"
   fi
 else
-  skip "jq not installed, SessionStart wiring not checked"
+  fail "jq not installed, SessionStart wiring not checked"
 fi
 
 # The SessionStart hook prints rules.md unchanged, within Claude Code's
@@ -155,7 +148,7 @@ if command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1; then
     fail "skills/retro/transcript lets tool output, a command or a secret through"
   fi
 else
-  skip "jq or perl not installed, skills/retro/transcript not checked"
+  fail "jq or perl not installed, skills/retro/transcript not checked"
 fi
 
 # mentat review, review --local, challenge and check behave as specified (stub
@@ -165,7 +158,7 @@ if command -v jq >/dev/null 2>&1; then
     if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
   done
 else
-  skip "jq not installed, mentat review, challenge, check and the hooks not tested"
+  fail "jq not installed, mentat review, challenge, check and the hooks not tested"
 fi
 
 # The Mentat pane is a Claude Code mod: the plugin validates (warnings are fine,
@@ -180,7 +173,7 @@ if command -v claude >/dev/null 2>&1; then
     fi
   done
 else
-  skip "claude not installed, the Mentat pane not validated or tested"
+  fail "claude not installed, the Mentat pane not validated or tested"
 fi
 
 # Shell scripts pass shellcheck.
@@ -191,7 +184,7 @@ if command -v shellcheck >/dev/null 2>&1; then
     fail "shellcheck tests/run hooks/session-start hooks/no-merge bin/mentat skills/retro/transcript tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh"
   fi
 else
-  skip "shellcheck not installed, shell scripts not checked"
+  fail "shellcheck not installed, shell scripts not checked"
 fi
 
 if [ "$failures" -gt 0 ]; then

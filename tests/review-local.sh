@@ -192,16 +192,12 @@ check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 # real `codex sandbox` (no model call) and runs shell probes against the review
 # worktree. It does not prove that `codex exec --ignore-user-config --strict-config`
 # behaves the same, and it says nothing about Linux or model-backed behavior.
-# A control that fails (the outer sandbox of an agent session may block one) is SKIP,
-# and FAIL in CI. A probe that is broken (the launcher failed) always fails.
+# A control that cannot run (a missing tool, or the outer sandbox of an agent session
+# blocking one) fails, like a probe that is broken (the launcher failed).
 live="review --local live sandbox"
-live_skip() {
-  if [ "${CI:-}" = "true" ]; then
-    printf 'FAIL: %s: %s (required in CI)\n' "$live" "$1"
-    failures=$((failures + 1))
-  else
-    printf 'SKIP: %s: %s\n' "$live" "$1"
-  fi
+live_fail() {
+  printf 'FAIL: %s: %s\n' "$live" "$1"
+  failures=$((failures + 1))
 }
 live_run() {
   local d self real_codex="" outside port="" i probes=0 bad=0 kind want got name detail
@@ -212,20 +208,20 @@ live_run() {
     [ "$d" != "$root/bin" ] && [ -x "$d/codex" ] && { real_codex="$d/codex"; break; }
   done
   IFS=$' \t\n'
-  [ -n "$real_codex" ] || { live_skip "codex is not installed"; return 0; }
+  [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
   # Controls that need no worktree.
   case "$(cd -P "$root" && pwd -P)" in
-    /tmp/* | /private/tmp/*) live_skip "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
+    /tmp/* | /private/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
   esac
   outside="$(cd -P "$(dirname "$mentat")/.." && pwd -P)/tests/run"
   case "$outside" in
-    /opt/homebrew/* | /usr/local/* | /tmp/* | /private/tmp/* | "$root"/*) live_skip "$outside is under a path the profile allows or denies for another reason"; return 0 ;;
+    /opt/homebrew/* | /usr/local/* | /tmp/* | /private/tmp/* | "$root"/*) live_fail "$outside is under a path the profile allows or denies for another reason"; return 0 ;;
   esac
-  [ -r "$outside" ] || { live_skip "$outside is not readable"; return 0; }
-  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_skip "could not create a file under /tmp"; return 0; }
-  echo fake >"$live_tmp" || { live_skip "could not write $live_tmp"; return 0; }
-  [ -r "$live_tmp" ] || { live_skip "$live_tmp is not readable"; return 0; }
-  command -v perl >/dev/null 2>&1 || { live_skip "perl is not installed, so there is no local listener"; return 0; }
+  [ -r "$outside" ] || { live_fail "$outside is not readable"; return 0; }
+  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /tmp"; return 0; }
+  echo fake >"$live_tmp" || { live_fail "could not write $live_tmp"; return 0; }
+  [ -r "$live_tmp" ] || { live_fail "$live_tmp is not readable"; return 0; }
+  command -v perl >/dev/null 2>&1 || { live_fail "perl is not installed, so there is no local listener"; return 0; }
   perl -MIO::Socket::INET -e '$| = 1; my $s = IO::Socket::INET->new(Listen => 5, LocalAddr => "127.0.0.1", LocalPort => 0, ReuseAddr => 1) or exit 1; print $s->sockport, "\n"; while (my $c = $s->accept) { close $c }' >"$root/port" 2>/dev/null &
   listener=$!
   disown "$listener" 2>/dev/null
@@ -234,7 +230,7 @@ live_run() {
     [ -z "$port" ] || break
     sleep 0.5
   done
-  case "$port" in '' | *[!0-9]*) live_skip "no local listener could start"; return 0 ;; esac
+  case "$port" in '' | *[!0-9]*) live_fail "no local listener could start"; return 0 ;; esac
 
   # A pull request head with one fake fixture per credential rule, nested ones too.
   LIVE_FIXTURES=".env
@@ -252,8 +248,8 @@ nested/.netrc
   (cd "$root/seed" && git checkout -q main && git checkout -qb live &&
     echo live >README &&
     while IFS= read -r f; do mkdir -p "$(dirname "$f")" && echo fake >"$f"; done <<<"$LIVE_FIXTURES" &&
-    git add -A && git commit -qm fixtures && git push -q "$root/origin.git" HEAD:refs/pull/9/head) || { live_skip "could not build the pull request head"; return 0; }
-  self=$(cd "$(dirname "$0")" && pwd) || { live_skip "could not find this script's directory"; return 0; }
+    git add -A && git commit -qm fixtures && git push -q "$root/origin.git" HEAD:refs/pull/9/head) || { live_fail "could not build the pull request head"; return 0; }
+  self=$(cd "$(dirname "$0")" && pwd) || { live_fail "could not find this script's directory"; return 0; }
   export LIVE_FIXTURES LIVE_CODEX="$real_codex" LIVE_PORT="$port" LIVE_TMPFILE="$live_tmp" LIVE_OUTSIDE="$outside" LIVE_BASE="$BASE" LIVE_SELF="$self/${0##*/}"
   LIVE_HEAD=$(git -C "$root/seed" rev-parse HEAD) && export LIVE_HEAD
 
@@ -265,7 +261,7 @@ nested/.netrc
     return 0
   fi
   if grep -q '^control|' "$STUB/live_results"; then
-    live_skip "$(sed -n 's/^control|//p' "$STUB/live_results" | head -n 1)"
+    live_fail "$(sed -n 's/^control|//p' "$STUB/live_results" | head -n 1)"
     return 0
   fi
   while IFS='|' read -r kind want got name detail; do
