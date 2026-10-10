@@ -44,8 +44,6 @@ const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
-// Counts the conversations; see classic.SessionStart and sendAnswer.
-const conversationAtom = atom({ plugin: 'mentat', key: 'conversation' } as const, 0)
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
 // The session id the conversation state belongs to; see classic.SessionStart.
@@ -76,29 +74,24 @@ const NOTE_MARK: Record<LogKind, FeedMark> = {
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
-// The event lines the pane writes to the Log itself, drawn dim. A `check` line takes the mark of the result, and an
-// `asked` line from a log kept by an earlier version is marked only when it was an alert.
-const EVENT_MARK: Record<Exclude<EventKind, 'asked' | 'check'>, FeedMark> = {
+// The event lines the pane writes to the Log itself, drawn dim. A `check` line takes the mark of the result.
+const EVENT_MARK: Partial<Record<EventKind, FeedMark>> = {
   agentDone: MARKS.success,
   agentFailed: MARKS.failure,
-  answered: MARKS.success,
-  dismissed: MARKS.none,
   prOpened: MARKS.none,
+  pushed: MARKS.none,
 }
 const RESULT_MARK: Record<EventMark, FeedMark> = {
   pass: MARKS.success,
   warn: MARKS.attention,
   fail: MARKS.failure,
-  alert: MARKS.attention,
-  question: MARKS.none,
-  action: MARKS.none,
 }
 // An entry stored without a source is a note.
 export const isNote = (entry: LogEntry): entry is NoteEntry => entry.source !== 'event'
 // The icon and color a Log row is drawn with.
 const styleOf = (entry: LogEntry): FeedMark => {
   if (isNote(entry)) return NOTE_MARK[entry.kind] ?? MARKS.none
-  if (entry.kind === 'check' || entry.kind === 'asked') return (entry.mark === undefined ? undefined : RESULT_MARK[entry.mark]) ?? MARKS.none
+  if (entry.kind === 'check') return (entry.mark === undefined ? undefined : RESULT_MARK[entry.mark]) ?? MARKS.none
 
   return EVENT_MARK[entry.kind] ?? MARKS.none
 }
@@ -283,6 +276,11 @@ const inTurn = <T,>(work: () => Promise<T>): Promise<T> => {
 // start empty. The conversation's own state (not the agent rows, which the engine lists, nor the view
 // toggles) is also kept in $.store under its session id, written after each change, newest SESSIONS_KEPT.
 
+// Entries of these kinds were written by earlier versions: the Feed records the work, not the pane's own
+// bookkeeping, so they are dropped wherever the log is loaded or read.
+const LEFTOVER_KINDS: readonly string[] = ['asked', 'answered', 'dismissed']
+const withoutLeftovers = (list: LogEntry[]): LogEntry[] => list.filter(x => x.source !== 'event' || !LEFTOVER_KINDS.includes(x.kind))
+
 // What a stored entry gives back, with every field checked: a value of the wrong shape is empty.
 function loadConversation(stored: unknown): Omit<SavedConversation, 'savedAt'> {
   const o = asObj(stored)
@@ -294,7 +292,7 @@ function loadConversation(stored: unknown): Omit<SavedConversation, 'savedAt'> {
     items: withoutSettled(list<Decision>(o.items)),
     nextId: typeof o.nextId === 'number' && Number.isFinite(o.nextId) && o.nextId >= 1 ? o.nextId : 1,
     sent: list(o.sent),
-    log: list(o.log),
+    log: withoutLeftovers(list<LogEntry>(o.log)),
     checkResult: hasResult ? { state: result.state as CheckResult['state'], warnings: list<string>(result.warnings) } : null,
     gone: list(o.gone),
   }
@@ -453,9 +451,38 @@ async function agentTick($: EngineInterface): Promise<void> {
   await invalidate($)
 }
 
-// What the main loop's Bash call says: a pull request it opened.
-async function afterBash($: EngineInterface, command: string, stdout: string): Promise<void> {
+// The branches a `git push` pushed, read from the lines git prints for them (`   abc1234..def5678  main -> main`,
+// ` + abc1234...def5678  main -> main (forced update)`, ` * [new branch]      topic -> topic`), by the remote's
+// name. Git's output has no count of commits, so none is given. Nothing is returned (so no line is written) unless
+// every line is one of those or part of the usual chatter: a rejected ref, an error, a dry run, a push that
+// printed no ref line (`Everything up-to-date`) or any other doubt writes nothing.
+const PUSH_COMMAND = /(?:^|[\s;&|(])git\s+(?:-C\s+\S+\s+)?push(?=$|[\s;&|)])/
+const PUSH_DRY_RUN = /(?:^|\s)(?:--dry-run|-n)(?=$|\s)/
+const PUSH_RANGE = /^\s*[+ ]?\s*[0-9a-f]{7,40}\.\.\.?[0-9a-f]{7,40}\s+\S+\s+->\s+(\S+)(?:\s+\([^)]*\))?\s*$/
+const PUSH_NEW = /^\s*\*\s+\[new branch\]\s+\S+\s+->\s+(\S+)\s*$/
+const PUSH_FAILED = /^\s*!\s|^error:|^fatal:|\[(?:remote )?rejected\]|failed to push/
+const pushedBranches = (command: string, output: string): string[] => {
+  if (!PUSH_COMMAND.test(command) || PUSH_DRY_RUN.test(command)) return []
+  const lines = output.replace(/\r/g, '').split('\n')
+  if (lines.some(l => PUSH_FAILED.test(l))) return []
+  const branches: string[] = []
+  for (const l of lines) {
+    const found = PUSH_RANGE.exec(l) ?? PUSH_NEW.exec(l)
+    if (found !== null && !branches.includes(found[1]!)) branches.push(found[1]!)
+  }
+
+  return branches
+}
+
+// What the main loop's Bash call says: a pull request it opened, a push it made.
+async function afterBash($: EngineInterface, command: string, stdout: string, stderr: string): Promise<void> {
   try {
+    const pushed = pushedBranches(command, `${stdout}\n${stderr}`)
+    if (pushed.length > 0) {
+      const at = await $.clock.now()
+      await inTurnSaved($, () => addLog($, at, [eventDraft('pushed', `Pushed ${pushed.join(', ')}`)]))
+      await invalidate($)
+    }
     if (/\bgh\s+pr\s+create\b/.test(command)) {
       const urls = [...stdout.matchAll(ghPrUrl)]
       const last = urls[urls.length - 1]
@@ -599,11 +626,8 @@ const sentLine = (entry: { text: string; isDelivered?: boolean }): string => {
 // first, and a second press for it does nothing. When the prompt did not enter, say so: a press
 // that vanishes looks broken.
 async function sendAnswer($: EngineInterface, d: { id: string; question: string }, text: string): Promise<boolean> {
-  // The conversation the press began in: a delivery that lands in a later one writes no line there.
-  let began = 0
   const isFirst = await inTurnSaved($, async () => {
     if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
-    began = await read($, conversationAtom)
     await update($, sentAtom, list => [...list, { id: d.id, text }])
     return true
   })
@@ -622,11 +646,7 @@ async function sendAnswer($: EngineInterface, d: { id: string; question: string 
     return false
   }
   // The answer entered the session; the line stops saying it waits.
-  await inTurnSaved($, async () => {
-    await update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x)))
-    if ((await read($, conversationAtom)) !== began) return
-    await addLog($, await $.clock.now(), [eventDraft('answered', `You answered "${text}": ${d.question}`)])
-  })
+  await inTurnSaved($, () => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
   await invalidate($)
   return true
 }
@@ -645,7 +665,6 @@ const dismissItem = async ($: EngineInterface, id: string) => {
     await update($, sentAtom, list => list.filter(x => x.id !== id))
     if (item !== undefined) {
       await recordGone($, [{ id, why: 'dismissed', at }])
-      await addLog($, at, [eventDraft('dismissed', `You dismissed: ${item.question}`)])
     }
   })
 }
@@ -705,7 +724,7 @@ async function paneData($: EngineInterface): Promise<PaneData> {
       if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
       return (b.startedAt ?? 0) - (a.startedAt ?? 0)
     })
-  const logList = await read($, logAtom)
+  const logList = withoutLeftovers(await read($, logAtom))
   const isLogAll = await read($, logAll)
   const budget = budgetAlert(limitsOf(await readUsage($), now, zone))
   const newest = logList.map((entry, n) => ({ entry, n })).reverse()
@@ -1149,6 +1168,7 @@ export const register: Register = (on, _options) => {
     // The former decisions pane kept settled entries (with closedAt) in this state;
     // nothing shows them now, so they must not come back as open questions.
     await inTurnSaved($, () => update($, items, withoutSettled))
+    await inTurnSaved($, () => update($, logAtom, withoutLeftovers))
     // A submit that was still waiting for a turn is lost with the old load: its question
     // offers its buttons again. A delivered answer stays marked.
     await inTurnSaved($, () => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
@@ -1200,10 +1220,9 @@ export const register: Register = (on, _options) => {
       // An answer still waiting for its turn is lost with the process; a delivered one stays marked.
       await update($, sentAtom, () => loaded.sent.filter(x => x.isDelivered === true))
       await update($, checkResult, () => loaded.checkResult)
-      // The log of the former conversation goes, and a write that began before this waits no longer holds.
+      // The log of the former conversation goes.
       await update($, logAtom, () => loaded.log)
       await update($, goneAtom, () => [...loaded.gone, ...formerGone, ...cleared].slice(-GONE_LIMIT))
-      await update($, conversationAtom, n => n + 1)
       await update($, ownerAtom, () => e.session_id)
       await saveConversation($)
       await pruneConversations($, e.session_id)
@@ -1258,9 +1277,8 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
-    const input = e as unknown as { id?: unknown; outcome?: unknown }
+    const input = e as unknown as { id?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
-    const outcome = typeof input.outcome === 'string' ? input.outcome.trim() : ''
     const found = await inTurnSaved($, async (): Promise<'open' | GoneEntry | undefined> => {
       const item = (await read($, items)).find(d => d.id === id)
       const isOpen = item !== undefined
@@ -1269,7 +1287,6 @@ export const register: Register = (on, _options) => {
       // A closed decision is dropped: nothing shows settled ones. So is the answer line of one that already left.
       await update($, items, all => all.filter(d => d.id !== id))
       await update($, sentAtom, sent => sent.filter(x => x.id !== id))
-      if (item !== undefined) await addLog($, await $.clock.now(), [eventDraft('answered', `Closed: ${item.question}${outcome === '' ? '' : ` · ${outcome}`}`)])
 
       return isOpen ? 'open' : gone
     })
@@ -1308,8 +1325,8 @@ export const register: Register = (on, _options) => {
     const isMainBash = e.tool === 'Bash' && e.agentId === undefined && typeof e.command === 'string'
     const ran = await next(e)
     if (isMainBash) {
-      const stdout = str(asObj((ran as { result?: unknown }).result).stdout)
-      void afterBash($, e.command as string, stdout)
+      const result = asObj((ran as { result?: unknown }).result)
+      void afterBash($, e.command as string, str(result.stdout), str(result.stderr))
       await afterCheck($, e.command as string, ran as { result?: unknown; text?: unknown; deny?: unknown })
     }
 

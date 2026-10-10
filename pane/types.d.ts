@@ -33,11 +33,11 @@ export type AgentRow = {
 export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
 // The kinds of event line the pane writes to the Log itself. The `note` tool never takes one.
-// (`asked` is no longer written; a log kept from an earlier version may still hold it.)
-export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'dismissed' | 'check' | 'prOpened'
+// (`asked`, `answered` and `dismissed` are no longer written, and a log kept from an earlier version has them dropped.)
+export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'dismissed' | 'check' | 'prOpened' | 'pushed'
 
-// What an `asked` or `check` event line is marked with: the kind of the item asked, or the result of the check.
-export type EventMark = 'question' | 'action' | 'alert' | 'pass' | 'warn' | 'fail'
+// What a `check` event line is marked with: the result of the check.
+export type EventMark = 'pass' | 'warn' | 'fail'
 
 // One line of the Log (the Feed): when (clock time), its kind and its text (one line). A note is one
 // Claude Code added; an event is one the pane wrote, drawn dim. A line stored without a source is a note.
@@ -78,9 +78,6 @@ declare module 'claude-code' {
       checkResult: CheckResult | null
       // The session's log, oldest first (the pane shows it newest first); capped.
       log: LogEntry[]
-      // Counts the conversations: bumped where a session start brings another session id's state in, so a
-      // write that waited for the engine can tell it began in an earlier conversation.
-      conversation: number
       // True while the Feed shows every log entry (default: the newest ten).
       logAll: boolean
       // Items that left without close_decision, oldest first; capped at 50, never drawn.
