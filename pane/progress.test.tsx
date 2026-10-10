@@ -2,9 +2,9 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { AGENT_HEAD_H, AGENT_ROW_H, isNote, resetAt, withoutSettled } from './progress'
 
-// Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
-// table of canned answers (nothing talks to GitHub), `$.agent.list` and
-// `$.session.usage` are tables too, and the clock moves only when a test moves it.
+// Tests for pane/progress.tsx. The test's hooks stand for the engine: `git` and `mentat check` are
+// canned answers (nothing talks to GitHub), `$.agent.list` and `$.session.usage` are tables too, and the
+// clock moves only when a test moves it.
 
 const OPEN = 'mcp__mentat__open_decision'
 const CLOSE = 'mcp__mentat__close_decision'
@@ -17,69 +17,17 @@ const T0 = Date.parse('2026-10-09T12:00:00Z')
 // The time zone reset times are shown in: the mod reads TZ, and every test sets it, so a weekly
 // reset prints the same wherever the tests run.
 const ZONE = 'America/New_York'
-const REPO = 'o/r'
-const ME = 'mentat-bot'
-const CODEX = 'chatgpt-codex-connector[bot]'
-const H1 = '415e6d9' + 'a'.repeat(33)
-const H2 = '9f8e7d6' + 'b'.repeat(33)
 
-// ---- fixtures: what GitHub returns ----------------------------------------
+// ---- fixtures: what the commands print ---------------------------------------
 
 type Run = { exitCode: number; stdout: string; stderr?: string }
 type Answer = Run | (() => Run | Promise<Run>)
 const ok = (stdout: string): Run => ({ exitCode: 0, stdout })
-const failed: Run = { exitCode: 1, stdout: '', stderr: 'gh: could not resolve' }
-
-const CHECK_OK = { __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'SUCCESS' }
-const prJson = (o: Record<string, unknown> = {}) =>
-  JSON.stringify({
-    number: 109,
-    title: 'chore: label issues by kind',
-    state: 'OPEN',
-    isDraft: false,
-    headRefOid: H1,
-    reviewDecision: 'REVIEW_REQUIRED',
-    statusCheckRollup: [CHECK_OK],
-    mergeStateStatus: 'BLOCKED',
-    updatedAt: '2026-10-09T11:59:00Z',
-    ...o,
-  })
-
-// The Codex app's summary comment, as GitHub returns it (the format tests/review.sh uses).
-const summary = (sha: string, status = 'Completed', login = CODEX) => ({
-  id: 1,
-  user: { login },
-  body: `<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **${status}** <relative-time datetime="2026-01-01T00:11:00.123456Z">2026-01-01T00:11:00.123456Z</relative-time> | \`${sha.slice(0, 7)}\` | Draft marked ready |\n`,
-})
-// A pull request review object (not an inline comment), as GET pulls/N/reviews returns it.
-const reviewOf = (sha: string, login = CODEX) => ({ id: 77, user: { login }, commit_id: sha, html_url: 'https://example.test/review' })
-const comment = (login: string, body: string, id = 500) => ({ id, user: { login }, body })
-const inline = (id: number, sha: string, login = CODEX, inReplyTo?: number) => ({
-  id,
-  user: { login },
-  commit_id: sha,
-  path: 'a.ts',
-  line: 3,
-  body: 'finding',
-  ...(inReplyTo === undefined ? {} : { in_reply_to_id: inReplyTo }),
-})
-const finalCheck = (sha: string, login = ME) => comment(login, `Final check on ${sha.slice(0, 7)}: tests and CI pass.`, 900)
-const localReview = (sha: string, result = 'NO FINDINGS', login = ME) =>
-  comment(login, `## Local Codex review of ${sha}\n\n- Run locally by the agent.\n\n---\n\nNothing to flag.\n\nREVIEW RESULT: ${result}\n`, 901)
-// `gh api --paginate` prints each page as its own array, one after the other.
-const pages = (...ps: unknown[][]) => ps.map(p => JSON.stringify(p)).join('')
 
 // ---- the world beneath the plugin -------------------------------------------
 
 type Usage = { context?: number; limits?: { kind: string; percentUsed: number; resetsAt?: string }[] }
 type World = {
-  repo: Answer
-  pr: Answer
-  prList: Answer
-  me: Answer
-  issueComments: Answer
-  pullComments: Answer
-  reviews: Answer
   // `git rev-parse --is-inside-work-tree`: by default not a work tree, so a session start runs no check.
   git: Answer
   // `mentat check` as the pane runs it at session start; 'missing' stands for no mentat on the PATH.
@@ -123,13 +71,6 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
   mock.env(on, { TZ: opts.zone ?? ZONE })
   const clock = mock.clock(on, { now: T0 })
   const world: World = {
-    repo: ok(`${REPO}\n`),
-    pr: ok(prJson()),
-    prList: ok('[]'),
-    me: ok(`${ME}\n`),
-    issueComments: ok(pages([])),
-    pullComments: ok(pages([])),
-    reviews: ok(pages([])),
     git: { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' },
     check: 'missing',
     cwds: {},
@@ -217,13 +158,7 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
       else if (isCall(argv, 'mentat', 'check')) {
         if (world.check === 'missing') throw new Error('spawn mentat ENOENT')
         answer = world.check
-      } else if (isCall(argv, 'gh', 'repo', 'view')) answer = world.repo
-      else if (isCall(argv, 'gh', 'pr', 'view')) answer = world.pr
-      else if (isCall(argv, 'gh', 'pr', 'list')) answer = world.prList
-      else if (isCall(argv, 'gh', 'api', 'user')) answer = world.me
-      else if (argv[0] === 'gh' && argv[1] === 'api' && argv.some(a => a.endsWith('/issues/109/comments'))) answer = world.issueComments
-      else if (argv[0] === 'gh' && argv[1] === 'api' && argv.some(a => a.endsWith('/pulls/109/comments'))) answer = world.pullComments
-      else if (argv[0] === 'gh' && argv[1] === 'api' && argv.some(a => a.endsWith('/pulls/109/reviews'))) answer = world.reviews
+      }
       const run = typeof answer === 'function' ? await answer() : answer
 
       return { value: { exitCode: run.exitCode, stdout: run.stdout, stderr: run.stderr ?? '' } }
@@ -290,16 +225,6 @@ const bandTexts = async ($: never, surface: 'terminal' | 'desktop' = 'terminal')
 
   return t
 }
-// Waits (real time) for a drawing to show the text; reads are fire and forget in the plugin.
-const untilPane = async ($: never, text: string, cols = 60) => {
-  let last: string[] = []
-  for (let i = 0; i < 300; i++) {
-    last = await paneTexts($, 'terminal', cols)
-    if (last.includes(text)) return last
-    await new Promise(r => setTimeout(r, 5))
-  }
-  throw new Error(`pane never showed "${text}"; it showed ${JSON.stringify(last)}`)
-}
 const until = async (cond: () => boolean, what: string) => {
   for (let i = 0; i < 300; i++) {
     if (cond()) return
@@ -307,7 +232,6 @@ const until = async (cond: () => boolean, what: string) => {
   }
   throw new Error(`timed out waiting for ${what}`)
 }
-const prViews = (w: World) => w.calls.filter(a => isCall(a, 'gh', 'pr', 'view')).length
 
 const eng = ($: never) =>
   $ as unknown as {
@@ -323,13 +247,6 @@ const bash = (w: World, $: never, command: string, stdout = '', extra: object = 
   w.bashErr = stderr
 
   return eng($).tool.call({ tool: 'Bash', command, ...extra })
-}
-const follow = async ($: never, args = 'pr 109') => (await eng($).command.run({ command: 'mentat', args })).text
-// Follows PR 109 and waits for the first read to land.
-const follow109 = async ($: never) => {
-  await startSession($)
-  await follow($)
-  await untilPane($, '#109')
 }
 // An Agent call with an effort, as the model makes it; resolves with the id the engine gave it.
 const callAgent = async (w: World, $: never, effort: string) => {
@@ -406,28 +323,10 @@ test('with only questions raising it, the band shows the newest question on the 
   await d.unmount()
 })
 
-test('a final-checked pull request does not matter to the band: an open question is alone on it, and closing it leaves the quiet line', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([finalCheck(H1)]))
-  await follow109($)
-  await eng($).tool.call({ tool: OPEN, question: 'A question too?' })
-  const t = await bandTexts($)
-  expect(t).toContain('A question too?')
-  expect(t.some(x => x.includes('Final check') || x.includes('#109'))).toBe(false)
-  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
-  const quiet = await bandTexts($)
-  expect(quiet).toContain('Mentat')
-  expect(quiet.some(x => x.includes('Final check') || x.includes('#109'))).toBe(false)
-})
-
 test('on the desktop the band and the agents card are drawn Svgs, found by alt text; the terminal draws text', async ($, on) => {
   const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
-  world.pullComments = ok(pages([inline(1, H1)]))
-  world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }]))
   world.usage = { context: 41, limits: [{ kind: 'five_hour', percentUsed: 85, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
-  await follow109($)
-  // Desktop band with nothing waiting: the budget warning is drawn, not the final-checked PR, with a native Details button.
+  // Desktop band with nothing waiting: the budget warning is drawn, with a native Details button.
   const budgetBand = await mount($, BAND, 'desktop')
   const budgetSvg = await svgsOf(budgetBand)
   expect(budgetSvg.map(v => v.alt)).toEqual(['5-hour limit 85% · resets in 1h 0m'])
@@ -452,7 +351,6 @@ test('on the desktop the band and the agents card are drawn Svgs, found by alt t
   const alt = (prefix: string) => svgs.find(v => v.alt.startsWith(prefix))
   expect(svgs.map(v => v.alt)).toEqual(['Running agents: 1 (general-purpose: Check the docs)'])
   expect(svgs.flatMap(v => v.drawn).some(x => /context|5-hour|%/i.test(x))).toBe(false)
-  expect(alt('#109')).toBeUndefined()
   expect(alt('Running agents')!.drawn).toEqual(expect.arrayContaining(['Running · 1', 'Check the docs', 'Opus 4.8 · high']))
   expect(await cardKeys(pane)).toEqual([])
   await pane.unmount()
@@ -465,7 +363,7 @@ test('on the desktop the band and the agents card are drawn Svgs, found by alt t
   const tPane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await tPane.findAll({ type: 'Svg' })).length).toBe(0)
   const t = await textsOf(tPane)
-  for (const x of ['Approval required', '✓', '1 other open PR in this repository', 'Check the docs']) expect(t).toContain(x)
+  expect(t).toContain('Check the docs')
   expect(t).not.toContain('Open it?')
   expect(t.some(x => /[█░]|Context|resets in/.test(x))).toBe(false)
   await tPane.unmount()
@@ -949,597 +847,6 @@ test('Details in the band opens the pane, in every state of the band', async ($,
   await band.press({ key: 'open' })
   await band.unmount()
   expect(world.opened).toContain('mentat')
-})
-
-// ---- which pull request is this session's ---------------------------------------------
-
-test('a gh pr create in the main loop names the session\'s pull request by its URL', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await bash(world, $, 'gh pr create --fill', `https://github.com/${REPO}/pull/109\n`)
-  const t = await untilPane($, '#109')
-  expect(t).toContain('Label issues by kind')
-  expect(world.calls.some(a => a.join(' ').includes('pr view 109 --repo o/r --json number,title,state,isDraft,headRefOid,reviewDecision,statusCheckRollup,mergeStateStatus,updatedAt'))).toBe(true)
-})
-
-test('mentat review <N> takes the repository from the checkout', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await bash(world, $, 'mentat review 109', 'The Codex app found nothing\n')
-  await untilPane($, '#109')
-  expect(world.calls.some(a => isCall(a, 'gh', 'repo', 'view'))).toBe(true)
-})
-
-test('mentat review --local <N> names the pull request too, and --repo overrides the checkout', async ($, on) => {
-  const { world } = boot(on)
-  world.repo = failed
-  await startSession($)
-  await bash(world, $, 'mentat review --local 109 --repo o/r', '')
-  await untilPane($, '#109')
-})
-
-test('commands from an agent, failed commands and other commands do not name a pull request', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await bash(world, $, 'gh pr create --fill', `https://github.com/${REPO}/pull/109\n`, { agentId: 'sub1' })
-  await bash(world, $, 'gh pr create --fill', 'a pull request already exists\n')
-  await bash(world, $, 'echo mentat review 109', '')
-  await bash(world, $, 'gh pr list', 'https://github.com/o/r/pull/7\n')
-  await new Promise(r => setTimeout(r, 30))
-  expect(prViews(world)).toBe(0)
-  expect((await paneTexts($)).includes('#109')).toBe(false)
-})
-
-test('a mentat review call follows its pull request at once, while the review is still running', async ($, on) => {
-  const { world } = boot(on)
-  world.pr = ok(prJson({ number: 7 }))
-  await startSession($)
-  let release: () => void = () => undefined
-  world.bashGate = new Promise<void>(r => { release = r })
-  const call = bash(world, $, 'mentat review 7', 'The Codex app found nothing\n')
-  const t = await untilPane($, '#7')
-  expect(t).toContain('Label issues by kind')
-  expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'view') && a[3] === '7')).toBe(true)
-  release()
-  await call
-})
-
-test('a new conversation (clear, resume, branch) drops the followed pull request; a reload and a compaction keep it', async ($, on) => {
-  const { world } = boot(on)
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
-  for (const source of ['clear', 'resume', 'fork']) {
-    await follow109($)
-    await classic.SessionStart({ source })
-    const t = await paneTexts($)
-    expect(t).not.toContain('#109')
-    expect(t.some(x => x.includes('o/r#'))).toBe(false)
-    expect(t).not.toContain('GitHub')
-  }
-
-  await follow109($)
-  await startSession($)
-  await classic.SessionStart({ source: 'startup' })
-  await classic.SessionStart({ source: 'compact' })
-  await new Promise(r => setTimeout(r, 30))
-  expect(await paneTexts($)).toContain('#109')
-  expect(world.calls.length).toBeGreaterThan(0)
-})
-
-test('/mentat pr sets the pull request by hand, and says when it cannot', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  expect(await follow($, 'pr banana')).toContain('Usage')
-  expect(await follow($, 'pr 109')).toContain('o/r#109')
-  await untilPane($, '#109')
-  expect(prViews(world)).toBeGreaterThan(0)
-  expect(await follow($, 'pr x/y#7')).toContain('x/y#7')
-})
-
-// ---- the GitHub and CI lines ---------------------------------------------------------------
-
-const GITHUB_CASES: [string, Record<string, unknown>, string][] = [
-  ['merged', { state: 'MERGED', reviewDecision: 'APPROVED' }, 'Merged'],
-  ['closed', { state: 'CLOSED' }, 'Closed'],
-  ['draft', { isDraft: true, reviewDecision: 'REVIEW_REQUIRED' }, 'Draft'],
-  ['conflicts', { mergeStateStatus: 'DIRTY', reviewDecision: 'CHANGES_REQUESTED' }, 'Conflicts'],
-  ['changes requested', { reviewDecision: 'CHANGES_REQUESTED', mergeStateStatus: 'BLOCKED' }, 'Changes requested'],
-  ['approved', { reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN' }, 'Approved'],
-  ['approval required', { reviewDecision: 'REVIEW_REQUIRED' }, 'Approval required'],
-  ['blocked with no review rule', { reviewDecision: null, mergeStateStatus: 'BEHIND' }, 'Merge blocked · behind'],
-  ['mergeable with no review rule', { reviewDecision: '', mergeStateStatus: 'CLEAN' }, 'Mergeable'],
-]
-for (const [name, fields, label] of GITHUB_CASES) {
-  test(`the GitHub line says ${name}`, async ($, on) => {
-    const { world } = boot(on)
-    world.pr = ok(prJson(fields))
-    await follow109($)
-    expect(await paneTexts($)).toContain(label)
-  })
-}
-
-const CI_CASES: [string, unknown[] | null, string][] = [
-  ['none without checks', [], 'none'],
-  ['none when GitHub gives null', null, 'none'],
-  ['a tick when everything passed', [CHECK_OK, { __typename: 'StatusContext', state: 'SUCCESS' }, { __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'SKIPPED' }], '✓'],
-  ['running while a check runs', [CHECK_OK, { __typename: 'CheckRun', status: 'IN_PROGRESS', conclusion: null }], 'running'],
-  ['running for a pending status', [{ __typename: 'StatusContext', state: 'PENDING' }], 'running'],
-  ['the failed count first', [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' }, { __typename: 'StatusContext', state: 'ERROR' }, { __typename: 'CheckRun', status: 'IN_PROGRESS', conclusion: null }, CHECK_OK], '✕ 2 failed'],
-  ['cancelled as failed', [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'CANCELLED' }], '✕ 1 failed'],
-]
-for (const [name, rollup, label] of CI_CASES) {
-  test(`the CI line says ${name}`, async ($, on) => {
-    const { world } = boot(on)
-    world.pr = ok(prJson({ statusCheckRollup: rollup }))
-    await follow109($)
-    expect(await paneTexts($)).toContain(label)
-  })
-}
-
-// ---- the Codex line ----------------------------------------------------------------------------
-
-const codexLine = async ($: never) => {
-  const t = await untilPane($, 'Codex')
-  const i = t.indexOf('Codex')
-
-  return t[i + 1]
-}
-
-test('Codex: completed on the head, findings and the ones the agent replied to', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1)]))
-  world.pullComments = ok(pages([
-    inline(1, H1),
-    inline(2, H1),
-    inline(3, H1, CODEX, 1),
-    inline(4, H1, ME, 1),
-    inline(5, H1, ME, 1),
-    inline(6, H1, 'someone-else', 2),
-  ]))
-  await follow109($)
-  // Two findings; one has a reply from the agent account (two replies count once);
-  // a reply from someone else and the app's own reply do not count.
-  expect(await codexLine($)).toBe('2 findings · 1 replied · 415e6d9')
-})
-
-test('Codex: one finding is singular, none is said plainly, and an older commit\'s findings are not counted', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1)]))
-  world.pullComments = ok(pages([inline(1, H1), inline(2, H2)]))
-  await follow109($)
-  expect(await codexLine($)).toBe('1 finding · 0 replied · 415e6d9')
-
-  world.pullComments = ok(pages([inline(2, H2)]))
-  await bash(world, $, 'git push', '')
-  await until(() => prViews(world) >= 2, 'a second read')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'No findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('No findings · 415e6d9')
-})
-
-test('Codex: running on the head, failed, and a summary about another commit', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1, 'In progress')]))
-  await follow109($)
-  expect(await codexLine($)).toBe('Running · 415e6d9')
-
-  world.issueComments = ok(pages([summary(H1, 'Failed')]))
-  await bash(world, $, 'mentat review 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'Failed · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('Failed · 415e6d9')
-
-  world.issueComments = ok(pages([summary(H2, 'Completed')]))
-  await bash(world, $, 'mentat review 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'Not on this commit'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('Not on this commit')
-})
-
-test('Codex: a summary in a format it does not know is unknown, and so is a status it does not know', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([comment(CODEX, '<!-- codex-pull-request-review-summary -->\nsomething else')]))
-  world.pullComments = ok(pages([inline(1, H1)]))
-  await follow109($)
-  expect(await codexLine($)).toBe('unknown')
-
-  world.issueComments = ok(pages([summary(H1, 'Pondering')]))
-  await bash(world, $, 'mentat review 109', '')
-  await new Promise(r => setTimeout(r, 50))
-  expect(await codexLine($)).toBe('unknown')
-})
-
-test('Codex: a summary from someone else is not the app\'s, and a missing one says so', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1, 'Completed', 'someone')]))
-  await follow109($)
-  expect(await codexLine($)).toBe('No review yet')
-})
-
-test('Codex: a local review shows as posted with its result line, not counted', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([localReview(H1, 'FINDINGS')]))
-  world.pullComments = ok(pages([inline(1, H1)]))
-  await follow109($)
-  expect(await codexLine($)).toBe('Local review posted · Findings · 415e6d9')
-
-  world.issueComments = ok(pages([localReview(H1, 'NO FINDINGS')]))
-  await bash(world, $, 'mentat review --local 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'Local review posted · No findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('Local review posted · No findings · 415e6d9')
-})
-
-test('Codex: a same-head local review shows over an app summary that is running or failed, not over a completed one', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1, 'Failed'), localReview(H1, 'NO FINDINGS')]))
-  await follow109($)
-  expect(await codexLine($)).toBe('Local review posted · No findings · 415e6d9')
-
-  world.issueComments = ok(pages([summary(H1, 'In progress'), localReview(H1, 'FINDINGS')]))
-  await bash(world, $, 'mentat review --local 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'Local review posted · Findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('Local review posted · Findings · 415e6d9')
-
-  // A local review of another commit does not displace Running; a completed app result wins.
-  world.issueComments = ok(pages([summary(H1, 'In progress'), localReview(H2)]))
-  await bash(world, $, 'mentat review 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'Running · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('Running · 415e6d9')
-  world.issueComments = ok(pages([summary(H1, 'Completed'), localReview(H1, 'FINDINGS')]))
-  await bash(world, $, 'mentat review 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'No findings · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('No findings · 415e6d9')
-})
-
-test('Codex: a local review of another commit, or by someone else, is not shown', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([localReview(H2), localReview(H1, 'NO FINDINGS', 'someone')]))
-  await follow109($)
-  expect(await codexLine($)).toBe('No review yet')
-})
-
-test('Codex: a review on the head with no inline comment is findings without a count, never No findings', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1)]))
-  world.reviews = ok(pages([reviewOf(H1)]))
-  await follow109($)
-  expect(await codexLine($)).toBe('Findings in review · 415e6d9')
-
-  // Inline comments, when there are some, keep their count.
-  world.pullComments = ok(pages([inline(1, H1)]))
-  await bash(world, $, 'mentat review 109', '')
-  for (let i = 0; i < 200 && (await codexLine($)) !== '1 finding · 0 replied · 415e6d9'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('1 finding · 0 replied · 415e6d9')
-})
-
-test('Codex: a review on an older commit, or by someone else, is not findings', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1)]))
-  world.reviews = ok(pages([reviewOf(H2), reviewOf(H1, 'someone-else')]))
-  await follow109($)
-  expect(await codexLine($)).toBe('No findings · 415e6d9')
-})
-
-test('a failed read of the reviews is a failed review read, not No findings', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1)]))
-  world.reviews = failed
-  await follow109($)
-  const t = await untilPane($, 'Review read failed')
-  expect(t[t.indexOf('Codex') + 1]).toBe('unknown')
-  expect(t).not.toContain('No findings · 415e6d9')
-})
-
-test('review comments are read across pages', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([comment('a', 'x', 1)], [summary(H1)]))
-  world.pullComments = ok(pages([inline(1, H1)], [inline(2, H1)], [inline(3, H1, ME, 2)]))
-  world.reviews = ok(pages([reviewOf(H2)], [reviewOf(H2)]))
-  await follow109($)
-  expect(await codexLine($)).toBe('2 findings · 1 replied · 415e6d9')
-  expect(world.calls.filter(a => isCall(a, 'gh', 'api')).every(a => a.includes('--paginate') || a[2] === 'user')).toBe(true)
-})
-
-test('a head change discards the review data of the old head', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
-  world.pullComments = ok(pages([inline(1, H1)]))
-  await follow109($)
-  expect(await codexLine($)).toBe('1 finding · 0 replied · 415e6d9')
-
-  // The branch moved; the review reads of the new head cannot be read yet.
-  world.pr = ok(prJson({ headRefOid: H2 }))
-  world.issueComments = failed
-  await bash(world, $, 'git push', '')
-  await until(() => world.calls.filter(a => a.join(' ').includes('/issues/109/comments')).length >= 2, 'the second review read')
-  for (let i = 0; i < 200 && (await codexLine($)) !== 'unknown'; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await codexLine($)).toBe('unknown')
-})
-
-// ---- the band does not read the pull request ------------------------------------------------------
-
-test('a final check on the current head, or on another commit, raises nothing: the band is the quiet line on both surfaces and never reads GitHub', async ($, on) => {
-  const { world, clock } = boot(on)
-  world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
-  await follow109($)
-  const calls = world.calls.length
-  for (const surface of SURFACES) {
-    const t = await bandTexts($, surface)
-    expect(t).toEqual(['Mentat'])
-  }
-  expect(world.calls.length).toBe(calls)
-
-  // Whatever the final check names, and however old or failed the reads are, the band stays quiet.
-  world.issueComments = ok(pages([finalCheck(H2), comment(ME, `Final check on ${H1}\n\nAll good.`, 3)]))
-  world.pr = failed
-  await clock.advance(6 * 60_000)
-  await untilPane($, 'PR read failed (last ok 6m ago)')
-  for (const surface of SURFACES) expect(await bandTexts($, surface)).toEqual(['Mentat'])
-})
-
-// ---- other open pull requests, freshness, failed reads ------------------------------------------------
-
-test('other open pull requests are counted without this one, singular and plural', async ($, on) => {
-  const { world } = boot(on)
-  world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }]))
-  await follow109($)
-  await untilPane($, '1 other open PR in this repository')
-
-  world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }, { number: 8 }]))
-  await bash(world, $, 'gh pr ready 109', '')
-  await untilPane($, '2 other open PRs in this repository')
-})
-
-test('other open pull requests say 100+ when the list hit its limit', async ($, on) => {
-  const { world } = boot(on)
-  world.prList = ok(JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i + 1 }))))
-  await follow109($)
-  await untilPane($, '100+ other open PRs in this repository')
-  expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'list') && a.includes('--limit') && a.includes('100') && a.includes('open'))).toBe(true)
-})
-
-// ---- the desktop pane has no pull request card (the app has its own chip); the terminal card stays ----------------
-
-// The terminal pane's texts; the desktop pane's pull request Svgs (none are expected).
-const cardOf = async ($: never) => {
-  const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
-  const drawn = await textsOf(pane)
-  await pane.unmount()
-
-  return drawn
-}
-const untilCard = async ($: never, cond: (t: string[]) => boolean, what: string) => {
-  let last: string[] = []
-  for (let i = 0; i < 300; i++) {
-    last = await cardOf($)
-    if (cond(last)) return last
-    await new Promise(r => setTimeout(r, 5))
-  }
-  throw new Error(`card never showed ${what}; it showed ${JSON.stringify(last)}`)
-}
-// Every Svg alt and drawn text of the desktop pane.
-const desktopPane = async ($: never) => {
-  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const svgs = await svgsOf(pane)
-  const texts = await textsOf(pane)
-  await pane.unmount()
-
-  return { alts: svgs.map(v => v.alt), texts }
-}
-
-test('terminal card: CI shows always; the desktop pane draws no pull request card or CI line', async ($, on) => {
-  const { world } = boot(on)
-  await follow109($)
-  await untilCard($, t => t.includes('Approval required'), 'the card')
-  for (const [rollup, terminal] of [[[CHECK_OK], '✓'], [[CHECK_OK, { __typename: 'CheckRun', status: 'IN_PROGRESS', conclusion: null }], 'running'], [[], 'none']] as [unknown[], string][]) {
-    world.pr = ok(prJson({ statusCheckRollup: rollup }))
-    await bash(world, $, 'gh pr ready 109', '')
-    await untilCard($, t => t.includes(terminal), `CI ${terminal}`)
-    const d = await desktopPane($)
-    expect(d.alts.some(a => a.startsWith('#109'))).toBe(false)
-    expect(d.texts.some(t => t.startsWith('CI') || t === 'No CI' || t === 'running' || t === 'Approval required')).toBe(false)
-  }
-
-  world.pr = ok(prJson({ statusCheckRollup: [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' }, CHECK_OK] }))
-  await bash(world, $, 'gh pr ready 109', '')
-  expect(await untilCard($, t => t.includes('✕ 1 failed'), 'the terminal CI')).toContain('CI')
-  expect((await desktopPane($)).texts.some(t => t.startsWith('CI'))).toBe(false)
-})
-
-test('the desktop pane draws no pull request card, and the band does not raise a final-checked pull request', async ($, on) => {
-  const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
-  await follow109($)
-  await untilCard($, t => t.includes('Approval required'), 'the card')
-  const pane = await desktopPane($)
-  expect(pane.alts).toEqual([])
-  expect(pane.texts.some(t => t.includes('Label issues by kind') || t.includes('Codex') || t.includes('Final check'))).toBe(false)
-  // The band is the quiet line, on the desktop.
-  const band = await mount($, BAND, 'desktop')
-  const bandSvg = await svgsOf(band)
-  expect(bandSvg.map(v => v.alt)).toEqual(['Mentat'])
-  await band.unmount()
-  // The terminal card keeps its lines; the final check is nobody's business there.
-  const t = await cardOf($)
-  expect(t).toContain('Label issues by kind')
-  expect(t).toContain('Codex')
-  expect(t.some(x => x.includes('Final check posted'))).toBe(false)
-})
-
-test('terminal card: other open pull requests and freshness stay; the desktop pane says neither', async ($, on) => {
-  const { world, clock } = boot(on)
-  world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }, { number: 8 }]))
-  await follow109($)
-  await untilPane($, '2 other open PRs in this repository')
-  expect((await desktopPane($)).texts.some(t => t.includes('other open'))).toBe(false)
-
-  world.pr = failed
-  await clock.advance(60_000)
-  await untilCard($, x => x.includes('PR read failed (last ok 1m ago)'), 'the freshness line')
-  expect((await desktopPane($)).texts.some(t => t.includes('read failed'))).toBe(false)
-})
-
-test('on the desktop a followed pull request whose first read failed draws no pull request line: the pane says nothing waits', async ($, on) => {
-  const { world } = boot(on)
-  world.pr = failed
-  await startSession($)
-  await follow($)
-  await untilPane($, 'PR read failed', 60)
-  const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect(await textsOf(desktop)).toEqual(['Nothing waiting on you.'])
-  await desktop.unmount()
-})
-
-test('a failed first read shows the pull request as named and says the read failed', async ($, on) => {
-  const { world } = boot(on)
-  world.pr = failed
-  await startSession($)
-  await follow($)
-  const t = await untilPane($, 'PR read failed')
-  expect(t).toContain('o/r#109')
-  expect(t.includes('Approval required')).toBe(false)
-})
-
-test('a failed read keeps the last good facts and says how old they are, only once old or failed', async ($, on) => {
-  const { world, clock } = boot(on)
-  await follow109($)
-  expect((await paneTexts($)).some(t => t.startsWith('PR read'))).toBe(false)
-  expect((await paneTexts($)).some(t => t.startsWith('Review read'))).toBe(false)
-
-  world.pr = failed
-  world.issueComments = failed
-  await clock.advance(60_000)
-  await untilPane($, 'PR read failed (last ok 1m ago)')
-  const t = await paneTexts($)
-  expect(t).toContain('Approval required')
-  // The review reads depend on the head, which could not be read: they were not tried.
-  expect(t.some(x => x.startsWith('Review read'))).toBe(false)
-
-  world.pr = ok(prJson())
-  await clock.advance(60_000)
-  await until(() => world.calls.filter(a => a.join(' ').includes('/issues/109/comments')).length >= 2, 'a review read')
-  await untilPane($, 'Review read failed (last ok 2m ago)')
-})
-
-test('a failed read of the agent account is named, not called a review failure', async ($, on) => {
-  const { world } = boot(on)
-  world.me = failed
-  await follow109($)
-  const t = await untilPane($, 'GitHub user read failed')
-  expect(t).not.toContain('Review read failed')
-  // The comments cannot be attributed, so Codex is unknown; the pull request's own facts stand.
-  expect(t).toContain('Approval required')
-  expect(t[t.indexOf('Codex') + 1]).toBe('unknown')
-  expect(world.calls.some(a => a.join(' ').includes('/issues/109/comments'))).toBe(false)
-
-  // Once the account can be read, the line goes and the review is read.
-  world.me = ok(`${ME}\n`)
-  world.issueComments = ok(pages([summary(H1)]))
-  await bash(world, $, 'git push', '')
-  for (let i = 0; i < 300 && (await paneTexts($)).includes('GitHub user read failed'); i++) await new Promise(r => setTimeout(r, 5))
-  const after = await paneTexts($)
-  expect(after).not.toContain('GitHub user read failed')
-  expect(after[after.indexOf('Codex') + 1]).toBe('No findings · 415e6d9')
-})
-
-test('data older than five minutes is marked old', async ($, on) => {
-  const { world, clock } = boot(on)
-  await follow109($)
-  world.pr = { exitCode: 1, stdout: '' }
-  await clock.advance(6 * 60_000)
-  const t = await untilPane($, 'PR read failed (last ok 6m ago)')
-  expect(t).toContain('Approval required')
-})
-
-test('a read that cannot be parsed is a failed read', async ($, on) => {
-  const { world } = boot(on)
-  world.pr = ok('not json')
-  await startSession($)
-  await follow($)
-  await untilPane($, 'PR read failed')
-})
-
-// ---- the refresh contract -----------------------------------------------------------------------------
-
-test('the first read runs at once, then every 60 seconds and right after gh pr, git push and mentat review', async ($, on) => {
-  const { world, clock } = boot(on)
-  await follow109($)
-  const n = () => prViews(world)
-  const first = n()
-  await clock.advance(60_000)
-  await until(() => n() > first, 'the 60 s read')
-  const second = n()
-  for (const cmd of ['gh pr ready 109', 'git push origin HEAD', 'mentat review --local 109']) {
-    const before = n()
-    await bash(world, $, cmd, '')
-    await until(() => n() > before, `a read after ${cmd}`)
-  }
-  const afterAll = n()
-  await bash(world, $, 'ls', '')
-  await bash(world, $, 'git status', '', {})
-  await bash(world, $, 'gh pr view 109', '', { agentId: 'sub1' })
-  await new Promise(r => setTimeout(r, 30))
-  expect(n()).toBe(afterAll)
-  expect(second).toBeGreaterThan(first)
-})
-
-test('one read at a time: a request while one runs is folded into one more read', async ($, on) => {
-  const { world } = boot(on)
-  await follow109($)
-  let release: (r: Run) => void = () => undefined
-  const gate = new Promise<Run>(r => { release = r })
-  const before = prViews(world)
-  world.pr = () => gate
-  await bash(world, $, 'git push', '')
-  await until(() => prViews(world) === before + 1, 'a read to start')
-  await bash(world, $, 'git push', '')
-  await bash(world, $, 'gh pr ready', '')
-  await bash(world, $, 'mentat review 109', '')
-  await new Promise(r => setTimeout(r, 30))
-  expect(prViews(world)).toBe(before + 1)
-  world.pr = ok(prJson({ title: 'chore: second' }))
-  release(ok(prJson({ title: 'chore: first' })))
-  await untilPane($, 'Second')
-  expect(prViews(world)).toBe(before + 2)
-  expect(world.peak).toBeLessThanOrEqual(3)
-})
-
-test('two reads finishing in reverse order: the older result is dropped', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await follow($)
-  await untilPane($, '#109')
-
-  // A read starts and hangs; the mod restarts (a reload raises session.start again)
-  // and its newer read finishes first. The old read then finishes with old data.
-  let releaseOld: (r: Run) => void = () => undefined
-  world.pr = () => new Promise<Run>(r => { releaseOld = r })
-  await bash(world, $, 'git push', '')
-  await until(() => prViews(world) >= 2, 'the old read to start')
-
-  world.pr = ok(prJson({ title: 'chore: newer', headRefOid: H2 }))
-  world.issueComments = ok(pages([summary(H2)]))
-  await startSession($)
-  await untilPane($, 'Newer')
-
-  releaseOld(ok(prJson({ title: 'chore: older' })))
-  await new Promise(r => setTimeout(r, 50))
-  const t = await paneTexts($)
-  expect(t).toContain('Newer')
-  expect(t).not.toContain('Older')
-})
-
-test('a result for a pull request that is no longer followed is dropped', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  let release: (r: Run) => void = () => undefined
-  world.pr = () => new Promise<Run>(r => { release = r })
-  await follow($, 'pr 109')
-  await until(() => prViews(world) >= 1, 'the read to start')
-  // Nothing newer for #7 can be read, so only the old result could put 109's facts there.
-  world.pr = failed
-  await follow($, 'pr o/r#7')
-  release(ok(prJson({ title: 'chore: stale 109' })))
-  await untilPane($, 'PR read failed')
-  const t = await paneTexts($)
-  expect(t).toContain('o/r#7')
-  expect(t).not.toContain('Stale 109')
 })
 
 // ---- agents ----------------------------------------------------------------------------------------------
@@ -2106,7 +1413,7 @@ test('the pane shows no usage on either surface: no tiles, no meters, no resets'
   await terminal.unmount()
 })
 
-test('no card is drawn for what there is not: no pull request, no agents, no questions', async ($, on) => {
+test('no card is drawn for what there is not: no agents, no questions', async ($, on) => {
   boot(on)
   const t = await paneTexts($)
   expect(t.some(x => x.toUpperCase().startsWith('AGENTS'))).toBe(false)
@@ -2144,7 +1451,7 @@ test('/mentat with nothing else to show opens the pane, so the Details button al
   expect(world.opened).toEqual(['mentat'])
 })
 
-test('/mentat opens the pane for an open question, a followed pull request or an agent row', async ($, on) => {
+test('/mentat opens the pane for an open question or an agent row', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
@@ -2160,14 +1467,6 @@ test('/mentat opens the pane for an open question, a followed pull request or an
   const withAgent = await eng($).command.run({ command: 'mentat', args: '' })
   expect(world.opened).toEqual(['mentat'])
   expect(withAgent.text).toBe('Mentat pane opened.')
-})
-
-test('/mentat opens the pane for a followed pull request', async ($, on) => {
-  const { world } = boot(on)
-  await follow109($)
-  world.opened.length = 0
-  await eng($).command.run({ command: 'mentat', args: '' })
-  expect(world.opened).toEqual(['mentat'])
 })
 
 // ---- the band for budget ------------------------------------------------------------
@@ -2275,10 +1574,9 @@ test('resetAt words the weekly reset in 12-hour time with a short weekday, in th
   expect(resetAt(at, now, 'Not/AZone')).toMatch(/^resets \w{3} \d{1,2}:\d{2} [AP]M$/)
 })
 
-test('an item that waits comes before the budget warning in the band, and the budget returns when it is closed; the final-checked pull request never shows', async ($, on) => {
+test('an item that waits comes before the budget warning in the band, and the budget returns when it is closed', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
-  world.issueComments = ok(pages([finalCheck(H1)]))
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Ask first?' })
   for (const surface of SURFACES) {
@@ -2288,14 +1586,6 @@ test('an item that waits comes before the budget warning in the band, and the bu
   }
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   expect((await bandTexts($)).some(x => x.includes('limit'))).toBe(true)
-
-  await follow($)
-  await untilPane($, '#109')
-  for (const surface of SURFACES) {
-    const t = await bandTexts($, surface)
-    expect(t).toContain('5-hour limit 95% · resets in 1h 29m')
-    expect(t.some(x => x.includes('Final check') || x.includes('#109'))).toBe(false)
-  }
 })
 
 // ---- kinds of open item: question, action, alert ------------------------------------------
@@ -2472,8 +1762,6 @@ const moreFor = (t: string[]) => t.find(x => /^\+\d+ more$/.test(x))
 test('the band shows the newest alert over everything else, then a question, a check warning and an action, then the budget, a note and the quiet line', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
-  world.issueComments = ok(pages([finalCheck(H1)]))
-  await follow109($)
   await note($, 'A note too', 'done')
   await open('action', 'Do the thing')($)
   await open(undefined, 'Ask first?')($)
@@ -2487,7 +1775,7 @@ test('the band shows the newest alert over everything else, then a question, a c
     const { texts, alts } = await bandWith($, surface)
     expect(texts).toContain('New alert')
     expect(texts).not.toContain('Old alert')
-    none(texts, 'Final check', 'limit', 'Ask first?', 'Do the thing', 'A note too')
+    none(texts, 'limit', 'Ask first?', 'Do the thing', 'A note too')
     expect(moreFor(texts)).toBe('+3 more')
     if (surface === 'desktop') {
       expect(alts).toEqual(['Alert: New alert (+3 more)'])
@@ -2508,7 +1796,7 @@ test('the band shows the newest alert over everything else, then a question, a c
   for (const surface of SURFACES) {
     const { texts, alts } = await bandWith($, surface)
     expect(texts).toContain('Ask first?')
-    none(texts, 'Final check', 'limit', 'Do the thing', 'A note too')
+    none(texts, 'limit', 'Do the thing', 'A note too')
     expect(moreFor(texts)).toBe('+1 more')
     if (surface === 'desktop') expect(alts).toEqual(['Question: Ask first? (+1 more)'])
   }
@@ -2518,7 +1806,7 @@ test('the band shows the newest alert over everything else, then a question, a c
   for (const surface of SURFACES) {
     const { texts, alts } = await bandWith($, surface)
     expect(texts).toContain('Do the thing')
-    none(texts, 'Final check', 'limit', 'A note too')
+    none(texts, 'limit', 'A note too')
     expect(moreFor(texts)).toBeUndefined()
     if (surface === 'desktop') expect(alts).toEqual(['Waiting on you: Do the thing'])
   }
@@ -2528,15 +1816,15 @@ test('the band shows the newest alert over everything else, then a question, a c
   for (const surface of SURFACES) {
     const { texts } = await bandWith($, surface)
     expect(texts).toContain('5-hour limit 95% · resets in 1h 29m')
-    none(texts, 'Final check', 'A note too')
+    none(texts, 'A note too')
   }
 
-  // Under the limit: the newest note, and never the final-checked pull request.
+  // Under the limit: the newest note.
   world.usage = { context: 5, limits: [limit('five_hour', 79, RESET_5H())] }
   for (const surface of SURFACES) {
     const { texts } = await bandWith($, surface)
     expect(texts).toContain('A note too')
-    none(texts, 'Final check', 'limit')
+    none(texts, 'limit')
   }
 })
 
@@ -2851,11 +2139,9 @@ test('the agent cannot open a warning: open_decision refuses the kind and record
   expect(await bandTexts($)).toEqual(['Mentat'])
 })
 
-test('the check warning comes after an alert and a question and before an action and the budget; the final-checked pull request never shows', async ($, on) => {
+test('the check warning comes after an alert and a question and before an action and the budget', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
-  world.issueComments = ok(pages([finalCheck(H1)]))
-  await follow109($)
   await open('action', 'Do the thing')($)
   await bash(world, $, 'mentat check', WARN_RUN)
   const none = (texts: string[], ...words: string[]) => expect(texts.some(x => words.some(w => x.includes(w)))).toBe(false)
@@ -2864,7 +2150,7 @@ test('the check warning comes after an alert and a question and before an action
   for (const surface of SURFACES) {
     const { texts, alts } = await bandWith($, surface)
     expect(texts).toContain('Check passed with 2 warnings')
-    none(texts, 'Final check', 'limit', 'Do the thing')
+    none(texts, 'limit', 'Do the thing')
     expect(moreFor(texts)).toBe('+1 more')
     if (surface === 'desktop') {
       expect(alts).toEqual(['Check warnings: Check passed with 2 warnings (+1 more)'])
@@ -2898,7 +2184,7 @@ test('the check warning comes after an alert and a question and before an action
   for (const surface of SURFACES) {
     const { texts } = await bandWith($, surface)
     expect(texts).toContain('Do the thing')
-    none(texts, 'Check passed', 'Final check', 'limit')
+    none(texts, 'Check passed', 'limit')
   }
 })
 
@@ -3078,7 +2364,7 @@ test('the same note twice in a row is added once; the same line after another no
 
 test('only the pane\'s own events are logged: a ready, a close, an issue, a Codex command and a merge add nothing', async ($, on) => {
   const { world } = boot(on)
-  await follow109($)
+  await startSession($)
   await bash(world, $, 'gh pr create --title "feat(pane): add a log" --body x', `${GH}/pull/130\n`)
   await bash(world, $, 'gh pr ready 130', '', {}, '✓ Pull request o/r#130 is marked as "ready for review"\n')
   await bash(world, $, 'gh pr close 131', '', {}, '✓ Closed pull request o/r#131 (feat: try a thing)\n')
@@ -3092,10 +2378,7 @@ test('only the pane\'s own events are logged: a ready, a close, an issue, a Code
   await eng($).agent.spawn(spawn('b1', 'Build the log', 'mentat:builder'))
   world.agents = [{ id: 'b1', type: 'mentat:builder', description: 'Build the log', status: 'completed' }]
   await eng($).turn.complete(turnDone('b1'))
-  world.pr = ok(prJson({ state: 'MERGED' }))
   await bash(world, $, 'git push', '')
-  const reads = prViews(world)
-  await until(() => prViews(world) > reads, 'the read of the merged pull request')
   await new Promise(r => setTimeout(r, 30))
   // Only the pane's own events: the PR opened, the item asked and closed, the builder done.
   expect(await lines($)).toEqual(['✓ Builder finished: Build the log · 0s', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
@@ -3199,22 +2482,6 @@ test('the log is plain text rows on both surfaces, with no Svg and no tint, and 
   await d.unmount()
 })
 
-test('on the terminal the log is under the pull request card; on the desktop there is no pull request card above it', async ($, on) => {
-  const { world } = boot(on)
-  await follow109($)
-  await note($, 'A note')
-  world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
-  await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
-  const term = await paneTexts($, 'terminal')
-  expect(term.indexOf('Label issues by kind')).toBeGreaterThan(-1)
-  expect(term.indexOf('Label issues by kind')).toBeLessThan(term.indexOf('LOG'))
-  expect(term.indexOf('LOG')).toBeLessThan(term.indexOf('Look around'))
-  const desk = await paneTexts($, 'desktop')
-  expect(desk).toContain('LOG')
-  expect(desk).not.toContain('Label issues by kind')
-  expect(desk).not.toContain('Nothing waiting on you.')
-})
-
 test('the desktop pane with only a note draws it and not the empty line', async ($, on) => {
   boot(on)
   await startSession($)
@@ -3244,6 +2511,13 @@ test('a new conversation empties the log; a reload and a compaction keep it', as
   }
 })
 
+test('/mentat takes no argument: with one it only says so, and opens nothing', async ($, on) => {
+  const { world } = boot(on)
+  expect((await eng($).command.run({ command: 'mentat', args: 'pr 5' })).text).toBe('Usage: /mentat')
+  expect(world.opened).toEqual([])
+  expect(world.calls).toEqual([])
+})
+
 test('the pane never calls $.command.run, whatever its buttons do', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
@@ -3262,7 +2536,7 @@ test('the pane never calls $.command.run, whatever its buttons do', async ($, on
 test('no terminal Box has a backgroundColor: a terminal draws an 8-digit hex tint as opaque grey', async ($, on) => {
   const { world } = boot(on, { zone: 'America/New_York' })
   world.usage = { context: 41, limits: [{ kind: 'five_hour', percentUsed: 85, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
-  await follow109($)
+  await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
   await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Merge it' })
   await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'CI is red' })
@@ -3770,10 +3044,8 @@ test('close_decision on an open item writes a Closed line with its outcome when 
 test('gh pr create that prints a pull request URL writes Opened PR #N, from the URL itself; other commands write none', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
-  // The read of the pull request fails: the line does not depend on the pane reading GitHub.
-  world.pr = failed
+  // The line comes from the URL the command printed; the pane reads nothing from GitHub.
   await bash(world, $, 'gh pr create --title "feat: x" --body y', `Creating pull request\n${GH}/pull/130\n`)
-  await until(() => prViews(world) > 0, 'the read')
   expect(await written($)).toEqual(['↗ Opened PR #130'])
   await bash(world, $, 'gh pr create --title "feat: y"', 'something went wrong\n')
   await bash(world, $, 'gh pr ready 130', `${GH}/pull/130\n`)
