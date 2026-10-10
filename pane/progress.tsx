@@ -1,6 +1,7 @@
-// Mentat's band and pane. The band is always there, one line: what waits on the maintainer, else a
-// warning that a rate limit runs low, else the newest note, else a quiet line. The pane holds the
-// Log and the agents.
+// Mentat's band and pane. On the desktop the band is always there, one line: what waits on the
+// maintainer, else a warning that a rate limit runs low, else the newest note, else a quiet line; the
+// pane holds the Log and the agents. On the terminal there is no band: the footer label counts what waits
+// and opens the pane, which has two sections, Waiting on you and the Feed.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -8,7 +9,7 @@
 // write it. Every $ call is in a hook or in a top-level function that takes $.
 
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren } from 'claude-code'
+import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { AgentRow, AgentStatus, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
 
@@ -22,9 +23,15 @@ const NOTE_TOOL = `mcp__${PLUGIN}__note`
 const WARN_PERCENT = 80
 // Rows between the desktop pane's sections.
 const SECTION_GAP = 2
-// The Log card keeps this many entries, shows the newest LOG_SHOWN until `Show all`, and cuts a line at LOG_WIDTH characters.
+// The terminal pane's width classes, in body columns: sections are framed from FRAME_COLUMNS, headed by a
+// rule from RULE_COLUMNS, and below that also drop the times, the recommendation and the WARN lines.
+const FRAME_COLUMNS = 60
+const RULE_COLUMNS = 40
+// The Log keeps this many entries and cuts a line at LOG_WIDTH characters. The desktop pane's Log card
+// shows the newest LOG_SHOWN until `Show all`; the terminal's Feed shows the newest FEED_SHOWN.
 const LOG_LIMIT = 200
 const LOG_SHOWN = 5
+const FEED_SHOWN = 10
 const LOG_WIDTH = 80
 // The record of items that left without close_decision keeps this many entries.
 const GONE_LIMIT = 50
@@ -45,7 +52,7 @@ const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The notes Claude Code adds with the `note` tool, in the pane's Log card and as the band's line: each kind has an
+// The notes Claude Code adds with the `note` tool, in the pane's Log and as the desktop band's line: each kind has an
 // icon and a color. The color is a theme color, so the line reads on the terminal and the desktop; the hue is
 // the same color for the desktop band's drawing.
 const LOG_STYLE: Record<LogKind, { icon: string; color: string; hue: string }> = {
@@ -201,7 +208,7 @@ const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number, effort
 }
 
 const ghPrUrl = /https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/pull\/(\d+)/g
-// The kinds of open item, in the order the pane lists them. An item stored without a kind is a question.
+// The kinds of open item, most urgent first. An item stored without a kind is a question.
 const KIND_RANK: Record<DecisionKind, number> = { alert: 0, question: 1, warning: 2, action: 3 }
 const kindOf = (d: { kind?: DecisionKind }): DecisionKind => d.kind ?? 'question'
 // The kinds the agent may open. A warning is the mod's own, for a passing `mentat check` with warnings.
@@ -568,10 +575,12 @@ const MARK: Record<BandKind, { char: string; hue: string }> = {
 }
 // The description of an item in the desktop band's alt text.
 const ITEM_ALT: Record<DecisionKind, string> = { question: 'Question', action: 'Waiting on you', alert: 'Alert', warning: 'Check warnings' }
-// The item that waits on the maintainer and comes first: alert, then question, check warning, action;
-// the newest of its kind. The rest are counted in `+N more`.
-const mostUrgent = (list: Decision[]): Decision | undefined =>
-  [...list].reverse().sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])[0]
+// The items that wait on the maintainer, most urgent first: alert, then question, check warning, action; the
+// newest of a kind first. The desktop band shows the first and counts the rest in `+N more`; the terminal
+// pane lists them all.
+const urgentFirst = (list: Decision[]): Decision[] =>
+  [...list].reverse().sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
+const mostUrgent = (list: Decision[]): Decision | undefined => urgentFirst(list)[0]
 
 // One line, drawn as a single Svg on the desktop: a mark and the text, and at the right the `+N more` pill
 // when more than one item waits. The buttons are native, beside it.
@@ -655,6 +664,211 @@ const dismissItem = async ($: EngineInterface, id: string) => {
 }
 // How close_decision names the way a new conversation started.
 const SOURCE_WORDS: Record<string, string> = { clear: '/clear', resume: '/resume', fork: '/branch' }
+
+// ---- the terminal pane: Waiting on you, then the Feed ----
+
+type Layout = 'frame' | 'rule' | 'narrow'
+const layoutOf = (cols: number): Layout => (cols >= FRAME_COLUMNS ? 'frame' : cols >= RULE_COLUMNS ? 'rule' : 'narrow')
+// The pieces of a section's top edge, which together are exactly `cols` characters wide: `╭─ TITLE 3 ───╮`
+// in a frame, `── TITLE 3 ───` as a rule. The title is drawn bold and the count dim, so they are apart.
+const topEdge = (layout: Layout, title: string, count: number, cols: number): { head: string; title: string; count: string; fill: string } => {
+  const head = layout === 'frame' ? '╭─ ' : '── '
+  const shown = ` ${count}`
+  const room = cols - head.length - title.length - shown.length - 1 - (layout === 'frame' ? 1 : 0)
+
+  return { head, title, count: shown, fill: ` ${'─'.repeat(Math.max(0, room))}${layout === 'frame' ? '╮' : ''}` }
+}
+const bottomEdge = (cols: number): string => `╰${'─'.repeat(Math.max(0, cols - 2))}╯`
+// The mark of each kind of open item and its theme color.
+const ITEM_MARK: Record<DecisionKind, { char: string; color: string | undefined }> = {
+  question: { char: '?', color: undefined },
+  alert: { char: '!', color: 'error' },
+  warning: { char: '!', color: 'warning' },
+  action: { char: '→', color: 'suggestion' },
+}
+
+// The pane on the terminal. `e` is the Pane's own render argument; `cols` its body width.
+async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], cols: number) {
+  const { Box, Button, Link, Text } = $.ui.resolve(e)
+  const now = await $.clock.now()
+  const zone = await readZone($)
+  const layout = layoutOf(cols)
+  const isShort = layout === 'narrow'
+  const open = urgentFirst(await read($, items))
+  const sentList = await read($, sentAtom)
+  const result = await read($, checkResult)
+  const live = [...(await read($, agents))]
+    .filter(a => !isEnded(a.status))
+    .sort((a, b) => {
+      if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
+      return (b.startedAt ?? 0) - (a.startedAt ?? 0)
+    })
+  const logList = await read($, logAtom)
+  const isLogAll = await read($, logAll)
+  const budget = budgetAlert(limitsOf(await readUsage($), now, zone))
+  const toggleLog = () => inTurn(() => update($, logAll, v => !v))
+
+  // One body row: in a frame between the dim side lines, else bare. The middle grows and shrinks, so a row
+  // that ends in Buttons needs no width arithmetic and the right edge stays where it is.
+  const row = (key: string, children: RenderElement[]) => (
+    <Box key={key} flexDirection="row">
+      {layout === 'frame' && <Text dimColor>│ </Text>}
+      <Box flexGrow={1} flexShrink={1} flexDirection="row" gap={1}>
+        {children}
+      </Box>
+      {layout === 'frame' && <Text dimColor> │</Text>}
+    </Box>
+  )
+  // A dim line under an item's text, indented to it.
+  const detail = (key: string, text: string) =>
+    row(key, [
+      <Box key="text" flexGrow={1} flexShrink={1} paddingLeft={2}>
+        <Text dimColor wrap="truncate-end">
+          {text}
+        </Text>
+      </Box>,
+    ])
+  const section = (key: string, title: string, count: number, rows: RenderElement[], gap: boolean) => {
+    const edge = topEdge(layout, title, count, cols)
+
+    return (
+      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0}>
+        <Box key={`${key}-top`} flexDirection="row">
+          <Text dimColor>{edge.head}</Text>
+          <Text bold>{edge.title}</Text>
+          <Text dimColor>{edge.count}</Text>
+          <Text dimColor>{edge.fill}</Text>
+        </Box>
+        {rows}
+        {layout === 'frame' && (
+          <Box key={`${key}-bottom`} flexDirection="row">
+            <Text dimColor>{bottomEdge(cols)}</Text>
+          </Box>
+        )}
+      </Box>
+    )
+  }
+
+  // Waiting on you: every open item, most urgent first. The first line holds the mark, the text and the buttons;
+  // under it, dim, the recommendation and the time, and for the check's warning item its WARN lines.
+  const waiting = open.flatMap(d => {
+    const kind = kindOf(d)
+    const sent = sentList.find(x => x.id === d.id)
+    const answer = kind === 'question' && sent === undefined ? d.accept : undefined
+    const link = kind !== 'question' ? d.link : undefined
+    const mark = ITEM_MARK[kind]
+    const lines: RenderElement[] = [
+      row(`item-${d.id}`, [
+        mark.color === undefined ? (
+          <Text key="mark" dimColor>
+            {mark.char}
+          </Text>
+        ) : (
+          <Text key="mark" color={mark.color}>
+            {mark.char}
+          </Text>
+        ),
+        <Box key="text" flexGrow={1} flexShrink={1}>
+          <Text wrap="truncate-end">{d.question}</Text>
+        </Box>,
+        <Box key="controls" flexDirection="row" gap={1} flexShrink={0}>
+          {answer !== undefined && (
+            <Button key={`accept-${d.id}`} plain label={answer} onPress={() => sendAnswer($, d, answer)}>
+              <Text bold color="suggestion">
+                {answer}
+              </Text>
+            </Button>
+          )}
+          {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
+          {link !== undefined && (
+            <Text underline color="suggestion">
+              <Link href={link} label={linkLabel(link)} />
+            </Text>
+          )}
+          <Button key={`dismiss-${d.id}`} plain label="Dismiss" onPress={() => dismissItem($, d.id)}>
+            <Text color="suggestion">Dismiss</Text>
+          </Button>
+        </Box>,
+      ]),
+    ]
+    if (!isShort) {
+      const time = clockAt(d.openedAt, zone)
+      lines.push(detail(`detail-${d.id}`, d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`))
+      if (d.id === CHECK_ID && kind === 'warning') {
+        ;(result?.warnings ?? []).forEach((w, i) => lines.push(detail(`warn-${i}`, `WARN: ${w}`)))
+      }
+    }
+
+    return lines
+  })
+
+  // The Feed: the agents that have not ended, pinned, then the log newest first.
+  const feedRows: RenderElement[] = live.map(a => {
+    const ms = a.startedAt === undefined ? undefined : now - a.startedAt
+    const state = ms === undefined ? a.status : `${a.status} · ${duration(ms)}`
+
+    return row(`agent-${a.id}`, [
+      <Text key="mark">{ROLE_MARK[roleOf(a.type).role]}</Text>,
+      <Box key="text" flexGrow={1} flexShrink={1}>
+        <Text bold wrap="truncate-end">
+          {a.description}
+        </Text>
+      </Box>,
+      <Text key="state" dimColor>
+        {state}
+      </Text>,
+    ])
+  })
+  if (live.length > 0 && logList.length > 0) feedRows.push(row('feed-gap', [<Text key="gap"> </Text>]))
+  const entries = logList.map((entry, n) => ({ entry, n })).reverse()
+  for (const { entry, n } of isLogAll ? entries : entries.slice(0, FEED_SHOWN)) {
+    const { icon, color } = styleOf(entry)
+    feedRows.push(
+      row(`log-${n}`, [
+        ...(isShort
+          ? []
+          : [
+              <Box key="time" width={8} flexShrink={0} justifyContent="flex-end">
+                <Text dimColor>{clockAt(entry.at, zone)}</Text>
+              </Box>,
+            ]),
+        <Text key="icon" color={color}>
+          {icon}
+        </Text>,
+        <Box key="text" flexGrow={1} flexShrink={1}>
+          <Text wrap="truncate-end" {...(isNote(entry) ? {} : { dimColor: true })}>
+            {entry.text}
+          </Text>
+        </Box>,
+      ]),
+    )
+  }
+  if (logList.length > FEED_SHOWN) {
+    const label = isLogAll ? 'Show fewer' : `Show all ${logList.length}`
+    feedRows.push(
+      row('log-toggle-row', [
+        <Button key="log-toggle" plain label={label} onPress={toggleLog}>
+          <Text color="suggestion">{label}</Text>
+        </Button>,
+      ]),
+    )
+  }
+
+  return (
+    <Box flexDirection="column">
+      {budget !== undefined && (
+        <Box key="budget" marginBottom={1}>
+          <Text color="warning" wrap="truncate-end">
+            {budget}
+          </Text>
+        </Box>
+      )}
+      {open.length > 0 && section('waiting', 'WAITING ON YOU', open.length, waiting, false)}
+      {feedRows.length > 0 && section('feed', 'FEED', live.length + logList.length, feedRows, open.length > 0)}
+      {open.length === 0 && feedRows.length === 0 && <Text dimColor>Nothing waiting on you.</Text>}
+    </Box>
+  )
+}
 
 export const register: Register = (on, _options) => {
   // The effort an Agent call asked for, until the agent it spawns is recorded.
@@ -947,11 +1161,15 @@ export const register: Register = (on, _options) => {
   })
 
   // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.
-  // Dim until a `mentat check` has run, then green, amber with the warning count, or red.
+  // `● Mentat`: dim until a `mentat check` has run, then green, amber with the warning count, or red. While
+  // items wait, `· N waiting` follows it, N counting every open item. On the terminal the label is a
+  // Button that opens the pane (there is no band there); on the desktop it is the same text, and the
+  // band is there.
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     const result = await read($, checkResult)
-    const { Box, Text } = $.ui.resolve(e)
+    const waiting = (await read($, items)).length
+    const { Box, Button, Text } = $.ui.resolve(e)
     const modes = e.props.modes
     const [text, color] =
       result === null
@@ -961,26 +1179,40 @@ export const register: Register = (on, _options) => {
           : result.state === 'warn'
             ? [`● Mentat · ${plural(result.warnings.length, 'warning', 'warnings')}`, 'warning']
             : ['● Mentat', 'success']
+    const name = color === undefined ? <Text key="name" dimColor>{text}</Text> : <Text key="name" color={color}>{text}</Text>
+    const count = waiting === 0 ? [] : [<Text key="sep" dimColor>{' · '}</Text>, <Text key="count" color="warning">{`${waiting} waiting`}</Text>]
+    const label = e.surface === 'terminal' ? (
+      <Button key="mentat-open" plain label={`${text}${waiting === 0 ? '' : ` · ${waiting} waiting`}`} onPress={() => $.ui.open({ id: PANE, title: TITLE })}>
+        {name}
+        {count}
+      </Button>
+    ) : (
+      <Box key="mentat-label" flexDirection="row">
+        {name}
+        {count}
+      </Box>
+    )
 
     return (
       <Box flexDirection="row" gap={1}>
-        {color === undefined ? <Text dimColor>{text}</Text> : <Text color={color}>{text}</Text>}
+        {label}
         {modes.length > 0 && <Text dimColor>{modes.join(' & ')}</Text>}
       </Box>
     )
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) {
+    // The terminal has no band of Mentat's: the footer label opens the pane. What is beneath stays.
+    if (e.props.hasSurvey || e.surface !== 'desktop') {
       return next(e)
     }
-    // The band is always there: what waits on the maintainer, else a budget warning, else the newest
+    // The desktop band is always there: what waits on the maintainer, else a budget warning, else the newest
     // Log note, else a quiet line. Nothing in it comes from GitHub.
     const open = await read($, items)
     const now = await $.clock.now()
     const urgent = mostUrgent(open)
-    // Budget raises it only when no item waits. Nothing redraws the band for a change of usage alone;
-    // it is read when the band is drawn (see the report).
+    // Budget raises it only when no item waits. It is read when the band is drawn, and the minute timer
+    // draws the band again, so a change of usage alone shows within a minute.
     const budget = urgent === undefined ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
     const logList = urgent === undefined && budget === undefined ? await read($, logAtom) : []
     // Only a note is the band's line, never an event line.
@@ -1019,41 +1251,20 @@ export const register: Register = (on, _options) => {
     )
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
-    if (e.surface === 'desktop') {
-      const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
-      // The Svg leaves room for the native buttons beside it.
-      const beside =
-        (urgent === undefined ? 0 : buttonW('Dismiss') + 8) +
-        (answer === undefined ? 0 : buttonW(answer) + 8) +
-        (sent === undefined ? 0 : Math.round(textW(sentLine(sent), 12)) + 8) +
-        (link === undefined ? 0 : Math.round(textW(linkLabel(link), 13)) + 8)
-      const W = Math.max(160, (e.props.bodyColumns ?? 80) * 8 - 96 - beside)
-      const alt = `${left.kind === 'budget' || left.kind === 'quiet' ? '' : left.kind === 'note' ? 'Note: ' : `${ITEM_ALT[left.kind]}: `}${left.text}${more === '' ? '' : ` (${more})`}`
-      return (
-        <Box flexDirection="column">
-          <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-            <Svg source={bandSvg(W, left, more)} alt={alt} width={W} height={28} />
-            {controls()}
-          </Box>
-          {beneath}
-        </Box>
-      )
-    }
+    const { Svg } = $.ui.resolve(e)
+    // The Svg leaves room for the native buttons beside it.
+    const beside =
+      (urgent === undefined ? 0 : buttonW('Dismiss') + 8) +
+      (answer === undefined ? 0 : buttonW(answer) + 8) +
+      (sent === undefined ? 0 : Math.round(textW(sentLine(sent), 12)) + 8) +
+      (link === undefined ? 0 : Math.round(textW(linkLabel(link), 13)) + 8)
+    const W = Math.max(160, (e.props.bodyColumns ?? 80) * 8 - 96 - beside)
+    const alt = `${left.kind === 'budget' || left.kind === 'quiet' ? '' : left.kind === 'note' ? 'Note: ' : `${ITEM_ALT[left.kind]}: `}${left.text}${more === '' ? '' : ` (${more})`}`
 
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={2}>
-          <Box flexDirection="row" alignItems="center" gap={1} flexShrink={1}>
-            {left.kind === 'budget' && <Text color="warning" wrap="truncate-end">{left.text}</Text>}
-            {left.kind === 'alert' && <Text color="error">!</Text>}
-            {left.kind === 'question' && <Text dimColor>?</Text>}
-            {left.kind === 'warning' && <Text color="warning">!</Text>}
-            {left.kind === 'action' && <Text color="suggestion">→</Text>}
-            {left.kind === 'note' && <Text color={LOG_STYLE[note!.kind].color}>{left.icon}</Text>}
-            {left.kind === 'quiet' && <Text dimColor>{left.text}</Text>}
-            {left.kind !== 'budget' && left.kind !== 'quiet' && <Text wrap="truncate-end">{left.text}</Text>}
-            {more !== '' && <Text dimColor>{more}</Text>}
-          </Box>
+        <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
+          <Svg source={bandSvg(W, left, more)} alt={alt} width={W} height={28} />
           {controls()}
         </Box>
         {beneath}
@@ -1062,11 +1273,10 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Text } = $.ui.resolve(e)
-    const Svg = e.surface === 'desktop' ? $.ui.resolve(e as typeof e & { surface: 'desktop' }).Svg : undefined
-    const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
-    const isNarrow = cols < 48
+    if (e.surface !== 'desktop') return terminalPane($, e, cols)
+    const { Box, Button, Svg, Text } = $.ui.resolve(e)
+    const now = await $.clock.now()
     // What waits on the maintainer is in the band, not here; the pane only knows whether anything does.
     const open = await read($, items)
     const rows = [...(await read($, agents))].sort((a, b) => {
@@ -1078,13 +1288,6 @@ export const register: Register = (on, _options) => {
     const liveRows = rows.filter(a => !isEnded(a.status))
     const doneRows = rows.filter(a => isEnded(a.status))
     const toggleFinished = () => inTurn(() => update($, finishedHidden, v => !v))
-    // The terminal's card: no background, because a terminal draws an 8-digit hex tint as an opaque grey.
-    // The kind is marked by its heading's color.
-    const Card = ({ children }: { children?: RenderChildren }) => (
-      <Box flexDirection="column" marginTop={1}>
-        {children}
-      </Box>
-    )
     const Heading = ({ label, color }: { label: string; color?: string }) => (
       <Box flexDirection="row" marginBottom={1}>
         <Text bold color={color ?? 'subtle'}>
@@ -1092,41 +1295,6 @@ export const register: Register = (on, _options) => {
         </Text>
       </Box>
     )
-
-    // One agent on the terminal, on one line: a mark for its role, the description (cut with an
-    // ellipsis when long), the model and effort, the tokens and elapsed time, and the status mark at
-    // the end. The status is also said in words when the mark cannot (waiting, idle, failed, killed, ended).
-    // No background colors: the terminal draws the desktop's alpha tints as solid grey.
-    const termRow = (a: AgentRow, i: number) => {
-      const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
-      const model = [a.model === undefined ? undefined : shortModel(a.model), isNarrow ? undefined : a.effort].filter(Boolean).join(' · ')
-      const word = a.status === 'running' || a.status === 'completed' ? undefined : a.status === 'unknown' ? 'ended' : a.status
-      const stats = [word, ms === undefined ? undefined : duration(ms), isNarrow || a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`]
-        .filter(Boolean)
-        .join(' · ')
-      const color = isActive(a.status) ? 'suggestion' : a.status === 'failed' || a.status === 'killed' ? 'error' : a.status === 'completed' ? 'success' : 'subtle'
-      return (
-        <Box key={a.id} flexDirection="row" gap={1}>
-          <Text dimColor={isEnded(a.status)}>{ROLE_MARK[roleOf(a.type).role]}</Text>
-          <Box flexGrow={1} flexShrink={1}>
-            <Text bold={isActive(a.status)} dimColor={isEnded(a.status)} wrap="truncate-end">
-              {a.description}
-            </Text>
-          </Box>
-          {model !== '' && (
-            <Text dimColor wrap="truncate-end">
-              {model}
-            </Text>
-          )}
-          {stats !== '' && (
-            <Text dimColor wrap="truncate-end">
-              {stats}
-            </Text>
-          )}
-          <Text color={color}>{isActive(a.status) ? '●' : a.status === 'completed' ? '✓' : a.status === 'failed' || a.status === 'killed' ? '✕' : '○'}</Text>
-        </Box>
-      )
-    }
 
     // The Log card: the newest entries first, the last LOG_SHOWN of them until `Show all`. Plain text
     // rows on both surfaces, with no background: an 8-digit hex tint renders as solid grey in a terminal.
@@ -1157,76 +1325,45 @@ export const register: Register = (on, _options) => {
           )}
         </Box>
       )
-    if (Svg !== undefined) {
-      const W = Math.max(220, Math.min(900, cols * 8 - 24))
-      const agentRow = (a: AgentRow): AgentCardRow => {
-        const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
-        const elapsed = ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms)
+    const W = Math.max(220, Math.min(900, cols * 8 - 24))
+    const agentRow = (a: AgentRow): AgentCardRow => {
+      const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
+      const elapsed = ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms)
 
-        return {
-          status: a.status,
-          title: a.description,
-          type: a.type,
-          model: [a.model === undefined ? undefined : shortModel(a.model), a.effort].filter(Boolean).join(' · '),
-          stats: [a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`, elapsed === '' ? undefined : elapsed].filter(Boolean).join(' · '),
-        }
+      return {
+        status: a.status,
+        title: a.description,
+        type: a.type,
+        model: [a.model === undefined ? undefined : shortModel(a.model), a.effort].filter(Boolean).join(' · '),
+        stats: [a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`, elapsed === '' ? undefined : elapsed].filter(Boolean).join(' · '),
       }
-      const liveRowsSvg = liveRows.map(agentRow)
-      const doneRowsSvg = doneRows.map(agentRow)
-      const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRowsSvg)
-      const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRowsSvg)
-      return (
-        <Box flexDirection="column" paddingX={1}>
-          {open.length === 0 && logList.length === 0 && rows.length === 0 && (
-            <Box marginTop={SECTION_GAP}>
-              <Text dimColor>Nothing waiting on you.</Text>
-            </Box>
-          )}
-          {logCard(SECTION_GAP)}
-          {rows.length > 0 && (
-            <Box flexDirection="column" marginTop={SECTION_GAP}>
-              {liveCard !== undefined && <Svg source={liveCard.svg} alt={agentsAlt('Running agents', liveRowsSvg)} width={W} height={liveCard.h} />}
-              {doneRows.length > 0 && (
-                <Box flexDirection="row" marginTop={liveCard === undefined ? 0 : 1}>
-                  <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
-                </Box>
-              )}
-              {doneCard !== undefined && (
-                <Box marginTop={1}>
-                  <Svg source={doneCard.svg} alt={agentsAlt('Finished agents', doneRowsSvg)} width={W} height={doneCard.h} />
-                </Box>
-              )}
-            </Box>
-          )}
-        </Box>
-      )
     }
-
+    const liveRowsSvg = liveRows.map(agentRow)
+    const doneRowsSvg = doneRows.map(agentRow)
+    const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRowsSvg)
+    const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRowsSvg)
     return (
       <Box flexDirection="column" paddingX={1}>
-        {open.length === 0 && logList.length === 0 && rows.length === 0 && <Text dimColor>Nothing waiting on you.</Text>}
-
-        {logCard(1)}
-
+        {open.length === 0 && logList.length === 0 && rows.length === 0 && (
+          <Box marginTop={SECTION_GAP}>
+            <Text dimColor>Nothing waiting on you.</Text>
+          </Box>
+        )}
+        {logCard(SECTION_GAP)}
         {rows.length > 0 && (
-          <Card>
-            {liveRows.length > 0 && (
-              <Box flexDirection="column">
-                <Box marginBottom={1}>
-                  <Text bold color="subtle">{`Running · ${liveRows.length}`}</Text>
-                </Box>
-                {liveRows.map((a, i) => termRow(a, i))}
-              </Box>
-            )}
+          <Box flexDirection="column" marginTop={SECTION_GAP}>
+            {liveCard !== undefined && <Svg source={liveCard.svg} alt={agentsAlt('Running agents', liveRowsSvg)} width={W} height={liveCard.h} />}
             {doneRows.length > 0 && (
-              <Box flexDirection="column" marginTop={liveRows.length > 0 ? 1 : 0}>
-                <Box flexDirection="row">
-                  <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
-                </Box>
-                {!isHidden && <Box flexDirection="column" marginTop={1}>{doneRows.map((a, i) => termRow(a, i))}</Box>}
+              <Box flexDirection="row" marginTop={liveCard === undefined ? 0 : 1}>
+                <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
               </Box>
             )}
-          </Card>
+            {doneCard !== undefined && (
+              <Box marginTop={1}>
+                <Svg source={doneCard.svg} alt={agentsAlt('Finished agents', doneRowsSvg)} width={W} height={doneCard.h} />
+              </Box>
+            )}
+          </Box>
         )}
       </Box>
     )
