@@ -82,6 +82,10 @@ export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] 
 // cause 'user': the read that failed was the agent account's login, not the review itself.
 export type ReadMark = { seq: number; okAt: number; failedAt: number; cause?: 'user' }
 
+// An item that left the list without close_decision: dismissed in the band, or cleared when a new
+// conversation started (source: clear, resume or fork). at is the clock time it left.
+export type GoneEntry = { id: string; why: 'dismissed' | 'cleared'; source?: string; at: number }
+
 declare module 'claude-code' {
   interface PluginState {
     'mentat': {
@@ -108,6 +112,8 @@ declare module 'claude-code' {
       log: LogEntry[]
       // True while the pane's Log card shows every entry (default: the last five).
       logAll: boolean
+      // Items that left without close_decision, oldest first; capped at 50, never drawn.
+      decisionsGone: GoneEntry[]
     }
   }
 }

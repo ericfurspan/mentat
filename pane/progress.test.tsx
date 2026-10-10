@@ -653,7 +653,7 @@ test('Dismiss on a sent question removes it and its sent entry, while the answer
         expect(await sentIds($)).toEqual([])
       }
       await band.unmount()
-      expect((await eng($).tool.call({ tool: CLOSE, id })).deny).toContain('No open decision')
+      expect(String((await eng($).tool.call({ tool: CLOSE, id })).result)).toContain(`Decision ${id} was already dismissed in the pane`)
     }
   }
 })
@@ -738,7 +738,110 @@ test('a question needs text', async ($, on) => {
 test('closing an unknown id is refused', async ($, on) => {
   boot(on)
   const ran = await eng($).tool.call({ tool: CLOSE, id: 'd99' })
-  expect(ran.deny).toContain('No open decision')
+  expect(ran.deny).toBe('No open decision with id d99, and no record of it being dismissed or cleared.')
+})
+
+// ---- items that left without close_decision ----------------------------------------------------------
+
+const newConversation = ($: never, source: string) =>
+  ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic.SessionStart({ source })
+
+test('close_decision on an item dismissed in the band succeeds and names the time, on both surfaces', async ($, on) => {
+  const { clock } = boot(on)
+  for (const [i, surface] of SURFACES.entries()) {
+    const id = `d${i + 1}`
+    await eng($).tool.call({ tool: OPEN, question: `Drop ${id}?` })
+    // The press is 5 minutes later than the time it was opened, so the time is the press's.
+    await clock.advance(5 * 60_000)
+    const band = await mount($, BAND, surface)
+    await band.press({ key: `dismiss-${id}` })
+    await band.unmount()
+    await clock.advance(60 * 60_000)
+    const ran = await eng($).tool.call({ tool: CLOSE, id })
+    expect(ran.deny).toBeUndefined()
+    // T0 is 8:00 AM in the test's zone; the first press is at 8:05, the second at 9:10 plus 5 minutes.
+    expect(ran.result).toBe(`Decision ${id} was already dismissed in the pane at ${i === 0 ? '8:05 AM' : '9:10 AM'}.`)
+    // It stays answerable: the record is not used up.
+    expect(String((await eng($).tool.call({ tool: CLOSE, id })).result)).toContain('already dismissed')
+  }
+})
+
+test('Dismiss records an id that was open, once; close_decision of an id never opened still refuses', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'One?' })
+  const band = await mount($, BAND, 'terminal')
+  await band.press({ key: 'dismiss-d1' })
+  await band.unmount()
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toContain('already dismissed')
+  expect((await eng($).tool.call({ tool: CLOSE, id: 'd2' })).deny).toContain('no record')
+})
+
+test('close_decision on items cleared by /clear, /resume or /branch succeeds and names how the conversation started', async ($, on) => {
+  boot(on)
+  const words = [['clear', '/clear'], ['resume', '/resume'], ['fork', '/branch']] as const
+  for (const [i, [source, shown]] of words.entries()) {
+    const id = `d${i + 1}`
+    await eng($).tool.call({ tool: OPEN, question: `Asked before ${source}?` })
+    await newConversation($, source)
+    const ran = await eng($).tool.call({ tool: CLOSE, id })
+    expect(ran.deny).toBeUndefined()
+    expect(ran.result).toBe(`Decision ${id} was already cleared when a new conversation started (${shown}).`)
+  }
+  // Ids keep counting across the reset, and the older records stay.
+  expect(String((await eng($).tool.call({ tool: OPEN, question: 'Next?' })).result)).toBe('Opened decision d4.')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toContain('(/clear)')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd4' })).result)).toBe('Closed decision d4.')
+})
+
+test('a startup or compaction keeps the open items and records nothing', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Still here?' })
+  await newConversation($, 'startup')
+  await newConversation($, 'compact')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Closed decision d1.')
+  expect((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).deny).toContain('no record')
+})
+
+test('the record of items that left keeps the last 50, oldest dropped, and survives a reload of the pane', async ($, on) => {
+  boot(on)
+  for (let i = 1; i <= 52; i++) await eng($).tool.call({ tool: OPEN, question: `Question ${i}?` })
+  // The band shows the newest item, so Dismiss takes d52, d51 ... d33 in turn; then /clear takes d1..d32.
+  // That is 52 records in this order, so the first two (d52, d51) fall out of the 50 kept.
+  const band = await mount($, BAND, 'terminal')
+  for (let i = 52; i >= 33; i--) await band.press({ key: `dismiss-d${i}` })
+  await band.unmount()
+  await newConversation($, 'clear')
+  await startSession($)
+  const answer = async (id: string) => eng($).tool.call({ tool: CLOSE, id })
+  expect((await answer('d52')).deny).toContain('no record')
+  expect((await answer('d51')).deny).toContain('no record')
+  expect(String((await answer('d50')).result)).toContain('already dismissed')
+  expect(String((await answer('d33')).result)).toContain('already dismissed')
+  expect(String((await answer('d32')).result)).toContain('already cleared')
+  expect(String((await answer('d1')).result)).toContain('already cleared')
+})
+
+test('the record survives a reload of the pane (a session start) and is never drawn', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Gone soon?' })
+  const band = await mount($, BAND, 'terminal')
+  await band.press({ key: 'dismiss-d1' })
+  await band.unmount()
+  await startSession($)
+  await startSession($)
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Decision d1 was already dismissed in the pane at 8:00 AM.')
+  for (const surface of SURFACES) {
+    expect(await bandTexts($, surface)).toEqual(['Mentat'])
+    expect((await paneTexts($, surface)).join(' ')).not.toContain('dismissed')
+  }
+})
+
+test('a check alert replaced or removed by a later run is not recorded', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  await bash(world, $, 'mentat check', 'Check OK (0 warning(s))')
+  expect((await eng($).tool.call({ tool: CLOSE, id: 'check' })).deny).toContain('no record')
 })
 
 test('the accept button sends its label as the answer, once, and only the most urgent question has one', async ($, on) => {
@@ -774,7 +877,8 @@ test('dismiss settles a question', async ($, on) => {
   await band.unmount()
   expect((await bandTexts($)).includes('Drop it?')).toBe(false)
   const again = await eng($).tool.call({ tool: CLOSE, id: 'd1' })
-  expect(again.deny).toContain('No open decision')
+  expect(again.deny).toBeUndefined()
+  expect(again.result).toBe('Decision d1 was already dismissed in the pane at 8:00 AM.')
 })
 
 test('two questions opened at once get different ids and both are kept', async ($, on) => {
