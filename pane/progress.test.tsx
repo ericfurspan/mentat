@@ -3325,8 +3325,8 @@ test('the desktop pane has a Waiting on you card and a Feed card, each with its 
   expect(boxes.filter(b => b.props?.backgroundColor !== undefined)).toHaveLength(2)
   expect(waiting.props?.flexDirection).toBe('column')
   expect(waiting.props?.borderStyle).toBe('round')
-  // Headings: bold, Waiting on you in the warning color and Feed muted, the count dim. Two items; the agent,
-  // the note, its Asked line and the check line make five Feed entries.
+  // Headings: bold, Waiting on you in the warning color and Feed muted, the count dim. Two items; the agent, the
+  // Asked line, the check line and the note make four Feed entries.
   const texts = await d.findAll({ type: 'Text' })
   const head = (title: string) => texts.findIndex(t => t.text === title)
   expect(texts[head('WAITING ON YOU')]!.props).toMatchObject({ bold: true, color: 'warning' })
