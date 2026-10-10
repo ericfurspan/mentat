@@ -29,10 +29,9 @@ const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const answering = atom({ plugin: 'mentat', key: 'decisionsAnswering' } as const, [])
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
-const queuedAtom = atom({ plugin: 'mentat', key: 'actionsQueued' } as const, [])
-const failedAtom = atom({ plugin: 'mentat', key: 'actionFailed' } as const, null)
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
+const commandsShown = atom({ plugin: 'mentat', key: 'commandsShown' } as const, false)
 const prRef = atom({ plugin: 'mentat', key: 'prRef' } as const, '')
 const prAtom = atom({ plugin: 'mentat', key: 'pr' } as const, null)
 const prMark = atom({ plugin: 'mentat', key: 'prMark' } as const, { seq: 0, okAt: 0, failedAt: 0 })
@@ -49,17 +48,20 @@ const TINT = { surface: '#8b949e14', you: '#d2992224', alert: '#d0453f24', actio
 // warning card after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The pane's actions row: each button runs one slash command through `$.command.run`, as if the
-// maintainer typed it. `command` is the name `$.command.list()` gives, without the slash: a plugin's
-// skill is `<plugin>:<skill>`. The pane cannot tell whether Codex review is on, so both of its buttons show.
-const ACTIONS = [
-  { key: 'come-again', label: 'Come again?', command: 'mentat:come-again' },
-  { key: 'retro', label: 'Retro', command: 'mentat:retro' },
-  { key: 'codex-review-off', label: 'Codex review off', command: 'mentat:codex-review-off' },
-  { key: 'codex-review-on', label: 'Codex review on', command: 'mentat:codex-review-on' },
-  { key: 'compact', label: 'Compact', command: 'compact' },
-] as const
-type PaneAction = (typeof ACTIONS)[number]
+// The pane's Commands card: the commands the maintainer types, one per row, each with when to use
+// it. Drawn as a markdown table; nothing in the card runs a command. A new maintainer command is
+// one line here (a `/mentat:<skill>` needs `skills/<skill>/SKILL.md`, which tests/run checks).
+export const COMMANDS: { name: string; use: string }[] = [
+  { name: '/mentat', use: 'open this pane' },
+  { name: '/mentat pr <n>', use: 'follow a pull request' },
+  { name: '/mentat:come-again', use: 'restate the last message' },
+  { name: '/mentat:retro', use: 'look back at a session that went badly' },
+  { name: '/mentat:codex-review-off', use: 'turn Codex reviews off for the session' },
+  { name: '/mentat:codex-review-on', use: 'turn Codex reviews back on for the session' },
+  { name: 'mentat check', use: 'in a terminal: check what Mentat needs' },
+]
+const commandsTable = (): string =>
+  ['| Command | Use |', '| --- | --- |', ...COMMANDS.map(c => `| \`${c.name}\` | ${c.use} |`)].join('\n')
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
@@ -440,38 +442,6 @@ async function run($: EngineInterface, argv: string[], cwd?: string): Promise<st
     return out.exitCode === 0 ? out.stdout : undefined
   } catch {
     return undefined
-  }
-}
-
-// Runs the action's command. `$.command.run` waits until the session is idle, so the command is
-// marked queued first and a second press of it does nothing until the run ends. A rejection (an
-// unknown name, a skill only the person may start) leaves a line naming the command to type; the
-// next run that succeeds clears it.
-async function runAction($: EngineInterface, action: PaneAction): Promise<void> {
-  const isFirst = await inTurn(async () => {
-    if ((await read($, queuedAtom)).includes(action.command)) return false
-    await update($, queuedAtom, list => [...list, action.command])
-    return true
-  })
-  if (!isFirst) return
-  try {
-    await $.command.run({ command: action.command })
-    await inTurn(() => update($, failedAtom, () => null))
-  } catch (err) {
-    // A name the session does not have fails when typed too; the engine's list says whether it has it.
-    const isMissing = await hasNoCommand($, action.command)
-    await inTurn(() => update($, failedAtom, () => ({ command: action.command, isMissing })))
-  } finally {
-    await inTurn(() => update($, queuedAtom, list => list.filter(c => c !== action.command)))
-  }
-}
-
-// True when the session's command list is readable and lacks the command.
-async function hasNoCommand($: EngineInterface, command: string): Promise<boolean> {
-  try {
-    return !(await $.command.list()).some(c => c.name === command)
-  } catch {
-    return false
   }
 }
 
@@ -972,7 +942,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show the actions, what needs you, the pull request, the agents and, on the terminal, the session budget in a pane',
+      description: 'Show the commands, what needs you, the pull request, the agents and, on the terminal, the session budget in a pane',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -1027,10 +997,6 @@ export const register: Register = (on, _options) => {
     // A submit that was still waiting for a turn is lost with the old load: its question
     // offers its buttons again. A delivered answer stays marked.
     await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
-    // A command still waiting for the session is lost with the old load too: its button works again.
-    // So is the line of a failed press.
-    await inTurn(() => update($, queuedAtom, () => []))
-    await inTurn(() => update($, failedAtom, () => null))
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()
@@ -1328,7 +1294,7 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Input, Link, Text } = $.ui.resolve(e)
+    const { Box, Button, Input, Link, Markdown, Text } = $.ui.resolve(e)
     const Svg = e.surface === 'desktop' ? $.ui.resolve(e as typeof e & { surface: 'desktop' }).Svg : undefined
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
@@ -1459,23 +1425,18 @@ export const register: Register = (on, _options) => {
       if (mark.okAt > 0 && now - mark.okAt > STALE_MS) return `${what} read ${Math.floor((now - mark.okAt) / 60_000)}m old`
       return undefined
     }
-    // The actions row, above everything else on both surfaces. A queued command's button says so.
-    const queued = await read($, queuedAtom)
-    const failedAction = await read($, failedAtom)
-    const actionsRow = (
+    // The Commands card, above everything else on both surfaces: a toggle (collapsed at first, the
+    // choice kept) and, when open, a markdown table of the commands (no background). No button here runs a command.
+    const isCommandsShown = await read($, commandsShown)
+    const toggleCommands = () => inTurn(() => update($, commandsShown, v => !v))
+    const commandsCard = (
       <Box flexDirection="column">
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          {ACTIONS.map(a => (
-            <Button key={a.key} label={queued.includes(a.command) ? `${a.label} · queued` : a.label} onPress={() => runAction($, a)} />
-          ))}
+        <Box flexDirection="row">
+          <Button key="commands-toggle" label={`${isCommandsShown ? '▾' : '▸'} Commands`} onPress={toggleCommands} />
         </Box>
-        {failedAction !== null && (
-          <Box marginTop={1}>
-            <Text color="warning">
-              {failedAction.isMissing
-                ? `/${failedAction.command} is not in this Mentat version; update the plugin.`
-                : `Could not run /${failedAction.command} from the pane; type it in chat.`}
-            </Text>
+        {isCommandsShown && (
+          <Box flexDirection="column" paddingLeft={2} marginTop={1}>
+            <Markdown text={commandsTable()} />
           </Box>
         )}
       </Box>
@@ -1524,7 +1485,7 @@ export const register: Register = (on, _options) => {
       const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRows.map(agentRow))
       return (
         <Box flexDirection="column" paddingX={1}>
-          {actionsRow}
+          {commandsCard}
           {open.length === 0 && ref === '' && rows.length === 0 && (
             <Box marginTop={SECTION_GAP}>
               <Text dimColor>Nothing waiting on you.</Text>
@@ -1641,7 +1602,7 @@ export const register: Register = (on, _options) => {
 
     return (
       <Box flexDirection="column" paddingX={1}>
-        {actionsRow}
+        {commandsCard}
 
         {open.filter(d => kindOf(d) === 'alert').map(otherCard)}
 
