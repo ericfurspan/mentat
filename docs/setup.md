@@ -29,6 +29,8 @@ claude plugin install mentat@mentat --scope local
 
 Or, to turn it on for everyone who clones the repository, use `--scope project`. That writes `.claude/settings.json`, which you commit. Each collaborator also runs `claude plugin marketplace add ericfurspan/mentat` and `claude plugin install mentat@mentat --scope project` once on their own machine.
 
+To turn it on in every folder you open, use `--scope user`: it then runs in every repository, not only this one.
+
 Start a new session. On its first change, Claude Code runs `mentat check`, which looks only at what Mentat needs and shows any warnings. The `mentat` command is available to Claude Code's Bash tool while the plugin is on, not in your own terminal.
 
 ### Choosing the Mentat reply style

@@ -25,6 +25,24 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional o
 - To skip Codex for a session, run `/mentat:codex-review-off`: one Claude `code-review`, asked for at medium effort, per pull request (at most two rounds), no plan challenges, a final check marked reviewed by Claude, not Codex, and you still merge every pull request. If `code-review` cannot run, the final check says "Not reviewed" and why. Claude is the same model family as the builder, so this review is weaker than a cross-model one. Run `/mentat:codex-review-on`, or say so in chat, to turn Codex back on.
 - Once per repository: turn Mentat on.
 
+## Plugin commands
+
+Run these in a terminal, in the checkout. Pick one scope: `local` is only you in this checkout, `project` is everyone who clones it, `user` is every folder you open, so Mentat then runs in every repository.
+
+| What you want | Command |
+| --- | --- |
+| Add the marketplace (once per machine) | `claude plugin marketplace add ericfurspan/mentat` |
+| Turn Mentat on for you, in this checkout | `claude plugin install mentat@mentat --scope local` |
+| Turn it on for everyone who clones this checkout | `claude plugin install mentat@mentat --scope project` |
+| Turn it on in every folder | `claude plugin install mentat@mentat --scope user` |
+| Update | `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <scope>`, then `/reload-plugins` in a running session |
+| Turn it off | `claude plugin disable mentat@mentat` |
+| Turn it back on | `claude plugin enable mentat@mentat` |
+| Remove it | `claude plugin uninstall mentat@mentat --scope <scope>` |
+| See which scope a checkout uses | `claude plugin list` (shows each Mentat install with its scope) |
+
+Details, and what each command leaves behind, are in [Turning Mentat on and off](docs/setup.md).
+
 ## Read more
 
 For you:
