@@ -746,9 +746,14 @@ async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: ()
       if (outcome.warnings.length === 0) return rest
       return [...rest, { id: CHECK_ID, kind: 'warning' as const, question: `Check passed with ${plural(outcome.warnings.length, 'warning', 'warnings')}`, openedAt }]
     })
+    // The Feed line is for a result that differs from the one before it (none, after a new conversation).
+    const previous = await read($, checkResult)
+    const state = outcome.passed ? (outcome.warnings.length > 0 ? 'warn' : 'pass') : 'fail'
+    const count = outcome.passed ? outcome.warnings.length : 0
+    const isChange = previous === null || previous.state !== state || previous.warnings.length !== count
     await update($, checkResult, () => (outcome.passed ? { state: outcome.warnings.length > 0 ? ('warn' as const) : ('pass' as const), warnings: outcome.warnings } : { state: 'fail' as const, warnings: [] }))
     await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
-    await addLog($, openedAt, [checkEvent(outcome)])
+    if (isChange) await addLog($, openedAt, [checkEvent(outcome)])
   })
   await invalidate($)
 }

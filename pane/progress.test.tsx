@@ -3600,6 +3600,44 @@ test('the pane\'s own check at session start writes its result line', async ($, 
   expect(await lines($)).toEqual(['✓ mentat check passed'])
 })
 
+test('the check line is written only when the result changes: a repeat writes none, pass then warn writes two', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  expect(await written($)).toEqual(['✓ mentat check passed'])
+  await bash(world, $, 'mentat check', WARN_RUN)
+  expect(await written($)).toEqual(['✓ mentat check passed', '! mentat check passed with 2 warnings'])
+  await bash(world, $, 'mentat check', WARN_RUN)
+  expect(await lines($)).toHaveLength(2)
+  // A different warning count is a different result.
+  await bash(world, $, 'mentat check', 'Check OK (1 warning(s))\nWARN: one\n')
+  expect((await lines($))[0]).toBe('! mentat check passed with 1 warning')
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  expect(await lines($)).toHaveLength(4)
+})
+
+test('a reload with an unchanged check result writes no line; after /clear the next run writes one', async ($, on) => {
+  const { world } = boot(on)
+  world.git = ok('true\n')
+  world.check = ok(CLEAN_RUN)
+  await startSession($)
+  await until(() => world.calls.some(a => isCall(a, 'mentat', 'check')), 'the startup check')
+  await new Promise(r => setTimeout(r, 30))
+  expect(await lines($)).toEqual(['✓ mentat check passed'])
+  const runs = () => world.calls.filter(a => isCall(a, 'mentat', 'check')).length
+  const before = runs()
+  await startSession($)
+  await until(() => runs() > before, 'the check after the reload')
+  await new Promise(r => setTimeout(r, 30))
+  expect(await lines($)).toEqual(['✓ mentat check passed'])
+  // A new conversation has no result yet: its first run is a change.
+  await classicOf($).SessionStart({ source: 'clear' })
+  await until(() => runs() > before + 1, 'the check after /clear')
+  await new Promise(r => setTimeout(r, 30))
+  expect(await lines($)).toEqual(['✓ mentat check passed'])
+})
+
 test('pressing the answer button writes one You answered line once the prompt is taken, not before', async ($, on) => {
   const { world } = boot(on)
   const turn = held()

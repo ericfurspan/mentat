@@ -36,7 +36,7 @@ The pane shows, in this order:
      - `✓ You answered "<text>": <question>` when the answer button's message has entered the session (not while it waits, and not when it is dropped).
      - `✓ Closed: <question>`, with ` · <outcome>` when one is given, when `close_decision` closes an open item (none for an item that was already dismissed or cleared).
      - `· You dismissed: <question>` when Dismiss removes an open item.
-     - A recorded `mentat check`: `✓ mentat check passed`, `! mentat check passed with N warning(s)` or `✕ mentat check failed: N problem(s)`.
+     - A recorded `mentat check`, when its result changes (a first result in the conversation, a different state or a different warning count; a repeat or a reload that leaves it as it was adds none): `✓ mentat check passed`, `! mentat check passed with N warning(s)` or `✕ mentat check failed: N problem(s)`.
      - `↗ Opened PR #<number>` when a `gh pr create` prints a pull request URL (blue).
    - An answer whose message enters the session after a `/clear`, `/resume` or `/branch` writes no line into the new log. `note` takes only its five kinds; it refuses an event kind.
    - The tool's description tells the agent to add a note only at such a moment, a few an hour at most and never for routine steps, and `rules.md` says the same. Nothing forces it to.
