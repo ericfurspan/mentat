@@ -80,6 +80,8 @@ type World = {
   pullComments: Answer
   reviews: Answer
   bash: string
+  // The stderr of a Bash call (where gh writes its success lines for pr ready, pr close and issue close).
+  bashErr: string
   agents: { id: string; type: string; description: string; status: string }[]
   usage: Usage
   calls: string[][]
@@ -120,6 +122,7 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     pullComments: ok(pages([])),
     reviews: ok(pages([])),
     bash: '',
+    bashErr: '',
     agents: [],
     usage: { context: 12, limits: [] },
     calls: [],
@@ -164,7 +167,7 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
   })
   onFn('tool.call', { tool: 'Bash' }, async () => {
     await world.bashGate
-    return { result: { stdout: world.bash, stderr: '' } }
+    return { result: { stdout: world.bash, stderr: world.bashErr } }
   })
   onFn('classic.SessionStart', (_$: unknown, e: unknown) => e)
   onFn('tool.call', { tool: 'Agent' }, (_$: unknown, e: { tool_use_id: string }) => {
@@ -293,8 +296,9 @@ const eng = ($: never) =>
     turn: { complete: (a: unknown) => Promise<unknown>; step: (a: unknown) => AsyncGenerator<unknown, unknown> }
   }
 const startSession = ($: never) => eng($).session.start({ cwd: '/work/r', surface: 'terminal', isInteractive: true })
-const bash = (w: World, $: never, command: string, stdout = '', extra: object = {}) => {
+const bash = (w: World, $: never, command: string, stdout = '', extra: object = {}, stderr = '') => {
   w.bash = stdout
+  w.bashErr = stderr
 
   return eng($).tool.call({ tool: 'Bash', command, ...extra })
 }
@@ -420,20 +424,17 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   expect((await band.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
   await band.unmount()
 
-  // Desktop pane: the question card, the PR card, the agents card; no usage tiles (the app's own popover shows those).
+  // Desktop pane: the question card and the agents card; no PR card (the app has its own chip) and no usage tiles (its own popover shows those).
   const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
   const svgs = await svgsOf(pane)
   const alt = (prefix: string) => svgs.find(v => v.alt.startsWith(prefix))
   expect(svgs.map(v => v.alt)).toEqual([
     'Question: Open it?',
-    '#109 Approval required',
     'Running agents: 1',
   ])
   expect(svgs.flatMap(v => v.drawn).some(x => /context|5-hour|%/i.test(x))).toBe(false)
   expect(alt('Question')!.drawn).toEqual(expect.arrayContaining(['Open it?', '→ Yes']))
-  expect(alt('#109')!.drawn).toEqual(expect.arrayContaining(['#109', 'Label issues by kind', 'Approval required', 'Codex · 1 finding · 0 replied · 415e6d9', 'Final check posted · 415e6d9']))
-  // The app's own chip shows CI and the other pull requests, so the desktop card leaves them out.
-  expect(alt('#109')!.drawn.some(x => x.startsWith('CI') || x.includes('other open'))).toBe(false)
+  expect(alt('#109')).toBeUndefined()
   expect(alt('Running agents')!.drawn).toEqual(expect.arrayContaining(['Running · 1', 'Check the docs', 'general-purpose', 'Opus 4.8 · high']))
   // The buttons stay native, under the question card.
   expect((await cardKeys(pane))).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
@@ -1193,7 +1194,7 @@ test('the final check may name the head by a short or the full SHA', async ($, o
   expect(await bandTexts($)).toContain('· Final check posted')
 })
 
-test('with a final check and two questions the band shows the newest question and the count, the pane keeps the final check', async ($, on) => {
+test('with a final check and two questions the band shows the newest question and the count, and the desktop pane has no pull request card', async ($, on) => {
   const { world } = boot(on)
   world.issueComments = ok(pages([finalCheck(H1)]))
   await follow109($)
@@ -1204,7 +1205,8 @@ test('with a final check and two questions the band shows the newest question an
   expect(t).toContain('Two?')
   expect(t.some(x => x.includes('Final check'))).toBe(false)
   const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect((await svgsOf(d)).find(v => v.alt.startsWith('#109'))!.drawn).toContain('Final check posted · 415e6d9')
+  // The pane has no pull request card on the desktop; the final check stays with the band.
+  expect((await svgsOf(d)).some(v => v.alt.startsWith('#109'))).toBe(false)
   await d.unmount()
 })
 
@@ -1283,84 +1285,95 @@ test('other open pull requests say 100+ when the list hit its limit', async ($, 
   expect(world.calls.some(a => isCall(a, 'gh', 'pr', 'list') && a.includes('--limit') && a.includes('100') && a.includes('open'))).toBe(true)
 })
 
-// ---- the desktop card shows only what the app's own pull request chip lacks ----------------------------
+// ---- the desktop pane has no pull request card (the app has its own chip); the terminal card stays ----------------
 
-const cardOf = async ($: never, surface: 'terminal' | 'desktop') => {
-  const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-  const drawn = surface === 'desktop' ? ((await svgsOf(pane)).find(v => v.alt.startsWith('#109'))?.drawn ?? []) : await textsOf(pane)
+// The terminal pane's texts; the desktop pane's pull request Svgs (none are expected).
+const cardOf = async ($: never) => {
+  const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  const drawn = await textsOf(pane)
   await pane.unmount()
 
   return drawn
 }
-const untilCard = async ($: never, surface: 'terminal' | 'desktop', cond: (t: string[]) => boolean, what: string) => {
+const untilCard = async ($: never, cond: (t: string[]) => boolean, what: string) => {
   let last: string[] = []
   for (let i = 0; i < 300; i++) {
-    last = await cardOf($, surface)
+    last = await cardOf($)
     if (cond(last)) return last
     await new Promise(r => setTimeout(r, 5))
   }
   throw new Error(`card never showed ${what}; it showed ${JSON.stringify(last)}`)
 }
+// Every Svg alt and drawn text of the desktop pane.
+const desktopPane = async ($: never) => {
+  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const svgs = await svgsOf(pane)
+  const texts = await textsOf(pane)
+  await pane.unmount()
 
-test('desktop card: CI shows only when checks failed, and the terminal card shows it always', async ($, on) => {
+  return { alts: svgs.map(v => v.alt), texts }
+}
+
+test('terminal card: CI shows always; the desktop pane draws no pull request card or CI line', async ($, on) => {
   const { world } = boot(on)
   await follow109($)
-  await untilCard($, 'desktop', t => t.includes('Approval required'), 'the card')
+  await untilCard($, t => t.includes('Approval required'), 'the card')
   for (const [rollup, terminal] of [[[CHECK_OK], '✓'], [[CHECK_OK, { __typename: 'CheckRun', status: 'IN_PROGRESS', conclusion: null }], 'running'], [[], 'none']] as [unknown[], string][]) {
     world.pr = ok(prJson({ statusCheckRollup: rollup }))
     await bash(world, $, 'gh pr ready 109', '')
-    await untilCard($, 'terminal', t => t.includes(terminal), `CI ${terminal}`)
-    expect((await cardOf($, 'desktop')).some(t => t.startsWith('CI') || t === 'No CI' || t === 'running')).toBe(false)
+    await untilCard($, t => t.includes(terminal), `CI ${terminal}`)
+    const d = await desktopPane($)
+    expect(d.alts.some(a => a.startsWith('#109'))).toBe(false)
+    expect(d.texts.some(t => t.startsWith('CI') || t === 'No CI' || t === 'running' || t === 'Approval required')).toBe(false)
   }
 
   world.pr = ok(prJson({ statusCheckRollup: [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' }, CHECK_OK] }))
   await bash(world, $, 'gh pr ready 109', '')
-  expect(await untilCard($, 'desktop', t => t.includes('CI 1 failed'), 'CI 1 failed')).toContain('Approval required')
-  expect(await untilCard($, 'terminal', t => t.includes('✕ 1 failed'), 'the terminal CI')).toContain('CI')
+  expect(await untilCard($, t => t.includes('✕ 1 failed'), 'the terminal CI')).toContain('CI')
+  expect((await desktopPane($)).texts.some(t => t.startsWith('CI'))).toBe(false)
 })
 
-test('desktop card: the final check chip shows only when the final check is on the current head', async ($, on) => {
+test('the desktop pane draws no pull request card while the band still raises a final-checked pull request', async ($, on) => {
   const { world } = boot(on)
-  world.issueComments = ok(pages([summary(H1)]))
-  await follow109($)
-  await untilCard($, 'desktop', t => t.some(x => x.startsWith('Codex')), 'the Codex chip')
-  expect((await cardOf($, 'desktop')).some(t => t.includes('Final check'))).toBe(false)
-
-  // The Codex chip changes in the same snapshot, so seeing it means the read landed.
-  world.issueComments = ok(pages([summary(H1, 'In progress'), finalCheck(H2)]))
-  await bash(world, $, 'mentat review 109', '')
-  const other = await untilCard($, 'desktop', t => t.includes('Codex · Running · 415e6d9'), 'the second review read')
-  expect(other.some(t => t.includes('Final check'))).toBe(false)
-
   world.issueComments = ok(pages([summary(H1), finalCheck(H1)]))
-  await bash(world, $, 'mentat review 109', '')
-  const t = await untilCard($, 'desktop', x => x.includes('Final check posted · 415e6d9'), 'the final check chip')
-  expect(t).toContain('Approval required')
-  // The terminal card keeps its own lines; the final check is the band's business there.
-  expect((await cardOf($, 'terminal')).some(x => x.startsWith('Final check posted ·'))).toBe(false)
+  await follow109($)
+  await untilCard($, t => t.includes('Approval required'), 'the card')
+  const pane = await desktopPane($)
+  expect(pane.alts).toEqual([])
+  expect(pane.texts.some(t => t.includes('Label issues by kind') || t.includes('Codex') || t.includes('Final check'))).toBe(false)
+  // The band reads the same pull request and still raises it, on the desktop.
+  const band = await mount($, BAND, 'desktop')
+  const bandSvg = await svgsOf(band)
+  expect(bandSvg.map(v => v.alt)).toEqual(['#109 final check posted'])
+  await band.unmount()
+  // The terminal card keeps its lines; the final check is the band's business there.
+  const t = await cardOf($)
+  expect(t).toContain('Label issues by kind')
+  expect(t).toContain('Codex')
+  expect(t.some(x => x.includes('Final check posted ·'))).toBe(false)
 })
 
-test('desktop card: no line for other open pull requests, while the terminal card keeps it; freshness stays', async ($, on) => {
+test('terminal card: other open pull requests and freshness stay; the desktop pane says neither', async ($, on) => {
   const { world, clock } = boot(on)
   world.prList = ok(JSON.stringify([{ number: 109 }, { number: 7 }, { number: 8 }]))
   await follow109($)
   await untilPane($, '2 other open PRs in this repository')
-  expect((await cardOf($, 'desktop')).some(t => t.includes('other open'))).toBe(false)
+  expect((await desktopPane($)).texts.some(t => t.includes('other open'))).toBe(false)
 
   world.pr = failed
   await clock.advance(60_000)
-  const t = await untilCard($, 'desktop', x => x.includes('PR read failed (last ok 1m ago)'), 'the freshness line')
-  expect(t.some(x => x.includes('other open'))).toBe(false)
+  await untilCard($, x => x.includes('PR read failed (last ok 1m ago)'), 'the freshness line')
+  expect((await desktopPane($)).texts.some(t => t.includes('read failed'))).toBe(false)
 })
 
-test('on the desktop a followed pull request whose first read failed is named with the failure, and the pane is not blank', async ($, on) => {
+test('on the desktop a followed pull request whose first read failed draws no pull request line: the pane says nothing waits', async ($, on) => {
   const { world } = boot(on)
   world.pr = failed
   await startSession($)
   await follow($)
   await untilPane($, 'PR read failed', 60)
   const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect(await textsOf(desktop)).toEqual(['o/r#109 · PR read failed'])
+  expect(await textsOf(desktop)).toEqual(['Nothing waiting on you.'])
   await desktop.unmount()
 })
 
@@ -2213,52 +2226,6 @@ test('the answer field starts focused and sits in a full-width box tinted like t
   }
 })
 
-test('a long pull request title is wrapped whole on the desktop card, which grows to hold it', async ($, on) => {
-  const { world } = boot(on)
-  const title = 'feat: ' + 'make the pull request title long enough to need several lines of the card '.repeat(2).trim() + ' finale'
-  expect(title.length).toBeGreaterThan(140)
-  await follow109($)
-  const heightOf = async () => {
-    const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-    const svg = (await pane.findAll({ type: 'Svg' })).find(x => String(x.props?.alt ?? '').startsWith('#109'))!
-    const drawn = (await svgsOf(pane)).find(v => v.alt.startsWith('#109'))!.drawn
-    await pane.unmount()
-
-    return { height: Number(svg.props?.height), drawn }
-  }
-  const short = await heightOf()
-
-  world.pr = ok(prJson({ title }))
-  await bash(world, $, 'gh pr ready 109', '')
-  for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).includes('Finale'); i++) await new Promise(r => setTimeout(r, 5))
-  const long = await heightOf()
-  const shown = long.drawn.filter(t => !/^(#109|CI|Codex|Final check|Approval|Merge|Draft)/.test(t)).join(' ')
-  expect(shown).toBe(title.replace(/^feat: /, '').replace(/^\w/, c => c.toUpperCase()))
-  expect(shown).toContain('finale')
-  expect(shown).not.toContain('…')
-  expect(long.height).toBeGreaterThan(short.height)
-})
-
-test('a pull request title ending in a word wider than the card is cut with an ellipsis, not left to overflow', async ($, on) => {
-  const { world } = boot(on)
-  await follow109($)
-  const token = 'hooks/' + 'a'.repeat(120) + '.tsx'
-  world.pr = ok(prJson({ title: `fix: handle ${token}` }))
-  await bash(world, $, 'gh pr ready 109', '')
-  for (let i = 0; i < 200 && !(await paneTexts($, 'desktop')).some(t => t.startsWith('Handle')); i++) await new Promise(r => setTimeout(r, 5))
-  const pane = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  const drawn = (await svgsOf(pane)).find(v => v.alt.startsWith('#109'))!.drawn
-  await pane.unmount()
-  const lines = drawn.filter(t => t.startsWith('Handle') || t.includes('aaaa'))
-  expect(lines.length).toBeGreaterThan(0)
-  expect(lines.some(t => t.includes('aaaa'))).toBe(true)
-  expect(lines.some(t => t.includes('.tsx'))).toBe(false)
-  for (const t of lines.filter(t => t.includes('aaaa'))) {
-    expect(t.endsWith('…')).toBe(true)
-    expect(t.length).toBeLessThan(token.length)
-  }
-})
-
 // ---- kinds of open item: question, action, alert ------------------------------------------
 
 const RED = '#D0453F'
@@ -2989,4 +2956,329 @@ test('the card lists the commands the mod exports, and the pane never calls $.co
     await pane.unmount()
   }
   expect(world.commands).toEqual([])
+})
+
+// ---- the Log card ---------------------------------------------------------------------------------
+
+const GH = 'https://github.com/o/r'
+// The log rows the pane draws (newest first), as time, icon and text, and the label of the toggle button, if any.
+const logOf = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => {
+  const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+  const t = await textsOf(pane)
+  const toggle = (await pane.findAll({ type: 'Button' })).filter(b => b.key === 'log-toggle').map(b => String(b.props?.label))
+  const hasSvg = (await pane.findAll({ type: 'Svg' })).length > 0
+  await pane.unmount()
+  const rows: { time: string; icon: string; text: string }[] = []
+  for (let i = t.indexOf('LOG') + 1; i > 0 && i + 2 < t.length && /^\d+:\d\d$/.test(t[i]!); i += 3) rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
+
+  return { rows, toggle, hasSvg }
+}
+const lines = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => (await logOf($, surface)).rows.map(r => `${r.icon} ${r.text}`)
+const codex = (name: 'off' | 'on') => ({ command: `mentat:codex-review-${name}`, args: '' })
+
+test('gh pr create logs the opened pull request with the title it was given; a failed create, or the same URL twice in a row, logs one entry at most', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  expect((await logOf($)).rows).toEqual([])
+  // A failed command prints no URL.
+  await bash(world, $, 'gh pr create --title "feat(pane): add a log" --body x', '', {}, 'error: no commits between main and the branch')
+  expect((await logOf($)).rows).toEqual([])
+  const create = 'gh pr create --title "feat(pane): add a log" --body x'
+  await bash(world, $, create, `${GH}/pull/130\n`)
+  // 12:00 UTC is 8:00 in New York.
+  expect((await logOf($)).rows).toEqual([{ time: '8:00', icon: '↑', text: 'Opened PR #130: Add a log' }])
+  await bash(world, $, create, `${GH}/pull/130\n`)
+  expect(await lines($)).toEqual(['↑ Opened PR #130: Add a log'])
+  // Without a title in the command the entry is just the number.
+  await bash(world, $, 'gh pr create --fill', `${GH}/pull/131\n`)
+  expect(await lines($)).toEqual(['↑ Opened PR #131', '↑ Opened PR #130: Add a log'])
+  // An agent's Bash call is not the session's.
+  await bash(world, $, 'gh pr create --fill', `${GH}/pull/132\n`, { agentId: 'a1' })
+  expect(await lines($)).toHaveLength(2)
+})
+
+test('gh pr ready and close, gh issue create and close are logged from the output; a failure prints no success line and logs nothing', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await bash(world, $, 'gh pr ready 130', '', {}, '✓ Pull request o/r#130 is marked as "ready for review"\n')
+  await bash(world, $, 'gh pr close 131', '', {}, '✓ Closed pull request o/r#131 (feat: try a thing)\n')
+  await bash(world, $, 'gh issue create --title "Log the session" --body x', `${GH}/issues/129\n`)
+  await bash(world, $, 'gh issue close 129', '', {}, '✓ Closed issue o/r#129 (Log the session)\n')
+  expect(await lines($)).toEqual([
+    '● Closed issue #129: Log the session',
+    '○ Opened issue #129: Log the session',
+    '✕ Closed PR #131: Try a thing',
+    '↑ PR #130 ready for review',
+  ])
+  // Already done, no such number, no URL: nothing new.
+  await bash(world, $, 'gh pr ready 130', '', {}, '! Pull request o/r#130 is already "ready for review"\n')
+  await bash(world, $, 'gh pr close 999', '', {}, 'GraphQL: Could not resolve to a PullRequest with the number of 999.\n')
+  await bash(world, $, 'gh issue create --title "x"', '', {}, 'error\n')
+  await bash(world, $, 'gh issue close 5', '', {}, 'no issue found\n')
+  expect(await lines($)).toHaveLength(4)
+  // The success line may come in the text the model read instead.
+  await bash(world, $, 'gh issue close 7', '', { text: 'x' })
+  expect(await lines($)).toHaveLength(4)
+})
+
+test('a followed pull request that turns merged on a read is logged once; one already merged when first read is not', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  expect(await lines($)).toEqual([])
+  world.pr = ok(prJson({ state: 'MERGED' }))
+  await bash(world, $, 'git push', '')
+  for (let i = 0; i < 300 && (await lines($)).length === 0; i++) await new Promise(r => setTimeout(r, 5))
+  expect(await lines($)).toEqual(['✓ Merged PR #109: Label issues by kind'])
+  // More reads of the merged pull request add nothing.
+  const reads = prViews(world)
+  await bash(world, $, 'git push', '')
+  await until(() => prViews(world) > reads, 'the next read')
+  await new Promise(r => setTimeout(r, 30))
+  expect(await lines($)).toEqual(['✓ Merged PR #109: Label issues by kind'])
+})
+
+test('a pull request that is merged on the first read logs no merge', async ($, on) => {
+  const { world } = boot(on)
+  world.pr = ok(prJson({ state: 'MERGED' }))
+  await follow109($)
+  await new Promise(r => setTimeout(r, 30))
+  expect(await lines($)).toEqual([])
+})
+
+test('close_decision logs the question, shortened, with its outcome; an action and an alert have their own icons', async ($, on) => {
+  boot(on)
+  const idOf = async (kind: string | undefined, question: string) => /d\d+/.exec(String((await open(kind, question)($ as never)).result))![0]
+  const q = await idOf(undefined, 'Merge the log card now?')
+  await eng($).tool.call({ tool: CLOSE, id: q, outcome: 'Yes, merge' })
+  const long = 'Should the pane keep the Log card on the desktop even when the app already draws its own chip for the pull request?'
+  const l = await idOf('question', long)
+  await eng($).tool.call({ tool: CLOSE, id: l, outcome: 'Keep it' })
+  const a = await idOf('action', 'Update the plugin after the merge')
+  await eng($).tool.call({ tool: CLOSE, id: a })
+  const x = await idOf('alert', 'CI is red on main')
+  await eng($).tool.call({ tool: CLOSE, id: x, outcome: 'Fixed' })
+  const got = await lines($)
+  expect(got[0]).toBe('! CI is red on main → Fixed')
+  expect(got[1]).toBe('→ Settled: Update the plugin after the merge')
+  expect(got[2]!.startsWith('? Should the pane keep the Log card')).toBe(true)
+  expect(got[2]!.endsWith('… → Keep it')).toBe(true)
+  expect([...got[2]!.slice(2)].length).toBeLessThanOrEqual(60)
+  expect(got[3]).toBe('? Merge the log card now? → Yes, merge')
+  // A refused close (no such item) logs nothing.
+  await eng($).tool.call({ tool: CLOSE, id: 'nope', outcome: 'x' })
+  expect(await lines($)).toHaveLength(4)
+})
+
+test('turning Codex reviews off and on is logged and the command runs as before; the same event twice in a row is logged once', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).command.run(codex('off'))
+  await eng($).command.run(codex('off'))
+  expect(await lines($)).toEqual(['⊘ Codex reviews turned off'])
+  await eng($).command.run(codex('on'))
+  await eng($).command.run({ command: 'codex-review-off', args: '' })
+  expect(await lines($)).toEqual(['⊘ Codex reviews turned off', '⊙ Codex reviews turned on', '⊘ Codex reviews turned off'])
+  // Every run reached the command beneath, and other commands log nothing.
+  expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-off', 'mentat:codex-review-on', 'codex-review-off'])
+  await eng($).command.run({ command: 'mentat:retro', args: '' })
+  expect(await lines($)).toHaveLength(3)
+})
+
+test('a builder started and finished, failed or stopped is logged; other agents are not', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  const spawnBuilder = async (n: string, description: string, type = 'mentat:builder') => {
+    world.agents = [...world.agents, { id: n, type, description, status: 'running' }]
+    await eng($).agent.spawn(spawn(n, description, type))
+  }
+  const end = async (n: string, status: string) => {
+    world.agents = world.agents.map(a => (a.id === n ? { ...a, status } : a))
+    await eng($).turn.complete(turnDone(n))
+  }
+  await spawnBuilder('b1', 'Build the log')
+  await spawnBuilder('e1', 'Look around', 'Explore')
+  expect(await lines($)).toEqual(['▸ Builder started: Build the log'])
+  await end('e1', 'completed')
+  expect(await lines($)).toEqual(['▸ Builder started: Build the log'])
+  await end('b1', 'completed')
+  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '▸ Builder started: Build the log'])
+  // A second sync of the finished builder adds nothing.
+  await eng($).turn.complete(turnDone('b1'))
+  expect(await lines($)).toHaveLength(2)
+  await spawnBuilder('b2', 'Build the card', 'builder')
+  await spawnBuilder('b3', 'Build the toggle')
+  await end('b2', 'failed')
+  await end('b3', 'killed')
+  expect((await lines($)).slice(0, 2)).toEqual(['✕ Builder stopped: Build the toggle', '✕ Builder failed: Build the card'])
+})
+
+test('a builder that vanishes from the engine\'s list is not logged as finished', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  world.agents = [{ id: 'b1', type: 'mentat:builder', description: 'Build it', status: 'running' }]
+  await eng($).agent.spawn(spawn('b1', 'Build it', 'mentat:builder'))
+  world.agents = []
+  await eng($).turn.complete(turnDone('b1'))
+  expect(await lines($)).toEqual(['▸ Builder started: Build it'])
+})
+
+test('the log shows the newest five; Show all N shows the rest and Show fewer goes back, on both surfaces, and the choice is kept', async ($, on) => {
+  boot(on)
+  await startSession($)
+  for (let i = 0; i < 3; i++) {
+    await eng($).command.run(codex('off'))
+    await eng($).command.run(codex('on'))
+  }
+  await eng($).command.run(codex('off'))
+  // Seven entries.
+  for (const surface of SURFACES) {
+    const first = await logOf($, surface)
+    expect(first.rows).toHaveLength(5)
+    expect(first.rows[0]).toEqual({ time: '8:00', icon: '⊘', text: 'Codex reviews turned off' })
+    expect(first.toggle).toEqual(['Show all 7'])
+  }
+  for (const surface of SURFACES) {
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    await pane.press({ key: 'log-toggle' })
+    await pane.unmount()
+    const all = await logOf($, surface)
+    expect(all.rows).toHaveLength(7)
+    expect(all.toggle).toEqual(['Show fewer'])
+    // A new entry joins the shown list, and the choice survives a remount.
+    const again = await mount($, PANE, surface, { bodyColumns: 60 })
+    await again.press({ key: 'log-toggle' })
+    await again.unmount()
+    const fewer = await logOf($, surface)
+    expect(fewer.rows).toHaveLength(5)
+    expect(fewer.toggle).toEqual(['Show all 7'])
+  }
+})
+
+test('with five entries or fewer there is no toggle; with none there is no Log card', async ($, on) => {
+  boot(on)
+  await startSession($)
+  expect(await paneTexts($)).not.toContain('LOG')
+  for (let i = 0; i < 5; i++) await eng($).command.run(codex(i % 2 === 0 ? 'off' : 'on'))
+  const got = await logOf($)
+  expect(got.rows).toHaveLength(5)
+  expect(got.toggle).toEqual([])
+})
+
+test('the log keeps the last 200 entries', async ($, on) => {
+  boot(on)
+  await startSession($)
+  for (let i = 0; i < 205; i++) await eng($).command.run(codex(i % 2 === 0 ? 'off' : 'on'))
+  expect((await logOf($)).toggle).toEqual(['Show all 200'])
+  const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  await pane.press({ key: 'log-toggle' })
+  await pane.unmount()
+  expect((await logOf($)).rows).toHaveLength(200)
+})
+
+test('a log line is one line of at most 60 characters, cut with an ellipsis', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await bash(world, $, `gh pr create --title "feat: ${'very long '.repeat(20)}title"`, `${GH}/pull/130\n`)
+  const [row] = (await logOf($)).rows
+  expect([...row!.text]).toHaveLength(60)
+  expect(row!.text.startsWith('Opened PR #130: Very long very long')).toBe(true)
+  expect(row!.text.endsWith('…')).toBe(true)
+  // A title with runs of spaces is one line.
+  await bash(world, $, 'gh issue close 3', '', {}, '✓ Closed issue o/r#3 (two   words)\n')
+  expect((await lines($))[0]).toBe('● Closed issue #3: Two words')
+})
+
+test('the time is the entry\'s clock time in the TZ zone, as h:mm', async ($, on) => {
+  const { clock } = boot(on, { zone: 'Asia/Kolkata' })
+  await startSession($)
+  await eng($).command.run(codex('off'))
+  await clock.advance(7 * 60_000)
+  await eng($).command.run(codex('on'))
+  // 12:00 UTC is 5:30 in Kolkata.
+  expect((await logOf($)).rows.map(r => r.time)).toEqual(['5:37', '5:30'])
+})
+
+test('the log is plain text rows on both surfaces, with no Svg and no tint, and sits under the open items and above the agents', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
+  await eng($).command.run(codex('off'))
+  world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
+  for (const surface of SURFACES) {
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    const t = await textsOf(pane)
+    // On the terminal the Log rows sit between the question and the agent (the desktop draws those as Svg, which textsOf lists last).
+    if (surface === 'terminal') {
+      expect(t.indexOf('Open one?')).toBeLessThan(t.indexOf('LOG'))
+      expect(t.indexOf('LOG')).toBeLessThan(t.indexOf('Look around'))
+    }
+    const rows = (await pane.findAll({ type: 'Box' })).filter(b => String(b.key).startsWith('log-'))
+    expect(rows).toHaveLength(1)
+    expect(rows.every(b => b.props?.backgroundColor === undefined)).toBe(true)
+    await pane.unmount()
+  }
+  // On the desktop the log is not an Svg: the Svg elements are the question and the agents.
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  expect((await svgsOf(d)).map(v => v.alt)).toEqual(['Question: Open one?', 'Running agents: 1'])
+  await d.unmount()
+})
+
+test('on the terminal the log is under the pull request card; on the desktop there is no pull request card above it', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  await eng($).command.run(codex('off'))
+  world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
+  const term = await paneTexts($, 'terminal')
+  expect(term.indexOf('Label issues by kind')).toBeGreaterThan(-1)
+  expect(term.indexOf('Label issues by kind')).toBeLessThan(term.indexOf('LOG'))
+  expect(term.indexOf('LOG')).toBeLessThan(term.indexOf('Look around'))
+  const desk = await paneTexts($, 'desktop')
+  expect(desk).toContain('LOG')
+  expect(desk).not.toContain('Label issues by kind')
+  expect(desk).not.toContain('Nothing waiting on you.')
+})
+
+test('the desktop pane with only a log entry draws it and not the empty line', async ($, on) => {
+  boot(on)
+  await startSession($)
+  expect(await paneTexts($, 'desktop')).toContain('Nothing waiting on you.')
+  await eng($).command.run(codex('off'))
+  const t = await paneTexts($, 'desktop')
+  expect(t).not.toContain('Nothing waiting on you.')
+  expect(t).toContain('Codex reviews turned off')
+})
+
+test('a new conversation empties the log; a reload and a compaction keep it', async ($, on) => {
+  boot(on)
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  await startSession($)
+  await eng($).command.run(codex('off'))
+  await startSession($)
+  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'compact' })
+  expect(await lines($)).toEqual(['⊘ Codex reviews turned off'])
+  for (const source of ['clear', 'resume', 'fork']) {
+    await eng($).command.run(codex('on'))
+    expect(await lines($)).toHaveLength(2)
+    await classic.SessionStart({ source })
+    expect(await lines($)).toEqual([])
+    await eng($).command.run(codex('off'))
+    expect(await lines($)).toEqual(['⊘ Codex reviews turned off'])
+  }
+})
+
+test('the log and settings: a command other than codex-review-off and -on is not logged, and the pane never calls $.command.run', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).command.run({ command: 'mentat', args: 'pr 5' })
+  await eng($).command.run({ command: 'mentat:come-again', args: '' })
+  expect(await lines($)).toEqual([])
+  for (const surface of SURFACES) {
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    for (const b of await pane.findAll({ type: 'Button' })) await pane.press({ key: String(b.key) })
+    await pane.unmount()
+  }
+  expect(world.commands).toEqual(['mentat:come-again'])
 })

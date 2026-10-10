@@ -9,7 +9,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
+import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, LogEntry, LogKind, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -24,6 +24,10 @@ const LIST_LIMIT = 100
 const WARN_PERCENT = 80
 // Rows between the desktop pane's sections.
 const SECTION_GAP = 2
+// The Log card keeps this many entries, shows the newest LOG_SHOWN until `Show all`, and cuts a line at LOG_WIDTH characters.
+const LOG_LIMIT = 200
+const LOG_SHOWN = 5
+const LOG_WIDTH = 60
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
@@ -40,6 +44,8 @@ const reviewMark = atom({ plugin: 'mentat', key: 'reviewMark' } as const, { seq:
 const meAtom = atom({ plugin: 'mentat', key: 'me' } as const, '')
 const seqAtom = atom({ plugin: 'mentat', key: 'seq' } as const, 0)
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
+const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
+const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 
 // Neutral tints that read on dark and light; amber for what needs the maintainer, red for an
 // alert, blue for an action only the maintainer can take.
@@ -63,9 +69,80 @@ export const COMMANDS: { name: string; use: string }[] = [
 const commandsTable = (): string =>
   ['| Command | Use |', '| --- | --- |', ...COMMANDS.map(c => `| \`${c.name}\` | ${c.use} |`)].join('\n')
 
+// The pane's Log card: one line per event the pane saw, with an icon for its kind. The color is a
+// theme color, so the line reads on the terminal and the desktop.
+const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
+  'pr-open': { icon: '↑', color: 'suggestion' },
+  'pr-ready': { icon: '↑', color: 'success' },
+  'pr-close': { icon: '✕', color: 'subtle' },
+  'pr-merge': { icon: '✓', color: 'success' },
+  'issue-open': { icon: '○', color: 'suggestion' },
+  'issue-close': { icon: '●', color: 'subtle' },
+  question: { icon: '?', color: 'warning' },
+  action: { icon: '→', color: 'suggestion' },
+  alert: { icon: '!', color: 'error' },
+  'codex-off': { icon: '⊘', color: 'subtle' },
+  'codex-on': { icon: '⊙', color: 'success' },
+  'builder-start': { icon: '▸', color: 'suggestion' },
+  'builder-done': { icon: '✓', color: 'success' },
+  'builder-fail': { icon: '✕', color: 'error' },
+}
+
 // ---- plain helpers (no $) -----------------------------------------------------------
 
 const cleanTitle = (t: string): string => t.replace(/^[a-z]+(\([^)]*\))?!?:\s*/, '').replace(/^\w/, c => c.toUpperCase())
+type LogDraft = { kind: LogKind; text: string }
+const withTitle = (head: string, title: string | undefined): string => (title === undefined || title.trim() === '' ? head : `${head}: ${cleanTitle(title.trim())}`)
+const lastMatch = (text: string, re: RegExp): RegExpMatchArray | undefined => [...text.matchAll(re)].pop()
+// The title a `gh ... create` command was given: `--title "..."`, `--title=...` or `-t ...`.
+const titleOf = (command: string): string | undefined => {
+  const m = /(?:^|\s)(?:--title|-t)(?:\s+|=)(?:"([^"]*)"|'([^']*)'|([^\s"']+))/.exec(command)
+
+  return m === null ? undefined : (m[1] ?? m[2] ?? m[3])
+}
+const GH_ISSUE_URL = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/(\d+)/g
+// What a main-session Bash call says happened to a pull request or an issue. A created pull request or
+// issue is known by its URL in the output; a ready or closed one by `gh`'s own success line (which `gh`
+// writes to stderr), so a failed command, which prints neither, logs nothing.
+const bashLog = (command: string, stdout: string, output: string): LogDraft[] => {
+  const drafts: LogDraft[] = []
+  if (/\bgh\s+pr\s+create\b/.test(command)) {
+    const url = lastMatch(stdout, ghPrUrl)
+    if (url !== undefined) drafts.push({ kind: 'pr-open', text: withTitle(`Opened PR #${url[2]}`, titleOf(command)) })
+  }
+  if (/\bgh\s+pr\s+ready\b/.test(command)) {
+    for (const m of output.matchAll(/Pull request \S*#(\d+) is marked as "ready for review"/g)) drafts.push({ kind: 'pr-ready', text: `PR #${m[1]} ready for review` })
+  }
+  if (/\bgh\s+pr\s+close\b/.test(command)) {
+    for (const m of output.matchAll(/Closed pull request \S*#(\d+)(?: \((.*)\))?/g)) drafts.push({ kind: 'pr-close', text: withTitle(`Closed PR #${m[1]}`, m[2]) })
+  }
+  if (/\bgh\s+issue\s+create\b/.test(command)) {
+    const url = lastMatch(stdout, GH_ISSUE_URL)
+    if (url !== undefined) drafts.push({ kind: 'issue-open', text: withTitle(`Opened issue #${url[1]}`, titleOf(command)) })
+  }
+  if (/\bgh\s+issue\s+close\b/.test(command)) {
+    for (const m of output.matchAll(/Closed issue \S*#(\d+)(?: \((.*)\))?/g)) drafts.push({ kind: 'issue-close', text: withTitle(`Closed issue #${m[1]}`, m[2]) })
+  }
+
+  return drafts
+}
+// A settled question, action or alert: its text cut to leave room for the outcome.
+const decisionLog = (d: Decision, outcome: string | undefined): LogDraft => {
+  const kind: LogKind = kindOf(d) === 'action' ? 'action' : kindOf(d) === 'alert' ? 'alert' : 'question'
+  const result = oneLine(outcome ?? '', 28)
+
+  return { kind, text: result === '' ? `Settled: ${d.question}` : `${oneLine(d.question, LOG_WIDTH - 3 - [...result].length)} → ${result}` }
+}
+// Builders that went from not ended to completed, failed or killed between two lists of rows.
+const builderEnds = (before: AgentRow[], after: AgentRow[]): LogDraft[] =>
+  after.flatMap((row): LogDraft[] => {
+    const was = before.find(r => r.id === row.id)
+    if (was === undefined || isEnded(was.status) || roleOf(row.type).role !== 'builder') return []
+    if (row.status === 'completed') return [{ kind: 'builder-done', text: `Builder finished: ${row.description}` }]
+    if (row.status === 'failed') return [{ kind: 'builder-fail', text: `Builder failed: ${row.description}` }]
+    if (row.status === 'killed') return [{ kind: 'builder-fail', text: `Builder stopped: ${row.description}` }]
+    return []
+  })
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 const shortModel = (model: string): string =>
   model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, ' $1.$2').replace(/^\w/, c => c.toUpperCase())
@@ -93,18 +170,34 @@ const resetIn = (at: string | undefined, now: number): string => {
 // for the zone the process runs in; a name the runtime does not know falls back to that zone.
 export const resetAt = (at: string | undefined, now: number, zone?: string): string => {
   if (at === undefined || !(Date.parse(at) - now > 0)) return ''
-  const when = new Date(at)
-  const parts = (timeZone: string | undefined) =>
-    new Intl.DateTimeFormat('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone }).formatToParts(when)
+  const part = zoneParts(new Date(at), { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true }, zone)
+
+  return `resets ${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod')}`
+}
+// The parts of a time in `zone` (an IANA name, or undefined for the zone the process runs in; a name
+// the runtime does not know falls back to that zone).
+const zoneParts = (when: Date, options: Intl.DateTimeFormatOptions, zone?: string): ((type: string) => string) => {
+  const parts = (timeZone: string | undefined) => new Intl.DateTimeFormat('en-US', { ...options, timeZone }).formatToParts(when)
   let found: Intl.DateTimeFormatPart[]
   try {
     found = parts(zone === '' ? undefined : zone)
   } catch {
     found = parts(undefined)
   }
-  const part = (type: string) => found.find(x => x.type === type)?.value ?? ''
 
-  return `resets ${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod')}`
+  return type => found.find(x => x.type === type)?.value ?? ''
+}
+// The time of a log entry as `h:mm`, 12-hour, in the same zone the weekly reset uses.
+const clockAt = (at: number, zone?: string): string => {
+  const part = zoneParts(new Date(at), { hour: 'numeric', minute: '2-digit', hour12: true }, zone)
+
+  return `${part('hour')}:${part('minute')}`
+}
+// One line, at most `max` characters, cut with an ellipsis.
+const oneLine = (text: string, max: number = LOG_WIDTH): string => {
+  const chars = [...text.replace(/\s+/g, ' ').trim()]
+
+  return chars.length <= max ? chars.join('') : `${chars.slice(0, max - 1).join('').trimEnd()}…`
 }
 
 const textMeter = (cells: number, percent: number): string => {
@@ -445,11 +538,45 @@ async function run($: EngineInterface, argv: string[], cwd?: string): Promise<st
   }
 }
 
+// Adds entries to the log; call it inside inTurn. An entry equal to the newest one (same kind and
+// text) is the same event again and is not added. The log keeps the last LOG_LIMIT entries.
+async function addLog($: EngineInterface, at: number, drafts: LogDraft[]): Promise<void> {
+  if (drafts.length === 0) return
+  await update($, logAtom, list => {
+    let next: LogEntry[] = list
+    for (const d of drafts) {
+      const text = oneLine(d.text)
+      const last = next[next.length - 1]
+      if (last !== undefined && last.kind === d.kind && last.text === text) continue
+      next = [...next, { at, kind: d.kind, text }]
+    }
+
+    return next.slice(-LOG_LIMIT)
+  })
+}
+
+// Logs events seen now, then redraws.
+async function logNow($: EngineInterface, drafts: LogDraft[]): Promise<void> {
+  if (drafts.length === 0) return
+  try {
+    const at = await $.clock.now()
+    await inTurn(() => addLog($, at, drafts))
+    await invalidate($)
+  } catch {
+    // the log is best effort
+  }
+}
+
 async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
   try {
     const infos = (await $.agent.list()) as AgentInfoLike[]
     const now = await $.clock.now()
-    await inTurn(() => update($, agents, rows => reconcile(rows, infos, now, efforts)))
+    await inTurn(async () => {
+      const before = await read($, agents)
+      const after = reconcile(before, infos, now, efforts)
+      await update($, agents, () => after)
+      await addLog($, now, builderEnds(before, after))
+    })
   } catch {
     // the next check tries again
   }
@@ -495,8 +622,13 @@ async function commitPr($: EngineInterface, ref: string, seq: number, snapshot: 
       await update($, prMark, () => failedMark(mark, seq, at))
       return false
     }
+    const before = await read($, prAtom)
     await update($, prAtom, () => snapshot)
     await update($, prMark, () => ({ seq, okAt: at, failedAt: 0 }))
+    // A followed pull request that was open (or closed) on the last read and is merged on this one.
+    if (snapshot.state === 'MERGED' && before !== null && before.state !== 'MERGED') {
+      await addLog($, at, [{ kind: 'pr-merge', text: withTitle(`Merged PR #${snapshot.number}`, snapshot.title) }])
+    }
     const review = await read($, reviewAtom)
     if (review !== null && review.head !== snapshot.head) await update($, reviewAtom, () => null)
     return true
@@ -673,6 +805,15 @@ async function afterCheck($: EngineInterface, command: string, ran: { result?: u
   }
 }
 
+// Everything a Bash result says: its stdout and stderr, and the text the model read. The stderr
+// matters: `gh` writes its success lines for `pr ready`, `pr close` and `issue close` there.
+const ranOutput = (ran: { result?: unknown; text?: unknown }): string => {
+  const record = ran.result
+  const typed = typeof record === 'object' && record !== null ? (record as { stdout?: unknown; stderr?: unknown }) : undefined
+
+  return [typed?.stdout, typed?.stderr, typeof record === 'string' ? record : undefined, ran.text].filter((part): part is string => typeof part === 'string').join('\n')
+}
+
 // A `mentat review` command names its pull request before it runs, so the card is
 // there during the long wait for the review.
 async function followReview($: EngineInterface, command: string): Promise<void> {
@@ -711,8 +852,8 @@ async function resolveTarget($: EngineInterface, arg: string): Promise<string | 
 // ---- Drawn desktop design: each card is one themed Svg; buttons stay native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
 const CSS = `<style>
-.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}.chip{fill:#ecebe7}.q{fill:#fbf3e2}.qr{fill:#fbeceb}.qb{fill:#e9f0fc}
-@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}.chip{fill:#2a2a28}.q{fill:#2b2618}.qr{fill:#2d1b1a}.qb{fill:#18222f}}
+.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}.q{fill:#fbf3e2}.qr{fill:#fbeceb}.qb{fill:#e9f0fc}
+@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}.q{fill:#2b2618}.qr{fill:#2d1b1a}.qb{fill:#18222f}}
 </style>`
 const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', teal: '#1E9E9A', grey: '#8f8f8a' }
 
@@ -748,34 +889,6 @@ const svgOf = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${CSS}${body}</svg>`
 const label = (x: number, y: number, text: string, color?: string): string =>
   `<text ${color === undefined ? 'class="m"' : `fill="${color}"`} x="${x}" y="${y}" font-family="${FONT}" font-size="10.5" font-weight="600" letter-spacing="0.6">${xml(text.toUpperCase())}</text>`
-// A rounded chip with a colored dot; returns its svg and width.
-const chip = (x: number, y: number, text: string, hue: string): { svg: string; w: number } => {
-  const w = Math.round(22 + textW(text, 12))
-  return {
-    w,
-    svg: `<rect class="chip" x="${x}" y="${y}" width="${w}" height="22" rx="11"/><circle cx="${x + 11}" cy="${y + 11}" r="3.5" fill="${hue}"/><text class="t" x="${x + 19}" y="${y + 15}" font-family="${FONT}" font-size="12" font-weight="500">${xml(text)}</text>`,
-  }
-}
-// Lays chips left to right, wrapping to a new row when the width runs out.
-const chips = (x0: number, y0: number, W: number, list: { text: string; hue: string }[]): { svg: string; h: number } => {
-  let x = x0
-  let y = y0
-  const parts: string[] = []
-  for (const c of list) {
-    const w = Math.round(22 + textW(c.text, 12))
-    if (x > x0 && x + w > W) { x = x0; y += 28 }
-    const one = chip(x, y, c.text, c.hue)
-    parts.push(one.svg)
-    x += one.w + 6
-  }
-  return { svg: parts.join(''), h: y - y0 + 22 }
-}
-
-const githubHue = (text: string): string =>
-  text === 'Merged' ? HUE.violet : text === 'Approved' || text === 'Mergeable' ? HUE.green : text === 'Conflicts' || text === 'Changes requested' ? HUE.red : text === 'Draft' || text === 'Closed' ? HUE.grey : HUE.amber
-const codexHue = (text: string): string =>
-  text.startsWith('No findings') ? HUE.green : text.startsWith('Running') ? HUE.blue : text.startsWith('Failed') || text === 'unknown' ? HUE.red : /finding/i.test(text) ? HUE.amber : HUE.grey
-
 // The card of one open item: a tinted panel with a bar and a label in the kind's color, the
 // text (up to three lines), detail lines (the PROBLEM or WARN lines of a check item, each wrapped
 // over up to three lines) and the recommendation.
@@ -808,27 +921,6 @@ const cardSvg = (W: number, kind: DecisionKind, text: string, recommendation: st
 ${label(tx, 20, title, hue)}
 ${lines.map((l, i) => `<text class="t" x="${tx}" y="${42 + i * 19}" font-family="${FONT}" font-size="14" font-weight="600">${xml(l)}</text>`).join('')}
 ${detailSvg.join('')}${recommendation === undefined ? '' : `<text class="s" x="${tx}" y="${recY}" font-family="${FONT}" font-size="12">${xml(fit(`→ ${recommendation}`, 12, W - tx - 14))}</text>`}`
-  return { svg: svgOf(W, h, body), h }
-}
-
-const prSvg = (W: number, p: { number: number; title: string; facts: { text: string; hue: string }[]; foot: { text: string; hue: string }[] }): { svg: string; h: number } => {
-  const pad = 14
-  const num = `#${p.number}`
-  const numW = Math.round(14 + textW(num, 12))
-  // The title wraps (up to three lines) beside the number chip, under its first line's left edge.
-  const titleLines = wrap(p.title, 14, W - pad * 2 - numW - 8, 3)
-  const top = 46 + (titleLines.length - 1) * 19
-  const c = chips(pad, top, W - pad, p.facts)
-  let y = top + c.h + 8
-  const foot = p.foot.map(f => {
-    y += 16
-    return `<text fill="${f.hue}" x="${pad}" y="${y}" font-family="${FONT}" font-size="11.5">${xml(fit(f.text, 11.5, W - pad * 2))}</text>`
-  })
-  const h = y + 14
-  const body = `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>
-<rect class="chip" x="${pad}" y="13" width="${numW}" height="22" rx="6"/><text class="s" x="${pad + 7}" y="28" font-family="${FONT}" font-size="12" font-weight="600" font-variant-numeric="tabular-nums">${num}</text>
-${titleLines.map((l, i) => `<text class="t" x="${pad + numW + 8}" y="${29 + i * 19}" font-family="${FONT}" font-size="14" font-weight="600">${xml(l)}</text>`).join('')}
-${c.svg}${foot.join('')}`
   return { svg: svgOf(W, h, body), h }
 }
 
@@ -1021,6 +1113,8 @@ export const register: Register = (on, _options) => {
         await update($, sentAtom, () => [])
         // The last check was of the old conversation too.
         await update($, checkResult, () => null)
+        // So is the log.
+        await update($, logAtom, () => [])
       })
       await invalidate($)
     }
@@ -1045,6 +1139,20 @@ export const register: Register = (on, _options) => {
 
     return { text: `Following ${ref}.` }
   })
+
+  // Codex reviews turned off or on: the command is logged and runs as it would without this hook.
+  for (const [name, kind, text] of [
+    ['codex-review-off', 'codex-off', 'Codex reviews turned off'],
+    ['codex-review-on', 'codex-on', 'Codex reviews turned on'],
+  ] as const) {
+    for (const command of [`mentat:${name}`, name]) {
+      on('command.run', { command }, async ($, e, next) => {
+        await logNow($, [{ kind, text }])
+
+        return next(e)
+      })
+    }
+  }
 
   on('tool.call', { tool: OPEN_TOOL }, async ($, e) => {
     const input = e as unknown as { kind?: unknown; question?: unknown; recommendation?: unknown; accept?: unknown; link?: unknown }
@@ -1076,13 +1184,16 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
-    const input = e as unknown as { id?: unknown }
+    const input = e as unknown as { id?: unknown; outcome?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
+    const outcome = typeof input.outcome === 'string' ? input.outcome : undefined
     const isClosed = await inTurn(async () => {
       const list = await read($, items)
-      if (!list.some(d => d.id === id)) {
+      const settled = list.find(d => d.id === id)
+      if (settled === undefined) {
         return false
       }
+      await addLog($, await $.clock.now(), [decisionLog(settled, outcome)])
       // A closed decision is dropped: nothing shows settled ones.
       await update($, items, all => all.filter(d => d.id !== id))
       await update($, sentAtom, sent => sent.filter(x => x.id !== id))
@@ -1108,6 +1219,7 @@ export const register: Register = (on, _options) => {
       const stdout = str(asObj((ran as { result?: unknown }).result).stdout)
       void afterBash($, e.command as string, stdout)
       await afterCheck($, e.command as string, ran as { result?: unknown; text?: unknown; deny?: unknown })
+      if ((ran as { deny?: unknown }).deny === undefined) await logNow($, bashLog(e.command as string, stdout, ranOutput(ran as { result?: unknown; text?: unknown })))
     }
 
     return ran
@@ -1130,7 +1242,10 @@ export const register: Register = (on, _options) => {
     const effort = effortByAgent.get(id) ?? effortByCall.get(e.tool_use_id)
     if (effort !== undefined) row.effort = effort
     effortByCall.delete(e.tool_use_id)
-    await inTurn(() => update($, agents, list => [...list.filter(a => a.id !== id), row].slice(-30)))
+    await inTurn(async () => {
+      await update($, agents, list => [...list.filter(a => a.id !== id), row].slice(-30))
+      if (roleOf(row.type).role === 'builder') await addLog($, startedAt, [{ kind: 'builder-start', text: `Builder started: ${row.description}` }])
+    })
     await invalidate($)
 
     return out
@@ -1441,6 +1556,33 @@ export const register: Register = (on, _options) => {
         )}
       </Box>
     )
+    // The Log card: the newest entries first, the last LOG_SHOWN of them until `Show all`. Plain text
+    // rows on both surfaces, with no background: an 8-digit hex tint renders as solid grey in a terminal.
+    const logList = await read($, logAtom)
+    const isLogAll = await read($, logAll)
+    const zone = await readZone($)
+    const toggleLog = () => inTurn(() => update($, logAll, v => !v))
+    const logRows = logList.map((entry, n) => ({ entry, n })).reverse()
+    const logCard = (marginTop: number) =>
+      logList.length === 0 ? undefined : (
+        <Box flexDirection="column" marginTop={marginTop}>
+          <Heading label="Log" />
+          {(isLogAll ? logRows : logRows.slice(0, LOG_SHOWN)).map(({ entry, n }) => (
+            <Box key={`log-${n}`} flexDirection="row" gap={1}>
+              <Box width={5} flexShrink={0} justifyContent="flex-end">
+                <Text dimColor>{clockAt(entry.at, zone)}</Text>
+              </Box>
+              <Text color={LOG_STYLE[entry.kind].color}>{LOG_STYLE[entry.kind].icon}</Text>
+              <Text wrap="truncate-end">{entry.text}</Text>
+            </Box>
+          ))}
+          {logList.length > LOG_SHOWN && (
+            <Box flexDirection="row" marginTop={1}>
+              <Button key="log-toggle" label={isLogAll ? 'Show fewer' : `Show all ${logList.length}`} onPress={toggleLog} />
+            </Box>
+          )}
+        </Box>
+      )
     const prFresh = freshness('PR', pm)
     const reviewFresh = freshness('Review', rm)
     const isReviewed = pr !== null && review !== null && review.head === pr.head
@@ -1449,26 +1591,6 @@ export const register: Register = (on, _options) => {
     const cells = isNarrow ? 6 : 10
     if (Svg !== undefined) {
       const W = Math.max(220, Math.min(900, cols * 8 - 24))
-      // The app already shows the pull request's number, repository, branch, diff and CI, so
-      // this card adds only what it lacks: CI only when it failed, and the final check.
-      const ciChip = pr !== null && pr.checks.failed > 0 ? [{ text: `CI ${pr.checks.failed} failed`, hue: HUE.red }] : []
-      const finalChip = pr !== null && isReviewed && review.isFinalChecked ? [{ text: `Final check posted · ${sha7(pr.head)}`, hue: HUE.green }] : []
-      const codex = pr !== null && (isReviewed || rm.failedAt > 0) ? (isReviewed ? codexText(review) : 'unknown') : undefined
-      const foot = [
-        ...(prFresh === undefined ? [] : [{ text: prFresh, hue: HUE.amber }]),
-        ...(reviewFresh === undefined ? [] : [{ text: reviewFresh, hue: HUE.amber }]),
-      ]
-      const card = pr === null ? undefined : prSvg(W, {
-        number: pr.number,
-        title: cleanTitle(pr.title),
-        facts: [
-          { text: githubLine(pr), hue: githubHue(githubLine(pr)) },
-          ...(codex === undefined ? [] : [{ text: `Codex · ${codex}`, hue: codexHue(codex) }]),
-          ...finalChip,
-          ...ciChip,
-        ],
-        foot,
-      })
       const agentRow = (a: AgentRow): AgentCardRow => {
         const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
         const elapsed = ms === undefined ? (a.status === 'unknown' ? 'ended' : '') : duration(ms)
@@ -1486,14 +1608,9 @@ export const register: Register = (on, _options) => {
       return (
         <Box flexDirection="column" paddingX={1}>
           {commandsCard}
-          {open.length === 0 && ref === '' && rows.length === 0 && (
+          {open.length === 0 && logList.length === 0 && rows.length === 0 && (
             <Box marginTop={SECTION_GAP}>
               <Text dimColor>Nothing waiting on you.</Text>
-            </Box>
-          )}
-          {ref !== '' && pr === null && (
-            <Box marginTop={SECTION_GAP}>
-              <Text color={prFresh === undefined ? undefined : 'warning'} wrap="truncate-end">{`${ref} · ${prFresh ?? 'reading'}`}</Text>
             </Box>
           )}
           {open.map(d => {
@@ -1549,11 +1666,7 @@ export const register: Register = (on, _options) => {
               </Box>
             )
           })}
-          {card !== undefined && (
-            <Box marginTop={SECTION_GAP}>
-              <Svg source={card.svg} alt={`#${pr!.number} ${githubLine(pr!)}`} width={W} height={card.h} />
-            </Box>
-          )}
+          {logCard(SECTION_GAP)}
           {rows.length > 0 && (
             <Box flexDirection="column" marginTop={SECTION_GAP}>
               {liveCard !== undefined && <Svg source={liveCard.svg} alt={`Running agents: ${liveRows.length}`} width={W} height={liveCard.h} />}
@@ -1691,6 +1804,8 @@ export const register: Register = (on, _options) => {
             )}
           </Card>
         )}
+
+        {logCard(1)}
 
         {rows.length > 0 && (
           <Card>
