@@ -10,7 +10,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { AgentRow, AgentStatus, CheckResult, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
+import type { AgentRow, AgentStatus, CheckResult, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry, SavedConversation } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -32,6 +32,11 @@ const FEED_SHOWN = 10
 const LOG_TEXT_LIMIT = 1000
 // The record of items that left without close_decision keeps this many entries.
 const GONE_LIMIT = 50
+// The conversations kept in $.store, one key per session id (several sessions can run at once, and each
+// writes only its own key): the newest SESSIONS_KEPT, pruned at a session start.
+const STORE_PREFIX = 'conv:'
+const storeKey = (sessionId: string): string => `${STORE_PREFIX}${sessionId}`
+const SESSIONS_KEPT = 20
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
@@ -39,46 +44,63 @@ const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
-// Counts the conversations; see classic.SessionStart and sendAnswer.
-const conversationAtom = atom({ plugin: 'mentat', key: 'conversation' } as const, 0)
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
+// The session id the conversation state belongs to; see classic.SessionStart.
+const ownerAtom = atom({ plugin: 'mentat', key: 'sessionOwner' } as const, null)
 
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The notes Claude Code adds with the `note` tool, in the pane's Feed: each kind has an icon and a color. The
-// color is a theme color, so the line reads on the terminal and the desktop.
-const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
-  decision: { icon: '◆', color: 'suggestion' },
-  plan: { icon: '▸', color: 'text' },
-  surprise: { icon: '!', color: 'warning' },
-  waiting: { icon: '◌', color: 'subtle' },
-  done: { icon: '✓', color: 'success' },
+// The Feed marks only three things, each with an icon and a theme color (so the line reads on the terminal and
+// the desktop): a success, a failure, and something that wants attention. Every other entry has no mark, and
+// its mark column is a space so the text still lines up.
+const MARKS = {
+  success: { icon: '✓', color: 'success' },
+  failure: { icon: '✕', color: 'error' },
+  attention: { icon: '!', color: 'warning' },
+  none: { icon: ' ', color: undefined },
+} as const
+type FeedMark = { icon: string; color: string | undefined }
+// The notes Claude Code adds with the `note` tool: a done note is a success and a surprise wants attention; a
+// decision, a plan and a wait are plain.
+const NOTE_MARK: Record<LogKind, FeedMark> = {
+  decision: MARKS.none,
+  plan: MARKS.none,
+  surprise: MARKS.attention,
+  waiting: MARKS.none,
+  done: MARKS.success,
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
-// The event lines the pane writes to the Log itself, drawn dim: each has a mark and a theme color. An
-// `asked` line takes the mark of the item's kind (the pane's marks) and a `check` line that of the result.
-const EVENT_STYLE: Record<Exclude<EventKind, 'asked' | 'check'> | EventMark, { icon: string; color: string }> = {
-  agentDone: { icon: '✓', color: 'success' },
-  agentFailed: { icon: '✕', color: 'error' },
-  answered: { icon: '✓', color: 'success' },
-  dismissed: { icon: '·', color: 'subtle' },
-  prOpened: { icon: '↗', color: 'suggestion' },
-  question: { icon: '?', color: 'warning' },
-  action: { icon: '→', color: 'suggestion' },
-  alert: { icon: '!', color: 'error' },
-  pass: { icon: '✓', color: 'success' },
-  warn: { icon: '!', color: 'warning' },
-  fail: { icon: '✕', color: 'error' },
+// The event lines the pane writes to the Log itself, drawn dim. A `check` line takes the mark of the result.
+const EVENT_MARK: Partial<Record<EventKind, FeedMark>> = {
+  agentDone: MARKS.success,
+  agentFailed: MARKS.failure,
+  prOpened: MARKS.none,
+  pushed: MARKS.none,
+}
+const RESULT_MARK: Record<EventMark, FeedMark> = {
+  pass: MARKS.success,
+  warn: MARKS.attention,
+  fail: MARKS.failure,
 }
 // An entry stored without a source is a note.
 export const isNote = (entry: LogEntry): entry is NoteEntry => entry.source !== 'event'
 // The icon and color a Log row is drawn with.
-const styleOf = (entry: LogEntry): { icon: string; color: string } =>
-  isNote(entry) ? LOG_STYLE[entry.kind] : EVENT_STYLE[(entry.mark ?? entry.kind) as keyof typeof EVENT_STYLE] ?? EVENT_STYLE.dismissed
+const styleOf = (entry: LogEntry): FeedMark => {
+  if (isNote(entry)) return NOTE_MARK[entry.kind] ?? MARKS.none
+  if (entry.kind === 'check') return (entry.mark === undefined ? undefined : RESULT_MARK[entry.mark]) ?? MARKS.none
+
+  return EVENT_MARK[entry.kind] ?? MARKS.none
+}
+
+// True for a row of one of this plugin's own tools that did not fail: such a row is hidden. A failed or interrupted
+// call (`isErrored`, `isInterrupted`) always keeps its row.
+const OWN_TOOLS: readonly string[] = [OPEN_TOOL, CLOSE_TOOL, NOTE_TOOL]
+const isHiddenCall = (props: { tool: string; isErrored: boolean; isInterrupted?: boolean }): boolean =>
+  OWN_TOOLS.includes(props.tool) && !props.isErrored && props.isInterrupted !== true
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
@@ -255,6 +277,84 @@ const inTurn = <T,>(work: () => Promise<T>): Promise<T> => {
   return run
 }
 
+// ---- the conversation kept between processes ---------------------------------------------------
+// $.state is gone when the process ends, so a `claude --continue` or `--resume` (same session id) would
+// start empty. The conversation's own state (not the agent rows, which the engine lists, nor the view
+// toggles) is also kept in $.store under its session id, written after each change, newest SESSIONS_KEPT.
+
+// Entries of these kinds were written by earlier versions: the Feed records the work, not the pane's own
+// bookkeeping, so they are dropped wherever the log is loaded or read.
+const LEFTOVER_KINDS: readonly string[] = ['asked', 'answered', 'dismissed']
+const withoutLeftovers = (list: LogEntry[]): LogEntry[] => list.filter(x => x.source !== 'event' || !LEFTOVER_KINDS.includes(x.kind))
+
+// What a stored entry gives back, with every field checked: a value of the wrong shape is empty.
+function loadConversation(stored: unknown): Omit<SavedConversation, 'savedAt'> {
+  const o = asObj(stored)
+  const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+  const result = asObj(o.checkResult)
+  const hasResult = result.state === 'pass' || result.state === 'warn' || result.state === 'fail'
+
+  return {
+    items: withoutSettled(list<Decision>(o.items)),
+    nextId: typeof o.nextId === 'number' && Number.isFinite(o.nextId) && o.nextId >= 1 ? o.nextId : 1,
+    sent: list(o.sent),
+    log: withoutLeftovers(list<LogEntry>(o.log)),
+    checkResult: hasResult ? { state: result.state as CheckResult['state'], warnings: list<string>(result.warnings) } : null,
+    gone: list(o.gone),
+  }
+}
+
+// Saves the conversation under the session id its state belongs to, when it differs from what is stored;
+// an entry that would be empty is removed instead. Call it inside inTurn, after the change. It never throws:
+// a store that fails leaves the pane as it is. A state with no owner yet (a new process before its session
+// start) is no conversation's and is not kept; saving it would overwrite what that session start is about to load.
+async function saveConversation($: EngineInterface): Promise<void> {
+  try {
+    const id = await read($, ownerAtom)
+    if (id === null) return
+    const entry = {
+      items: await read($, items),
+      nextId: await read($, nextId),
+      sent: await read($, sentAtom),
+      log: await read($, logAtom),
+      checkResult: await read($, checkResult),
+      gone: await read($, goneAtom),
+    }
+    const stored = await $.store.get(storeKey(id))
+    const former = stored === undefined ? undefined : loadConversation(stored)
+    if (former !== undefined && JSON.stringify(former) === JSON.stringify(loadConversation(entry))) return
+    const isEmpty = entry.items.length === 0 && entry.log.length === 0 && entry.gone.length === 0 && entry.sent.length === 0 && entry.checkResult === null
+    if (isEmpty) {
+      if (former !== undefined) await $.store.delete(storeKey(id))
+      return
+    }
+    await $.store.set(storeKey(id), { savedAt: await $.clock.now(), ...entry })
+  } catch {
+    // the in-memory state is right; the next change saves again
+  }
+}
+
+// Deletes the conversations past the newest SESSIONS_KEPT, by when each was saved. Run at a session start,
+// not on every save. The session that is starting is never the one dropped: it keeps its place.
+async function pruneConversations($: EngineInterface, current: string): Promise<void> {
+  try {
+    const keys = (await $.store.keys()).filter(k => k.startsWith(STORE_PREFIX) && k !== storeKey(current))
+    const saved = await Promise.all(keys.map(async key => ({ key, at: Number(asObj(await $.store.get(key)).savedAt ?? 0) })))
+    for (const { key } of saved.sort((a, b) => b.at - a.at).slice(SESSIONS_KEPT - 1)) await $.store.delete(key)
+  } catch {
+    // the next session start prunes again
+  }
+}
+
+// inTurn for a change to the kept state: saves the conversation when the change is done.
+const inTurnSaved = <T,>($: EngineInterface, work: () => Promise<T>): Promise<T> =>
+  inTurn(async () => {
+    const out = await work()
+    await saveConversation($)
+
+    return out
+  })
+
 // ---- top-level functions that take $ ------------------------------------------------------
 
 async function invalidate($: EngineInterface): Promise<void> {
@@ -340,7 +440,10 @@ async function syncAgents($: EngineInterface): Promise<void> {
       const before = await read($, agents)
       const after = reconcile(before, infos, now)
       await update($, agents, () => after)
-      await addLog($, now, agentEvents(before, after))
+      const events = agentEvents(before, after)
+      await addLog($, now, events)
+      // The agent rows are not kept; only an event line they wrote is.
+      if (events.length > 0) await saveConversation($)
     })
   } catch {
     // the next check tries again
@@ -354,15 +457,44 @@ async function agentTick($: EngineInterface): Promise<void> {
   await invalidate($)
 }
 
-// What the main loop's Bash call says: a pull request it opened.
-async function afterBash($: EngineInterface, command: string, stdout: string): Promise<void> {
+// The branches a `git push` pushed, read from the lines git prints for them (`   abc1234..def5678  main -> main`,
+// ` + abc1234...def5678  main -> main (forced update)`, ` * [new branch]      topic -> topic`), by the remote's
+// name. Git's output has no count of commits, so none is given. Nothing is returned (so no line is written) unless
+// every line is one of those or part of the usual chatter: a rejected ref, an error, a dry run, a push that
+// printed no ref line (`Everything up-to-date`) or any other doubt writes nothing.
+const PUSH_COMMAND = /(?:^|[\s;&|(])git\s+(?:-C\s+\S+\s+)?push(?=$|[\s;&|)])/
+const PUSH_DRY_RUN = /(?:^|\s)(?:--dry-run|-n)(?=$|\s)/
+const PUSH_RANGE = /^\s*[+ ]?\s*[0-9a-f]{7,40}\.\.\.?[0-9a-f]{7,40}\s+\S+\s+->\s+(\S+)(?:\s+\([^)]*\))?\s*$/
+const PUSH_NEW = /^\s*\*\s+\[new branch\]\s+\S+\s+->\s+(\S+)\s*$/
+const PUSH_FAILED = /^\s*!\s|^error:|^fatal:|\[(?:remote )?rejected\]|failed to push/
+const pushedBranches = (command: string, output: string): string[] => {
+  if (!PUSH_COMMAND.test(command) || PUSH_DRY_RUN.test(command)) return []
+  const lines = output.replace(/\r/g, '').split('\n')
+  if (lines.some(l => PUSH_FAILED.test(l))) return []
+  const branches: string[] = []
+  for (const l of lines) {
+    const found = PUSH_RANGE.exec(l) ?? PUSH_NEW.exec(l)
+    if (found !== null && !branches.includes(found[1]!)) branches.push(found[1]!)
+  }
+
+  return branches
+}
+
+// What the main loop's Bash call says: a pull request it opened, a push it made.
+async function afterBash($: EngineInterface, command: string, stdout: string, stderr: string): Promise<void> {
   try {
+    const pushed = pushedBranches(command, `${stdout}\n${stderr}`)
+    if (pushed.length > 0) {
+      const at = await $.clock.now()
+      await inTurnSaved($, () => addLog($, at, [eventDraft('pushed', `Pushed ${pushed.join(', ')}`)]))
+      await invalidate($)
+    }
     if (/\bgh\s+pr\s+create\b/.test(command)) {
       const urls = [...stdout.matchAll(ghPrUrl)]
       const last = urls[urls.length - 1]
       if (last !== undefined) {
         const at = await $.clock.now()
-        await inTurn(() => addLog($, at, [eventDraft('prOpened', `Opened PR #${last[2]}`)]))
+        await inTurnSaved($, () => addLog($, at, [eventDraft('prOpened', `Opened PR #${last[2]}`)]))
         await invalidate($)
       }
     }
@@ -388,7 +520,7 @@ const checkEvent = (outcome: CheckRead): LogDraft => {
 // isCurrent is asked inside the turn that writes: a run that is no longer the latest writes nothing.
 async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: () => boolean): Promise<void> {
   const openedAt = await $.clock.now()
-  await inTurn(async () => {
+  await inTurnSaved($, async () => {
     if (!isCurrent()) return
     await update($, items, list => {
       const rest = list.filter(d => d.id !== CHECK_ID)
@@ -500,11 +632,8 @@ const sentLine = (entry: { text: string; isDelivered?: boolean }): string => {
 // first, and a second press for it does nothing. When the prompt did not enter, say so: a press
 // that vanishes looks broken.
 async function sendAnswer($: EngineInterface, d: { id: string; question: string }, text: string): Promise<boolean> {
-  // The conversation the press began in: a delivery that lands in a later one writes no line there.
-  let began = 0
-  const isFirst = await inTurn(async () => {
+  const isFirst = await inTurnSaved($, async () => {
     if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
-    began = await read($, conversationAtom)
     await update($, sentAtom, list => [...list, { id: d.id, text }])
     return true
   })
@@ -518,16 +647,12 @@ async function sendAnswer($: EngineInterface, d: { id: string; question: string 
     isTaken = false
   }
   if (!isTaken) {
-    await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
+    await inTurnSaved($, () => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
     $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
     return false
   }
   // The answer entered the session; the line stops saying it waits.
-  await inTurn(async () => {
-    await update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x)))
-    if ((await read($, conversationAtom)) !== began) return
-    await addLog($, await $.clock.now(), [eventDraft('answered', `You answered "${text}": ${d.question}`)])
-  })
+  await inTurnSaved($, () => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
   await invalidate($)
   return true
 }
@@ -540,13 +665,12 @@ async function recordGone($: EngineInterface, gone: GoneEntry[]): Promise<void> 
 const dismissItem = async ($: EngineInterface, id: string) => {
   const at = await $.clock.now()
 
-  return inTurn(async () => {
+  return inTurnSaved($, async () => {
     const item = (await read($, items)).find(x => x.id === id)
     await update($, items, all => all.filter(x => x.id !== id))
     await update($, sentAtom, list => list.filter(x => x.id !== id))
     if (item !== undefined) {
       await recordGone($, [{ id, why: 'dismissed', at }])
-      await addLog($, at, [eventDraft('dismissed', `You dismissed: ${item.question}`)])
     }
   })
 }
@@ -588,7 +712,8 @@ type PaneData = {
   logList: LogEntry[]
   isLogAll: boolean
   // The Feed's log lines, newest first (`n` is the entry's place in the stored log), cut to FEED_SHOWN unless all.
-  entries: { entry: LogEntry; n: number }[]
+  // `time` is the clock time of the entry, shown only on the first row of a run of the same time (`isTimed`).
+  entries: { entry: LogEntry; n: number; time: string; isTimed: boolean }[]
   // The toggle's label, when the log is longer than FEED_SHOWN.
   toggle: string | undefined
   budget: string | undefined
@@ -605,15 +730,21 @@ async function paneData($: EngineInterface): Promise<PaneData> {
       if (isActive(a.status) !== isActive(b.status)) return isActive(a.status) ? -1 : 1
       return (b.startedAt ?? 0) - (a.startedAt ?? 0)
     })
-  const logList = await read($, logAtom)
+  const logList = withoutLeftovers(await read($, logAtom))
   const isLogAll = await read($, logAll)
   const budget = budgetAlert(limitsOf(await readUsage($), now, zone))
   const newest = logList.map((entry, n) => ({ entry, n })).reverse()
   const toggle = logList.length > FEED_SHOWN ? (isLogAll ? 'Show fewer' : `Show all ${logList.length}`) : undefined
 
-  return { now, zone, open, sentList, result, live, logList, isLogAll, entries: isLogAll ? newest : newest.slice(0, FEED_SHOWN), toggle, budget }
+  const shown = (isLogAll ? newest : newest.slice(0, FEED_SHOWN)).map(x => ({ ...x, time: clockAt(x.entry.at, zone) }))
+  // The time is written once for a run of consecutive rows with the same displayed time; the rows after it leave it blank.
+  const entries = shown.map((x, i) => ({ ...x, isTimed: i === 0 || shown[i - 1]!.time !== x.time }))
+
+  return { now, zone, open, sentList, result, live, logList, isLogAll, entries, toggle, budget }
 }
 const toggleLogAll = ($: EngineInterface) => inTurn(() => update($, logAll, v => !v))
+// True when the recommendation only repeats the answer button's label (trimmed, case-insensitive).
+const isSameWords = (a: string, b: string | undefined): boolean => b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase()
 // What an open item shows besides its text: the answer button or the sent line, the link, the line under it
 // (`Recommended: <text> · <time>`, else the time) and, for the check's warning item, the WARN lines.
 const itemView = (d: Decision, data: PaneData) => {
@@ -626,7 +757,7 @@ const itemView = (d: Decision, data: PaneData) => {
     sent,
     answer: kind === 'question' && sent === undefined ? d.accept : undefined,
     link: kind !== 'question' ? d.link : undefined,
-    detail: d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`,
+    detail: d.recommendation === undefined || isSameWords(d.recommendation, d.accept) ? time : `Recommended: ${d.recommendation} · ${time}`,
     warns: d.id === CHECK_ID && kind === 'warning' ? (data.result?.warnings ?? []).map(w => `WARN: ${w}`) : [],
   }
 }
@@ -690,14 +821,16 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     )
   }
 
-  // Waiting on you: every open item, most urgent first. The first line holds the mark, the text and the buttons;
-  // under it, dim, the recommendation and the time, and for the check's warning item its WARN lines.
-  const waiting = open.flatMap(d => {
+  // Waiting on you: every open item, most urgent first. The first row holds the mark and the text, full width.
+  // Under it a row holds the detail (the recommendation and the time), wrapped at the left, and the buttons at
+  // the right; then, for the check's warning item, its WARN lines. Under 40 columns the time and the
+  // recommendation are left out and the row holds only the buttons, at the right.
+  const waiting = open.map((d, index) => {
     const { kind, sent, answer, link, detail: recommended, warns } = itemView(d, data)
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
       // The mark never shrinks and keeps its space after it (a margin, which a tight row cannot take away);
-      // the text is what wraps. The controls keep their size and their space before them.
+      // the text is what wraps.
       row(`item-${d.id}`, [
         <Box key="mark-box" flexShrink={0} marginRight={1}>
           {mark.color === undefined ? <Text key="mark" dimColor>{mark.char}</Text> : <Text key="mark" color={mark.color}>{mark.char}</Text>}
@@ -705,7 +838,17 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
         <Box key="text" flexGrow={1} flexShrink={1}>
           <Text wrap="wrap">{d.question}</Text>
         </Box>,
-        <Box key="controls" flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
+      ], 0),
+      // The detail grows and shrinks and wraps under itself; the controls keep their size at the right.
+      <Box key={`actions-${d.id}`} flexDirection="row" alignItems="flex-start" justifyContent="flex-end" gap={1}>
+        {!isShort && (
+          <Box key="detail" flexGrow={1} flexShrink={1} paddingLeft={2}>
+            <Text dimColor wrap="wrap">
+              {recommended}
+            </Text>
+          </Box>
+        )}
+        <Box key="controls" flexDirection="row" gap={1} flexShrink={0}>
           {answer !== undefined && (
             <Button key={`accept-${d.id}`} plain label={answer} onPress={() => sendAnswer($, d, answer)}>
               <Text bold color="suggestion">
@@ -722,15 +865,17 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
           <Button key={`dismiss-${d.id}`} plain label="Dismiss" onPress={() => dismissItem($, d.id)}>
             <Text color="suggestion">Dismiss</Text>
           </Button>
-        </Box>,
-      ], 0),
+        </Box>
+      </Box>,
     ]
-    if (!isShort) {
-      lines.push(detail(`detail-${d.id}`, recommended))
-      warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
-    }
+    if (!isShort) warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
 
-    return lines
+    // One blank row between items, not after the last.
+    return (
+      <Box key={`block-${d.id}`} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
+        {lines}
+      </Box>
+    )
   })
 
   // The Feed: the agents that have not ended, pinned, then the log newest first.
@@ -753,7 +898,7 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     ])
   })
   if (live.length > 0 && logList.length > 0) feedRows.push(row('feed-gap', [<Text key="gap"> </Text>]))
-  for (const { entry, n } of data.entries) {
+  for (const { entry, n, time, isTimed } of data.entries) {
     const { icon, color } = styleOf(entry)
     feedRows.push(
       row(`log-${n}`, [
@@ -761,11 +906,11 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
           ? []
           : [
               <Box key="time" width={8} flexShrink={0} justifyContent="flex-end">
-                <Text dimColor>{clockAt(entry.at, zone)}</Text>
+                <Text dimColor>{isTimed ? time : ' '}</Text>
               </Box>,
             ]),
         <Box key="icon" flexShrink={0}>
-          <Text color={color}>{icon}</Text>
+          <Text {...(color === undefined ? {} : { color })}>{icon}</Text>
         </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
           <Text wrap="wrap" {...(isNote(entry) ? {} : { dimColor: true })}>
@@ -809,6 +954,8 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
 export const CARD_TINT = '#80808014'
 // The mark column of an item row, in cells (the Svg inside is 20px), and the indent of the lines under the text.
 const MARK_CELLS = 3
+// The space between the items of the desktop's Waiting on you card, in rows: each item reads as its own block.
+const WAITING_GAP = 2
 const TEXT_INDENT = MARK_CELLS + 1
 // A small round tinted mark with a glyph, a fixed 20px Svg; it is the only picture in the pane, and it does
 // not take part in the reflow when the divider moves.
@@ -858,6 +1005,9 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
             <Svg source={markSvg(mark.char, mark.hue)} alt={ITEM_ALT[kind]} width={MARK_SIZE} height={MARK_SIZE} />
           </Box>
           {cut(d.question)}
+        </Box>
+        <Box key="actions" paddingLeft={TEXT_INDENT} marginTop={1} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+          {cut(detail, { dimColor: true })}
           <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
             {link !== undefined && (
               <Text>
@@ -869,7 +1019,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
             <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismissItem($, d.id)} />
           </Box>
         </Box>
-        {[detail, ...warns].map((line, i) => (
+        {warns.map((line, i) => (
           <Box key={`detail-${i}`} paddingLeft={TEXT_INDENT} flexDirection="row" minWidth={0}>
             {cut(line, { dimColor: true })}
           </Box>
@@ -902,14 +1052,14 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
       </Box>
     )
   })
-  const logRows = data.entries.map(({ entry, n }) => {
+  const logRows = data.entries.map(({ entry, n, time, isTimed }) => {
     const { icon, color } = styleOf(entry)
 
     return (
       <Box key={`log-${n}`} flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
-        {timeColumn(<Text dimColor>{clockAt(entry.at, zone)}</Text>)}
+        {timeColumn(<Text dimColor>{isTimed ? time : ' '}</Text>)}
         <Box flexShrink={0}>
-          <Text color={color}>{icon}</Text>
+          <Text {...(color === undefined ? {} : { color })}>{icon}</Text>
         </Box>
         {cut(entry.text, isNote(entry) ? {} : { dimColor: true })}
       </Box>
@@ -939,7 +1089,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
           {budget}
         </Text>
       )}
-      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box flexDirection="column" gap={1} minWidth={0}>{waiting}</Box>)}
+      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box key="items" flexDirection="column" gap={WAITING_GAP} minWidth={0}>{waiting}</Box>)}
       {hasFeed && card('card-feed', 'FEED', 'subtle', live.length + logList.length, feed)}
       {open.length === 0 && !hasFeed && <Text dimColor>Nothing waiting on you.</Text>}
     </Box>
@@ -1023,10 +1173,11 @@ export const register: Register = (on, _options) => {
     // A (re)load: reconcile the agents with the engine's list and start the timers over.
     // The former decisions pane kept settled entries (with closedAt) in this state;
     // nothing shows them now, so they must not come back as open questions.
-    await inTurn(() => update($, items, withoutSettled))
+    await inTurnSaved($, () => update($, items, withoutSettled))
+    await inTurnSaved($, () => update($, logAtom, withoutLeftovers))
     // A submit that was still waiting for a turn is lost with the old load: its question
     // offers its buttons again. A delivered answer stays marked.
-    await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
+    await inTurnSaved($, () => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
     agentTimer?.cancel()
     refreshTimer?.cancel()
     await syncAgents($)
@@ -1038,28 +1189,54 @@ export const register: Register = (on, _options) => {
     return next(e)
   })
 
-  // A different conversation starts (/clear, /resume, /branch): the open questions of the old one
-  // are not this session's. A mod reload (session.start), a startup and a compaction are the same
-  // conversation and keep them.
+  // A conversation starts or goes on (a startup, /clear, /resume, /branch, a `--continue` or `--resume`, a
+  // compaction). The state belongs to the session id it was kept for (sessionOwner); one rule decides:
+  // - the same id (a compaction, a resume of this conversation inside this process): keep everything;
+  // - another id, or no owner yet (a new process): the open items of the former conversation are recorded
+  //   as gone, and what $.store holds for the new id is loaded (nothing, for the new id a /clear or /branch
+  //   gives, so it starts empty). A mod reload (session.start) and a compaction keep the state as it is.
   on('classic.SessionStart', async ($, e, next) => {
-    if (e.source === 'clear' || e.source === 'resume' || e.source === 'fork') {
-      // A check still running for the old conversation writes nothing.
-      checkEpoch += 1
-      // Open questions belong to the conversation they were asked in.
-      const at = await $.clock.now()
-      await inTurn(async () => {
-        await recordGone($, (await read($, items)).map(d => ({ id: d.id, why: 'cleared', source: e.source, at })))
-        await update($, items, () => [])
-        await update($, sentAtom, () => [])
-        // The last check was of the old conversation too.
-        await update($, checkResult, () => null)
-        // So is the log, and a write that began before this waits no longer holds.
-        await update($, logAtom, () => [])
-        await update($, conversationAtom, n => n + 1)
-      })
+    if (e.source === 'compact') return next(e)
+    const at = await $.clock.now()
+    let isChanged = false
+    let hasCheck = false
+    // A startup in a process with no conversation yet: the mod load (session.start) runs its check.
+    let isFirstStartup = false
+    await inTurn(async () => {
+      const former = await read($, ownerAtom)
+      if (former === e.session_id) return
+      isChanged = true
+      isFirstStartup = e.source === 'startup' && former === null
+      // A check still running for the former conversation writes nothing.
+      if (!isFirstStartup) checkEpoch += 1
+      let stored: unknown
+      try {
+        stored = await $.store.get(storeKey(e.session_id))
+      } catch {
+        // a store that cannot be read: the conversation starts empty
+      }
+      const loaded = loadConversation(stored)
+      hasCheck = loaded.checkResult !== null
+      // Open questions belong to the conversation they were asked in; close_decision still explains them.
+      const cleared: GoneEntry[] = (await read($, items)).map(d => ({ id: d.id, why: 'cleared', source: e.source, at }))
+      const formerGone = await read($, goneAtom)
+      await update($, items, () => loaded.items)
+      // Ids keep counting across the switch, so an id that left is never handed out again.
+      await update($, nextId, n => Math.max(n, loaded.nextId))
+      // An answer still waiting for its turn is lost with the process; a delivered one stays marked.
+      await update($, sentAtom, () => loaded.sent.filter(x => x.isDelivered === true))
+      await update($, checkResult, () => loaded.checkResult)
+      // The log of the former conversation goes.
+      await update($, logAtom, () => loaded.log)
+      await update($, goneAtom, () => [...loaded.gone, ...formerGone, ...cleared].slice(-GONE_LIMIT))
+      await update($, ownerAtom, () => e.session_id)
+      await saveConversation($)
+      await pruneConversations($, e.session_id)
+    })
+    if (isChanged) {
       await invalidate($)
-      // The new conversation's check.
-      void startCheck($)
+      // The new conversation's check, unless the one kept for it is still there.
+      if (!hasCheck && !isFirstStartup) void startCheck($)
     }
 
     return next(e)
@@ -1091,14 +1268,13 @@ export const register: Register = (on, _options) => {
     // Only a question has answer buttons.
     const accept = kind === 'question' ? optional(input.accept) : undefined
     const link = httpsLink(input.link)
-    const id = await inTurn(async () => {
+    const id = await inTurnSaved($, async () => {
       const n = await read($, nextId)
       await update($, nextId, () => n + 1)
       const openedAt = await $.clock.now()
       await update($, items, list =>
         [...list, { id: `d${n}`, ...(kind === 'question' ? {} : { kind }), question, ...(link === undefined ? {} : { link }), recommendation, accept, openedAt }],
       )
-      await addLog($, openedAt, [eventDraft('asked', `Asked you: ${question}`, kind)])
       return `d${n}`
     })
     await invalidate($)
@@ -1107,10 +1283,9 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
-    const input = e as unknown as { id?: unknown; outcome?: unknown }
+    const input = e as unknown as { id?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
-    const outcome = typeof input.outcome === 'string' ? input.outcome.trim() : ''
-    const found = await inTurn(async (): Promise<'open' | GoneEntry | undefined> => {
+    const found = await inTurnSaved($, async (): Promise<'open' | GoneEntry | undefined> => {
       const item = (await read($, items)).find(d => d.id === id)
       const isOpen = item !== undefined
       const gone = [...(await read($, goneAtom))].reverse().find(g => g.id === id)
@@ -1118,7 +1293,6 @@ export const register: Register = (on, _options) => {
       // A closed decision is dropped: nothing shows settled ones. So is the answer line of one that already left.
       await update($, items, all => all.filter(d => d.id !== id))
       await update($, sentAtom, sent => sent.filter(x => x.id !== id))
-      if (item !== undefined) await addLog($, await $.clock.now(), [eventDraft('answered', `Closed: ${item.question}${outcome === '' ? '' : ` · ${outcome}`}`)])
 
       return isOpen ? 'open' : gone
     })
@@ -1147,7 +1321,7 @@ export const register: Register = (on, _options) => {
       return { deny: `note kind must be ${NOTE_KINDS.join(', ')}.` }
     }
     const kind: LogKind = input.kind ?? 'plan'
-    await inTurn(async () => addLog($, await $.clock.now(), [{ kind, text }]))
+    await inTurnSaved($, async () => addLog($, await $.clock.now(), [{ kind, text }]))
     await invalidate($)
 
     return { result: 'Noted.' }
@@ -1157,8 +1331,8 @@ export const register: Register = (on, _options) => {
     const isMainBash = e.tool === 'Bash' && e.agentId === undefined && typeof e.command === 'string'
     const ran = await next(e)
     if (isMainBash) {
-      const stdout = str(asObj((ran as { result?: unknown }).result).stdout)
-      void afterBash($, e.command as string, stdout)
+      const result = asObj((ran as { result?: unknown }).result)
+      void afterBash($, e.command as string, str(result.stdout), str(result.stderr))
       await afterCheck($, e.command as string, ran as { result?: unknown; text?: unknown; deny?: unknown })
     }
 
@@ -1194,6 +1368,23 @@ export const register: Register = (on, _options) => {
     }
 
     return next(e)
+  })
+
+  // The pane's own tool calls (open_decision, close_decision, note) are bookkeeping, not conversation: their rows
+  // and results draw nothing in the transcript. A call that errored (a refusal included) or was interrupted keeps
+  // its row, so a failure is never hidden. Every other tool's row is returned as it is. (A group folds only the
+  // built-in reads and searches, which these tools are not, and a progress row is only the background hint.)
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    if (!isHiddenCall(e.props)) return next(e)
+    const { Box } = $.ui.resolve(e)
+
+    return <Box display="none" />
+  })
+  on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+    if (!isHiddenCall(e.props)) return next(e)
+    const { Box } = $.ui.resolve(e)
+
+    return <Box display="none" />
   })
 
   // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.

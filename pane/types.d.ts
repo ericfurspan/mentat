@@ -33,10 +33,11 @@ export type AgentRow = {
 export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
 // The kinds of event line the pane writes to the Log itself. The `note` tool never takes one.
-export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'dismissed' | 'check' | 'prOpened'
+// (`asked`, `answered` and `dismissed` are no longer written, and a log kept from an earlier version has them dropped.)
+export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'dismissed' | 'check' | 'prOpened' | 'pushed'
 
-// What an `asked` or `check` event line is marked with: the kind of the item asked, or the result of the check.
-export type EventMark = 'question' | 'action' | 'alert' | 'pass' | 'warn' | 'fail'
+// What a `check` event line is marked with: the result of the check.
+export type EventMark = 'pass' | 'warn' | 'fail'
 
 // One line of the Log (the Feed): when (clock time), its kind and its text (one line). A note is one
 // Claude Code added; an event is one the pane wrote, drawn dim. A line stored without a source is a note.
@@ -51,6 +52,19 @@ export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] 
 // conversation started (source: clear, resume or fork). at is the clock time it left.
 export type GoneEntry = { id: string; why: 'dismissed' | 'cleared'; source?: string; at: number }
 
+// What the pane keeps in `$.store` for one conversation (key `conv:<session id>`), so
+// `claude --continue` or `--resume` brings it back. Agent rows and view toggles are not kept.
+export type SavedConversation = {
+  // The clock time of the last change; a session start prunes the store to the 20 newest.
+  savedAt: number
+  items: Decision[]
+  nextId: number
+  sent: { id: string; text: string; isDelivered?: boolean }[]
+  log: LogEntry[]
+  checkResult: CheckResult | null
+  gone: GoneEntry[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'mentat': {
@@ -64,13 +78,13 @@ declare module 'claude-code' {
       checkResult: CheckResult | null
       // The session's log, oldest first (the pane shows it newest first); capped.
       log: LogEntry[]
-      // Counts the conversations: bumped where a /clear, /resume or /branch empties the log, so a write
-      // that waited for the engine can tell it began in an earlier conversation.
-      conversation: number
       // True while the Feed shows every log entry (default: the newest ten).
       logAll: boolean
       // Items that left without close_decision, oldest first; capped at 50, never drawn.
       decisionsGone: GoneEntry[]
+      // The session id the conversation state above belongs to; null until a session start has set it. A
+      // session start with another id loads that conversation from the store, and the same id keeps this.
+      sessionOwner: string | null
     }
   }
 }
