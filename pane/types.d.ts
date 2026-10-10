@@ -51,6 +51,19 @@ export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] 
 // conversation started (source: clear, resume or fork). at is the clock time it left.
 export type GoneEntry = { id: string; why: 'dismissed' | 'cleared'; source?: string; at: number }
 
+// What the pane keeps in `$.store` for one conversation (key `conv:<session id>`), so
+// `claude --continue` or `--resume` brings it back. Agent rows and view toggles are not kept.
+export type SavedConversation = {
+  // The clock time of the last change; a session start prunes the store to the 20 newest.
+  savedAt: number
+  items: Decision[]
+  nextId: number
+  sent: { id: string; text: string; isDelivered?: boolean }[]
+  log: LogEntry[]
+  checkResult: CheckResult | null
+  gone: GoneEntry[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'mentat': {
@@ -64,13 +77,16 @@ declare module 'claude-code' {
       checkResult: CheckResult | null
       // The session's log, oldest first (the pane shows it newest first); capped.
       log: LogEntry[]
-      // Counts the conversations: bumped where a /clear, /resume or /branch empties the log, so a write
-      // that waited for the engine can tell it began in an earlier conversation.
+      // Counts the conversations: bumped where a session start brings another session id's state in, so a
+      // write that waited for the engine can tell it began in an earlier conversation.
       conversation: number
       // True while the Feed shows every log entry (default: the newest ten).
       logAll: boolean
       // Items that left without close_decision, oldest first; capped at 50, never drawn.
       decisionsGone: GoneEntry[]
+      // The session id the conversation state above belongs to; null until a session start has set it. A
+      // session start with another id loads that conversation from the store, and the same id keeps this.
+      sessionOwner: string | null
     }
   }
 }

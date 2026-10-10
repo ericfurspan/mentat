@@ -65,6 +65,11 @@ type World = {
   invalidations: number
   // The slash commands the plugin ran through $.command.run, in order.
   commands: string[]
+  // $.store, in memory: what a process left behind is what a test seeds (`boot(on, { store })`).
+  store: Record<string, unknown>
+  // When set, $.store.set rejects (a full or unwritable store); storeWrites counts the sets that went through.
+  storeFails: boolean
+  storeWrites: number
   // The tools the pane registered, as it described them.
   tools: { name: string; description: string; inputSchema: { required: string[]; properties: Record<string, { enum?: string[] }> }; isDeferred: boolean }[]
 }
@@ -72,7 +77,7 @@ type World = {
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
 
 // `band: false` leaves what the band draws beneath the plugin to the test.
-const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
+const boot = (on: never, opts: { band?: boolean; zone?: string; store?: Record<string, unknown> } = {}) => {
   const onFn = on as (event: string, ...rest: unknown[]) => void
   mock.env(on, { TZ: opts.zone ?? ZONE })
   const clock = mock.clock(on, { now: T0 })
@@ -95,6 +100,9 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     usageFails: false,
     invalidations: 0,
     commands: [],
+    store: JSON.parse(JSON.stringify(opts.store ?? {})),
+    storeFails: false,
+    storeWrites: 0,
     tools: [],
   }
   let active = 0
@@ -135,6 +143,18 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     await world.bashGate
     return { result: { stdout: world.bash, stderr: world.bashErr } }
   })
+  onFn('store.get', (_$: unknown, e: { key: string }) => ({ value: world.store[e.key] }))
+  onFn('store.set', (_$: unknown, e: { key: string; value: unknown }) => {
+    if (world.storeFails) throw new Error('the store is full')
+    world.storeWrites += 1
+    world.store[e.key] = JSON.parse(JSON.stringify(e.value))
+    return { value: undefined }
+  })
+  onFn('store.delete', (_$: unknown, e: { key: string }) => {
+    delete world.store[e.key]
+    return { value: undefined }
+  })
+  onFn('store.keys', () => ({ value: Object.keys(world.store) }))
   onFn('classic.SessionStart', (_$: unknown, e: unknown) => e)
   onFn('prompt.submit', async (_$: unknown, e: { text: string }) => {
     await world.promptGate
@@ -250,6 +270,17 @@ const until = async (cond: () => boolean, what: string) => {
     await new Promise(r => setTimeout(r, 5))
   }
   throw new Error(`timed out waiting for ${what}`)
+}
+
+// The engine's SessionStart. Each call is a new session id unless the test names one (`session_id`), as a
+// /clear, a /branch and an in-app resume each begin under a new id; a compaction goes on under the same.
+let sessionCount = 0
+const classicOf = ($: never) => {
+  const raw = ($ as never as { classic: { SessionStart: (a: { source: string; session_id?: string }) => Promise<unknown> } }).classic
+  return {
+    SessionStart: (a: { source: string; session_id?: string }) =>
+      raw.SessionStart({ ...a, session_id: a.session_id ?? (a.source === 'compact' ? `s${sessionCount}` : `s${++sessionCount}`) }),
+  }
 }
 
 const eng = ($: never) =>
@@ -385,7 +416,7 @@ test('the desktop pane is native rows with small Svg marks found by alt text; th
 
 test('a new conversation (clear, resume, branch) drops the open questions too; a reload and a compaction keep them', async ($, on) => {
   boot(on)
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
   for (const source of ['clear', 'resume', 'fork']) {
     await eng($).tool.call({ tool: OPEN, question: `Asked before ${source}?` })
     await classic.SessionStart({ source })
@@ -395,9 +426,11 @@ test('a new conversation (clear, resume, branch) drops the open questions too; a
       expect(t).toContain('Nothing waiting on you.')
     }
   }
+  // A startup begins a conversation; a reload, a repeated start of it and a compaction keep what it holds.
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await eng($).tool.call({ tool: OPEN, question: 'Kept?' })
   await startSession($)
-  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await classic.SessionStart({ source: 'compact' })
   for (const surface of SURFACES) expect(await waitTexts($, surface)).toContain('Kept?')
 })
@@ -625,7 +658,7 @@ test('closing a question, or a new conversation, forgets that it was sent', asyn
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   expect(await sentIds($)).toEqual(['d1', 'd3'])
   // A new conversation drops the questions and their marks.
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
   await classic.SessionStart({ source: 'clear' })
   expect(await sentIds($)).toEqual([])
 })
@@ -645,7 +678,7 @@ test('closing an unknown id is refused', async ($, on) => {
 // ---- items that left without close_decision ----------------------------------------------------------
 
 const newConversation = ($: never, source: string) =>
-  ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic.SessionStart({ source })
+  classicOf($).SessionStart({ source })
 
 test('close_decision on an item dismissed in the pane succeeds and names the time, on both surfaces', async ($, on) => {
   const { clock } = boot(on)
@@ -696,8 +729,9 @@ test('close_decision on items cleared by /clear, /resume or /branch succeeds and
 
 test('a startup or compaction keeps the open items and records nothing', async ($, on) => {
   boot(on)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'here' })
   await eng($).tool.call({ tool: OPEN, question: 'Still here?' })
-  await newConversation($, 'startup')
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'here' })
   await newConversation($, 'compact')
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Closed decision d1.')
   expect((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).deny).toContain('no record')
@@ -1636,7 +1670,7 @@ test('the Feed of both panes shows the notes newest first, each with its kind\'s
   world.usage = { context: 5, limits: [limit('seven_day', 10)] }
 
   // A new conversation empties the log.
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
   await classic.SessionStart({ source: 'clear' })
   for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
 })
@@ -1669,7 +1703,7 @@ test('/mentat opens the pane for an open action or alert', async ($, on) => {
 
 test('closing an alert or an action by id removes it, and a new conversation drops them too', async ($, on) => {
   boot(on)
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
   await open('alert', 'Down')($)
   await open('action', 'Do it')($)
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
@@ -2020,12 +2054,13 @@ test('the check warning comes after an alert and a question and before an action
 
 test('a new conversation drops the check result and its warning card, and a mod reload keeps them', async ($, on) => {
   const { world } = boot(on)
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await bash(world, $, 'mentat check', WARN_RUN)
   await startSession($)
   expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
   expect((await checkItemsOf($)).length).toBe(1)
-  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await classic.SessionStart({ source: 'compact' })
   expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
   expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'warning', dim: false })
@@ -2361,11 +2396,12 @@ test('the desktop pane with only a note draws it and not the empty line', async 
 
 test('a new conversation empties the log; a reload and a compaction keep it', async ($, on) => {
   boot(on)
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await startSession($)
   await note($, 'Before')
   await startSession($)
-  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await classic.SessionStart({ source: 'compact' })
   expect(await lines($)).toEqual(['▸ Before'])
   for (const source of ['clear', 'resume', 'fork']) {
@@ -2704,7 +2740,7 @@ test('after /clear the label goes dim, then the new conversation is checked; a r
   }
   await startSession($)
   await until(() => gates.length === 1, 'the startup check')
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
   await classic.SessionStart({ source: 'clear' })
   await until(() => gates.length === 2, 'the check after /clear')
   expect(world.cwds['mentat']).toBe('/work/r')
@@ -2744,17 +2780,18 @@ test('a terminal pane row ends in its buttons without width arithmetic: a growin
 
 test('with the pane open, a question opened by the agent is still open after the user types a message, and close_decision settles it', async ($, on) => {
   const { world } = boot(on)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'kept' })
   await startSession($)
   const pane = await mount($, TERM, 'terminal')
   const opened = await eng($).tool.call({ tool: OPEN, question: 'Ship it?', recommendation: 'Yes', accept: 'Yes' })
   expect(String(opened.result)).toContain('d1')
   // What can happen in the session meanwhile: the user's message (the agent's turn goes on), a model
   // request, a timer-driven read, a reload and a compaction. None of them touches the open question.
-  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  const classic = classicOf($)
   await eng($).turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 'turn-main', reason: 'end_turn' })
   await step($, undefined)
   await startSession($)
-  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await classic.SessionStart({ source: 'compact' })
   expect(await waitTexts($, 'desktop')).toContain('Ship it?')
   expect(await textsOf(pane)).toContain('Ship it?')
@@ -2787,7 +2824,6 @@ const drawnRow = async ($: never, surface: 'terminal' | 'desktop', icon: string,
 
   return { colors: marks.map(m => m.props?.color), dim: texts.map(t => t.props?.dimColor === true) }
 }
-const classicOf = ($: never) => ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
 
 test('an agent that ends writes one line: finished (with no time), failed, or stopped; an unknown end writes none', async ($, on) => {
   const { world, clock } = boot(on)
@@ -3465,4 +3501,228 @@ test('an agent first seen live after a reload, with no known start, shows no tim
   await eng($).turn.complete(turnDone('z9'))
   await clock.advance(3_000)
   expect(deskLine(await paneTexts($, 'desktop'), 'Unseen one')?.elapsed).toMatch(/^[34]s$/)
+})
+
+// ---- the conversation survives a restart of the process (#159) ------------------------------------------
+// A new process starts with empty $.state and the same $.store. The tests stand for it with a fresh `boot`
+// whose store is seeded with what an earlier process wrote (`world.store['conv:S1']`), and for a session id
+// that changes (/clear, /branch, an in-app resume) with a SessionStart that names another `session_id`.
+
+const sessionsOf = (world: World) => Object.fromEntries(Object.entries(world.store).filter(([k]) => k.startsWith('conv:')).map(([k, v]) => [k.slice(5), v])) as Record<string, { savedAt: number; items: { id: string; question: string }[]; nextId: number; log: { text: string }[]; sent: unknown[]; gone: { id: string }[]; checkResult: unknown }>
+// What an earlier process left for session S1: two open items and the check's warning item, a delivered
+// answer and one still waiting, a note and an event line, a dismissed item, the last check result.
+const LEFT_BEHIND = {
+  savedAt: T0 - 3600_000,
+  items: [
+    { id: 'd1', question: 'Ship it?', recommendation: 'Yes', accept: 'Yes', openedAt: T0 - 7200_000 },
+    { id: 'd2', question: 'Merge it?', accept: 'Go', openedAt: T0 - 7100_000 },
+    { id: 'd3', kind: 'action', question: 'Rotate the token', link: 'https://github.com/o/r/issues/7', openedAt: T0 - 7000_000 },
+    { id: 'check', kind: 'warning', question: 'Check passed with 2 warnings', openedAt: T0 - 6900_000 },
+  ],
+  nextId: 5,
+  sent: [{ id: 'd1', text: 'Yes', isDelivered: true }, { id: 'd2', text: 'Go' }],
+  log: [
+    { at: T0 - 7200_000, kind: 'plan', text: 'Plan the release' },
+    { at: T0 - 7100_000, kind: 'asked', text: 'Asked you: Merge it?', source: 'event', mark: 'question' },
+  ],
+  checkResult: { state: 'warn', warnings: ['gh is old', 'codex is old'] },
+  gone: [{ id: 'd4', why: 'dismissed', at: T0 - 6000_000 }],
+}
+
+test('a restart of the same conversation (empty state, same id, source resume) brings back the items, the numbering, the Feed, the check and what was answered', async ($, on) => {
+  const { world } = boot(on, { store: { 'conv:S1': LEFT_BEHIND } })
+  world.git = ok('true')
+  world.check = ok(CLEAN_RUN)
+  // (A mod load also runs a check of its own, as it always did; this test is of the session start alone.)
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+  for (const surface of SURFACES) {
+    const t = await waitTexts($, surface)
+    for (const q of ['Ship it?', 'Merge it?', 'Rotate the token', 'Check passed with 2 warnings']) expect(t).toContain(q)
+  }
+  // The Feed.
+  expect(await lines($)).toEqual(['? Asked you: Merge it?', '▸ Plan the release'])
+  // The check result is kept, so the label is the warning one and no new check is run.
+  expect(await footerTextOf($)).toBe('● Mentat · 4 waiting')
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'warning', dim: false })
+  expect(world.calls.filter(a => isCall(a, 'mentat', 'check'))).toEqual([])
+  // The delivered answer is still marked sent; the one that had not entered the session is forgotten.
+  const d = await mount($, TERM, 'terminal')
+  expect(await textsOf(d)).toContain('Sent: Yes')
+  expect(await bandKeys(d)).toContain('accept-d2')
+  expect(await bandKeys(d)).not.toContain('accept-d1')
+  await d.unmount()
+  // The numbering continues, and the record of items that left is back.
+  expect(String((await eng($).tool.call({ tool: OPEN, question: 'Next?' })).result)).toBe('Opened decision d5.')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd4' })).result)).toContain('already dismissed')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Closed decision d1.')
+  // Nothing of it was recorded as cleared.
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd2' })).result)).toBe('Closed decision d2.')
+})
+
+const NOTHING_STORED: [string, Record<string, unknown>][] = [
+  ['no store', {}],
+  ['another id only', { 'conv:S2': LEFT_BEHIND }],
+  ['an entry that is not an object', { 'conv:S1': 'junk' }],
+  ['an entry of the wrong shapes', { 'conv:S1': { items: 'junk', log: 4, nextId: 'x', checkResult: { state: 'bad' } } }],
+]
+for (const [what, store] of NOTHING_STORED) {
+  test(`a restart with nothing usable stored for the id (${what}) starts empty and runs the check`, async ($, on) => {
+    const { world } = boot(on, { store })
+    world.git = ok('true')
+    world.check = ok(CLEAN_RUN)
+    await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+    await until(() => world.calls.some(a => isCall(a, 'mentat', 'check')), 'the check')
+    await until(() => world.invalidations > 0, 'the check')
+    // Only the new check's own line: nothing waits and nothing else is in the Feed.
+    await untilFooter($, 'terminal', '● Mentat', 'success')
+    expect(await lines($)).toEqual(['✓ mentat check passed'])
+    for (const surface of SURFACES) expect((await paneTexts($, surface)).includes('WAITING ON YOU')).toBe(false)
+    expect(String((await eng($).tool.call({ tool: OPEN, question: 'First?' })).result)).toBe('Opened decision d1.')
+  })
+}
+
+test('a resume of this conversation inside the same process keeps everything and records nothing as gone', async ($, on) => {
+  const { world } = boot(on)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'S1' })
+  await eng($).tool.call({ tool: OPEN, question: 'Stay?', accept: 'Yes' })
+  await note($, 'Before')
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+  await classicOf($).SessionStart({ source: 'compact' })
+  expect(await waitTexts($, 'terminal')).toContain('Stay?')
+  expect(await lines($)).toEqual(['▸ Before', '? Asked you: Stay?'])
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Closed decision d1.')
+  expect((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).deny).toContain('no record')
+  expect(sessionsOf(world).S1!.items).toEqual([])
+})
+
+test('a new id with nothing stored (as after /clear or /branch) starts empty and records the old items as cleared; the old conversation stays stored', async ($, on) => {
+  const { world } = boot(on)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'S1' })
+  await eng($).tool.call({ tool: OPEN, question: 'Old?' })
+  await note($, 'Old note')
+  await classicOf($).SessionStart({ source: 'clear', session_id: 'S2' })
+  for (const surface of SURFACES) expect(await paneTexts($, surface)).toEqual(['Nothing waiting on you.'])
+  expect(await lines($)).toEqual([])
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Decision d1 was already cleared when a new conversation started (/clear).')
+  expect(String((await eng($).tool.call({ tool: OPEN, question: 'New?' })).result)).toBe('Opened decision d2.')
+  // S1 is what it was; S2 holds the new conversation.
+  expect(sessionsOf(world).S1!.items.map(d => d.question)).toEqual(['Old?'])
+  expect(sessionsOf(world).S2!.items.map(d => d.question)).toEqual(['New?'])
+})
+
+test('a resume to a different id that has stored state loads that state, and going back loads the first again', async ($, on) => {
+  const { world } = boot(on)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'S1' })
+  await eng($).tool.call({ tool: OPEN, question: 'Alpha?' })
+  await note($, 'Alpha note')
+  await classicOf($).SessionStart({ source: 'clear', session_id: 'S2' })
+  await eng($).tool.call({ tool: OPEN, question: 'Beta?' })
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+  expect(await waitTexts($, 'terminal')).toContain('Alpha?')
+  expect(await waitTexts($, 'terminal')).not.toContain('Beta?')
+  expect(await lines($)).toEqual(['▸ Alpha note', '? Asked you: Alpha?'])
+  // Beta's item went as cleared (by /resume); numbering does not reuse an id that left.
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd2' })).result)).toBe('Decision d2 was already cleared when a new conversation started (/resume).')
+  expect(String((await eng($).tool.call({ tool: OPEN, question: 'Gamma?' })).result)).toBe('Opened decision d3.')
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S2' })
+  expect(await waitTexts($, 'terminal')).toContain('Beta?')
+  expect(await waitTexts($, 'terminal')).not.toContain('Gamma?')
+  expect(Object.keys(sessionsOf(world)).sort()).toEqual(['S1', 'S2'])
+})
+
+test('the store keeps one key per conversation, `conv:<session id>`, and a save writes only its own', async ($, on) => {
+  const { world } = boot(on, { store: { 'conv:OTHER': { ...LEFT_BEHIND, savedAt: 5 } } })
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'S1' })
+  expect(Object.keys(world.store)).toEqual(['conv:OTHER'])
+  await eng($).tool.call({ tool: OPEN, question: 'Mine?' })
+  // Another session, running at once, saves its own key meanwhile; this one's later saves leave it alone.
+  world.store['conv:LIVE'] = { ...LEFT_BEHIND, savedAt: T0 + 1 }
+  await note($, 'Still mine')
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  expect(Object.keys(world.store).sort()).toEqual(['conv:LIVE', 'conv:OTHER', 'conv:S1'])
+  expect(world.store['conv:LIVE']).toEqual({ ...LEFT_BEHIND, savedAt: T0 + 1 })
+  expect((world.store['conv:S1'] as { log: unknown[] }).log.length).toBe(3)
+  // A conversation that ends up empty has no key.
+  await classicOf($).SessionStart({ source: 'clear', session_id: 'S2' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  expect(Object.keys(world.store)).not.toContain('conv:S2')
+})
+
+test('the store keeps what a conversation holds under its session id, and at most the 20 most recently saved (pruned at a session start), dropping the oldest', async ($, on) => {
+  const { world, clock } = boot(on)
+  for (let i = 1; i <= 22; i++) {
+    await clock.advance(1000)
+    await classicOf($).SessionStart({ source: i === 1 ? 'startup' : 'clear', session_id: `S${i}` })
+    await eng($).tool.call({ tool: OPEN, question: `Question ${i}?` })
+  }
+  const kept = sessionsOf(world)
+  expect(Object.keys(kept).sort()).toEqual(Array.from({ length: 20 }, (_, i) => `S${i + 3}`).sort())
+  const last = kept.S22!
+  expect(Object.keys(last).sort()).toEqual(['checkResult', 'gone', 'items', 'log', 'nextId', 'savedAt', 'sent'])
+  expect(last.items.map(d => d.question)).toEqual(['Question 22?'])
+  expect(last.nextId).toBe(23)
+  expect(last.savedAt).toBe(T0 + 22_000)
+  expect(last.log.map(l => l.text)).toEqual(['Asked you: Question 22?'])
+  // The agent rows and the view toggles are not kept.
+  expect(JSON.stringify(world.store)).not.toContain('logAll')
+  // An old conversation that is changed again is the newest.
+  await clock.advance(1000)
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S3' })
+  await note($, 'Touched')
+  await clock.advance(1000)
+  await classicOf($).SessionStart({ source: 'clear', session_id: 'S23' })
+  await eng($).tool.call({ tool: OPEN, question: 'Question 23?' })
+  expect(Object.keys(sessionsOf(world))).toContain('S3')
+  expect(Object.keys(sessionsOf(world))).not.toContain('S4')
+  expect(Object.keys(sessionsOf(world)).length).toBe(20)
+})
+
+test('a store write that throws leaves the pane working, and a later write goes through', async ($, on) => {
+  const { world } = boot(on)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'S1' })
+  world.storeFails = true
+  const opened = await eng($).tool.call({ tool: OPEN, question: 'Still works?', accept: 'Yes' })
+  expect(String(opened.result)).toBe('Opened decision d1.')
+  await note($, 'A note')
+  const d = await mount($, TERM, 'terminal')
+  expect(await textsOf(d)).toContain('Still works?')
+  await d.press({ key: 'accept-d1' })
+  await d.unmount()
+  expect(world.sent.length).toBe(1)
+  await classicOf($).SessionStart({ source: 'clear', session_id: 'S2' })
+  expect(await paneTexts($, 'terminal')).toEqual(['Nothing waiting on you.'])
+  expect(world.storeWrites).toBe(0)
+  world.storeFails = false
+  await eng($).tool.call({ tool: OPEN, question: 'Saved?' })
+  expect(sessionsOf(world).S2!.items.map(d => d.question)).toEqual(['Saved?'])
+})
+
+test('a mod load before the session start does not wipe what is stored for the conversation', async ($, on) => {
+  const { world } = boot(on, { store: { 'conv:S1': LEFT_BEHIND } })
+  await startSession($)
+  await eng($).tool.call({ tool: NOTE, text: 'Too early' })
+  expect(sessionsOf(world).S1!.items.length).toBe(4)
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+  expect(await waitTexts($, 'terminal')).toContain('Ship it?')
+})
+
+test('a startup session start runs no check of its own (the mod load does), and a resume that restores a kept check result runs none', async ($, on) => {
+  const { world } = boot(on)
+  world.git = ok('true')
+  world.check = ok(CLEAN_RUN)
+  await classicOf($).SessionStart({ source: 'startup', session_id: 'S1' })
+  await new Promise(r => setTimeout(r, 30))
+  expect(world.calls.filter(a => isCall(a, 'mentat', 'check'))).toEqual([])
+  await startSession($)
+  await until(() => world.calls.some(a => isCall(a, 'mentat', 'check')), 'the mod load check')
+  await untilFooter($, 'terminal', '● Mentat', 'success')
+  expect(world.calls.filter(a => isCall(a, 'mentat', 'check')).length).toBe(1)
+  // The result is kept with the conversation: back in S1 after /clear, it is not run again.
+  await classicOf($).SessionStart({ source: 'clear', session_id: 'S2' })
+  await until(() => world.calls.filter(a => isCall(a, 'mentat', 'check')).length === 2, 'the check after /clear')
+  await untilFooter($, 'terminal', '● Mentat', 'success')
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+  await new Promise(r => setTimeout(r, 30))
+  expect(world.calls.filter(a => isCall(a, 'mentat', 'check')).length).toBe(2)
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '● Mentat', color: 'success', dim: false })
 })

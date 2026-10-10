@@ -10,7 +10,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { AgentRow, AgentStatus, CheckResult, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
+import type { AgentRow, AgentStatus, CheckResult, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry, SavedConversation } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -32,6 +32,11 @@ const FEED_SHOWN = 10
 const LOG_TEXT_LIMIT = 1000
 // The record of items that left without close_decision keeps this many entries.
 const GONE_LIMIT = 50
+// The conversations kept in $.store, one key per session id (several sessions can run at once, and each
+// writes only its own key): the newest SESSIONS_KEPT, pruned at a session start.
+const STORE_PREFIX = 'conv:'
+const storeKey = (sessionId: string): string => `${STORE_PREFIX}${sessionId}`
+const SESSIONS_KEPT = 20
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
@@ -43,6 +48,8 @@ const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
 const conversationAtom = atom({ plugin: 'mentat', key: 'conversation' } as const, 0)
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
+// The session id the conversation state belongs to; see classic.SessionStart.
+const ownerAtom = atom({ plugin: 'mentat', key: 'sessionOwner' } as const, null)
 
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
@@ -255,6 +262,79 @@ const inTurn = <T,>(work: () => Promise<T>): Promise<T> => {
   return run
 }
 
+// ---- the conversation kept between processes ---------------------------------------------------
+// $.state is gone when the process ends, so a `claude --continue` or `--resume` (same session id) would
+// start empty. The conversation's own state (not the agent rows, which the engine lists, nor the view
+// toggles) is also kept in $.store under its session id, written after each change, newest SESSIONS_KEPT.
+
+// What a stored entry gives back, with every field checked: a value of the wrong shape is empty.
+function loadConversation(stored: unknown): Omit<SavedConversation, 'savedAt'> {
+  const o = asObj(stored)
+  const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+  const result = asObj(o.checkResult)
+  const hasResult = result.state === 'pass' || result.state === 'warn' || result.state === 'fail'
+
+  return {
+    items: withoutSettled(list<Decision>(o.items)),
+    nextId: typeof o.nextId === 'number' && Number.isFinite(o.nextId) && o.nextId >= 1 ? o.nextId : 1,
+    sent: list(o.sent),
+    log: list(o.log),
+    checkResult: hasResult ? { state: result.state as CheckResult['state'], warnings: list<string>(result.warnings) } : null,
+    gone: list(o.gone),
+  }
+}
+
+// Saves the conversation under the session id its state belongs to, when it differs from what is stored;
+// an entry that would be empty is removed instead. Call it inside inTurn, after the change. It never throws:
+// a store that fails leaves the pane as it is. A state with no owner yet (a new process before its session
+// start) is no conversation's and is not kept; saving it would overwrite what that session start is about to load.
+async function saveConversation($: EngineInterface): Promise<void> {
+  try {
+    const id = await read($, ownerAtom)
+    if (id === null) return
+    const entry = {
+      items: await read($, items),
+      nextId: await read($, nextId),
+      sent: await read($, sentAtom),
+      log: await read($, logAtom),
+      checkResult: await read($, checkResult),
+      gone: await read($, goneAtom),
+    }
+    const stored = await $.store.get(storeKey(id))
+    const former = stored === undefined ? undefined : loadConversation(stored)
+    if (former !== undefined && JSON.stringify(former) === JSON.stringify(loadConversation(entry))) return
+    const isEmpty = entry.items.length === 0 && entry.log.length === 0 && entry.gone.length === 0 && entry.sent.length === 0 && entry.checkResult === null
+    if (isEmpty) {
+      if (former !== undefined) await $.store.delete(storeKey(id))
+      return
+    }
+    await $.store.set(storeKey(id), { savedAt: await $.clock.now(), ...entry })
+  } catch {
+    // the in-memory state is right; the next change saves again
+  }
+}
+
+// Deletes the conversations past the newest SESSIONS_KEPT, by when each was saved. Run at a session start,
+// not on every save. The session that is starting is never the one dropped: it keeps its place.
+async function pruneConversations($: EngineInterface, current: string): Promise<void> {
+  try {
+    const keys = (await $.store.keys()).filter(k => k.startsWith(STORE_PREFIX) && k !== storeKey(current))
+    const saved = await Promise.all(keys.map(async key => ({ key, at: Number(asObj(await $.store.get(key)).savedAt ?? 0) })))
+    for (const { key } of saved.sort((a, b) => b.at - a.at).slice(SESSIONS_KEPT - 1)) await $.store.delete(key)
+  } catch {
+    // the next session start prunes again
+  }
+}
+
+// inTurn for a change to the kept state: saves the conversation when the change is done.
+const inTurnSaved = <T,>($: EngineInterface, work: () => Promise<T>): Promise<T> =>
+  inTurn(async () => {
+    const out = await work()
+    await saveConversation($)
+
+    return out
+  })
+
 // ---- top-level functions that take $ ------------------------------------------------------
 
 async function invalidate($: EngineInterface): Promise<void> {
@@ -340,7 +420,10 @@ async function syncAgents($: EngineInterface): Promise<void> {
       const before = await read($, agents)
       const after = reconcile(before, infos, now)
       await update($, agents, () => after)
-      await addLog($, now, agentEvents(before, after))
+      const events = agentEvents(before, after)
+      await addLog($, now, events)
+      // The agent rows are not kept; only an event line they wrote is.
+      if (events.length > 0) await saveConversation($)
     })
   } catch {
     // the next check tries again
@@ -362,7 +445,7 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
       const last = urls[urls.length - 1]
       if (last !== undefined) {
         const at = await $.clock.now()
-        await inTurn(() => addLog($, at, [eventDraft('prOpened', `Opened PR #${last[2]}`)]))
+        await inTurnSaved($, () => addLog($, at, [eventDraft('prOpened', `Opened PR #${last[2]}`)]))
         await invalidate($)
       }
     }
@@ -388,7 +471,7 @@ const checkEvent = (outcome: CheckRead): LogDraft => {
 // isCurrent is asked inside the turn that writes: a run that is no longer the latest writes nothing.
 async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: () => boolean): Promise<void> {
   const openedAt = await $.clock.now()
-  await inTurn(async () => {
+  await inTurnSaved($, async () => {
     if (!isCurrent()) return
     await update($, items, list => {
       const rest = list.filter(d => d.id !== CHECK_ID)
@@ -502,7 +585,7 @@ const sentLine = (entry: { text: string; isDelivered?: boolean }): string => {
 async function sendAnswer($: EngineInterface, d: { id: string; question: string }, text: string): Promise<boolean> {
   // The conversation the press began in: a delivery that lands in a later one writes no line there.
   let began = 0
-  const isFirst = await inTurn(async () => {
+  const isFirst = await inTurnSaved($, async () => {
     if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
     began = await read($, conversationAtom)
     await update($, sentAtom, list => [...list, { id: d.id, text }])
@@ -518,12 +601,12 @@ async function sendAnswer($: EngineInterface, d: { id: string; question: string 
     isTaken = false
   }
   if (!isTaken) {
-    await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
+    await inTurnSaved($, () => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
     $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
     return false
   }
   // The answer entered the session; the line stops saying it waits.
-  await inTurn(async () => {
+  await inTurnSaved($, async () => {
     await update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x)))
     if ((await read($, conversationAtom)) !== began) return
     await addLog($, await $.clock.now(), [eventDraft('answered', `You answered "${text}": ${d.question}`)])
@@ -540,7 +623,7 @@ async function recordGone($: EngineInterface, gone: GoneEntry[]): Promise<void> 
 const dismissItem = async ($: EngineInterface, id: string) => {
   const at = await $.clock.now()
 
-  return inTurn(async () => {
+  return inTurnSaved($, async () => {
     const item = (await read($, items)).find(x => x.id === id)
     await update($, items, all => all.filter(x => x.id !== id))
     await update($, sentAtom, list => list.filter(x => x.id !== id))
@@ -1023,10 +1106,10 @@ export const register: Register = (on, _options) => {
     // A (re)load: reconcile the agents with the engine's list and start the timers over.
     // The former decisions pane kept settled entries (with closedAt) in this state;
     // nothing shows them now, so they must not come back as open questions.
-    await inTurn(() => update($, items, withoutSettled))
+    await inTurnSaved($, () => update($, items, withoutSettled))
     // A submit that was still waiting for a turn is lost with the old load: its question
     // offers its buttons again. A delivered answer stays marked.
-    await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
+    await inTurnSaved($, () => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
     agentTimer?.cancel()
     refreshTimer?.cancel()
     await syncAgents($)
@@ -1038,28 +1121,55 @@ export const register: Register = (on, _options) => {
     return next(e)
   })
 
-  // A different conversation starts (/clear, /resume, /branch): the open questions of the old one
-  // are not this session's. A mod reload (session.start), a startup and a compaction are the same
-  // conversation and keep them.
+  // A conversation starts or goes on (a startup, /clear, /resume, /branch, a `--continue` or `--resume`, a
+  // compaction). The state belongs to the session id it was kept for (sessionOwner); one rule decides:
+  // - the same id (a compaction, a resume of this conversation inside this process): keep everything;
+  // - another id, or no owner yet (a new process): the open items of the former conversation are recorded
+  //   as gone, and what $.store holds for the new id is loaded (nothing, for the new id a /clear or /branch
+  //   gives, so it starts empty). A mod reload (session.start) and a compaction keep the state as it is.
   on('classic.SessionStart', async ($, e, next) => {
-    if (e.source === 'clear' || e.source === 'resume' || e.source === 'fork') {
-      // A check still running for the old conversation writes nothing.
-      checkEpoch += 1
-      // Open questions belong to the conversation they were asked in.
-      const at = await $.clock.now()
-      await inTurn(async () => {
-        await recordGone($, (await read($, items)).map(d => ({ id: d.id, why: 'cleared', source: e.source, at })))
-        await update($, items, () => [])
-        await update($, sentAtom, () => [])
-        // The last check was of the old conversation too.
-        await update($, checkResult, () => null)
-        // So is the log, and a write that began before this waits no longer holds.
-        await update($, logAtom, () => [])
-        await update($, conversationAtom, n => n + 1)
-      })
+    if (e.source === 'compact') return next(e)
+    const at = await $.clock.now()
+    let isChanged = false
+    let hasCheck = false
+    // A startup in a process with no conversation yet: the mod load (session.start) runs its check.
+    let isFirstStartup = false
+    await inTurn(async () => {
+      const former = await read($, ownerAtom)
+      if (former === e.session_id) return
+      isChanged = true
+      isFirstStartup = e.source === 'startup' && former === null
+      // A check still running for the former conversation writes nothing.
+      if (!isFirstStartup) checkEpoch += 1
+      let stored: unknown
+      try {
+        stored = await $.store.get(storeKey(e.session_id))
+      } catch {
+        // a store that cannot be read: the conversation starts empty
+      }
+      const loaded = loadConversation(stored)
+      hasCheck = loaded.checkResult !== null
+      // Open questions belong to the conversation they were asked in; close_decision still explains them.
+      const cleared: GoneEntry[] = (await read($, items)).map(d => ({ id: d.id, why: 'cleared', source: e.source, at }))
+      const formerGone = await read($, goneAtom)
+      await update($, items, () => loaded.items)
+      // Ids keep counting across the switch, so an id that left is never handed out again.
+      await update($, nextId, n => Math.max(n, loaded.nextId))
+      // An answer still waiting for its turn is lost with the process; a delivered one stays marked.
+      await update($, sentAtom, () => loaded.sent.filter(x => x.isDelivered === true))
+      await update($, checkResult, () => loaded.checkResult)
+      // The log of the former conversation goes, and a write that began before this waits no longer holds.
+      await update($, logAtom, () => loaded.log)
+      await update($, goneAtom, () => [...loaded.gone, ...formerGone, ...cleared].slice(-GONE_LIMIT))
+      await update($, conversationAtom, n => n + 1)
+      await update($, ownerAtom, () => e.session_id)
+      await saveConversation($)
+      await pruneConversations($, e.session_id)
+    })
+    if (isChanged) {
       await invalidate($)
-      // The new conversation's check.
-      void startCheck($)
+      // The new conversation's check, unless the one kept for it is still there.
+      if (!hasCheck && !isFirstStartup) void startCheck($)
     }
 
     return next(e)
@@ -1091,7 +1201,7 @@ export const register: Register = (on, _options) => {
     // Only a question has answer buttons.
     const accept = kind === 'question' ? optional(input.accept) : undefined
     const link = httpsLink(input.link)
-    const id = await inTurn(async () => {
+    const id = await inTurnSaved($, async () => {
       const n = await read($, nextId)
       await update($, nextId, () => n + 1)
       const openedAt = await $.clock.now()
@@ -1110,7 +1220,7 @@ export const register: Register = (on, _options) => {
     const input = e as unknown as { id?: unknown; outcome?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
     const outcome = typeof input.outcome === 'string' ? input.outcome.trim() : ''
-    const found = await inTurn(async (): Promise<'open' | GoneEntry | undefined> => {
+    const found = await inTurnSaved($, async (): Promise<'open' | GoneEntry | undefined> => {
       const item = (await read($, items)).find(d => d.id === id)
       const isOpen = item !== undefined
       const gone = [...(await read($, goneAtom))].reverse().find(g => g.id === id)
@@ -1147,7 +1257,7 @@ export const register: Register = (on, _options) => {
       return { deny: `note kind must be ${NOTE_KINDS.join(', ')}.` }
     }
     const kind: LogKind = input.kind ?? 'plan'
-    await inTurn(async () => addLog($, await $.clock.now(), [{ kind, text }]))
+    await inTurnSaved($, async () => addLog($, await $.clock.now(), [{ kind, text }]))
     await invalidate($)
 
     return { result: 'Noted.' }
