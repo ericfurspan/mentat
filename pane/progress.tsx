@@ -10,7 +10,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, LogEntry, LogKind, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
+import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, GoneEntry, LogEntry, LogKind, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -30,6 +30,8 @@ const SECTION_GAP = 2
 const LOG_LIMIT = 200
 const LOG_SHOWN = 5
 const LOG_WIDTH = 80
+// The record of items that left without close_decision keeps this many entries.
+const GONE_LIMIT = 50
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
@@ -46,6 +48,7 @@ const seqAtom = atom({ plugin: 'mentat', key: 'seq' } as const, 0)
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
+const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
 
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
@@ -932,11 +935,24 @@ async function sendAnswer($: EngineInterface, d: { id: string; question: string 
   await inTurn(() => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
   return true
 }
-const dismissItem = ($: EngineInterface, id: string) =>
-  inTurn(async () => {
+// Notes that items left the list without close_decision, so close_decision can say so later; call it
+// inside inTurn. The record keeps the last GONE_LIMIT entries and is never drawn.
+async function recordGone($: EngineInterface, gone: GoneEntry[]): Promise<void> {
+  if (gone.length === 0) return
+  await update($, goneAtom, list => [...list, ...gone].slice(-GONE_LIMIT))
+}
+const dismissItem = async ($: EngineInterface, id: string) => {
+  const at = await $.clock.now()
+
+  return inTurn(async () => {
+    const wasOpen = (await read($, items)).some(x => x.id === id)
     await update($, items, all => all.filter(x => x.id !== id))
     await update($, sentAtom, list => list.filter(x => x.id !== id))
+    if (wasOpen) await recordGone($, [{ id, why: 'dismissed', at }])
   })
+}
+// How close_decision names the way a new conversation started.
+const SOURCE_WORDS: Record<string, string> = { clear: '/clear', resume: '/resume', fork: '/branch' }
 
 export const register: Register = (on, _options) => {
   // The effort an Agent call asked for, until the agent it spawns is recorded.
@@ -1047,7 +1063,9 @@ export const register: Register = (on, _options) => {
       // A check still running for the old conversation writes nothing.
       checkEpoch += 1
       // Open questions belong to the conversation they were asked in.
+      const at = await $.clock.now()
       await inTurn(async () => {
+        await recordGone($, (await read($, items)).map(d => ({ id: d.id, why: 'cleared', source: e.source, at })))
         await update($, items, () => [])
         await update($, sentAtom, () => [])
         // The last check was of the old conversation too.
@@ -1113,22 +1131,29 @@ export const register: Register = (on, _options) => {
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
     const input = e as unknown as { id?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
-    const isClosed = await inTurn(async () => {
-      const list = await read($, items)
-      if (!list.some(d => d.id === id)) {
-        return false
-      }
-      // A closed decision is dropped: nothing shows settled ones.
+    const found = await inTurn(async (): Promise<'open' | GoneEntry | undefined> => {
+      const isOpen = (await read($, items)).some(d => d.id === id)
+      const gone = [...(await read($, goneAtom))].reverse().find(g => g.id === id)
+      if (!isOpen && gone === undefined) return undefined
+      // A closed decision is dropped: nothing shows settled ones. So is the answer line of one that already left.
       await update($, items, all => all.filter(d => d.id !== id))
       await update($, sentAtom, sent => sent.filter(x => x.id !== id))
-      return true
+
+      return isOpen ? 'open' : gone
     })
-    if (!isClosed) {
-      return { deny: `No open decision with id ${id}.` }
+    if (found === undefined) {
+      return { deny: `No open decision with id ${id}, and no record of it being dismissed or cleared.` }
     }
     await invalidate($)
+    if (found === 'open') {
+      return { result: `Closed decision ${id}.` }
+    }
+    if (found.why === 'dismissed') {
+      return { result: `Decision ${id} was already dismissed in the pane at ${clockAt(found.at, await readZone($))}.` }
+    }
+    const source = found.source === undefined ? '' : (SOURCE_WORDS[found.source] ?? found.source)
 
-    return { result: `Closed decision ${id}.` }
+    return { result: `Decision ${id} was already cleared when a new conversation started${source === '' ? '' : ` (${source})`}.` }
   })
 
   on('tool.call', { tool: NOTE_TOOL }, async ($, e) => {
