@@ -72,8 +72,17 @@ export type ReviewSnapshot = {
 // The kinds of note in the pane's Log card; each has its own icon and color.
 export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
-// One line of the Log card, a note Claude Code added: when (clock time), its kind and its text (one line).
-export type LogEntry = { at: number; kind: LogKind; text: string }
+// The kinds of event line the pane writes to the Log itself. The `note` tool never takes one.
+export type EventKind = 'agentDone' | 'agentFailed' | 'asked' | 'answered' | 'dismissed' | 'check' | 'prOpened'
+
+// What an `asked` or `check` event line is marked with: the kind of the item asked, or the result of the check.
+export type EventMark = 'question' | 'action' | 'alert' | 'pass' | 'warn' | 'fail'
+
+// One line of the Log card (the Feed): when (clock time), its kind and its text (one line). A note is one
+// Claude Code added; an event is one the pane wrote, drawn dim. A line stored without a source is a note.
+export type NoteEntry = { at: number; kind: LogKind; text: string; source?: 'note' }
+export type EventEntry = { at: number; kind: EventKind; text: string; source: 'event'; mark?: EventMark }
+export type LogEntry = NoteEntry | EventEntry
 
 // The last `mentat check` of the main session: pass, pass with warnings, or fail.
 export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] }
@@ -110,6 +119,9 @@ declare module 'claude-code' {
       checkResult: CheckResult | null
       // The session's log, oldest first (the pane shows it newest first); capped.
       log: LogEntry[]
+      // Counts the conversations: bumped where a /clear, /resume or /branch empties the log, so a write
+      // that waited for the engine can tell it began in an earlier conversation.
+      conversation: number
       // True while the pane's Log card shows every entry (default: the last five).
       logAll: boolean
       // Items that left without close_decision, oldest first; capped at 50, never drawn.

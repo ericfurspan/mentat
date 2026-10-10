@@ -10,7 +10,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, GoneEntry, LogEntry, LogKind, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
+import type { AgentRow, AgentStatus, Checks, CodexRead, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry, PrSnapshot, ReadMark, ReviewSnapshot } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -47,6 +47,8 @@ const meAtom = atom({ plugin: 'mentat', key: 'me' } as const, '')
 const seqAtom = atom({ plugin: 'mentat', key: 'seq' } as const, 0)
 const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null)
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
+// Counts the conversations; see classic.SessionStart and sendAnswer.
+const conversationAtom = atom({ plugin: 'mentat', key: 'conversation' } as const, 0)
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
 
@@ -66,11 +68,38 @@ const LOG_STYLE: Record<LogKind, { icon: string; color: string; hue: string }> =
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
+// The event lines the pane writes to the Log itself, drawn dim: each has a mark and a theme color. An
+// `asked` line takes the mark of the item's kind (the band's marks) and a `check` line that of the result.
+const EVENT_STYLE: Record<Exclude<EventKind, 'asked' | 'check'> | EventMark, { icon: string; color: string }> = {
+  agentDone: { icon: '✓', color: 'success' },
+  agentFailed: { icon: '✕', color: 'error' },
+  answered: { icon: '✓', color: 'success' },
+  dismissed: { icon: '·', color: 'subtle' },
+  prOpened: { icon: '↗', color: 'suggestion' },
+  question: { icon: '?', color: 'warning' },
+  action: { icon: '→', color: 'suggestion' },
+  alert: { icon: '!', color: 'error' },
+  pass: { icon: '✓', color: 'success' },
+  warn: { icon: '!', color: 'warning' },
+  fail: { icon: '✕', color: 'error' },
+}
+// An entry stored without a source is a note.
+export const isNote = (entry: LogEntry): entry is NoteEntry => entry.source !== 'event'
+// The icon and color a Log row is drawn with.
+const styleOf = (entry: LogEntry): { icon: string; color: string } =>
+  isNote(entry) ? LOG_STYLE[entry.kind] : EVENT_STYLE[(entry.mark ?? entry.kind) as keyof typeof EVENT_STYLE] ?? EVENT_STYLE.dismissed
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
 const cleanTitle = (t: string): string => t.replace(/^[a-z]+(\([^)]*\))?!?:\s*/, '').replace(/^\w/, c => c.toUpperCase())
-type LogDraft = { kind: LogKind; text: string }
+type LogDraft = { kind: LogKind; text: string } | { kind: EventKind; text: string; source: 'event'; mark?: EventMark }
+const eventDraft = (kind: EventKind, text: string, mark?: EventMark): LogDraft => ({ kind, text, source: 'event', ...(mark === undefined ? {} : { mark }) })
+// An agent's role as an event line names it: Builder, Explore, Plan, else the type as given.
+const roleName = (type: string): string => {
+  const { role } = roleOf(type)
+
+  return role === 'builder' ? 'Builder' : role === 'explore' ? 'Explore' : role === 'plan' ? 'Plan' : type
+}
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 const shortModel = (model: string): string =>
   model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, ' $1.$2').replace(/^\w/, c => c.toUpperCase())
@@ -449,21 +478,43 @@ async function run($: EngineInterface, argv: string[], cwd?: string): Promise<st
   }
 }
 
-// Adds entries to the log; call it inside inTurn. An entry equal to the newest one (same kind and
-// text) is the same event again and is not added. The log keeps the last LOG_LIMIT entries.
+// Adds entries to the log; call it inside inTurn. A note equal to the newest entry (same kind and
+// text) is the same note again and is not added; an event line is always added, for two agents or two
+// questions can read alike. The log keeps the last LOG_LIMIT entries.
 async function addLog($: EngineInterface, at: number, drafts: LogDraft[]): Promise<void> {
   if (drafts.length === 0) return
   await update($, logAtom, list => {
     let next: LogEntry[] = list
     for (const d of drafts) {
       const text = oneLine(d.text)
+      if ('source' in d) {
+        next = [...next, { at, kind: d.kind, text, source: 'event', ...(d.mark === undefined ? {} : { mark: d.mark }) }]
+        continue
+      }
       const last = next[next.length - 1]
-      if (last !== undefined && last.kind === d.kind && last.text === text) continue
+      if (last !== undefined && isNote(last) && last.kind === d.kind && last.text === text) continue
       next = [...next, { at, kind: d.kind, text }]
     }
 
     return next.slice(-LOG_LIMIT)
   })
+}
+
+// The event lines for the agents that went from not ended to completed, failed or killed between two
+// readings of the rows. An agent that was not in the former rows, or that ended as unknown, writes none.
+const agentEvents = (before: AgentRow[], after: AgentRow[]): LogDraft[] => {
+  const drafts: LogDraft[] = []
+  for (const row of after) {
+    const was = before.find(r => r.id === row.id)
+    if (was === undefined || isEnded(was.status)) continue
+    const who = `${roleName(row.type)} ${row.status === 'completed' ? 'finished' : row.status === 'failed' ? 'failed' : 'stopped'}: ${row.description}`
+    if (row.status === 'completed') {
+      const ms = row.startedAt === undefined || row.endedAt === undefined ? undefined : row.endedAt - row.startedAt
+      drafts.push(eventDraft('agentDone', ms === undefined ? who : `${who} · ${duration(ms)}`))
+    } else if (row.status === 'failed' || row.status === 'killed') drafts.push(eventDraft('agentFailed', who))
+  }
+
+  return drafts
 }
 
 async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
@@ -472,7 +523,9 @@ async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, strin
     const now = await $.clock.now()
     await inTurn(async () => {
       const before = await read($, agents)
-      await update($, agents, () => reconcile(before, infos, now, efforts))
+      const after = reconcile(before, infos, now, efforts)
+      await update($, agents, () => after)
+      await addLog($, now, agentEvents(before, after))
     })
   } catch {
     // the next check tries again
@@ -649,7 +702,12 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
     if (/\bgh\s+pr\s+create\b/.test(command)) {
       const urls = [...stdout.matchAll(ghPrUrl)]
       const last = urls[urls.length - 1]
-      if (last !== undefined) await follow($, `${last[1]}#${last[2]}`)
+      if (last !== undefined) {
+        const at = await $.clock.now()
+        await inTurn(() => addLog($, at, [eventDraft('prOpened', `Opened PR #${last[2]}`)]))
+        await invalidate($)
+        await follow($, `${last[1]}#${last[2]}`)
+      }
     } else {
       const target = reviewTarget(command)
       if (target !== undefined) {
@@ -661,6 +719,18 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
   } catch {
     // the next read tries again
   }
+}
+
+// The event line for a recorded `mentat check` result.
+const checkEvent = (outcome: CheckRead): LogDraft => {
+  if (!outcome.passed) {
+    const problems = Number(/\d+/.exec(outcome.failedLine)?.[0] ?? 0)
+
+    return eventDraft('check', `mentat check failed: ${plural(problems, 'problem', 'problems')}`, 'fail')
+  }
+  const n = outcome.warnings.length
+
+  return n === 0 ? eventDraft('check', 'mentat check passed', 'pass') : eventDraft('check', `mentat check passed with ${plural(n, 'warning', 'warnings')}`, 'warn')
 }
 
 // What a `mentat check` run says, recorded: a failed run pins one alert (id CHECK_ID), replacing the
@@ -678,6 +748,7 @@ async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: ()
     })
     await update($, checkResult, () => (outcome.passed ? { state: outcome.warnings.length > 0 ? ('warn' as const) : ('pass' as const), warnings: outcome.warnings } : { state: 'fail' as const, warnings: [] }))
     await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
+    await addLog($, openedAt, [checkEvent(outcome)])
   })
   await invalidate($)
 }
@@ -912,8 +983,11 @@ const sentLine = (entry: { text: string; isDelivered?: boolean }): string => {
 // first, and a second press for it does nothing. When the prompt did not enter, say so: a press
 // that vanishes looks broken.
 async function sendAnswer($: EngineInterface, d: { id: string; question: string }, text: string): Promise<boolean> {
+  // The conversation the press began in: a delivery that lands in a later one writes no line there.
+  let began = 0
   const isFirst = await inTurn(async () => {
     if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
+    began = await read($, conversationAtom)
     await update($, sentAtom, list => [...list, { id: d.id, text }])
     return true
   })
@@ -932,7 +1006,12 @@ async function sendAnswer($: EngineInterface, d: { id: string; question: string 
     return false
   }
   // The answer entered the session; the line stops saying it waits.
-  await inTurn(() => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
+  await inTurn(async () => {
+    await update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x)))
+    if ((await read($, conversationAtom)) !== began) return
+    await addLog($, await $.clock.now(), [eventDraft('answered', `You answered "${text}": ${d.question}`)])
+  })
+  await invalidate($)
   return true
 }
 // Notes that items left the list without close_decision, so close_decision can say so later; call it
@@ -945,10 +1024,13 @@ const dismissItem = async ($: EngineInterface, id: string) => {
   const at = await $.clock.now()
 
   return inTurn(async () => {
-    const wasOpen = (await read($, items)).some(x => x.id === id)
+    const item = (await read($, items)).find(x => x.id === id)
     await update($, items, all => all.filter(x => x.id !== id))
     await update($, sentAtom, list => list.filter(x => x.id !== id))
-    if (wasOpen) await recordGone($, [{ id, why: 'dismissed', at }])
+    if (item !== undefined) {
+      await recordGone($, [{ id, why: 'dismissed', at }])
+      await addLog($, at, [eventDraft('dismissed', `You dismissed: ${item.question}`)])
+    }
   })
 }
 // How close_decision names the way a new conversation started.
@@ -1070,8 +1152,9 @@ export const register: Register = (on, _options) => {
         await update($, sentAtom, () => [])
         // The last check was of the old conversation too.
         await update($, checkResult, () => null)
-        // So is the log.
+        // So is the log, and a write that began before this waits no longer holds.
         await update($, logAtom, () => [])
+        await update($, conversationAtom, n => n + 1)
       })
       await invalidate($)
       // The new conversation's check.
@@ -1108,7 +1191,7 @@ export const register: Register = (on, _options) => {
     if (input.kind !== undefined && !isKind(input.kind)) {
       return { deny: 'open_decision kind must be question, action or alert.' }
     }
-    const kind: DecisionKind = input.kind ?? 'question'
+    const kind: Exclude<DecisionKind, 'warning'> = input.kind ?? 'question'
     const optional = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined)
     const recommendation = optional(input.recommendation)
     // Only a question has answer buttons.
@@ -1121,6 +1204,7 @@ export const register: Register = (on, _options) => {
       await update($, items, list =>
         [...list, { id: `d${n}`, ...(kind === 'question' ? {} : { kind }), question, ...(link === undefined ? {} : { link }), recommendation, accept, openedAt }],
       )
+      await addLog($, openedAt, [eventDraft('asked', `Asked you: ${question}`, kind)])
       return `d${n}`
     })
     await invalidate($)
@@ -1129,15 +1213,18 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
-    const input = e as unknown as { id?: unknown }
+    const input = e as unknown as { id?: unknown; outcome?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
+    const outcome = typeof input.outcome === 'string' ? input.outcome.trim() : ''
     const found = await inTurn(async (): Promise<'open' | GoneEntry | undefined> => {
-      const isOpen = (await read($, items)).some(d => d.id === id)
+      const item = (await read($, items)).find(d => d.id === id)
+      const isOpen = item !== undefined
       const gone = [...(await read($, goneAtom))].reverse().find(g => g.id === id)
       if (!isOpen && gone === undefined) return undefined
       // A closed decision is dropped: nothing shows settled ones. So is the answer line of one that already left.
       await update($, items, all => all.filter(d => d.id !== id))
       await update($, sentAtom, sent => sent.filter(x => x.id !== id))
+      if (item !== undefined) await addLog($, await $.clock.now(), [eventDraft('answered', `Closed: ${item.question}${outcome === '' ? '' : ` · ${outcome}`}`)])
 
       return isOpen ? 'open' : gone
     })
@@ -1288,7 +1375,8 @@ export const register: Register = (on, _options) => {
     // it is read when the band is drawn (see the report).
     const budget = urgent === undefined ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
     const logList = urgent === undefined && budget === undefined ? await read($, logAtom) : []
-    const note = logList[logList.length - 1]
+    // Only a note is the band's line, never an event line.
+    const note = [...logList].reverse().find(isNote)
     const left: BandLeft =
       urgent !== undefined
         ? { kind: kindOf(urgent), text: urgent.question }
@@ -1471,8 +1559,10 @@ export const register: Register = (on, _options) => {
               <Box width={8} flexShrink={0} justifyContent="flex-end">
                 <Text dimColor>{clockAt(entry.at, zone)}</Text>
               </Box>
-              <Text color={LOG_STYLE[entry.kind].color}>{LOG_STYLE[entry.kind].icon}</Text>
-              <Text wrap="truncate-end">{entry.text}</Text>
+              <Text color={styleOf(entry).color}>{styleOf(entry).icon}</Text>
+              <Text wrap="truncate-end" {...(isNote(entry) ? {} : { dimColor: true })}>
+                {entry.text}
+              </Text>
             </Box>
           ))}
           {logList.length > LOG_SHOWN && (

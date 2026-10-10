@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { AGENT_HEAD_H, AGENT_ROW_H, resetAt, withoutSettled } from './progress'
+import { AGENT_HEAD_H, AGENT_ROW_H, isNote, resetAt, withoutSettled } from './progress'
 
 // Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
@@ -360,7 +360,8 @@ test('an opened question shows in the band, not in the pane, and closing it leav
     expect(band).toContain('Open the issue?')
     expect(band.some(t => t.includes('more'))).toBe(false)
     const t = await paneTexts($, surface)
-    expect(t.some(x => x.includes('Open the issue?') || x.includes('→ yes'))).toBe(false)
+    // No card of its own; the Log holds only its `Asked you:` line.
+    expect(t.some(x => x === 'Open the issue?' || x.includes('→ yes'))).toBe(false)
   }
 
   await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'opened' })
@@ -832,7 +833,8 @@ test('the record survives a reload of the pane (a session start) and is never dr
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Decision d1 was already dismissed in the pane at 8:00 AM.')
   for (const surface of SURFACES) {
     expect(await bandTexts($, surface)).toEqual(['Mentat'])
-    expect((await paneTexts($, surface)).join(' ')).not.toContain('dismissed')
+    // The record itself is never drawn; the Log's `You dismissed:` line is the only trace.
+    expect((await paneTexts($, surface)).filter(t => t.includes('dismissed'))).toEqual(['You dismissed: Gone soon?'])
   }
 })
 
@@ -2332,7 +2334,7 @@ test('an alert in the band is red, with Dismiss and no answer button, on both su
 
   for (const surface of SURFACES) {
     const pane = await paneTexts($, surface)
-    expect(pane.some(x => x.includes('CI is red') || x.toUpperCase() === 'ALERT')).toBe(false)
+    expect(pane.some(x => x === 'CI is red and I cannot fix it' || x.toUpperCase() === 'ALERT')).toBe(false)
   }
 })
 
@@ -2355,7 +2357,7 @@ test('an action in the band is blue, with Dismiss and no answer button, on both 
 
   for (const surface of SURFACES) {
     const pane = await paneTexts($, surface)
-    expect(pane.some(x => x.includes('Merge #112') || x.toUpperCase() === 'WAITING ON YOU')).toBe(false)
+    expect(pane.some(x => x === 'Merge #112 when ready' || x.toUpperCase() === 'WAITING ON YOU')).toBe(false)
   }
 })
 
@@ -2402,7 +2404,7 @@ test('the pane draws no waiting card of any kind, on either surface, and no answ
   for (const surface of SURFACES) {
     const d = await mount($, PANE, surface, { bodyColumns: 60 })
     const t = await textsOf(d)
-    for (const x of ['Action one', 'Question one', 'Alert one', 'Check passed with 2 warnings', 'gh is old']) expect(t.some(y => y.includes(x))).toBe(false)
+    for (const x of ['Action one', 'Question one', 'Alert one', 'Check passed with 2 warnings', 'gh is old']) expect(t.includes(x)).toBe(false)
     for (const x of ['ALERT', 'QUESTION FOR YOU', 'WAITING ON YOU', 'CHECK WARNINGS']) expect(t.map(y => y.toUpperCase())).not.toContain(x)
     expect(await cardKeys(d)).toEqual([])
     expect(await d.findAll({ type: 'Input' })).toEqual([])
@@ -3074,7 +3076,7 @@ test('the same note twice in a row is added once; the same line after another no
   expect(await lines($)).toEqual(['◌ Waiting on you', '▸ Waiting on you', '◌ Waiting on you'])
 })
 
-test('no mechanical event is logged: pull requests, issues, settled items, Codex commands, builders and a merge add nothing', async ($, on) => {
+test('only the pane\'s own events are logged: a ready, a close, an issue, a Codex command and a merge add nothing', async ($, on) => {
   const { world } = boot(on)
   await follow109($)
   await bash(world, $, 'gh pr create --title "feat(pane): add a log" --body x', `${GH}/pull/130\n`)
@@ -3095,8 +3097,8 @@ test('no mechanical event is logged: pull requests, issues, settled items, Codex
   const reads = prViews(world)
   await until(() => prViews(world) > reads, 'the read of the merged pull request')
   await new Promise(r => setTimeout(r, 30))
-  expect(await lines($)).toEqual([])
-  expect(await paneTexts($)).not.toContain('LOG')
+  // Only the pane's own events: the PR opened, the item asked and closed, the builder done.
+  expect(await lines($)).toEqual(['✓ Builder finished: Build the log · 0s', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
   // The commands still ran as before.
   expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-on'])
 })
@@ -3186,7 +3188,8 @@ test('the log is plain text rows on both surfaces, with no Svg and no tint, and 
     if (surface === 'terminal') expect(t.indexOf('LOG')).toBeLessThan(t.indexOf('Look around'))
     expect(t.includes('Open one?')).toBe(false)
     const rows = (await pane.findAll({ type: 'Box' })).filter(b => String(b.key).startsWith('log-'))
-    expect(rows).toHaveLength(1)
+    // The note, and the line for the question the pane saw opened.
+    expect(rows).toHaveLength(2)
     expect(rows.every(b => b.props?.backgroundColor === undefined)).toBe(true)
     await pane.unmount()
   }
@@ -3464,4 +3467,375 @@ test('with the pane open, a question opened by the agent is still open after the
   expect(await bandTexts($)).toEqual(['Mentat'])
   expect(world.sent).toEqual([])
   await pane.unmount()
+})
+
+// ---- the Feed: event lines the pane writes itself ----------------------------------------------
+
+// Every Log line in the order they were written (oldest first), as icon and text: the pane shows the newest
+// five until `Show all`, so this presses it when it is there.
+const written = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => {
+  const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+  if ((await pane.findAll({ type: 'Button' })).some(b => b.key === 'log-toggle' && String(b.props?.label).startsWith('Show all'))) await pane.press({ key: 'log-toggle' })
+  await pane.unmount()
+
+  return (await lines($, surface)).reverse()
+}
+// How a Log row is drawn: the colors of the Text elements with that mark, and whether the Text with that line is dim.
+const drawnRow = async ($: never, surface: 'terminal' | 'desktop', icon: string, text: string) => {
+  const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+  const marks = await pane.findAll({ type: 'Text', text: icon })
+  const texts = (await pane.findAll({ type: 'Text' })).filter(t => t.text === text)
+  await pane.unmount()
+
+  return { colors: marks.map(m => m.props?.color), dim: texts.map(t => t.props?.dimColor === true) }
+}
+const classicOf = ($: never) => ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+
+test('an agent that ends writes one line: finished with the time it took, failed, or stopped; an unknown end writes none', async ($, on) => {
+  const { world, clock } = boot(on)
+  const row = (id: string, type: string, description: string, status = 'running') => ({ id, type, description, status })
+  // z1 is listed by the engine before the pane ever sees it spawn: it has no start time.
+  world.agents = [row('z1', 'Explore', 'Never spawned here')]
+  await startSession($)
+  const all = [
+    ['b1', 'mentat:builder', 'Build it'],
+    ['e1', 'Explore', 'Look'],
+    ['p1', 'Plan', 'Map it'],
+    ['x1', 'general-purpose', 'Other thing'],
+    ['f1', 'builder', 'Broke'],
+    ['k1', 'Plan', 'Halted'],
+    ['u1', 'Explore', 'Vanished'],
+  ] as const
+  world.agents = [row('z1', 'Explore', 'Never spawned here'), ...all.map(([id, type, description]) => row(id, type, description))]
+  for (const [id, type, description] of all) await eng($).agent.spawn(spawn(id, description, type))
+  expect(await lines($)).toEqual([])
+  await clock.advance(83_000)
+  // u1 leaves the engine's list, which ends it as unknown; the rest end.
+  world.agents = [
+    row('z1', 'Explore', 'Never spawned here', 'completed'),
+    row('b1', 'mentat:builder', 'Build it', 'completed'),
+    row('e1', 'Explore', 'Look', 'completed'),
+    row('p1', 'Plan', 'Map it', 'completed'),
+    row('x1', 'general-purpose', 'Other thing', 'completed'),
+    row('f1', 'builder', 'Broke', 'failed'),
+    row('k1', 'Plan', 'Halted', 'killed'),
+  ]
+  await eng($).turn.complete(turnDone('b1'))
+  // A further sync finds them all ended: no line again.
+  await eng($).turn.complete(turnDone('b1'))
+  await clock.advance(5_000)
+  expect(await written($)).toEqual([
+    '✓ Explore finished: Never spawned here',
+    '✓ Builder finished: Build it · 1m 23s',
+    '✓ Explore finished: Look · 1m 23s',
+    '✓ Plan finished: Map it · 1m 23s',
+    '✓ general-purpose finished: Other thing · 1m 23s',
+    '✕ Builder failed: Broke',
+    '✕ Plan stopped: Halted',
+  ])
+})
+
+test('an agent first listed already ended writes no line, and two agents with the same description each get one', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  world.agents = [{ id: 'old', type: 'Explore', description: 'Already over', status: 'completed' }]
+  await eng($).turn.complete(turnDone('old'))
+  expect(await lines($)).toEqual([])
+  world.agents = [
+    { id: 'a1', type: 'Explore', description: 'Check the docs', status: 'running' },
+    { id: 'a2', type: 'Explore', description: 'Check the docs', status: 'running' },
+  ]
+  await eng($).agent.spawn(spawn('a1', 'Check the docs', 'Explore'))
+  await eng($).agent.spawn(spawn('a2', 'Check the docs', 'Explore'))
+  world.agents = world.agents.map(a => ({ ...a, status: 'completed' }))
+  await eng($).turn.complete(turnDone('a1'))
+  expect(await written($)).toEqual(['✓ Explore finished: Check the docs · 0s', '✓ Explore finished: Check the docs · 0s'])
+})
+
+test('open_decision writes an Asked line marked by the kind of item; two questions with the same text each get one', async ($, on) => {
+  boot(on)
+  await open(undefined, 'Ship it?')($)
+  await open('question', 'Ship it?')($)
+  await open('action', 'Merge #5 when ready')($)
+  await open('alert', 'CI is red')($)
+  expect(await written($)).toEqual(['? Asked you: Ship it?', '? Asked you: Ship it?', '→ Asked you: Merge #5 when ready', '! Asked you: CI is red'])
+  // A refused call writes nothing.
+  expect((await open('warning', 'Not allowed')($)).deny).toBeDefined()
+  expect((await open(undefined, '  ')($)).deny).toBeDefined()
+  expect(await lines($)).toHaveLength(4)
+  for (const surface of SURFACES) {
+    expect((await drawnRow($, surface, '?', 'Asked you: Ship it?')).colors).toContain('warning')
+    expect((await drawnRow($, surface, '→', 'Asked you: Merge #5 when ready')).colors).toContain('suggestion')
+    expect((await drawnRow($, surface, '!', 'Asked you: CI is red')).colors).toContain('error')
+  }
+})
+
+test('the mod\'s own check items are not asked: a check writes its result line and no Asked line', async ($, on) => {
+  const { world } = boot(on)
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  await bash(world, $, 'mentat check', WARN_RUN)
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  expect(await written($)).toEqual(['✕ mentat check failed: 2 problems', '! mentat check passed with 2 warnings', '✓ mentat check passed'])
+  await bash(world, $, 'mentat check', 'Check OK (1 warning(s))\nWARN: one\n')
+  await bash(world, $, 'mentat check', 'Check failed: 1 problem(s)\n')
+  expect((await lines($)).slice(0, 2)).toEqual(['✕ mentat check failed: 1 problem', '! mentat check passed with 1 warning'])
+  // A run with neither final line records nothing, and neither does a subagent's.
+  await bash(world, $, 'mentat check', 'usage: mentat check\n')
+  await bash(world, $, 'mentat check', CLEAN_RUN, { agentId: 'a1' })
+  expect(await lines($)).toHaveLength(5)
+  for (const surface of SURFACES) {
+    expect((await drawnRow($, surface, '✕', 'mentat check failed: 1 problem')).colors).toContain('error')
+    expect((await drawnRow($, surface, '!', 'mentat check passed with 1 warning')).colors).toContain('warning')
+    expect((await drawnRow($, surface, '✓', 'mentat check passed')).colors).toContain('success')
+  }
+})
+
+test('the pane\'s own check at session start writes its result line', async ($, on) => {
+  const { world } = boot(on)
+  world.git = ok('true\n')
+  world.check = ok(CLEAN_RUN)
+  await startSession($)
+  await until(() => world.calls.some(a => isCall(a, 'mentat', 'check')), 'the startup check')
+  await new Promise(r => setTimeout(r, 30))
+  expect(await lines($)).toEqual(['✓ mentat check passed'])
+})
+
+test('pressing the answer button writes one You answered line once the prompt is taken, not before', async ($, on) => {
+  const { world } = boot(on)
+  const turn = held()
+  world.promptGate = turn.gate
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', accept: 'Yes' })
+  const band = await mount($, BAND, 'terminal')
+  // Three presses, the last two before the drawing could have changed.
+  const presses = [band.press({ key: 'accept-d1' }), band.press({ key: 'accept-d1' }), band.press({ key: 'accept-d1' })]
+  await new Promise(r => setTimeout(r, 20))
+  expect(await written($)).toEqual(['? Asked you: Mock it?'])
+  turn.release()
+  await Promise.all(presses)
+  expect(world.sent).toHaveLength(1)
+  expect(await written($)).toEqual(['? Asked you: Mock it?', '✓ You answered "Yes": Mock it?'])
+  for (const surface of SURFACES) expect((await drawnRow($, surface, '✓', 'You answered "Yes": Mock it?')).colors).toContain('success')
+  // Pressing again after the delivery does nothing more.
+  await band.press({ key: 'accept-d1' }).catch(() => undefined)
+  expect(await lines($)).toHaveLength(2)
+  await band.unmount()
+})
+
+test('a submit that is dropped or rejected writes no answered line; the press that follows writes one', async ($, on) => {
+  const { world } = boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', accept: 'Yes' })
+  const band = await mount($, BAND, 'terminal')
+  world.dropPrompts = true
+  await band.press({ key: 'accept-d1' })
+  world.dropPrompts = false
+  world.rejectPrompts = true
+  await band.press({ key: 'accept-d1' })
+  expect(world.sent).toEqual([])
+  expect(await written($)).toEqual(['? Asked you: Mock it?'])
+  world.rejectPrompts = false
+  await band.press({ key: 'accept-d1' })
+  expect(await written($)).toEqual(['? Asked you: Mock it?', '✓ You answered "Yes": Mock it?'])
+  await band.unmount()
+})
+
+test('an answer whose delivery lands after a /clear, /resume or /branch writes nothing into the new log', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  for (const [n, source] of ['clear', 'resume', 'fork'].entries()) {
+    const turn = held()
+    world.promptGate = turn.gate
+    await eng($).tool.call({ tool: OPEN, question: `Mock it ${source}?`, accept: 'Yes' })
+    const band = await mount($, BAND, 'terminal')
+    const press = band.press({ key: `accept-d${n + 1}` })
+    await new Promise(r => setTimeout(r, 20))
+    await classicOf($).SessionStart({ source })
+    expect(await lines($)).toEqual([])
+    turn.release()
+    await press
+    // The prompt did enter the session, but the new conversation's log does not mention it.
+    expect(world.sent).toHaveLength(n + 1)
+    expect(await lines($)).toEqual([])
+    await band.unmount()
+  }
+  // A reload is the same conversation: the line is written.
+  world.promptGate = undefined
+  await eng($).tool.call({ tool: OPEN, question: 'After the reload?', accept: 'Yes' })
+  const band = await mount($, BAND, 'terminal')
+  await startSession($)
+  await band.press({ key: 'accept-d4' })
+  expect(await written($)).toEqual(['? Asked you: After the reload?', '✓ You answered "Yes": After the reload?'])
+  await band.unmount()
+})
+
+test('dismissing a question while its answer waits writes the dismissal now and the answer when it is taken', async ($, on) => {
+  const { world } = boot(on)
+  const turn = held()
+  world.promptGate = turn.gate
+  await eng($).tool.call({ tool: OPEN, question: 'Mock it?', accept: 'Yes' })
+  const band = await mount($, BAND, 'terminal')
+  const press = band.press({ key: 'accept-d1' })
+  await new Promise(r => setTimeout(r, 20))
+  await band.press({ key: 'dismiss-d1' })
+  expect(await written($)).toEqual(['? Asked you: Mock it?', '· You dismissed: Mock it?'])
+  turn.release()
+  await press
+  expect(await written($)).toEqual(['? Asked you: Mock it?', '· You dismissed: Mock it?', '✓ You answered "Yes": Mock it?'])
+  await band.unmount()
+})
+
+test('Dismiss writes a dim You dismissed line, once; the dismissal of a check item counts too', async ($, on) => {
+  const { world } = boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Gone soon?' })
+  const band = await mount($, BAND, 'terminal')
+  await band.press({ key: 'dismiss-d1' })
+  await band.press({ key: 'dismiss-d1' }).catch(() => undefined)
+  await band.unmount()
+  expect(await written($)).toEqual(['? Asked you: Gone soon?', '· You dismissed: Gone soon?'])
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  const alert = await mount($, BAND, 'terminal')
+  await alert.press({ key: 'dismiss-check' })
+  await alert.unmount()
+  expect((await lines($))[0]).toBe('· You dismissed: Check failed: 2 problem(s)')
+  for (const surface of SURFACES) {
+    const drawn = await drawnRow($, surface, '·', 'You dismissed: Gone soon?')
+    expect(drawn.colors).toContain('subtle')
+    expect(drawn.dim).toEqual([true])
+  }
+})
+
+test('close_decision on an open item writes a Closed line with its outcome when it has one; on one already dismissed or cleared, or unknown, it writes none', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'Merge it?' })
+  await eng($).tool.call({ tool: OPEN, question: 'Merge it?' })
+  await eng($).tool.call({ tool: OPEN, question: 'Closed third?' })
+  await eng($).tool.call({ tool: OPEN, question: 'Cleared one?' })
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: '  Yes, merge ' })).result)).toBe('Closed decision d1.')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd2' })).result)).toBe('Closed decision d2.')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd3', outcome: '   ' })).result)).toBe('Closed decision d3.')
+  expect((await lines($)).slice(0, 3)).toEqual(['✓ Closed: Closed third?', '✓ Closed: Merge it?', '✓ Closed: Merge it? · Yes, merge'])
+
+  // Already dismissed in the band, cleared by a new conversation, or closed twice: no line.
+  const band = await mount($, BAND, 'terminal')
+  await eng($).tool.call({ tool: OPEN, question: 'To dismiss?' })
+  await band.press({ key: 'dismiss-d5' })
+  await band.unmount()
+  await eng($).tool.call({ tool: OPEN, question: 'To clear?' })
+  await classicOf($).SessionStart({ source: 'clear' })
+  expect(await lines($)).toEqual([])
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd5', outcome: 'late' })).result)).toContain('already dismissed')
+  expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd6', outcome: 'late' })).result)).toContain('already cleared')
+  expect((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).deny).toBeDefined()
+  expect((await eng($).tool.call({ tool: CLOSE, id: 'd99' })).deny).toBeDefined()
+  expect(await lines($)).toEqual([])
+})
+
+test('gh pr create that prints a pull request URL writes Opened PR #N, from the URL itself; other commands write none', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  // The read of the pull request fails: the line does not depend on the pane reading GitHub.
+  world.pr = failed
+  await bash(world, $, 'gh pr create --title "feat: x" --body y', `Creating pull request\n${GH}/pull/130\n`)
+  await until(() => prViews(world) > 0, 'the read')
+  expect(await written($)).toEqual(['↗ Opened PR #130'])
+  await bash(world, $, 'gh pr create --title "feat: y"', 'something went wrong\n')
+  await bash(world, $, 'gh pr ready 130', `${GH}/pull/130\n`)
+  await bash(world, $, 'gh pr view 130', `${GH}/pull/130\n`)
+  await bash(world, $, 'gh pr create --title "feat: z" --body y', `${GH}/pull/131\n`, { agentId: 'a1' })
+  await new Promise(r => setTimeout(r, 30))
+  expect(await written($)).toEqual(['↗ Opened PR #130'])
+  for (const surface of SURFACES) expect((await drawnRow($, surface, '↗', 'Opened PR #130')).colors).toContain('suggestion')
+})
+
+test('events draw their text dim with their own mark and notes draw as before, on both surfaces', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  world.agents = [{ id: 'b1', type: 'builder', description: 'Build it', status: 'running' }, { id: 'b2', type: 'builder', description: 'Break it', status: 'running' }]
+  await eng($).agent.spawn(spawn('b1', 'Build it', 'builder'))
+  await eng($).agent.spawn(spawn('b2', 'Break it', 'builder'))
+  world.agents = [{ id: 'b1', type: 'builder', description: 'Build it', status: 'completed' }, { id: 'b2', type: 'builder', description: 'Break it', status: 'failed' }]
+  await eng($).turn.complete(turnDone('b1'))
+  await note($, 'A plain note', 'done')
+  await note($, 'Another note')
+  for (const surface of SURFACES) {
+    const done = await drawnRow($, surface, '✓', 'Builder finished: Build it · 0s')
+    expect(done.colors).toContain('success')
+    expect(done.dim).toEqual([true])
+    const failedRow = await drawnRow($, surface, '✕', 'Builder failed: Break it')
+    expect(failedRow.colors).toContain('error')
+    expect(failedRow.dim).toEqual([true])
+    expect((await drawnRow($, surface, '✓', 'A plain note')).dim).toEqual([false])
+    expect((await drawnRow($, surface, '▸', 'Another note')).dim).toEqual([false])
+  }
+  // A note's text carries no dimColor at all.
+  const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  expect((await pane.findAll({ type: 'Text', text: 'A plain note' }))[0]!.props?.dimColor).toBeUndefined()
+  await pane.unmount()
+})
+
+test('the band\'s line is the newest note, never an event; with only events it is the quiet Mentat line', async ($, on) => {
+  boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Merge it?' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'yes' })
+  expect((await lines($)).length).toBe(2)
+  for (const surface of SURFACES) expect((await bandWith($, surface)).texts).toEqual(['Mentat'])
+  await note($, 'Keep this one', 'decision')
+  await eng($).tool.call({ tool: OPEN, question: 'Another?' })
+  await eng($).tool.call({ tool: CLOSE, id: 'd2' })
+  expect((await lines($))[0]).toBe('✓ Closed: Another?')
+  for (const surface of SURFACES) {
+    const { texts, alts } = await bandWith($, surface)
+    expect(texts).toEqual(['◆', 'Keep this one'])
+    if (surface === 'desktop') expect(alts).toEqual(['Note: Keep this one'])
+  }
+})
+
+test('an entry stored without a source is a note; a note written now has none, and an event says so', async ($, on) => {
+  boot(on)
+  expect(isNote({ at: 1, kind: 'plan', text: 'Stored before the Feed' })).toBe(true)
+  expect(isNote({ at: 1, kind: 'plan', text: 'A note', source: 'note' })).toBe(true)
+  expect(isNote({ at: 1, kind: 'asked', text: 'Asked you: x', source: 'event' })).toBe(false)
+  // The state a note and an event are written as.
+  let stored: unknown[] = []
+  ;(on as (e: string, ...r: unknown[]) => void)('state.set', async (_$: never, e: { plugin: string; key: string; value: unknown[] }, next: (e: unknown) => unknown) => {
+    if (e.plugin === 'mentat' && e.key === 'log') stored = e.value
+
+    return next(e)
+  })
+  await note($, 'Plain')
+  await eng($).tool.call({ tool: OPEN, question: 'Asked?', kind: 'alert' })
+  expect(stored).toEqual([
+    { at: T0, kind: 'plan', text: 'Plain' },
+    { at: T0, kind: 'asked', text: 'Asked you: Asked?', source: 'event', mark: 'alert' },
+  ])
+})
+
+test('an equal note straight after another is added once; an event between two equal notes, or two equal events, are all kept', async ($, on) => {
+  boot(on)
+  await note($, 'Same', 'waiting')
+  await note($, 'Same', 'waiting')
+  expect(await written($)).toEqual(['◌ Same'])
+  await eng($).tool.call({ tool: OPEN, question: 'Q?' })
+  await note($, 'Same', 'waiting')
+  expect(await written($)).toEqual(['◌ Same', '? Asked you: Q?', '◌ Same'])
+})
+
+test('an event line is one line of at most 80 characters, and events count toward the 200-line cap', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: `Should we ${'really '.repeat(30)}go?` })
+  const [row] = (await logOf($)).rows
+  expect([...row!.text]).toHaveLength(80)
+  expect(row!.text.startsWith('Asked you: Should we really')).toBe(true)
+  expect(row!.text.endsWith('…')).toBe(true)
+  for (let i = 0; i < 204; i++) await eng($).tool.call({ tool: OPEN, question: `Q${i}?` })
+  expect((await logOf($)).toggle).toEqual(['Show all 200'])
+})
+
+test('note still refuses every event kind', async ($, on) => {
+  boot(on)
+  await startSession($)
+  for (const kind of ['agentDone', 'agentFailed', 'asked', 'answered', 'dismissed', 'check', 'prOpened', 'event']) {
+    expect((await note($, 'A line', kind)).deny).toBe('note kind must be decision, plan, surprise, waiting, done.')
+  }
+  expect(await lines($)).toEqual([])
 })
