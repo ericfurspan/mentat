@@ -29,6 +29,8 @@ const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const answering = atom({ plugin: 'mentat', key: 'decisionsAnswering' } as const, [])
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
+const queuedAtom = atom({ plugin: 'mentat', key: 'actionsQueued' } as const, [])
+const failedAtom = atom({ plugin: 'mentat', key: 'actionFailed' } as const, null)
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
 const prRef = atom({ plugin: 'mentat', key: 'prRef' } as const, '')
@@ -46,6 +48,18 @@ const TINT = { surface: '#8b949e14', you: '#d2992224', alert: '#d0453f24', actio
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
 // warning card after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
+
+// The pane's actions row: each button runs one slash command through `$.command.run`, as if the
+// maintainer typed it. `command` is the name `$.command.list()` gives, without the slash: a plugin's
+// skill is `<plugin>:<skill>`. The pane cannot tell whether Codex review is on, so both of its buttons show.
+const ACTIONS = [
+  { key: 'come-again', label: 'Come again?', command: 'mentat:come-again' },
+  { key: 'retro', label: 'Retro', command: 'mentat:retro' },
+  { key: 'codex-review-off', label: 'Codex review off', command: 'mentat:codex-review-off' },
+  { key: 'codex-review-on', label: 'Codex review on', command: 'mentat:codex-review-on' },
+  { key: 'compact', label: 'Compact', command: 'compact' },
+] as const
+type PaneAction = (typeof ACTIONS)[number]
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
@@ -90,8 +104,6 @@ export const resetAt = (at: string | undefined, now: number, zone?: string): str
 
   return `resets ${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod')}`
 }
-// What follows `resets`: the part the band and `/mentat` print without the word.
-const resetWhen = (reset: string): string => reset.replace(/^resets (in )?/, '')
 
 const textMeter = (cells: number, percent: number): string => {
   const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * cells)
@@ -117,10 +129,6 @@ const metersOf = (usage: Usage | undefined, now: number, zone?: string): { meter
     meters: [...(context === undefined ? [] : [{ kind: 'context', label: 'Context', percent: Math.round(context), reset: '' }]), ...limits],
   }
 }
-
-// One line of the budget: `Context 10% · 5-hour 12% (1h 29m) · Week 8% (Thu 7:00 PM)`.
-const budgetLine = (meters: Meter[]): string =>
-  meters.map(m => `${m.label} ${m.percent}%${m.reset === '' ? '' : ` (${resetWhen(m.reset)})`}`).join(' · ')
 
 // The band's budget text, for the most used of the 5-hour and weekly limits when it
 // is at WARN_PERCENT or more. The context window never raises the band.
@@ -425,11 +433,6 @@ async function readZone($: EngineInterface): Promise<string | undefined> {
   }
 }
 
-// True when the pane would have nothing to show: no open item, no followed pull request, no agent.
-async function isPaneEmpty($: EngineInterface): Promise<boolean> {
-  return (await read($, items)).length === 0 && (await read($, prRef)) === '' && (await read($, agents)).length === 0
-}
-
 // Runs a command; the stdout, or undefined when it failed (nonzero exit or rejection).
 async function run($: EngineInterface, argv: string[], cwd?: string): Promise<string | undefined> {
   try {
@@ -437,6 +440,38 @@ async function run($: EngineInterface, argv: string[], cwd?: string): Promise<st
     return out.exitCode === 0 ? out.stdout : undefined
   } catch {
     return undefined
+  }
+}
+
+// Runs the action's command. `$.command.run` waits until the session is idle, so the command is
+// marked queued first and a second press of it does nothing until the run ends. A rejection (an
+// unknown name, a skill only the person may start) leaves a line naming the command to type; the
+// next run that succeeds clears it.
+async function runAction($: EngineInterface, action: PaneAction): Promise<void> {
+  const isFirst = await inTurn(async () => {
+    if ((await read($, queuedAtom)).includes(action.command)) return false
+    await update($, queuedAtom, list => [...list, action.command])
+    return true
+  })
+  if (!isFirst) return
+  try {
+    await $.command.run({ command: action.command })
+    await inTurn(() => update($, failedAtom, () => null))
+  } catch (err) {
+    // A name the session does not have fails when typed too; the engine's list says whether it has it.
+    const isMissing = await hasNoCommand($, action.command)
+    await inTurn(() => update($, failedAtom, () => ({ command: action.command, isMissing })))
+  } finally {
+    await inTurn(() => update($, queuedAtom, list => list.filter(c => c !== action.command)))
+  }
+}
+
+// True when the session's command list is readable and lacks the command.
+async function hasNoCommand($: EngineInterface, command: string): Promise<boolean> {
+  try {
+    return !(await $.command.list()).some(c => c.name === command)
+  } catch {
+    return false
   }
 }
 
@@ -937,7 +972,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show what needs you, the pull request, the agents and the session budget in a pane; with only budget to show, one line of it',
+      description: 'Show the actions, what needs you, the pull request, the agents and, on the terminal, the session budget in a pane',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -992,6 +1027,10 @@ export const register: Register = (on, _options) => {
     // A submit that was still waiting for a turn is lost with the old load: its question
     // offers its buttons again. A delivered answer stays marked.
     await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
+    // A command still waiting for the session is lost with the old load too: its button works again.
+    // So is the line of a failed press.
+    await inTurn(() => update($, queuedAtom, () => []))
+    await inTurn(() => update($, failedAtom, () => null))
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()
@@ -1026,12 +1065,6 @@ export const register: Register = (on, _options) => {
   on('command.run', { command: 'mentat' }, async ($, e) => {
     const args = e.args.trim()
     if (args === '') {
-      // With nothing but budget to show, a pane would be mostly empty: say it in a line.
-      if (await isPaneEmpty($)) {
-        const { meters } = metersOf(await readUsage($), await $.clock.now(), await readZone($))
-
-        return { text: meters.length === 0 ? 'Nothing waiting on you; session budget unavailable.' : budgetLine(meters) }
-      }
       await $.ui.open({ id: PANE, title: TITLE })
 
       return { text: 'Mentat pane opened.' }
@@ -1254,14 +1287,12 @@ export const register: Register = (on, _options) => {
             ? left.text
             : `${CARD_STYLE[left.kind].alt}: ${left.text}`
       // The count is left out when the one open item is the one shown.
-      // The app's usage popover has the detail of a budget band, so a pane with nothing else in it gets no button.
-      const isBudgetOnly = left.kind === 'budget' && (await isPaneEmpty($))
       const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action')
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
             <Svg source={bandSvg(W, left, isLone ? 0 : open.length, pillLabel(open), pillHue(open))} alt={alt} width={W} height={28} />
-            {!isBudgetOnly && <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />}
+            <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
           </Box>
           {beneath}
         </Box>
@@ -1428,6 +1459,27 @@ export const register: Register = (on, _options) => {
       if (mark.okAt > 0 && now - mark.okAt > STALE_MS) return `${what} read ${Math.floor((now - mark.okAt) / 60_000)}m old`
       return undefined
     }
+    // The actions row, above everything else on both surfaces. A queued command's button says so.
+    const queued = await read($, queuedAtom)
+    const failedAction = await read($, failedAtom)
+    const actionsRow = (
+      <Box flexDirection="column">
+        <Box flexDirection="row" flexWrap="wrap" gap={1}>
+          {ACTIONS.map(a => (
+            <Button key={a.key} label={queued.includes(a.command) ? `${a.label} · queued` : a.label} onPress={() => runAction($, a)} />
+          ))}
+        </Box>
+        {failedAction !== null && (
+          <Box marginTop={1}>
+            <Text color="warning">
+              {failedAction.isMissing
+                ? `/${failedAction.command} is not in this Mentat version; update the plugin.`
+                : `Could not run /${failedAction.command} from the pane; type it in chat.`}
+            </Text>
+          </Box>
+        )}
+      </Box>
+    )
     const prFresh = freshness('PR', pm)
     const reviewFresh = freshness('Review', rm)
     const isReviewed = pr !== null && review !== null && review.head === pr.head
@@ -1472,6 +1524,7 @@ export const register: Register = (on, _options) => {
       const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRows.map(agentRow))
       return (
         <Box flexDirection="column" paddingX={1}>
+          {actionsRow}
           {open.length === 0 && ref === '' && rows.length === 0 && (
             <Box marginTop={SECTION_GAP}>
               <Text dimColor>Nothing waiting on you.</Text>
@@ -1588,6 +1641,8 @@ export const register: Register = (on, _options) => {
 
     return (
       <Box flexDirection="column" paddingX={1}>
+        {actionsRow}
+
         {open.filter(d => kindOf(d) === 'alert').map(otherCard)}
 
         {open.filter(d => kindOf(d) === 'question').map(d => (
