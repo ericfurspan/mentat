@@ -457,28 +457,13 @@ async function startCheck($: EngineInterface, cwd?: string): Promise<void> {
 
 // ---- the module -----------------------------------------------------------------------------
 
-// ---- Drawn desktop pieces: the band's one-line Svg and the pane's small marks; buttons and text rows are native. ----
+// ---- Drawn desktop pieces: the small round marks of the band and the pane; text, rows and buttons are native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
-const CSS = `<style>
-.t{fill:#1d1d1b}.m{fill:#9b9b96}
-@media (prefers-color-scheme: dark){.t{fill:#ededeb}.m{fill:#7c7c78}}
-</style>`
-const HUE = { amber: '#C98A0E', blue: '#3D7FE6', red: '#D0453F', grey: '#8f8f8a' }
+const HUE = { amber: '#C98A0E', blue: '#3D7FE6', red: '#D0453F' }
 
 const xml = (s: string): string => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
-const charEm = (ch: string): number => (/[\s.,:;'|!il1()[\]]/.test(ch) ? 0.3 : /[A-Z@%mw#]/.test(ch) ? 0.72 : 0.56)
-const textW = (s: string, size: number): number => [...s].reduce((w, ch) => w + charEm(ch) * size, 0)
-const fit = (s: string, size: number, maxW: number): string => {
-  if (textW(s, size) <= maxW) return s
-  let out = ''
-  for (const ch of s) {
-    if (textW(out + ch + '…', size) > maxW) break
-    out += ch
-  }
-  return out + '…'
-}
 const svgOf = (W: number, H: number, body: string): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${CSS}${body}</svg>`
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`
 // The role of an agent by its type.
 type Role = 'builder' | 'explore' | 'plan' | 'other'
 const roleOf = (type: string): Role => {
@@ -502,7 +487,7 @@ const MARK: Record<BandKind, { char: string; hue: string }> = {
   action: { char: '→', hue: HUE.blue },
   budget: { char: '!', hue: HUE.amber },
 }
-// The description of an item in the desktop band's alt text.
+// The description of an item in the alt text of its mark.
 const ITEM_ALT: Record<DecisionKind, string> = { question: 'Question', action: 'Waiting on you', alert: 'Alert', warning: 'Check warnings' }
 // The items that wait on the maintainer, most urgent first: alert, then question, check warning, action; the
 // newest of a kind first. The desktop band shows the first and counts the rest in `+N more`; the terminal
@@ -510,24 +495,6 @@ const ITEM_ALT: Record<DecisionKind, string> = { question: 'Question', action: '
 const urgentFirst = (list: Decision[]): Decision[] =>
   [...list].reverse().sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
 const mostUrgent = (list: Decision[]): Decision | undefined => urgentFirst(list)[0]
-
-// One line, drawn as a single Svg on the desktop: a mark and the text, and at the right the `+N more` pill
-// when more than one item waits. The buttons are native, beside it.
-const bandSvg = (W: number, left: BandLeft, more: string): string => {
-  const pillW = more === '' ? 0 : Math.round(20 + textW(more, 12))
-  const room = W - pillW - 16
-  const mark = left.kind === 'quiet' ? undefined : left.kind === 'note' ? { char: left.icon, hue: left.hue } : MARK[left.kind]
-  const leftSvg =
-    mark === undefined
-      ? `<text class="m" x="2" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(left.text)}</text>`
-      : `<circle cx="11" cy="14" r="8" fill="${mark.hue}" opacity="0.18"/><text fill="${mark.hue}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(mark.char)}</text>
-<text class="t" x="27" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(fit(left.text, 13, room - 30))}</text>`
-  const hue = mark?.hue ?? HUE.grey
-  const pill = more === '' ? '' : `<rect x="${W - pillW}" y="4" width="${pillW}" height="20" rx="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="${W - pillW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600">${xml(more)}</text>`
-  return svgOf(W, 28, leftSvg + pill)
-}
-// The width a native button takes beside the band's Svg, roughly.
-const buttonW = (text: string): number => Math.round(textW(text, 13) + 40)
 
 // The short line that takes the place of a question's answer button once the answer is sent; it says
 // the answer is queued until the prompt has entered the session.
@@ -846,6 +813,8 @@ const TEXT_INDENT = MARK_CELLS + 1
 // A small round tinted mark with a glyph, a fixed 20px Svg; it is the only picture in the pane, and it does
 // not take part in the reflow when the divider moves.
 const MARK_SIZE = 20
+// The tint behind the band's `+N more` pill: the warning amber at about 18%.
+const MORE_TINT = `${HUE.amber}2e`
 const markSvg = (char: string, hue: string): string =>
   svgOf(MARK_SIZE, MARK_SIZE, `<circle cx="10" cy="10" r="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="10" y="14.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(char)}</text>`)
 
@@ -1325,19 +1294,38 @@ export const register: Register = (on, _options) => {
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
     const { Svg } = $.ui.resolve(e)
-    // The Svg leaves room for the native buttons beside it.
-    const beside =
-      (urgent === undefined ? 0 : buttonW('Dismiss') + 8) +
-      (answer === undefined ? 0 : buttonW(answer) + 8) +
-      (sent === undefined ? 0 : Math.round(textW(sentLine(sent), 12)) + 8) +
-      (link === undefined ? 0 : Math.round(textW(shortLink(link), 13)) + 8)
-    const W = Math.max(160, (e.props.bodyColumns ?? 80) * 8 - 96 - beside)
-    const alt = `${left.kind === 'budget' || left.kind === 'quiet' ? '' : left.kind === 'note' ? 'Note: ' : `${ITEM_ALT[left.kind]}: `}${left.text}${more === '' ? '' : ` (${more})`}`
+    // The mark: the item's kind, the note's icon in its color, the rate limit's; the quiet line has none.
+    const mark =
+      left.kind === 'quiet'
+        ? undefined
+        : left.kind === 'note'
+          ? { char: left.icon, hue: left.hue, alt: 'Note' }
+          : { ...MARK[left.kind], alt: left.kind === 'budget' ? 'Rate limit' : ITEM_ALT[left.kind] }
+    // An item's text is bold, the budget line is in the warning color, a note is plain and the quiet line muted.
+    const textProps = left.kind === 'quiet' ? { dimColor: true } : left.kind === 'budget' ? { color: 'warning' } : left.kind === 'note' ? {} : { bold: true }
 
+    // One native row, so it follows the divider with no redraw from the mod: the mark, the text (the only part
+    // that shrinks, cut with `…`; minWidth 0 because a flex item never shrinks below its content otherwise),
+    // the `+N more` pill right after it, a spacer that takes the rest, then the controls.
     return (
-      <Box flexDirection="column">
-        <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-          <Svg source={bandSvg(W, left, more)} alt={alt} width={W} height={28} />
+      <Box flexDirection="column" minWidth={0}>
+        <Box flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+          {mark !== undefined && (
+            <Box key="mark" width={MARK_CELLS} flexShrink={0}>
+              <Svg source={markSvg(mark.char, mark.hue)} alt={mark.alt} width={MARK_SIZE} height={MARK_SIZE} />
+            </Box>
+          )}
+          <Box key="text" flexShrink={1} minWidth={0} overflow="hidden">
+            <Text wrap="truncate-end" {...textProps}>
+              {left.text}
+            </Text>
+          </Box>
+          {more !== '' && (
+            <Box key="more" flexShrink={0} paddingX={1} backgroundColor={MORE_TINT}>
+              <Text color="warning">{more}</Text>
+            </Box>
+          )}
+          <Box key="spacer" flexGrow={1} minWidth={0} />
           {controls()}
         </Box>
         {beneath}

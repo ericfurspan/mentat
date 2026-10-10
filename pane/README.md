@@ -49,12 +49,12 @@ With no open item, no live agent and no log line the pane says `Nothing waiting 
 
 ### The band
 
-The band above the prompt is always there, in one line. What it shows on its left is the first that applies, in this order:
+The band above the prompt is always there, in one line of native rows, like the pane's cards: a small round tinted mark (a fixed 20 px `Svg` with alt text), the text, the `+N more` pill right after the text, then the buttons at the right edge. The text is the part that shrinks and is cut with `…`, so the band follows the divider with no redraw from the mod; nothing in it is measured from its width. What it shows on its left is the first that applies, in this order:
 
-1. The item that waits on you, the most urgent (see above); when more than one item is open, `+N more` follows the text, N being the others. Its buttons are in one row at the right: the answer button of a question with a recommended answer (the `Sent:` line once pressed), Dismiss, the link of an action or alert, then Details.
-2. Otherwise, a 5-hour or weekly rate limit at 80% or more, worded as above.
-3. Otherwise, the newest note in the Log (see below): the kind's icon and the text.
-4. Otherwise, a quiet `Mentat` line.
+1. The item that waits on you, the most urgent (see above); the text is bold, and when more than one item is open, `+N more` follows it in a tinted pill, N being the others. Its buttons are in one row at the right: the answer button of a question with a recommended answer (the `Sent:` line once pressed), Dismiss, the link of an action or alert, then Details.
+2. Otherwise, a 5-hour or weekly rate limit at 80% or more, worded as above, in the amber warning color.
+3. Otherwise, the newest note in the Log (see below): the kind's icon, in its color, as the mark, and the text.
+4. Otherwise, a quiet `Mentat` line, muted and with no mark.
 
 The band shows one line, so the recommendation, and the WARN lines of a `mentat check`, are not drawn in it; the pane draws them. Details is there in every state and opens the pane, as does `/mentat`. The band draws a link short, as the pane does. The band is hidden only while the app shows a survey.
 

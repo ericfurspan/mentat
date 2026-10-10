@@ -207,6 +207,19 @@ const svgsOf = async (d: Drawing) =>
       .filter(t => t !== '')
     return { alt: String(x.props?.alt ?? ''), source, drawn }
   })
+// The desktop band's mark Svg(s) with the text beside it, in the shape a one-Svg band had: the alt reads
+// `<mark>: <text> (+N more)` and the drawn texts are the glyph, the text and the pill.
+const bandSvgs = async (d: Drawing) => {
+  const texts = await d.findAll({ type: 'Text' })
+  const text = texts[0]?.text ?? ''
+  const more = (await d.findAll({ type: 'Box' })).some(b => b.key === 'more') ? texts[1]?.text : undefined
+
+  return (await svgsOf(d)).map(m => ({
+    ...m,
+    alt: `${m.alt}: ${text}${more === undefined ? '' : ` (${more})`}`,
+    drawn: [...m.drawn, text, ...(more === undefined ? [] : [more])],
+  }))
+}
 // Every Text of the drawing, and on the desktop the text drawn inside its Svg elements.
 const textsOf = async (d: Drawing) => [
   ...(await d.findAll({ type: 'Text' })).map(t => t.text ?? ''),
@@ -358,13 +371,13 @@ test('with only questions raising it, the band shows the newest question on the 
   expect(pane.some(x => x.includes('more'))).toBe(false)
 })
 
-test('on the desktop the band is a drawn Svg found by alt text, and the pane is native rows; the terminal draws text', async ($, on) => {
+test('on the desktop the band and the pane are native rows with small Svg marks found by alt text; the terminal draws text', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 41, limits: [{ kind: 'five_hour', percentUsed: 85, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
   // Desktop band with nothing waiting: the budget warning is drawn, with a native Details button.
   const budgetBand = await mount($, BAND, 'desktop')
-  const budgetSvg = await svgsOf(budgetBand)
-  expect(budgetSvg.map(v => v.alt)).toEqual(['5-hour limit 85% · resets in 1h 0m'])
+  const budgetSvg = await bandSvgs(budgetBand)
+  expect(budgetSvg.map(v => v.alt)).toEqual(['Rate limit: 5-hour limit 85% · resets in 1h 0m'])
   expect((await budgetBand.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
   await budgetBand.unmount()
   await eng($).tool.call({ tool: OPEN, question: 'Open it?', recommendation: 'Yes', accept: 'Yes' })
@@ -373,7 +386,7 @@ test('on the desktop the band is a drawn Svg found by alt text, and the pane is 
 
   // Desktop band with the question open: it is the question that is drawn, with its answer button, Dismiss and Details.
   const band = await mount($, BAND, 'desktop')
-  const bandSvg = await svgsOf(band)
+  const bandSvg = await bandSvgs(band)
   expect(bandSvg.map(v => v.alt)).toEqual(['Question: Open it?'])
   expect(bandSvg[0]!.drawn).toEqual(['?', 'Open it?'])
   expect((await band.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1', 'open'])
@@ -405,14 +418,14 @@ test('the desktop band says +N more only when more than one item waits', async (
   boot(on)
   await eng($).tool.call({ tool: OPEN, question: 'Only one?' })
   let band = await mount($, BAND, 'desktop')
-  let drawn = (await svgsOf(band)).flatMap(v => v.drawn)
+  let drawn = (await bandSvgs(band)).flatMap(v => v.drawn)
   expect(drawn).toContain('Only one?')
   expect(drawn.some(x => x.includes('more'))).toBe(false)
   await band.unmount()
 
   await eng($).tool.call({ tool: OPEN, question: 'And another?' })
   band = await mount($, BAND, 'desktop')
-  drawn = (await svgsOf(band)).flatMap(v => v.drawn)
+  drawn = (await bandSvgs(band)).flatMap(v => v.drawn)
   expect(drawn).toContain('And another?')
   expect(drawn).toContain('+1 more')
   await band.unmount()
@@ -882,7 +895,9 @@ test('with nothing to show the desktop band is a quiet Mentat line with Details;
   expect(await bandKeys(d)).toEqual([])
   expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
   expect(await textsOf(d)).toEqual(['Mentat'])
-  expect((await svgsOf(d)).map(v => v.alt)).toEqual(['Mentat'])
+  // No mark on the quiet line, and its text is muted.
+  expect((await d.findAll({ type: 'Svg' })).length).toBe(0)
+  expect((await d.findAll({ type: 'Text', text: 'Mentat' }))[0]!.props?.dimColor).toBe(true)
   await d.unmount()
   const term = await mount($, TERM, 'terminal')
   expect(await textsOf(term)).toEqual(['Nothing waiting on you.'])
@@ -1419,7 +1434,7 @@ test('an alert is red, with Dismiss and no answer button: in the terminal pane\'
   await term.unmount()
 
   const desk = await mount($, BAND, 'desktop')
-  const [card] = await svgsOf(desk)
+  const [card] = await bandSvgs(desk)
   expect(card!.alt).toBe('Alert: CI is red and I cannot fix it')
   expect(card!.drawn).toEqual(['!', 'CI is red and I cannot fix it'])
   expect(card!.source).toContain(RED)
@@ -1449,7 +1464,7 @@ test('an action is blue, with Dismiss and no answer button: in the terminal pane
   await term.unmount()
 
   const desk = await mount($, BAND, 'desktop')
-  const [card] = await svgsOf(desk)
+  const [card] = await bandSvgs(desk)
   expect(card!.alt).toBe('Waiting on you: Merge #112 when ready')
   expect(card!.drawn).toEqual(['→', 'Merge #112 when ready'])
   expect(card!.source).toContain(BLUE)
@@ -1475,7 +1490,9 @@ test('a question with kind question and one without a kind are the same amber qu
     expect(await textsOf(d)).toEqual(expect.arrayContaining(['?', 'Plain?']))
     await d.unmount()
   }
-  const plain = (await svgsOf(await mount($, BAND, 'desktop')))[0]!
+  const plainBand = await mount($, BAND, 'desktop')
+  const plain = (await bandSvgs(plainBand))[0]!
+  await plainBand.unmount()
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   await open('question', 'Explicit?', { accept: 'Yes' })($)
   for (const surface of SURFACES) {
@@ -1483,7 +1500,7 @@ test('a question with kind question and one without a kind are the same amber qu
     expect(await bandKeys(d)).toEqual(['accept-d2', 'dismiss-d2'])
     expect(await textsOf(d)).toEqual(expect.arrayContaining(['?', 'Explicit?']))
     if (surface === 'desktop') {
-      const [explicit] = await svgsOf(d)
+      const [explicit] = await bandSvgs(d)
       expect(explicit!.alt).toBe('Question: Explicit?')
       expect(explicit!.source).toContain(AMBER)
       // The same drawing for both: only the text differs.
@@ -1623,7 +1640,7 @@ test('a question draws no link, and a call without kind or link behaves as befor
 // Band priority. A rate limit over 80%, a note and the items open together.
 const bandWith = async ($: never, surface: 'terminal' | 'desktop') => {
   const d = await mount($, BAND, surface)
-  const out = { texts: await textsOf(d), alts: await altsOf(d) }
+  const out = { texts: await textsOf(d), alts: (await bandSvgs(d)).map(v => v.alt) }
   await d.unmount()
   return out
 }
@@ -1658,7 +1675,7 @@ test('the band shows the newest alert over everything else, then a question, a c
   expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   await term.unmount()
   const desk = await mount($, BAND, 'desktop')
-  expect((await svgsOf(desk))[0]!.source).toContain(RED)
+  expect((await bandSvgs(desk))[0]!.source).toContain(RED)
   await desk.unmount()
 
   // The alerts closed: the question, with the action counted.
@@ -1743,7 +1760,7 @@ test('with no item the band shows the budget warning, else the newest note with 
     const surface = 'desktop' as const
     const { texts, alts } = await bandWith($, surface)
     // The newest note only, with its kind's icon.
-    expect(texts).toEqual(['!', 'The tests read the old log'])
+    expect(texts).toEqual(['The tests read the old log', '!'])
     if (surface === 'desktop') expect(alts).toEqual(['Note: The tests read the old log'])
     expect(moreFor(texts)).toBeUndefined()
   }
@@ -1751,18 +1768,18 @@ test('with no item the band shows the budget warning, else the newest note with 
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
   await term.unmount()
   const desk = await mount($, BAND, 'desktop')
-  expect((await svgsOf(desk))[0]!.source).toContain(AMBER)
+  expect((await bandSvgs(desk))[0]!.source).toContain(AMBER)
   expect(await bandKeys(desk)).toEqual([])
   await desk.unmount()
 
   await note($, 'Merged', 'done')
-  expect((await bandWith($, 'desktop')).texts).toEqual(['✓', 'Merged'])
+  expect((await bandWith($, 'desktop')).texts).toEqual(['Merged', '✓'])
 
   // A budget warning outranks the note; with the limit gone the note is back.
   world.usage = { context: 5, limits: [limit('seven_day', 91, RESET_WEEK())] }
   expect((await bandWith($, 'desktop')).texts).toContain('Week limit 91% · resets Thu 7:00 PM')
   world.usage = { context: 5, limits: [limit('seven_day', 10)] }
-  expect((await bandWith($, 'desktop')).texts).toEqual(['✓', 'Merged'])
+  expect((await bandWith($, 'desktop')).texts).toEqual(['Merged', '✓'])
 
   // A new conversation empties the log, and the band is quiet again.
   const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
@@ -1819,7 +1836,7 @@ const FAILED_RUN = 'OK: gh is installed\nPROBLEM: codex is not installed\nPROBLE
 // The desktop band's drawing when it shows an alert.
 const alertsOf = async ($: never) => {
   const d = await mount($, BAND, 'desktop')
-  const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Alert'))
+  const cards = (await bandSvgs(d)).filter(v => v.alt.startsWith('Alert'))
   await d.unmount()
   return cards
 }
@@ -1858,7 +1875,7 @@ test('a second failed run replaces the alert, so there is still one', async ($, 
   expect(cards[0]!.alt).toBe('Alert: Check failed: 1 problem(s) (+1 more)')
   expect(cards[0]!.drawn).toEqual(['!', 'Check failed: 1 problem(s)', '+1 more'])
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
-  expect(await bandTexts($)).toEqual(['!', 'Check failed: 1 problem(s)'])
+  expect(await bandTexts($)).toEqual(['Check failed: 1 problem(s)', '!'])
 })
 
 const WARN_RUN = 'OK: gh is installed\nWARN: gh is old\nWARN: codex is old\nCheck OK (2 warning(s))\n'
@@ -1876,7 +1893,7 @@ const footerOf = async ($: never, surface: 'terminal' | 'desktop', modes: string
 // The desktop band's drawing when it shows a check warning.
 const checkItemsOf = async ($: never) => {
   const d = await mount($, BAND, 'desktop')
-  const cards = (await svgsOf(d)).filter(v => v.alt.startsWith('Check warnings'))
+  const cards = (await bandSvgs(d)).filter(v => v.alt.startsWith('Check warnings'))
   await d.unmount()
   return cards
 }
@@ -2135,7 +2152,7 @@ test('the check warning comes after an alert and a question and before an action
   expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   await term.unmount()
   const desk = await mount($, BAND, 'desktop')
-  expect((await svgsOf(desk))[0]!.source).toContain(HUE_AMBER)
+  expect((await bandSvgs(desk))[0]!.source).toContain(HUE_AMBER)
   await desk.unmount()
 
   // A question outranks the warning.
@@ -2828,12 +2845,12 @@ test('after /clear the label goes dim, then the new conversation is checked; a r
 
 // ---- the band is one row; an open question survives what happens around it ----------------------------------
 
-test('the desktop band is one row: the text, then one Box that holds the answer button, Dismiss, the link and Details', async ($, on) => {
+test('the desktop band has one Box that holds the answer button, Dismiss, the link and Details, and it does not shrink', async ($, on) => {
   boot(on)
   await open('question', 'Ship it?', { accept: 'Yes' })($)
   const d = await mount($, BAND, 'desktop')
   // The buttons are in one Box that does not shrink or wrap; there is no second row of controls.
-  const controls = (await d.findAll({ type: 'Box' })).filter(b => b.props?.flexShrink === 0)
+  const controls = (await d.findAll({ type: 'Box' })).filter(b => b.props?.flexShrink === 0 && b.props?.width === undefined)
   expect(controls).toHaveLength(1)
   expect(controls[0]!.props?.flexDirection).toBe('row')
   expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1'])
@@ -3243,7 +3260,7 @@ test('the desktop band\'s line is the newest note, never an event; with only eve
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   expect((await lines($))[0]).toBe('✓ Closed: Another?')
   const { texts, alts } = await bandWith($, 'desktop')
-  expect(texts).toEqual(['◆', 'Keep this one'])
+  expect(texts).toEqual(['Keep this one', '◆'])
   expect(alts).toEqual(['Note: Keep this one'])
   // The terminal has no band, so no line of Mentat's there.
   expect(await bandTexts($, 'terminal')).toEqual([])
@@ -3396,7 +3413,7 @@ test('the desktop answer button is primary and sends the answer once; a sent ans
   expect(t).toContain('You dismissed: Drop it?')
 })
 
-test('the desktop pane draws a GitHub link as #<number> and any other as its host; the band does too, and reserves only that width', async ($, on) => {
+test('the desktop pane draws a GitHub link as #<number> and any other as its host; the band does too', async ($, on) => {
   boot(on)
   await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Merge it', link: 'https://github.com/ericfurspan/mentat/issues/160' })
   await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'Read this', link: 'https://example.com/some/long/path' })
@@ -3409,13 +3426,10 @@ test('the desktop pane draws a GitHub link as #<number> and any other as its hos
   // The band shows the most urgent item, the alert, with its link as the host.
   const band = await mount($, BAND, 'desktop')
   expect((await band.findAll({ type: 'Link' })).map(l => [l.props?.href, l.props?.label])).toEqual([['https://example.com/some/long/path', 'example.com']])
-  const hostWidth = Number((await band.findAll({ type: 'Svg' }))[0]!.props?.width)
   await band.unmount()
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   const github = await mount($, BAND, 'desktop')
   expect((await github.findAll({ type: 'Link' })).map(l => [l.props?.href, l.props?.label])).toEqual([['https://github.com/ericfurspan/mentat/issues/160', '#160']])
-  // The Svg beside the buttons reserves the room of `#160`, which is less than that of `example.com`.
-  expect(Number((await github.findAll({ type: 'Svg' }))[0]!.props?.width)).toBeGreaterThan(hostWidth)
   await github.unmount()
 })
 
@@ -3500,4 +3514,85 @@ test('every desktop Box that can shrink has minWidth 0, and the text Boxes hide 
   for (const b of widths) expect(b.props?.flexShrink).toBe(0)
   const groups = boxes.filter(b => b.props?.flexShrink === 0 && b.props?.flexDirection === 'row')
   expect(groups.length).toBeGreaterThanOrEqual(3)
+})
+
+// ---- the desktop band: one native row ------------------------------------------------------------------------
+
+test('the desktop band is one row of a mark, the text, the pill right after it, a spacer and the controls', async ($, on) => {
+  boot(on)
+  await open('question', 'Ship it?', { accept: 'Yes' })($)
+  await open('question', 'And this?')($)
+  const d = await mount($, BAND, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  const keys = boxes.map(b => b.key).filter(k => ['mark', 'text', 'more', 'spacer'].includes(String(k)))
+  // Left to right: the mark, the text, then the pill right after the text and before the spacer.
+  expect(keys).toEqual(['mark', 'text', 'more', 'spacer'])
+  const text = boxes.find(b => b.key === 'text')!
+  expect(text.props).toMatchObject({ flexShrink: 1, minWidth: 0, overflow: 'hidden' })
+  expect(boxes.find(b => b.key === 'spacer')?.props?.flexGrow).toBe(1)
+  expect(boxes.find(b => b.key === 'more')?.props?.flexShrink).toBe(0)
+  expect(boxes.find(b => b.key === 'mark')?.props?.flexShrink).toBe(0)
+  // The text is cut with an ellipsis and bold; the pill is a Text in the warning color on a tint.
+  const texts = await d.findAll({ type: 'Text' })
+  expect(texts[0]).toMatchObject({ text: 'And this?', props: { bold: true, wrap: 'truncate-end' } })
+  expect(texts[1]).toMatchObject({ text: '+1 more', props: { color: 'warning' } })
+  expect(boxes.find(b => b.key === 'more')?.props?.backgroundColor).toBeDefined()
+  // Every Box that can shrink has minWidth 0 (a flex item otherwise never shrinks below its content).
+  for (const b of boxes.filter(b => b.props?.flexShrink !== 0 && b.props?.width === undefined && b.key !== 'engine-own')) {
+    expect({ key: b.key, minWidth: b.props?.minWidth }).toEqual({ key: b.key, minWidth: 0 })
+  }
+  await d.unmount()
+})
+
+test('the desktop band has only a small mark for an Svg, and its tree does not depend on bodyColumns', async ($, on) => {
+  const { world } = boot(on)
+  const states: (() => Promise<unknown>)[] = [
+    async () => undefined,
+    async () => note($, 'A note', 'done'),
+    async () => {
+      world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+    },
+    async () => {
+      await open('action', 'Rotate the token that the deploy job reads from the secrets store', { link: 'https://github.com/o/r/issues/160' })($)
+      await open('alert', 'An alert')($)
+    },
+  ]
+  const trees: string[] = []
+  // Every state of the band, quiet to an item with its pill, at three widths.
+  for (const setup of states) {
+    await setup()
+    const seen: string[] = []
+    for (const cols of [30, 60, 140]) {
+      const d = await mount($, BAND, 'desktop', { bodyColumns: cols })
+      const svgs = await d.findAll({ type: 'Svg' })
+      for (const v of svgs) {
+        expect(Number(v.props?.width)).toBeLessThanOrEqual(24)
+        expect(Number(v.props?.height)).toBeLessThanOrEqual(24)
+        expect(String(v.props?.alt)).not.toBe('')
+      }
+      seen.push(JSON.stringify([await textsOf(d), (await d.findAll({ type: 'Box' })).map(b => b.props), svgs.map(v => v.props)]))
+      await d.unmount()
+    }
+    expect(new Set(seen).size).toBe(1)
+    trees.push(seen[0]!)
+  }
+  expect(new Set(trees).size).toBe(4)
+})
+
+test('the band marks a note in its color and the rate limit, and the quiet line has no mark', async ($, on) => {
+  const { world } = boot(on)
+  let d = await mount($, BAND, 'desktop')
+  expect((await d.findAll({ type: 'Svg' })).length).toBe(0)
+  await d.unmount()
+  await note($, 'A surprise', 'surprise')
+  d = await mount($, BAND, 'desktop')
+  expect((await bandSvgs(d)).map(v => v.alt)).toEqual(['Note: A surprise'])
+  expect((await bandSvgs(d))[0]!.source).toContain(AMBER)
+  expect((await d.findAll({ type: 'Text' }))[0]!.props?.bold).toBeUndefined()
+  await d.unmount()
+  world.usage = { context: 5, limits: [limit('five_hour', 95, RESET_5H())] }
+  d = await mount($, BAND, 'desktop')
+  expect((await bandSvgs(d)).map(v => v.alt)).toEqual(['Rate limit: 5-hour limit 95% · resets in 1h 29m'])
+  expect((await d.findAll({ type: 'Text' }))[0]!.props).toMatchObject({ color: 'warning', wrap: 'truncate-end' })
+  await d.unmount()
 })
