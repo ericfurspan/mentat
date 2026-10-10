@@ -929,6 +929,8 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
 export const CARD_TINT = '#80808014'
 // The mark column of an item row, in cells (the Svg inside is 20px), and the indent of the lines under the text.
 const MARK_CELLS = 3
+// The space between the items of the desktop's Waiting on you card, in rows: each item reads as its own block.
+const WAITING_GAP = 2
 const TEXT_INDENT = MARK_CELLS + 1
 // A small round tinted mark with a glyph, a fixed 20px Svg; it is the only picture in the pane, and it does
 // not take part in the reflow when the divider moves.
@@ -979,7 +981,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
           </Box>
           {cut(d.question)}
         </Box>
-        <Box key="actions" paddingLeft={TEXT_INDENT} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+        <Box key="actions" paddingLeft={TEXT_INDENT} marginTop={1} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
           {cut(detail, { dimColor: true })}
           <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
             {link !== undefined && (
@@ -1062,7 +1064,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
           {budget}
         </Text>
       )}
-      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box flexDirection="column" gap={1} minWidth={0}>{waiting}</Box>)}
+      {open.length > 0 && card('card-waiting', 'WAITING ON YOU', 'warning', open.length, <Box key="items" flexDirection="column" gap={WAITING_GAP} minWidth={0}>{waiting}</Box>)}
       {hasFeed && card('card-feed', 'FEED', 'subtle', live.length + logList.length, feed)}
       {open.length === 0 && !hasFeed && <Text dimColor>Nothing waiting on you.</Text>}
     </Box>

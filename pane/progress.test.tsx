@@ -3890,3 +3890,22 @@ test('on the terminal there is one blank row between the items of Waiting on you
     await d.unmount()
   }
 })
+
+test('on the desktop an item\'s button row has room above it and is centered; the items in the card are spaced two rows apart', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'A long question that wraps onto a second line when the divider is dragged narrow?', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Rotate the token', link: 'https://github.com/o/r/issues/7' })
+  const d = await mount($, DESK, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  const actions = boxes.filter(b => b.key === 'actions')
+  expect(actions).toHaveLength(2)
+  for (const row of actions) expect(row.props).toMatchObject({ flexDirection: 'row', alignItems: 'center', marginTop: 1, paddingLeft: 4 })
+  // The card's items are one column, two rows apart; the card keeps its even side padding.
+  expect(boxes.find(b => b.key === 'items')!.props).toMatchObject({ flexDirection: 'column', gap: 2 })
+  expect(boxes.find(b => b.key === 'card-waiting')!.props).toMatchObject({ paddingX: 1, gap: 1 })
+  await d.unmount()
+  // The terminal is as it was: no top margin on its button row.
+  const term = await mount($, TERM, 'terminal')
+  expect((await term.findAll({ type: 'Box' })).filter(b => String(b.key).startsWith('actions-')).every(b => b.props?.marginTop === undefined)).toBe(true)
+  await term.unmount()
+})
