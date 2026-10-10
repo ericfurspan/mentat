@@ -2951,7 +2951,7 @@ const logOf = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => 
   const hasSvg = (await pane.findAll({ type: 'Svg' })).length > 0
   await pane.unmount()
   const rows: { time: string; icon: string; text: string }[] = []
-  for (let i = t.indexOf('LOG') + 1; i > 0 && i + 2 < t.length && /^\d+:\d\d$/.test(t[i]!); i += 3) rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
+  for (let i = t.indexOf('LOG') + 1; i > 0 && i + 2 < t.length && /^\d+:\d\d [AP]M$/.test(t[i]!); i += 3) rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
 
   return { rows, toggle, hasSvg }
 }
@@ -2967,8 +2967,8 @@ test('gh pr create logs the opened pull request with the title it was given; a f
   expect((await logOf($)).rows).toEqual([])
   const create = 'gh pr create --title "feat(pane): add a log" --body x'
   await bash(world, $, create, `${GH}/pull/130\n`)
-  // 12:00 UTC is 8:00 in New York.
-  expect((await logOf($)).rows).toEqual([{ time: '8:00', icon: '↑', text: 'Opened PR #130: Add a log' }])
+  // 12:00 UTC is 8:00 AM in New York.
+  expect((await logOf($)).rows).toEqual([{ time: '8:00 AM', icon: '↑', text: 'Opened PR #130: Add a log' }])
   await bash(world, $, create, `${GH}/pull/130\n`)
   expect(await lines($)).toEqual(['↑ Opened PR #130: Add a log'])
   // Without a title in the command the entry is just the number.
@@ -3116,7 +3116,7 @@ test('the log shows the newest five; Show all N shows the rest and Show fewer go
   for (const surface of SURFACES) {
     const first = await logOf($, surface)
     expect(first.rows).toHaveLength(5)
-    expect(first.rows[0]).toEqual({ time: '8:00', icon: '⊘', text: 'Codex reviews turned off' })
+    expect(first.rows[0]).toEqual({ time: '8:00 AM', icon: '⊘', text: 'Codex reviews turned off' })
     expect(first.toggle).toEqual(['Show all 7'])
   }
   for (const surface of SURFACES) {
@@ -3170,14 +3170,24 @@ test('a log line is one line of at most 60 characters, cut with an ellipsis', as
   expect((await lines($))[0]).toBe('● Closed issue #3: Two words')
 })
 
-test('the time is the entry\'s clock time in the TZ zone, as h:mm', async ($, on) => {
+test('the time is the entry\'s clock time in the TZ zone, as h:mm AM or PM', async ($, on) => {
   const { clock } = boot(on, { zone: 'Asia/Kolkata' })
   await startSession($)
   await eng($).command.run(codex('off'))
   await clock.advance(7 * 60_000)
   await eng($).command.run(codex('on'))
-  // 12:00 UTC is 5:30 in Kolkata.
-  expect((await logOf($)).rows.map(r => r.time)).toEqual(['5:37', '5:30'])
+  // 12:00 UTC is 5:30 PM in Kolkata.
+  expect((await logOf($)).rows.map(r => r.time)).toEqual(['5:37 PM', '5:30 PM'])
+  // A two-digit evening hour and a one-digit morning hour: 5:37 PM + 4h35m is 10:12 PM, and 11 hours later 9:12 AM.
+  // (The mock clock fires the pane's 1-second timer for every second, so it moves in steps.)
+  const forward = async (minutes: number) => {
+    for (let left = minutes; left > 0; left -= 20) await clock.advance(Math.min(left, 20) * 60_000)
+  }
+  await forward(4 * 60 + 35)
+  await eng($).command.run(codex('off'))
+  await forward(11 * 60)
+  await eng($).command.run(codex('on'))
+  expect((await logOf($)).rows.map(r => r.time)).toEqual(['9:12 AM', '10:12 PM', '5:37 PM', '5:30 PM'])
 })
 
 test('the log is plain text rows on both surfaces, with no Svg and no tint, and sits under the open items and above the agents', async ($, on) => {

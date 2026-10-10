@@ -187,11 +187,11 @@ const zoneParts = (when: Date, options: Intl.DateTimeFormatOptions, zone?: strin
 
   return type => found.find(x => x.type === type)?.value ?? ''
 }
-// The time of a log entry as `h:mm`, 12-hour, in the same zone the weekly reset uses.
+// The time of a log entry as `h:mm AM` or `h:mm PM` (12-hour, no seconds), in the same zone the weekly reset uses.
 const clockAt = (at: number, zone?: string): string => {
   const part = zoneParts(new Date(at), { hour: 'numeric', minute: '2-digit', hour12: true }, zone)
 
-  return `${part('hour')}:${part('minute')}`
+  return `${part('hour')}:${part('minute')} ${part('dayPeriod')}`
 }
 // One line, at most `max` characters, cut with an ellipsis.
 const oneLine = (text: string, max: number = LOG_WIDTH): string => {
@@ -1559,7 +1559,7 @@ export const register: Register = (on, _options) => {
           <Heading label="Log" />
           {(isLogAll ? logRows : logRows.slice(0, LOG_SHOWN)).map(({ entry, n }) => (
             <Box key={`log-${n}`} flexDirection="row" gap={1}>
-              <Box width={5} flexShrink={0} justifyContent="flex-end">
+              <Box width={8} flexShrink={0} justifyContent="flex-end">
                 <Text dimColor>{clockAt(entry.at, zone)}</Text>
               </Box>
               <Text color={LOG_STYLE[entry.kind].color}>{LOG_STYLE[entry.kind].icon}</Text>
