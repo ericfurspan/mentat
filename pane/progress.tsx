@@ -1,6 +1,6 @@
 // Mentat's band and pane. The band is always there, one line: what waits on the maintainer, else a
 // warning that a rate limit runs low, else the newest note, else a quiet line. The pane holds the
-// Commands card, the Log, the agents and, on the terminal, where this session's pull request stands.
+// Log, the agents and, on the terminal, where this session's pull request stands.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -36,7 +36,6 @@ const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
-const commandsShown = atom({ plugin: 'mentat', key: 'commandsShown' } as const, false)
 const prRef = atom({ plugin: 'mentat', key: 'prRef' } as const, '')
 const prAtom = atom({ plugin: 'mentat', key: 'pr' } as const, null)
 const prMark = atom({ plugin: 'mentat', key: 'prMark' } as const, { seq: 0, okAt: 0, failedAt: 0 })
@@ -51,21 +50,6 @@ const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
-
-// The pane's Commands card: the commands the maintainer types, one per row, each with when to use
-// it. Drawn as a markdown table; nothing in the card runs a command. A new maintainer command is
-// one line here (a `/mentat:<skill>` needs `skills/<skill>/SKILL.md`, which tests/run checks).
-export const COMMANDS: { name: string; use: string }[] = [
-  { name: '/mentat', use: 'open this pane' },
-  { name: '/mentat pr <n>', use: 'follow a pull request' },
-  { name: '/mentat:come-again', use: 'restate the last message' },
-  { name: '/mentat:retro', use: 'look back at a session that went badly' },
-  { name: '/mentat:codex-review-off', use: 'turn Codex reviews off for the session' },
-  { name: '/mentat:codex-review-on', use: 'turn Codex reviews back on for the session' },
-  { name: 'mentat check', use: 'in a terminal: check what Mentat needs' },
-]
-const commandsTable = (): string =>
-  ['| Command | Use |', '| --- | --- |', ...COMMANDS.map(c => `| \`${c.name}\` | ${c.use} |`)].join('\n')
 
 // The notes Claude Code adds with the `note` tool, in the pane's Log card and as the band's line: each kind has an
 // icon and a color. The color is a theme color, so the line reads on the terminal and the desktop; the hue is
@@ -966,7 +950,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show the commands, the log, the agents and, on the terminal, the pull request in a pane',
+      description: 'Show the log, the agents and, on the terminal, the pull request in a pane',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -1357,7 +1341,7 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Markdown, Text } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
     const Svg = e.surface === 'desktop' ? $.ui.resolve(e as typeof e & { surface: 'desktop' }).Svg : undefined
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
@@ -1446,22 +1430,6 @@ export const register: Register = (on, _options) => {
       if (mark.okAt > 0 && now - mark.okAt > STALE_MS) return `${what} read ${Math.floor((now - mark.okAt) / 60_000)}m old`
       return undefined
     }
-    // The Commands card, above everything else on both surfaces: a toggle (collapsed at first, the
-    // choice kept) and, when open, a markdown table of the commands (no background). No button here runs a command.
-    const isCommandsShown = await read($, commandsShown)
-    const toggleCommands = () => inTurn(() => update($, commandsShown, v => !v))
-    const commandsCard = (
-      <Box flexDirection="column">
-        <Box flexDirection="row">
-          <Button key="commands-toggle" label={`${isCommandsShown ? '▾' : '▸'} Commands`} onPress={toggleCommands} />
-        </Box>
-        {isCommandsShown && (
-          <Box flexDirection="column" paddingLeft={2} marginTop={1}>
-            <Markdown text={commandsTable()} />
-          </Box>
-        )}
-      </Box>
-    )
     // The Log card: the newest entries first, the last LOG_SHOWN of them until `Show all`. Plain text
     // rows on both surfaces, with no background: an 8-digit hex tint renders as solid grey in a terminal.
     const logList = await read($, logAtom)
@@ -1514,7 +1482,6 @@ export const register: Register = (on, _options) => {
       const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRowsSvg)
       return (
         <Box flexDirection="column" paddingX={1}>
-          {commandsCard}
           {open.length === 0 && logList.length === 0 && rows.length === 0 && (
             <Box marginTop={SECTION_GAP}>
               <Text dimColor>Nothing waiting on you.</Text>
@@ -1542,7 +1509,7 @@ export const register: Register = (on, _options) => {
 
     return (
       <Box flexDirection="column" paddingX={1}>
-        {commandsCard}
+        {ref === '' && open.length === 0 && logList.length === 0 && rows.length === 0 && <Text dimColor>Nothing waiting on you.</Text>}
 
         {ref !== '' && (
           <Card>
