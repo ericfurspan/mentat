@@ -1422,7 +1422,7 @@ export const register: Register = (on, _options) => {
       return undefined
     }
     // The Commands card, above everything else on both surfaces: a toggle (collapsed at first, the
-    // choice kept) and, when open, one plain line per command. No button here runs a command.
+    // choice kept) and, when open, one plain line per command (no background, the command bold and its use dim). No button here runs a command.
     const isCommandsShown = await read($, commandsShown)
     const toggleCommands = () => inTurn(() => update($, commandsShown, v => !v))
     const commandsCard = (
@@ -1431,11 +1431,14 @@ export const register: Register = (on, _options) => {
           <Button key="commands-toggle" label={`${isCommandsShown ? '▾' : '▸'} Commands`} onPress={toggleCommands} />
         </Box>
         {isCommandsShown && (
-          <Card>
+          <Box flexDirection="column" paddingLeft={2} marginTop={1}>
             {COMMANDS.map(c => (
-              <Text key={c.names.join(' ')} wrap="wrap">{`${c.names.join(' · ')}: ${c.use}`}</Text>
+              <Box key={c.names.join(' ')} flexDirection="row" gap={2}>
+                <Text bold>{c.names.join(' · ')}</Text>
+                <Text dimColor>{c.use}</Text>
+              </Box>
             ))}
-          </Card>
+          </Box>
         )}
       </Box>
     )
