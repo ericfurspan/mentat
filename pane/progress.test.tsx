@@ -2208,7 +2208,7 @@ test('a question comes before budget in the band, and so does a final-checked pu
 
 // ---- the answer field -------------------------------------------------------------------
 
-test('the answer field starts focused and sits in a full-width box tinted like the question card', async ($, on) => {
+test('the answer field starts focused and sits in a full-width box, tinted like the question card on the desktop only', async ($, on) => {
   boot(on)
   await eng($).tool.call({ tool: OPEN, question: 'Keep it?' })
   const opener = await mount($, PANE, 'terminal')
@@ -2221,7 +2221,8 @@ test('the answer field starts focused and sits in a full-width box tinted like t
     expect(input?.props?.autoFocus).toBe(true)
     const boxes = (await pane.findAll({ type: 'Box' })).filter(b => b.props?.width === '100%')
     expect(boxes.length).toBe(1)
-    expect(boxes[0]!.props?.backgroundColor).toBe('#d2992224')
+    // Only the desktop tints it; a terminal draws an 8-digit hex tint as opaque grey.
+    expect(boxes[0]!.props?.backgroundColor).toBe(surface === 'desktop' ? '#d2992224' : undefined)
     await pane.unmount()
   }
 })
@@ -2247,7 +2248,7 @@ test('an alert card is red, labelled ALERT, with Dismiss and no answer buttons, 
   expect(t).toEqual(expect.arrayContaining(['ALERT', 'CI is red and I cannot fix it', '→ Look at the log']))
   expect(t).not.toContain('QUESTION FOR YOU')
   expect((await term.findAll({ type: 'Text', text: 'ALERT' }))[0]!.props?.color).toBe('error')
-  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d0453f24')).toBe(true)
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   expect(await keysOf(term)).toEqual(['dismiss-d1'])
   expect(await term.findAll({ type: 'Input' })).toEqual([])
   await term.unmount()
@@ -2268,7 +2269,7 @@ test('an action card is blue, labelled WAITING ON YOU, with Dismiss and no answe
   await open('action', 'Merge #112 when ready', { accept: 'Yes' })($)
   const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect(await textsOf(term)).toEqual(expect.arrayContaining(['WAITING ON YOU', 'Merge #112 when ready']))
-  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#3d7fe624')).toBe(true)
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   expect(await keysOf(term)).toEqual(['dismiss-d1'])
   await term.unmount()
 
@@ -2396,7 +2397,7 @@ test('the band shows the newest alert over everything else, then a question, a f
   }
   const term = await mount($, BAND, 'terminal')
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('error')
-  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d0453f24')).toBe(true)
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   await term.unmount()
   const desk = await mount($, BAND, 'desktop')
   const band = (await svgsOf(desk))[0]!.source
@@ -2635,7 +2636,7 @@ test('a pass with warnings pins one warning card with the WARN lines, a clean pa
   const term = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect(await textsOf(term)).toEqual(expect.arrayContaining(['CHECK WARNINGS', 'Check passed with 2 warnings', 'gh is old', 'codex is old']))
   expect((await term.findAll({ type: 'Text', text: 'CHECK WARNINGS' }))[0]!.props?.color).toBe('warning')
-  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d2992224')).toBe(true)
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   // Only Dismiss: no answer buttons and no link.
   expect(await keysOf(term)).toEqual(expect.arrayContaining(['dismiss-check']))
   expect((await keysOf(term)).filter(k => String(k).includes('check'))).toEqual(['dismiss-check'])
@@ -2766,7 +2767,7 @@ test('the band shows an alert, then a question, then the check warning, then a f
   }
   const term = await mount($, BAND, 'terminal')
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
-  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor === '#d2992224')).toBe(true)
+  expect((await term.findAll({ type: 'Box' })).some(b => b.props?.backgroundColor !== undefined)).toBe(false)
   await term.unmount()
   const desk = await mount($, BAND, 'desktop')
   expect((await svgsOf(desk))[0]!.source).toContain(HUE_AMBER)
@@ -3281,4 +3282,28 @@ test('the log and settings: a command other than codex-review-off and -on is not
     await pane.unmount()
   }
   expect(world.commands).toEqual(['mentat:come-again'])
+})
+
+test('no terminal Box has a backgroundColor: a terminal draws an 8-digit hex tint as opaque grey; the desktop keeps the answer field tint', async ($, on) => {
+  const { world } = boot(on, { zone: 'America/New_York' })
+  world.usage = { context: 41, limits: [{ kind: 'five_hour', percentUsed: 85, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
+  await follow109($)
+  await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Merge it' })
+  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'CI is red' })
+  await eng($).command.run({ command: 'mentat:codex-review-off', args: '' })
+  world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
+  const opener = await mount($, PANE, 'terminal')
+  await opener.press({ key: 'answer-open-d1' })
+  await opener.unmount()
+  for (const [spec, props] of [[PANE, { bodyColumns: 60 }], [BAND, {}]] as const) {
+    const term = await mount($, spec, 'terminal', props)
+    const boxes = await term.findAll({ type: 'Box' })
+    expect(boxes.length).toBeGreaterThan(0)
+    expect(boxes.filter(b => b.props?.backgroundColor !== undefined)).toEqual([])
+    await term.unmount()
+  }
+  // The terminal's session meters are still drawn, as text.
+  expect(await paneTexts($, 'terminal')).toContain('SESSION')
 })

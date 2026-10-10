@@ -47,9 +47,9 @@ const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 
-// Neutral tints that read on dark and light; amber for what needs the maintainer, red for an
-// alert, blue for an action only the maintainer can take.
-const TINT = { surface: '#8b949e14', you: '#d2992224', alert: '#d0453f24', action: '#3d7fe624' }
+// The amber tint of the desktop's answer field, which reads on dark and light. Only the desktop draws it: a terminal
+// shows an 8-digit hex color as an opaque grey, so the terminal pane has no backgrounds.
+const TINT = { you: '#d2992224' }
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
 // warning card after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
@@ -74,14 +74,14 @@ const commandsTable = (): string =>
 const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
   'pr-open': { icon: '↑', color: 'suggestion' },
   'pr-ready': { icon: '↑', color: 'success' },
-  'pr-close': { icon: '✕', color: 'subtle' },
+  'pr-close': { icon: '✕', color: 'text' },
   'pr-merge': { icon: '✓', color: 'success' },
   'issue-open': { icon: '○', color: 'suggestion' },
-  'issue-close': { icon: '●', color: 'subtle' },
+  'issue-close': { icon: '●', color: 'text' },
   question: { icon: '?', color: 'warning' },
   action: { icon: '→', color: 'suggestion' },
   alert: { icon: '!', color: 'error' },
-  'codex-off': { icon: '⊘', color: 'subtle' },
+  'codex-off': { icon: '⊘', color: 'warning' },
   'codex-on': { icon: '⊙', color: 'success' },
   'builder-start': { icon: '▸', color: 'suggestion' },
   'builder-done': { icon: '✓', color: 'success' },
@@ -1396,7 +1396,7 @@ export const register: Register = (on, _options) => {
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
             {open.length > 0 && (
-              <Box flexDirection="row" backgroundColor={alert !== undefined ? TINT.alert : question !== undefined || warning !== undefined ? TINT.you : TINT.action} paddingX={1}>
+              <Box flexDirection="row">
                 <Text color={alert !== undefined ? 'error' : question !== undefined || warning !== undefined ? 'warning' : 'suggestion'}>{pillLabel(open)}</Text>
               </Box>
             )}
@@ -1432,8 +1432,10 @@ export const register: Register = (on, _options) => {
     const liveRows = rows.filter(a => !isEnded(a.status))
     const doneRows = rows.filter(a => isEnded(a.status))
     const toggleFinished = () => inTurn(() => update($, finishedHidden, v => !v))
-    const Card = ({ tint, children }: { tint?: string; children?: RenderChildren }) => (
-      <Box flexDirection="column" backgroundColor={tint ?? TINT.surface} paddingX={2} paddingY={1.5} marginTop={1}>
+    // The terminal's card: no background, because a terminal draws an 8-digit hex tint as an opaque grey.
+    // The kind is marked by its heading's color.
+    const Card = ({ children }: { children?: RenderChildren }) => (
+      <Box flexDirection="column" marginTop={1}>
         {children}
       </Box>
     )
@@ -1692,7 +1694,7 @@ export const register: Register = (on, _options) => {
       const details = cutLines(d.lines ?? [])
 
       return (
-        <Card key={d.id} tint={kind === 'alert' ? TINT.alert : kind === 'warning' ? TINT.you : TINT.action}>
+        <Card key={d.id}>
           <Heading label={CARD_STYLE[kind].label} color={kind === 'alert' ? 'error' : kind === 'warning' ? 'warning' : 'suggestion'} />
           <Text bold>{d.question}</Text>
           {details.map((line, i) => (
@@ -1720,7 +1722,7 @@ export const register: Register = (on, _options) => {
         {open.filter(d => kindOf(d) === 'alert').map(otherCard)}
 
         {open.filter(d => kindOf(d) === 'question').map(d => (
-          <Card key={d.id} tint={TINT.you}>
+          <Card key={d.id}>
             <Heading label="Question for you" color="warning" />
             <Text bold>{d.question}</Text>
             {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
@@ -1739,7 +1741,7 @@ export const register: Register = (on, _options) => {
               <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
             </Box>
             {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
-              <Box marginTop={1} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
+              <Box marginTop={1} width="100%">
                 <Input
                   key={`answer-${d.id}`}
                   autoFocus
