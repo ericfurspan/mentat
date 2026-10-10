@@ -1838,7 +1838,8 @@ test('an action or alert shows its link as a Link element beside Dismiss, only w
   for (const surface of SURFACES) {
     const b = await bandOf(surface)
     expect(b.hrefs).toEqual([url])
-    expect(b.links.every(l => l.props?.label === 'github.com/o/r/issues/112')).toBe(true)
+    // The desktop band draws the address; the tight terminal row draws `#112`.
+    expect(b.links.every(l => l.props?.label === (surface === 'terminal' ? '#112' : 'github.com/o/r/issues/112'))).toBe(true)
     // Dismiss is drawn beside the link.
     expect(b.keys).toEqual(['dismiss-d1'])
   }
@@ -1857,6 +1858,50 @@ test('an action or alert shows its link as a Link element beside Dismiss, only w
       expect(b.keys.filter(k => String(k).startsWith('dismiss-')).length).toBe(1)
     }
     await eng($).tool.call({ tool: CLOSE, id: `d${i + 3}` })
+  }
+})
+
+test('the terminal pane draws a GitHub issue or pull request link as #<number>, any other link as its host, and the Link opens the whole address', async ($, on) => {
+  boot(on)
+  const cases: [string, string][] = [
+    ['https://github.com/ericfurspan/mentat/issues/160', '#160'],
+    ['https://github.com/o/r/pull/9', '#9'],
+    ['https://github.com/other/repo/issues/12', '#12'],
+    ['https://github.com/o/r/issues/7#issuecomment-1', '#7'],
+    ['https://example.com/some/long/path?x=1', 'example.com'],
+    ['https://github.com/o/r', 'github.com'],
+    ['https://docs.example.org:8443/a', 'docs.example.org:8443'],
+  ]
+  for (const [i, [url, label]] of cases.entries()) {
+    await open('action', `Rotate the token ${i}`, { link: url })($)
+    const d = await mount($, TERM, 'terminal')
+    const links = await d.findAll({ type: 'Link' })
+    expect(links.map(l => [l.props?.href, l.props?.label])).toEqual([[url, label]])
+    await d.unmount()
+    await eng($).tool.call({ tool: CLOSE, id: `d${i + 1}` })
+  }
+})
+
+test('a terminal row with a link keeps the mark and the space after it, and the text is what is cut', async ($, on) => {
+  boot(on)
+  await open('action', 'Rotate the token that the deploy job reads from the secrets store', { link: 'https://github.com/ericfurspan/mentat/issues/160' })($)
+  for (const cols of [60, 85]) {
+    const d = await mount($, PANE, 'terminal', { bodyColumns: cols })
+    const boxes = await d.findAll({ type: 'Box' })
+    // The mark is in a Box that does not shrink and has a margin after it, so a tight row cannot take the space away.
+    const mark = boxes.find(b => b.key === 'mark-box')!
+    expect(mark.props?.flexShrink).toBe(0)
+    expect(mark.props?.marginRight).toBe(1)
+    // The text can shrink and is cut with an ellipsis; the controls do not shrink.
+    expect(boxes.find(b => b.key === 'text')?.props?.flexShrink).toBe(1)
+    expect(boxes.find(b => b.key === 'controls')?.props?.flexShrink).toBe(0)
+    const texts = await d.findAll({ type: 'Text' })
+    expect(texts.find(t => t.text === 'Rotate the token that the deploy job reads from the secrets store')?.props?.wrap).toBe('truncate-end')
+    // Left to right: the side line, the mark, the text, the short link, Dismiss, the side line.
+    const all = texts.map(t => t.text)
+    const i = all.indexOf('│ ')
+    expect(all.slice(i, i + 6)).toEqual(['│ ', '→', 'Rotate the token that the deploy job reads from the secrets store', '#160', 'Dismiss', ' │'])
+    await d.unmount()
   }
 })
 

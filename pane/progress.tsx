@@ -220,6 +220,15 @@ const httpsLink = (v: unknown): string | undefined => {
 }
 // The words an item's link is drawn with: the address without its scheme.
 const linkLabel = (link: string): string => link.replace(/^https:\/\//, '')
+// The words a link is drawn with on the terminal, where a row is tight: `#160` for a GitHub issue or pull
+// request (always the bare number: knowing whether it is this session's repository would need a read, and the
+// pane reads nothing), else the host (`example.com`). The Link still opens the whole address.
+const shortLink = (link: string): string => {
+  const github = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/(?:issues|pull)\/(\d+)(?:[/?#]\S*)?$/.exec(link)
+  if (github !== null) return `#${github[1]}`
+
+  return /^https:\/\/([^/?#\s]+)/.exec(link)?.[1] ?? linkLabel(link)
+}
 
 // `mentat check` as words anywhere in a command: after a `cd ... &&`, with a path or quotes
 // around mentat, before `2>&1` or a pipe.
@@ -710,10 +719,10 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
 
   // One body row: in a frame between the dim side lines, else bare. The middle grows and shrinks, so a row
   // that ends in Buttons needs no width arithmetic and the right edge stays where it is.
-  const row = (key: string, children: RenderElement[]) => (
+  const row = (key: string, children: RenderElement[], gap = 1) => (
     <Box key={key} flexDirection="row">
       {layout === 'frame' && <Text dimColor>│ </Text>}
-      <Box flexGrow={1} flexShrink={1} flexDirection="row" gap={1}>
+      <Box flexGrow={1} flexShrink={1} flexDirection="row" gap={gap}>
         {children}
       </Box>
       {layout === 'frame' && <Text dimColor> │</Text>}
@@ -758,20 +767,16 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     const link = kind !== 'question' ? d.link : undefined
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
+      // The mark never shrinks and keeps its space after it (a margin, which a tight row cannot take away);
+      // the text is what is cut. The controls keep their size and their space before them.
       row(`item-${d.id}`, [
-        mark.color === undefined ? (
-          <Text key="mark" dimColor>
-            {mark.char}
-          </Text>
-        ) : (
-          <Text key="mark" color={mark.color}>
-            {mark.char}
-          </Text>
-        ),
+        <Box key="mark-box" flexShrink={0} marginRight={1}>
+          {mark.color === undefined ? <Text key="mark" dimColor>{mark.char}</Text> : <Text key="mark" color={mark.color}>{mark.char}</Text>}
+        </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
           <Text wrap="truncate-end">{d.question}</Text>
         </Box>,
-        <Box key="controls" flexDirection="row" gap={1} flexShrink={0}>
+        <Box key="controls" flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
           {answer !== undefined && (
             <Button key={`accept-${d.id}`} plain label={answer} onPress={() => sendAnswer($, d, answer)}>
               <Text bold color="suggestion">
@@ -782,14 +787,14 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
           {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
           {link !== undefined && (
             <Text underline color="suggestion">
-              <Link href={link} label={linkLabel(link)} />
+              <Link href={link} label={shortLink(link)} />
             </Text>
           )}
           <Button key={`dismiss-${d.id}`} plain label="Dismiss" onPress={() => dismissItem($, d.id)}>
             <Text color="suggestion">Dismiss</Text>
           </Button>
         </Box>,
-      ]),
+      ], 0),
     ]
     if (!isShort) {
       const time = clockAt(d.openedAt, zone)
