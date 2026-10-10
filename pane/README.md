@@ -60,9 +60,9 @@ The desktop draws a Box background and a rounded border only if the app does; th
 
 The Log holds the notes the agent adds with the `note` tool and the event lines the pane writes itself, newest first. It keeps the last 200 lines, lasts for the session and survives a reload of the pane; a `/clear`, `/resume` or `/branch` empties it. A note equal to the note just before it is not added again; an event line is always added, so two agents or two questions that read alike each get a line. The Feed shows the log in the pane, on both surfaces: notes and event lines alike. A line stored without a source is a note.
 
-- `note` takes `text` (required, one line, cut at 80 characters with `…`) and an optional `kind`, which is `plan` when left out. A call without text, or with a `kind` that is not one of these five, is refused and adds nothing. It answers `Noted.`
+- `note` takes `text` (required, one line: runs of spaces and line breaks become one space, and the Feed wraps it in full; only past 1000 characters is it cut, with `…`) and an optional `kind`, which is `plan` when left out. A call without text, or with a `kind` that is not one of these five, is refused and adds nothing. It answers `Noted.`
 - The kinds: `decision` (`◆`, a decision the maintainer made), `plan` (`▸`, a change of plan or what comes next), `surprise` (`!`, amber, something surprising found), `waiting` (`◌`, dim, what the agent now waits on) and `done` (`✓`, green, a piece of work finished).
-- The event lines, one per real state change, each cut to one line like a note, with a mark in the color shown:
+- The event lines, one per real state change, each one line like a note, with a mark in the color shown:
   - An agent ends: `✓ <Role> finished: <description>` (green, with no time), `✕ <Role> failed: <description>` or `✕ <Role> stopped: <description>` (red, for a failed or a killed agent). The role is `Builder` (for `builder` and `mentat:builder`), `Explore`, `Plan` or the type as given. An agent whose end is not known, or one the pane first sees already ended, adds no line.
   - `Asked you: <question>` when `open_decision` opens an item, marked like the item: `?` amber for a question, `→` blue for an action, `!` red for an alert.
   - `✓ You answered "<text>": <question>` when the answer button's message has entered the session (not while it waits, and not when it is dropped).

@@ -24,11 +24,12 @@ const WARN_PERCENT = 80
 // rule from RULE_COLUMNS, and below that also drop the times, the recommendation and the WARN lines.
 const FRAME_COLUMNS = 60
 const RULE_COLUMNS = 40
-// The Log keeps this many entries and cuts a line at LOG_WIDTH characters. The Feed shows the newest
-// FEED_SHOWN until `Show all`.
+// The Log keeps this many entries; a line is one line of whitespace-collapsed text, cut only past
+// LOG_TEXT_LIMIT characters (a safety limit: the Feed wraps text, it does not cut it). The Feed shows the
+// newest FEED_SHOWN until `Show all`.
 const LOG_LIMIT = 200
 const FEED_SHOWN = 10
-const LOG_WIDTH = 80
+const LOG_TEXT_LIMIT = 1000
 // The record of items that left without close_decision keeps this many entries.
 const GONE_LIMIT = 50
 
@@ -130,8 +131,8 @@ const clockAt = (at: number, zone?: string): string => {
 
   return `${part('hour')}:${part('minute')} ${part('dayPeriod')}`
 }
-// One line, at most `max` characters, cut with an ellipsis.
-const oneLine = (text: string, max: number = LOG_WIDTH): string => {
+// One line (whitespace collapsed), at most `max` characters, cut with an ellipsis only past that.
+const oneLine = (text: string, max: number = LOG_TEXT_LIMIT): string => {
   const chars = [...text.replace(/\s+/g, ' ').trim()]
 
   return chars.length <= max ? chars.join('') : `${chars.slice(0, max - 1).join('').trimEnd()}…`
@@ -1007,7 +1008,7 @@ export const register: Register = (on, _options) => {
       inputSchema: {
         type: 'object',
         properties: {
-          text: { type: 'string', description: 'One plain line, about 80 characters at most; longer text is cut with an ellipsis' },
+          text: { type: 'string', description: 'One plain line, about 80 characters at most' },
           kind: {
             type: 'string',
             enum: [...NOTE_KINDS],
@@ -1138,7 +1139,7 @@ export const register: Register = (on, _options) => {
 
   on('tool.call', { tool: NOTE_TOOL }, async ($, e) => {
     const input = e as unknown as { text?: unknown; kind?: unknown }
-    const text = typeof input.text === 'string' ? oneLine(input.text, LOG_WIDTH) : ''
+    const text = typeof input.text === 'string' ? oneLine(input.text) : ''
     if (text === '') {
       return { deny: 'note needs a line of text.' }
     }

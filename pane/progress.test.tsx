@@ -2174,20 +2174,31 @@ test('each kind has its own icon and color on both surfaces', async ($, on) => {
   }
 })
 
-test('a note is one line of at most 80 characters, cut with an ellipsis', async ($, on) => {
+test('a note is one line, kept in full and wrapped; only past the 1000 character limit is it cut with an ellipsis', async ($, on) => {
   boot(on)
   await startSession($)
-  await note($, `Moving the ${'very long '.repeat(20)}plan`)
-  const [row] = (await logOf($)).rows
-  expect([...row!.text]).toHaveLength(80)
-  expect(row!.text.startsWith('Moving the very long very long')).toBe(true)
-  expect(row!.text.endsWith('…')).toBe(true)
-  // Exactly 80 characters is kept whole; runs of spaces and line breaks make one line.
-  await note($, 'x'.repeat(80))
-  expect([...(await logOf($)).rows[0]!.text]).toHaveLength(80)
-  expect((await logOf($)).rows[0]!.text.endsWith('…')).toBe(false)
+  const long = `Moving the ${'very long '.repeat(20)}plan`
+  await note($, long)
+  for (const surface of SURFACES) {
+    const [row] = (await logOf($, surface)).rows
+    expect(row!.text).toBe(long.replace(/\s+$/, ''))
+    expect([...row!.text].length).toBeGreaterThan(80)
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await pane.findAll({ type: 'Text', text: row!.text }))[0]!.props?.wrap).toBe('wrap')
+    await pane.unmount()
+  }
+  // Runs of spaces and line breaks make one line.
   await note($, 'two   words\nand a third line')
   expect((await lines($))[0]).toBe('▸ two words and a third line')
+  // Exactly the limit is kept whole; past it the line is cut with an ellipsis.
+  await note($, 'x'.repeat(1000))
+  expect([...(await logOf($)).rows[0]!.text]).toHaveLength(1000)
+  expect((await logOf($)).rows[0]!.text.endsWith('…')).toBe(false)
+  await note($, 'y'.repeat(2000))
+  const cut = (await logOf($)).rows[0]!.text
+  expect([...cut]).toHaveLength(1000)
+  expect(cut.startsWith('yyyy')).toBe(true)
+  expect(cut.endsWith('…')).toBe(true)
 })
 
 test('a note without text, or with a kind that is not one of the five, is refused and adds nothing', async ($, on) => {
@@ -3147,13 +3158,22 @@ test('an equal note straight after another is added once; an event between two e
   expect(await written($)).toEqual(['◌ Same', '? Asked you: Q?', '◌ Same'])
 })
 
-test('an event line is one line of at most 80 characters, and events count toward the 200-line cap', async ($, on) => {
+test('an event line is kept in full and wrapped, cut only past 1000 characters, and events count toward the 200-line cap', async ($, on) => {
   boot(on)
-  await eng($).tool.call({ tool: OPEN, question: `Should we ${'really '.repeat(30)}go?` })
-  const [row] = (await logOf($)).rows
-  expect([...row!.text]).toHaveLength(80)
-  expect(row!.text.startsWith('Asked you: Should we really')).toBe(true)
-  expect(row!.text.endsWith('…')).toBe(true)
+  const question = 'Draft the desktop pane next, or finish the Feed icons first? This question is long on purpose so it has to wrap'
+  await eng($).tool.call({ tool: OPEN, question })
+  for (const surface of SURFACES) {
+    const [row] = (await logOf($, surface)).rows
+    expect(row!.text).toBe(`Asked you: ${question}`)
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await pane.findAll({ type: 'Text', text: row!.text }))[0]!.props?.wrap).toBe('wrap')
+    await pane.unmount()
+  }
+  await eng($).tool.call({ tool: OPEN, question: `Should we ${'really '.repeat(300)}go?` })
+  const cut = (await logOf($)).rows[0]!.text
+  expect([...cut]).toHaveLength(1000)
+  expect(cut.startsWith('Asked you: Should we really')).toBe(true)
+  expect(cut.endsWith('…')).toBe(true)
   for (let i = 0; i < 204; i++) await eng($).tool.call({ tool: OPEN, question: `Q${i}?` })
   expect((await logOf($)).toggle).toEqual(['Show all 200'])
 })
