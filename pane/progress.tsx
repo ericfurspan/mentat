@@ -169,16 +169,17 @@ const isEnded = (s: AgentStatus): boolean => s === 'completed' || s === 'failed'
 const isActive = (s: AgentStatus): boolean => s === 'running' || s === 'waiting' || s === 'pending'
 
 type AgentInfoLike = { id: string; type: string; description: string; status: AgentStatus }
-// Fits the rows to what the engine lists: statuses follow the engine, an end freezes
-// the elapsed time, an agent the mod never saw is added without a start,
-// and one the engine no longer lists is ended (unknown), never finished.
+// Fits the rows to what the engine lists: statuses follow the engine, an agent the mod never saw is added
+// without a start, and one the engine no longer lists is ended (unknown), never finished. An agent that
+// goes from ended back to live (a builder resumed with a message) starts its time over at the moment the
+// mod saw it, so the time it sat idle is not counted.
 const reconcile = (rows: AgentRow[], infos: AgentInfoLike[], now: number): AgentRow[] => {
   const next = rows.map(row => {
     const info = infos.find(i => i.id === row.id)
     if (info === undefined) return isEnded(row.status) ? row : { ...row, status: 'unknown' as const, endedAt: now }
     if (isEnded(info.status)) return { ...row, status: info.status, endedAt: row.endedAt ?? now }
     const { endedAt: _endedAt, ...rest } = row
-    return { ...rest, status: info.status }
+    return { ...rest, status: info.status, ...(isEnded(row.status) ? { startedAt: now } : {}) }
   })
   for (const info of infos) {
     if (rows.some(r => r.id === info.id)) continue
@@ -321,9 +322,9 @@ const agentEvents = (before: AgentRow[], after: AgentRow[]): LogDraft[] => {
     const was = before.find(r => r.id === row.id)
     if (was === undefined || isEnded(was.status)) continue
     const who = `${roleName(row.type)} ${row.status === 'completed' ? 'finished' : row.status === 'failed' ? 'failed' : 'stopped'}: ${row.description}`
+    // No duration: an agent resumed after it finished keeps no honest start to measure from.
     if (row.status === 'completed') {
-      const ms = row.startedAt === undefined || row.endedAt === undefined ? undefined : row.endedAt - row.startedAt
-      drafts.push(eventDraft('agentDone', ms === undefined ? who : `${who} · ${duration(ms)}`))
+      drafts.push(eventDraft('agentDone', who))
     } else if (row.status === 'failed' || row.status === 'killed') drafts.push(eventDraft('agentFailed', who))
   }
 

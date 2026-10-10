@@ -875,10 +875,10 @@ test('a live agent is pinned in the Feed with its state and elapsed time; when i
   // Ended: not in the Feed as an agent on either surface (its end is an event line, with the time it took).
   const t = await paneTexts($)
   expect(stateOf(t, 'Check the docs')).toBeUndefined()
-  expect(t).toContain('general-purpose finished: Check the docs · 1m 06s')
+  expect(t).toContain('general-purpose finished: Check the docs')
   const desk = await paneTexts($, 'desktop')
   expect(deskLine(desk, 'Check the docs')).toBeUndefined()
-  expect(desk).toContain('general-purpose finished: Check the docs · 1m 06s')
+  expect(desk).toContain('general-purpose finished: Check the docs')
 })
 
 test('a turn that completes is not the end of a waiting agent', async ($, on) => {
@@ -938,7 +938,7 @@ test('after a reload the mod keeps what it knew, shows unknown agents without an
   const t = await paneTexts($)
   // The known one ended (the Feed has its event line, with the time it took); the unseen one has no start, so no time.
   expect(stateOf(t, 'Known one')).toBeUndefined()
-  expect(t).toContain('general-purpose finished: Known one · 30s')
+  expect(t).toContain('general-purpose finished: Known one')
   expect(stateOf(t, 'Unseen one')).toBe('running')
   const d = await paneTexts($, 'desktop')
   expect(deskLine(d, 'Known one')).toBeUndefined()
@@ -2230,7 +2230,7 @@ test('only the pane\'s own events are logged: a ready, a close, an issue, a Code
   await bash(world, $, 'git push', '')
   await new Promise(r => setTimeout(r, 30))
   // Only the pane's own events: the PR opened, the item asked and closed, the builder done.
-  expect(await lines($)).toEqual(['✓ Builder finished: Build the log · 0s', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
+  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '✓ Closed: Merge the log card now? · Yes, merge', '? Asked you: Merge the log card now?', '↗ Opened PR #130'])
   // The commands still ran as before.
   expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-on'])
 })
@@ -2564,7 +2564,7 @@ test('live agents are pinned above the log with a blank row between; ended agent
   expect(stateOf(t, 'Running one')).toBe('running · 2s')
   expect(t).not.toContain('Ended one')
   // Its end is an event line, in the log below (the engine's next check of its list found it ended).
-  expect(t).toContain('Explore finished: Ended one · 1s')
+  expect(t).toContain('Explore finished: Ended one')
 })
 
 // ---- the check at session start -----------------------------------------------------
@@ -2778,7 +2778,7 @@ const drawnRow = async ($: never, surface: 'terminal' | 'desktop', icon: string,
 }
 const classicOf = ($: never) => ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
 
-test('an agent that ends writes one line: finished with the time it took, failed, or stopped; an unknown end writes none', async ($, on) => {
+test('an agent that ends writes one line: finished (with no time), failed, or stopped; an unknown end writes none', async ($, on) => {
   const { world, clock } = boot(on)
   const row = (id: string, type: string, description: string, status = 'running') => ({ id, type, description, status })
   // z1 is listed by the engine before the pane ever sees it spawn: it has no start time.
@@ -2813,10 +2813,10 @@ test('an agent that ends writes one line: finished with the time it took, failed
   await clock.advance(5_000)
   expect(await written($)).toEqual([
     '✓ Explore finished: Never spawned here',
-    '✓ Builder finished: Build it · 1m 23s',
-    '✓ Explore finished: Look · 1m 23s',
-    '✓ Plan finished: Map it · 1m 23s',
-    '✓ general-purpose finished: Other thing · 1m 23s',
+    '✓ Builder finished: Build it',
+    '✓ Explore finished: Look',
+    '✓ Plan finished: Map it',
+    '✓ general-purpose finished: Other thing',
     '✕ Builder failed: Broke',
     '✕ Plan stopped: Halted',
   ])
@@ -2836,7 +2836,7 @@ test('an agent first listed already ended writes no line, and two agents with th
   await eng($).agent.spawn(spawn('a2', 'Check the docs', 'Explore'))
   world.agents = world.agents.map(a => ({ ...a, status: 'completed' }))
   await eng($).turn.complete(turnDone('a1'))
-  expect(await written($)).toEqual(['✓ Explore finished: Check the docs · 0s', '✓ Explore finished: Check the docs · 0s'])
+  expect(await written($)).toEqual(['✓ Explore finished: Check the docs', '✓ Explore finished: Check the docs'])
 })
 
 test('open_decision writes an Asked line marked by the kind of item; two questions with the same text each get one', async ($, on) => {
@@ -3080,7 +3080,7 @@ test('events draw their text dim with their own mark and notes draw as before, o
   await note($, 'A plain note', 'done')
   await note($, 'Another note')
   for (const surface of SURFACES) {
-    const done = await drawnRow($, surface, '✓', 'Builder finished: Build it · 0s')
+    const done = await drawnRow($, surface, '✓', 'Builder finished: Build it')
     expect(done.colors).toContain('success')
     expect(done.dim).toEqual([true])
     const failedRow = await drawnRow($, surface, '✕', 'Builder failed: Break it')
@@ -3386,4 +3386,63 @@ test('AbovePrompt draws no Svg, Box or Button of Mentat\'s in any state: quiet, 
       }
     }
   }
+})
+
+// ---- times that are not inaccurate ------------------------------------------------------------------------------
+
+test('a finished or failed line has no duration', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  world.agents = [
+    { id: 'a1', type: 'builder', description: 'Build it', status: 'running' },
+    { id: 'a2', type: 'builder', description: 'Break it', status: 'running' },
+  ]
+  for (const id of ['a1', 'a2']) await eng($).agent.spawn(spawn(id, id === 'a1' ? 'Build it' : 'Break it', 'builder'))
+  await clock.advance(30 * 60_000)
+  world.agents = [
+    { id: 'a1', type: 'builder', description: 'Build it', status: 'completed' },
+    { id: 'a2', type: 'builder', description: 'Break it', status: 'failed' },
+  ]
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+  for (const surface of SURFACES) expect((await lines($, surface)).sort()).toEqual(['✓ Builder finished: Build it', '✕ Builder failed: Break it'])
+})
+
+test('an agent resumed after it finished counts its time from the resume, not from its first start', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  world.agents = [{ id: 'a1', type: 'builder', description: 'Build it', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Build it', 'builder'))
+  await clock.advance(10 * 60_000)
+  expect(deskLine(await paneTexts($, 'desktop'), 'Build it')).toEqual({ state: 'running', elapsed: '10m 00s' })
+  world.agents = [{ id: 'a1', type: 'builder', description: 'Build it', status: 'completed' }]
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+  expect(deskLine(await paneTexts($, 'desktop'), 'Build it')).toBeUndefined()
+  // It sits idle for an hour, then a message resumes it; the engine's list says so at the agent's next turn.
+  await clock.advance(3_600_000)
+  world.agents = [{ id: 'a1', type: 'builder', description: 'Build it', status: 'running' }]
+  await eng($).turn.complete(turnDone('a1'))
+  await clock.advance(2 * 60_000)
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(surface === 'terminal' ? stateOf(t, 'Build it') : deskLine(t, 'Build it')?.elapsed).toMatch(/^(running · )?2m 0\ds$/)
+  }
+})
+
+test('an agent first seen live after a reload, with no known start, shows no time, and a resume of it starts one', async ($, on) => {
+  const { world, clock } = boot(on)
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
+  await startSession($)
+  await clock.advance(5_000)
+  expect(stateOf(await paneTexts($, 'terminal'), 'Unseen one')).toBe('running')
+  expect(deskLine(await paneTexts($, 'desktop'), 'Unseen one')).toEqual({ state: 'running', elapsed: undefined })
+  // It ends and is resumed: from then on its time is known.
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'completed' }]
+  await clock.advance(1_000)
+  await new Promise(r => setTimeout(r, 30))
+  world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
+  await eng($).turn.complete(turnDone('z9'))
+  await clock.advance(3_000)
+  expect(deskLine(await paneTexts($, 'desktop'), 'Unseen one')?.elapsed).toMatch(/^[34]s$/)
 })
