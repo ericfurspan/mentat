@@ -4,6 +4,8 @@ The Mentat pane shows what needs you and what is going on. It is a Claude Code m
 
 The mod reads nothing from GitHub. It does not look up the session's pull request, CI or Codex review; the one thing it takes from a pull request is the `Opened PR #<number>` Feed line written when `gh pr create` prints the pull request's URL.
 
+The pane hides its own tool calls (`open_decision`, `close_decision`, `note`) from the chat transcript, on both surfaces: their rows and results draw nothing. A call that failed (a refused call included) or was interrupted keeps its row, so a failure is never hidden; every other tool's row is untouched.
+
 ## Where an item that waits on you shows
 
 The agent records items with `open_decision` (nothing forces it to) and closes them with `close_decision`. A call without a `kind` is a question, and a `kind` other than `question`, `action` or `alert` is refused (the `warning` kind is only for the mod). Items are ordered by urgency: an alert, then a question, then the check warning from a `mentat check` that passed with warnings, then an action; the newest first within a kind.

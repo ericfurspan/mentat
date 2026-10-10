@@ -96,6 +96,12 @@ const styleOf = (entry: LogEntry): FeedMark => {
   return EVENT_MARK[entry.kind] ?? MARKS.none
 }
 
+// True for a row of one of this plugin's own tools that did not fail: such a row is hidden. A failed or interrupted
+// call (`isErrored`, `isInterrupted`) always keeps its row.
+const OWN_TOOLS: readonly string[] = [OPEN_TOOL, CLOSE_TOOL, NOTE_TOOL]
+const isHiddenCall = (props: { tool: string; isErrored: boolean; isInterrupted?: boolean }): boolean =>
+  OWN_TOOLS.includes(props.tool) && !props.isErrored && props.isInterrupted !== true
+
 // ---- plain helpers (no $) -----------------------------------------------------------
 
 type LogDraft = { kind: LogKind; text: string } | { kind: EventKind; text: string; source: 'event'; mark?: EventMark }
@@ -1362,6 +1368,23 @@ export const register: Register = (on, _options) => {
     }
 
     return next(e)
+  })
+
+  // The pane's own tool calls (open_decision, close_decision, note) are bookkeeping, not conversation: their rows
+  // and results draw nothing in the transcript. A call that errored (a refusal included) or was interrupted keeps
+  // its row, so a failure is never hidden. Every other tool's row is returned as it is. (A group folds only the
+  // built-in reads and searches, which these tools are not, and a progress row is only the background hint.)
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    if (!isHiddenCall(e.props)) return next(e)
+    const { Box } = $.ui.resolve(e)
+
+    return <Box display="none" />
+  })
+  on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+    if (!isHiddenCall(e.props)) return next(e)
+    const { Box } = $.ui.resolve(e)
+
+    return <Box display="none" />
   })
 
   // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.

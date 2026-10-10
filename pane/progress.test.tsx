@@ -3926,3 +3926,44 @@ test('entries of the kinds asked, answered and dismissed are dropped when a log 
   await note($, 'Next')
   expect(sessionsOf(world).S1!.log.map(l => l.text)).toEqual(['Keep me', 'Opened PR #5', 'Next'])
 })
+
+// ---- the pane's own tool calls are not drawn in the transcript ---------------------------------------------
+
+const TOOL_USE = { plugin: 'engine', component: 'ToolUse' }
+const TOOL_RESULT = { plugin: 'engine', component: 'ToolResult' }
+const rowProps = (tool: string, extra: object = {}) => ({ tool_use_id: 'tu1', tool, input: {}, isRunning: false, isErrored: false, isInterrupted: false, output: 'x', ...extra })
+const drawnOf = async ($: never, spec: object, surface: 'terminal' | 'desktop', props: object) => {
+  const d = await mount($, spec, surface, props)
+  const tree = (await (d as unknown as { drawn: () => Promise<{ type: string; props?: Record<string, unknown> }> }).drawn())
+  await d.unmount()
+
+  return tree
+}
+
+test('the rows and results of the pane\'s own three tools draw nothing, on both surfaces, when they ran (or are running)', async ($, on) => {
+  boot(on)
+  for (const surface of SURFACES) {
+    for (const tool of [OPEN, CLOSE, NOTE]) {
+      for (const extra of [{}, { isRunning: true, output: undefined }]) {
+        expect((await drawnOf($, TOOL_USE, surface, rowProps(tool, extra))).props).toMatchObject({ display: 'none' })
+      }
+      expect((await drawnOf($, TOOL_RESULT, surface, { tool_use_id: 'tu1', tool, output: 'x', isErrored: false })).props).toMatchObject({ display: 'none' })
+    }
+  }
+})
+
+test('a failed or interrupted call of the pane\'s own tools keeps its row, and another tool\'s row is left as it is', async ($, on) => {
+  boot(on)
+  for (const surface of SURFACES) {
+    for (const tool of [OPEN, CLOSE, NOTE]) {
+      for (const extra of [{ isErrored: true }, { isInterrupted: true }]) {
+        expect((await drawnOf($, TOOL_USE, surface, rowProps(tool, extra))).props?.key).toBe('engine-own')
+      }
+      expect((await drawnOf($, TOOL_RESULT, surface, { tool_use_id: 'tu1', tool, output: 'No open decision', isErrored: true })).props?.key).toBe('engine-own')
+    }
+    for (const tool of ['Bash', 'mcp__other__open_decision', 'mcp__mentat__other']) {
+      expect((await drawnOf($, TOOL_USE, surface, rowProps(tool))).props?.key).toBe('engine-own')
+      expect((await drawnOf($, TOOL_RESULT, surface, { tool_use_id: 'tu1', tool, output: 'x', isErrored: false })).props?.key).toBe('engine-own')
+    }
+  }
+})
