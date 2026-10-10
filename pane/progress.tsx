@@ -1307,9 +1307,11 @@ export const register: Register = (on, _options) => {
     // One native row, so it follows the divider with no redraw from the mod: the mark, the text (the only part
     // that shrinks, cut with `…`; minWidth 0 because a flex item never shrinks below its content otherwise),
     // the `+N more` pill right after it, a spacer that takes the rest, then the controls.
+    // The outer column holds `beneath`, an engine node, and the engine refuses an engine node under a Box
+    // with minWidth (it then draws its own band): so no minWidth on this Box or any other above `beneath`.
     return (
-      <Box flexDirection="column" minWidth={0}>
-        <Box flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+      <Box key="band" flexDirection="column">
+        <Box key="band-row" flexDirection="row" alignItems="center" gap={1} minWidth={0}>
           {mark !== undefined && (
             <Box key="mark" width={MARK_CELLS} flexShrink={0}>
               <Svg source={markSvg(mark.char, mark.hue)} alt={mark.alt} width={MARK_SIZE} height={MARK_SIZE} />

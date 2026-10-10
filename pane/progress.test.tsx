@@ -3538,7 +3538,7 @@ test('the desktop band is one row of a mark, the text, the pill right after it, 
   expect(texts[1]).toMatchObject({ text: '+1 more', props: { color: 'warning' } })
   expect(boxes.find(b => b.key === 'more')?.props?.backgroundColor).toBeDefined()
   // Every Box that can shrink has minWidth 0 (a flex item otherwise never shrinks below its content).
-  for (const b of boxes.filter(b => b.props?.flexShrink !== 0 && b.props?.width === undefined && b.key !== 'engine-own')) {
+  for (const b of boxes.filter(b => b.props?.flexShrink !== 0 && b.props?.width === undefined && b.key !== 'engine-own' && b.key !== 'band')) {
     expect({ key: b.key, minWidth: b.props?.minWidth }).toEqual({ key: b.key, minWidth: 0 })
   }
   await d.unmount()
@@ -3595,4 +3595,20 @@ test('the band marks a note in its color and the rate limit, and the quiet line 
   expect((await bandSvgs(d)).map(v => v.alt)).toEqual(['Rate limit: 5-hour limit 95% · resets in 1h 29m'])
   expect((await d.findAll({ type: 'Text' }))[0]!.props).toMatchObject({ color: 'warning', wrap: 'truncate-end' })
   await d.unmount()
+})
+
+test('the desktop band keeps minWidth off every Box above what the engine draws beneath it, which the engine refuses', async ($, on) => {
+  boot(on)
+  await open('question', 'Ship it?', { accept: 'Yes' })($)
+  const d = await mount($, BAND, 'desktop')
+  const boxes = await d.findAll({ type: 'Box' })
+  await d.unmount()
+  // The engine's own node (the mock draws a Box keyed engine-own) is in the drawing, so the band was not refused.
+  expect(boxes.some(b => b.key === 'engine-own')).toBe(true)
+  // The one Box that holds it is the band's outer column: it has no minWidth, and no other Box is above it.
+  const outer = boxes.find(b => b.key === 'band')!
+  expect(outer.props?.flexDirection).toBe('column')
+  expect(outer.props?.minWidth).toBeUndefined()
+  // The row inside it, which holds the shrinking text, keeps minWidth 0.
+  expect(boxes.find(b => b.key === 'band-row')?.props?.minWidth).toBe(0)
 })
