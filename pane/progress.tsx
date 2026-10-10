@@ -1,8 +1,6 @@
-// Mentat's band and pane. On the desktop the band is always there, one line: what waits on the
-// maintainer, else a warning that a rate limit runs low, else the newest note, else a quiet line. On the
-// terminal there is no band: the footer label counts what waits and opens the pane. The pane, on both, has
-// two sections, Waiting on you and the Feed (the agents that have not ended, then the log); the desktop
-// draws them as two cards of native rows, the terminal as framed text.
+// Mentat's pane. There is no band: on both surfaces the footer label counts what waits and opens the pane.
+// The pane has two sections, Waiting on you and the Feed (the agents that have not ended, then the log); the
+// desktop draws them as two cards of native rows, the terminal as bordered text.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -20,7 +18,7 @@ const TITLE = 'Mentat'
 const OPEN_TOOL = `mcp__${PLUGIN}__open_decision`
 const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
 const NOTE_TOOL = `mcp__${PLUGIN}__note`
-// A rate limit this far gone raises the band.
+// A rate limit this far gone is warned at the top of the pane.
 const WARN_PERCENT = 80
 // The terminal pane's width classes, in body columns: sections have a border from FRAME_COLUMNS, headed by a
 // rule from RULE_COLUMNS, and below that also drop the times, the recommendation and the WARN lines.
@@ -49,20 +47,19 @@ const goneAtom = atom({ plugin: 'mentat', key: 'decisionsGone' } as const, [])
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The notes Claude Code adds with the `note` tool, in the pane's Log and as the desktop band's line: each kind has an
-// icon and a color. The color is a theme color, so the line reads on the terminal and the desktop; the hue is
-// the same color for the desktop band's drawing.
-const LOG_STYLE: Record<LogKind, { icon: string; color: string; hue: string }> = {
-  decision: { icon: '◆', color: 'suggestion', hue: '#3D7FE6' },
-  plan: { icon: '▸', color: 'text', hue: '#8f8f8a' },
-  surprise: { icon: '!', color: 'warning', hue: '#C98A0E' },
-  waiting: { icon: '◌', color: 'subtle', hue: '#8f8f8a' },
-  done: { icon: '✓', color: 'success', hue: '#2F9461' },
+// The notes Claude Code adds with the `note` tool, in the pane's Feed: each kind has an icon and a color. The
+// color is a theme color, so the line reads on the terminal and the desktop.
+const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
+  decision: { icon: '◆', color: 'suggestion' },
+  plan: { icon: '▸', color: 'text' },
+  surprise: { icon: '!', color: 'warning' },
+  waiting: { icon: '◌', color: 'subtle' },
+  done: { icon: '✓', color: 'success' },
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
 // The event lines the pane writes to the Log itself, drawn dim: each has a mark and a theme color. An
-// `asked` line takes the mark of the item's kind (the band's marks) and a `check` line that of the result.
+// `asked` line takes the mark of the item's kind (the pane's marks) and a `check` line that of the result.
 const EVENT_STYLE: Record<Exclude<EventKind, 'asked' | 'check'> | EventMark, { icon: string; color: string }> = {
   agentDone: { icon: '✓', color: 'success' },
   agentFailed: { icon: '✕', color: 'error' },
@@ -143,7 +140,7 @@ const oneLine = (text: string, max: number = LOG_WIDTH): string => {
 type Meter = { kind: string; label: string; percent: number; reset: string }
 type Usage = Awaited<ReturnType<EngineInterface['session']['usage']>>
 
-// The rate limits as the band reads them, each with its percent and the reset: a countdown for the
+// The rate limits as the pane reads them, each with its percent and the reset: a countdown for the
 // 5-hour limit, the weekday and local time for the weekly one.
 const limitsOf = (usage: Usage | undefined, now: number, zone?: string): Meter[] =>
   (usage?.rateLimits ?? []).map(r => ({
@@ -153,8 +150,8 @@ const limitsOf = (usage: Usage | undefined, now: number, zone?: string): Meter[]
     reset: r.kind === 'seven_day' ? resetAt(r.resetsAt, now, zone) : resetIn(r.resetsAt, now),
   }))
 
-// The band's budget text, for the most used of the 5-hour and weekly limits when it
-// is at WARN_PERCENT or more. The context window never raises the band.
+// The pane's budget text, for the most used of the 5-hour and weekly limits when it
+// is at WARN_PERCENT or more. The context window never raises it.
 const budgetAlert = (limits: Meter[]): string | undefined => {
   const over = limits
     .filter(m => (m.kind === 'five_hour' || m.kind === 'seven_day') && m.percent >= WARN_PERCENT)
@@ -457,7 +454,7 @@ async function startCheck($: EngineInterface, cwd?: string): Promise<void> {
 
 // ---- the module -----------------------------------------------------------------------------
 
-// ---- Drawn desktop pieces: the small round marks of the band and the pane; text, rows and buttons are native. ----
+// ---- Drawn desktop pieces: the small round marks of the pane; text, rows and buttons are native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
 const HUE = { amber: '#C98A0E', blue: '#3D7FE6', red: '#D0453F' }
 
@@ -475,26 +472,19 @@ const roleOf = (type: string): Role => {
 }
 // The terminal's one-character mark for a role, where the desktop draws its glyph.
 const ROLE_MARK: Record<Role, string> = { builder: '◆', explore: '◎', plan: '◇', other: '·' }
-// What the band's left side shows, in this order: the item that waits on the maintainer (the most
-// urgent: alert, question, check warning, action; the newest within a kind), a budget warning,
-// the newest Log note, and last a quiet `Mentat` line.
-type BandKind = DecisionKind | 'budget'
-type BandLeft = { kind: BandKind; text: string } | { kind: 'note'; text: string; icon: string; hue: string } | { kind: 'quiet'; text: string }
-const MARK: Record<BandKind, { char: string; hue: string }> = {
+// The mark of each kind of open item on the desktop: its glyph and hue.
+const MARK: Record<DecisionKind, { char: string; hue: string }> = {
   alert: { char: '!', hue: HUE.red },
   question: { char: '?', hue: HUE.amber },
   warning: { char: '!', hue: HUE.amber },
   action: { char: '→', hue: HUE.blue },
-  budget: { char: '!', hue: HUE.amber },
 }
 // The description of an item in the alt text of its mark.
 const ITEM_ALT: Record<DecisionKind, string> = { question: 'Question', action: 'Waiting on you', alert: 'Alert', warning: 'Check warnings' }
 // The items that wait on the maintainer, most urgent first: alert, then question, check warning, action; the
-// newest of a kind first. The desktop band shows the first and counts the rest in `+N more`; the terminal
-// pane lists them all.
+// newest of a kind first. Both panes list them all.
 const urgentFirst = (list: Decision[]): Decision[] =>
   [...list].reverse().sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
-const mostUrgent = (list: Decision[]): Decision | undefined => urgentFirst(list)[0]
 
 // The short line that takes the place of a question's answer button once the answer is sent; it says
 // the answer is queued until the prompt has entered the session.
@@ -821,8 +811,6 @@ const TEXT_INDENT = MARK_CELLS + 1
 // A small round tinted mark with a glyph, a fixed 20px Svg; it is the only picture in the pane, and it does
 // not take part in the reflow when the divider moves.
 const MARK_SIZE = 20
-// The tint behind the band's `+N more` pill: the warning amber at about 18%.
-const MORE_TINT = `${HUE.amber}2e`
 const markSvg = (char: string, hue: string): string =>
   svgOf(MARK_SIZE, MARK_SIZE, `<circle cx="10" cy="10" r="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="10" y="14.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(char)}</text>`)
 
@@ -1209,9 +1197,7 @@ export const register: Register = (on, _options) => {
   // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.
   // `● Mentat`: dim until a `mentat check` has run, then green, amber with the warning count, or red. While
   // items wait it reads `● Mentat · N waiting` instead, N counting every open item, only the dot in the
-  // check's color. On the terminal the label is a
-  // Button that opens the pane (there is no band there); on the desktop it is the same text, and the
-  // band is there.
+  // check's color. On both surfaces the label is a Button that opens the pane (there is no band).
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     const result = await read($, checkResult)
@@ -1233,112 +1219,16 @@ export const register: Register = (on, _options) => {
       waiting === 0
         ? [mark(text)]
         : [mark('●'), <Text key="name">{' Mentat'}</Text>, <Text key="sep" dimColor>{' · '}</Text>, <Text key="count" color="warning">{`${waiting} waiting`}</Text>]
-    const label = e.surface === 'terminal' ? (
+    const label = (
       <Button key="mentat-open" plain label={waiting === 0 ? text : `● Mentat · ${waiting} waiting`} onPress={() => $.ui.open({ id: PANE, title: TITLE })}>
         {parts}
       </Button>
-    ) : (
-      <Box key="mentat-label" flexDirection="row">
-        {parts}
-      </Box>
     )
 
     return (
       <Box flexDirection="row" gap={1}>
         {label}
         {modes.length > 0 && <Text dimColor>{modes.join(' & ')}</Text>}
-      </Box>
-    )
-  })
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    // The terminal has no band of Mentat's: the footer label opens the pane. What is beneath stays.
-    if (e.props.hasSurvey || e.surface !== 'desktop') {
-      return next(e)
-    }
-    // The desktop band is always there: what waits on the maintainer, else a budget warning, else the newest
-    // Log note, else a quiet line. Nothing in it comes from GitHub.
-    const open = await read($, items)
-    const now = await $.clock.now()
-    const urgent = mostUrgent(open)
-    // Budget raises it only when no item waits. It is read when the band is drawn, and the minute timer
-    // draws the band again, so a change of usage alone shows within a minute.
-    const budget = urgent === undefined ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
-    const logList = urgent === undefined && budget === undefined ? await read($, logAtom) : []
-    // Only a note is the band's line, never an event line.
-    const note = [...logList].reverse().find(isNote)
-    const left: BandLeft =
-      urgent !== undefined
-        ? { kind: kindOf(urgent), text: urgent.question }
-        : budget !== undefined
-          ? { kind: 'budget', text: budget }
-          : note !== undefined
-            ? { kind: 'note', text: note.text, icon: LOG_STYLE[note.kind].icon, hue: LOG_STYLE[note.kind].hue }
-            : { kind: 'quiet', text: TITLE }
-    const more = open.length > 1 ? `+${open.length - 1} more` : ''
-    // The urgent item's controls: a question with a recommended answer has a one-press button (a line
-    // in its place once sent), every item has Dismiss, and an action or alert may carry a link.
-    const sent = urgent === undefined ? undefined : (await read($, sentAtom)).find(x => x.id === urgent.id)
-    const answer = urgent !== undefined && kindOf(urgent) === 'question' && sent === undefined ? urgent.accept : undefined
-    const link = urgent !== undefined && kindOf(urgent) !== 'question' ? urgent.link : undefined
-    const { Box, Button, Link, Text } = $.ui.resolve(e)
-    // One row, never wrapped: the answer button (or the sent line), Dismiss, the link, then Details. It
-    // is one Box with every child its own, not a fragment: a fragment's children are not laid out as one row.
-    const controls = () => (
-      <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
-        {answer !== undefined && urgent !== undefined && (
-          <Button key={`accept-${urgent.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, urgent, answer)} />
-        )}
-        {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
-        {urgent !== undefined && <Button key={`dismiss-${urgent.id}`} label="Dismiss" onPress={() => dismissItem($, urgent.id)} />}
-        {link !== undefined && (
-          <Text>
-            <Link href={link} label={shortLink(link)} />
-          </Text>
-        )}
-        <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
-      </Box>
-    )
-    // The band is shared: what the plugins beneath draw stays, under this row.
-    const beneath = await next(e)
-    const { Svg } = $.ui.resolve(e)
-    // The mark: the item's kind, the note's icon in its color, the rate limit's; the quiet line has none.
-    const mark =
-      left.kind === 'quiet'
-        ? undefined
-        : left.kind === 'note'
-          ? { char: left.icon, hue: left.hue, alt: 'Note' }
-          : { ...MARK[left.kind], alt: left.kind === 'budget' ? 'Rate limit' : ITEM_ALT[left.kind] }
-    // An item's text is bold, the budget line is in the warning color, a note is plain and the quiet line muted.
-    const textProps = left.kind === 'quiet' ? { dimColor: true } : left.kind === 'budget' ? { color: 'warning' } : left.kind === 'note' ? {} : { bold: true }
-
-    // One native row, so it follows the divider with no redraw from the mod: the mark, the text (the only part
-    // that shrinks, cut with `…`; minWidth 0 because a flex item never shrinks below its content otherwise),
-    // the `+N more` pill right after it, a spacer that takes the rest, then the controls.
-    // The outer column holds `beneath`, an engine node, and the engine refuses an engine node under a Box
-    // with minWidth (it then draws its own band): so no minWidth on this Box or any other above `beneath`.
-    return (
-      <Box key="band" flexDirection="column">
-        <Box key="band-row" flexDirection="row" alignItems="center" gap={1} minWidth={0}>
-          {mark !== undefined && (
-            <Box key="mark" width={MARK_CELLS} flexShrink={0}>
-              <Svg source={markSvg(mark.char, mark.hue)} alt={mark.alt} width={MARK_SIZE} height={MARK_SIZE} />
-            </Box>
-          )}
-          <Box key="text" flexShrink={1} minWidth={0} overflow="hidden">
-            <Text wrap="truncate-end" {...textProps}>
-              {left.text}
-            </Text>
-          </Box>
-          {more !== '' && (
-            <Box key="more" flexShrink={0} paddingX={1} backgroundColor={MORE_TINT}>
-              <Text color="warning">{more}</Text>
-            </Box>
-          )}
-          <Box key="spacer" flexGrow={1} minWidth={0} />
-          {controls()}
-        </Box>
-        {beneath}
       </Box>
     )
   })
