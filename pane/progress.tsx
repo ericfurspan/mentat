@@ -55,37 +55,53 @@ const ownerAtom = atom({ plugin: 'mentat', key: 'sessionOwner' } as const, null)
 // warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
-// The notes Claude Code adds with the `note` tool, in the pane's Feed: each kind has an icon and a color. The
-// color is a theme color, so the line reads on the terminal and the desktop.
-const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
-  decision: { icon: '◆', color: 'suggestion' },
-  plan: { icon: '▸', color: 'text' },
-  surprise: { icon: '!', color: 'warning' },
-  waiting: { icon: '◌', color: 'subtle' },
-  done: { icon: '✓', color: 'success' },
+// The Feed marks only three things, each with an icon and a theme color (so the line reads on the terminal and
+// the desktop): a success, a failure, and something that wants attention. Every other entry has no mark, and
+// its mark column is a space so the text still lines up.
+const MARKS = {
+  success: { icon: '✓', color: 'success' },
+  failure: { icon: '✕', color: 'error' },
+  attention: { icon: '!', color: 'warning' },
+  none: { icon: ' ', color: undefined },
+} as const
+type FeedMark = { icon: string; color: string | undefined }
+// The notes Claude Code adds with the `note` tool: a done note is a success and a surprise wants attention; a
+// decision, a plan and a wait are plain.
+const NOTE_MARK: Record<LogKind, FeedMark> = {
+  decision: MARKS.none,
+  plan: MARKS.none,
+  surprise: MARKS.attention,
+  waiting: MARKS.none,
+  done: MARKS.success,
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
-// The event lines the pane writes to the Log itself, drawn dim: each has a mark and a theme color. An
-// `asked` line takes the mark of the item's kind (the pane's marks) and a `check` line that of the result.
-const EVENT_STYLE: Record<Exclude<EventKind, 'asked' | 'check'> | EventMark, { icon: string; color: string }> = {
-  agentDone: { icon: '✓', color: 'success' },
-  agentFailed: { icon: '✕', color: 'error' },
-  answered: { icon: '✓', color: 'success' },
-  dismissed: { icon: '·', color: 'subtle' },
-  prOpened: { icon: '↗', color: 'suggestion' },
-  question: { icon: '?', color: 'warning' },
-  action: { icon: '→', color: 'suggestion' },
-  alert: { icon: '!', color: 'error' },
-  pass: { icon: '✓', color: 'success' },
-  warn: { icon: '!', color: 'warning' },
-  fail: { icon: '✕', color: 'error' },
+// The event lines the pane writes to the Log itself, drawn dim. A `check` line takes the mark of the result, and an
+// `asked` line from a log kept by an earlier version is marked only when it was an alert.
+const EVENT_MARK: Record<Exclude<EventKind, 'asked' | 'check'>, FeedMark> = {
+  agentDone: MARKS.success,
+  agentFailed: MARKS.failure,
+  answered: MARKS.success,
+  dismissed: MARKS.none,
+  prOpened: MARKS.none,
+}
+const RESULT_MARK: Record<EventMark, FeedMark> = {
+  pass: MARKS.success,
+  warn: MARKS.attention,
+  fail: MARKS.failure,
+  alert: MARKS.attention,
+  question: MARKS.none,
+  action: MARKS.none,
 }
 // An entry stored without a source is a note.
 export const isNote = (entry: LogEntry): entry is NoteEntry => entry.source !== 'event'
 // The icon and color a Log row is drawn with.
-const styleOf = (entry: LogEntry): { icon: string; color: string } =>
-  isNote(entry) ? LOG_STYLE[entry.kind] : EVENT_STYLE[(entry.mark ?? entry.kind) as keyof typeof EVENT_STYLE] ?? EVENT_STYLE.dismissed
+const styleOf = (entry: LogEntry): FeedMark => {
+  if (isNote(entry)) return NOTE_MARK[entry.kind] ?? MARKS.none
+  if (entry.kind === 'check' || entry.kind === 'asked') return (entry.mark === undefined ? undefined : RESULT_MARK[entry.mark]) ?? MARKS.none
+
+  return EVENT_MARK[entry.kind] ?? MARKS.none
+}
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
@@ -671,7 +687,8 @@ type PaneData = {
   logList: LogEntry[]
   isLogAll: boolean
   // The Feed's log lines, newest first (`n` is the entry's place in the stored log), cut to FEED_SHOWN unless all.
-  entries: { entry: LogEntry; n: number }[]
+  // `time` is the clock time of the entry, shown only on the first row of a run of the same time (`isTimed`).
+  entries: { entry: LogEntry; n: number; time: string; isTimed: boolean }[]
   // The toggle's label, when the log is longer than FEED_SHOWN.
   toggle: string | undefined
   budget: string | undefined
@@ -694,7 +711,11 @@ async function paneData($: EngineInterface): Promise<PaneData> {
   const newest = logList.map((entry, n) => ({ entry, n })).reverse()
   const toggle = logList.length > FEED_SHOWN ? (isLogAll ? 'Show fewer' : `Show all ${logList.length}`) : undefined
 
-  return { now, zone, open, sentList, result, live, logList, isLogAll, entries: isLogAll ? newest : newest.slice(0, FEED_SHOWN), toggle, budget }
+  const shown = (isLogAll ? newest : newest.slice(0, FEED_SHOWN)).map(x => ({ ...x, time: clockAt(x.entry.at, zone) }))
+  // The time is written once for a run of consecutive rows with the same displayed time; the rows after it leave it blank.
+  const entries = shown.map((x, i) => ({ ...x, isTimed: i === 0 || shown[i - 1]!.time !== x.time }))
+
+  return { now, zone, open, sentList, result, live, logList, isLogAll, entries, toggle, budget }
 }
 const toggleLogAll = ($: EngineInterface) => inTurn(() => update($, logAll, v => !v))
 // True when the recommendation only repeats the answer button's label (trimmed, case-insensitive).
@@ -779,7 +800,7 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   // Under it a row holds the detail (the recommendation and the time), wrapped at the left, and the buttons at
   // the right; then, for the check's warning item, its WARN lines. Under 40 columns the time and the
   // recommendation are left out and the row holds only the buttons, at the right.
-  const waiting = open.flatMap(d => {
+  const waiting = open.map((d, index) => {
     const { kind, sent, answer, link, detail: recommended, warns } = itemView(d, data)
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
@@ -824,7 +845,12 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     ]
     if (!isShort) warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
 
-    return lines
+    // One blank row between items, not after the last.
+    return (
+      <Box key={`block-${d.id}`} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
+        {lines}
+      </Box>
+    )
   })
 
   // The Feed: the agents that have not ended, pinned, then the log newest first.
@@ -847,7 +873,7 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     ])
   })
   if (live.length > 0 && logList.length > 0) feedRows.push(row('feed-gap', [<Text key="gap"> </Text>]))
-  for (const { entry, n } of data.entries) {
+  for (const { entry, n, time, isTimed } of data.entries) {
     const { icon, color } = styleOf(entry)
     feedRows.push(
       row(`log-${n}`, [
@@ -855,11 +881,11 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
           ? []
           : [
               <Box key="time" width={8} flexShrink={0} justifyContent="flex-end">
-                <Text dimColor>{clockAt(entry.at, zone)}</Text>
+                <Text dimColor>{isTimed ? time : ' '}</Text>
               </Box>,
             ]),
         <Box key="icon" flexShrink={0}>
-          <Text color={color}>{icon}</Text>
+          <Text {...(color === undefined ? {} : { color })}>{icon}</Text>
         </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
           <Text wrap="wrap" {...(isNote(entry) ? {} : { dimColor: true })}>
@@ -999,14 +1025,14 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
       </Box>
     )
   })
-  const logRows = data.entries.map(({ entry, n }) => {
+  const logRows = data.entries.map(({ entry, n, time, isTimed }) => {
     const { icon, color } = styleOf(entry)
 
     return (
       <Box key={`log-${n}`} flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
-        {timeColumn(<Text dimColor>{clockAt(entry.at, zone)}</Text>)}
+        {timeColumn(<Text dimColor>{isTimed ? time : ' '}</Text>)}
         <Box flexShrink={0}>
-          <Text color={color}>{icon}</Text>
+          <Text {...(color === undefined ? {} : { color })}>{icon}</Text>
         </Box>
         {cut(entry.text, isNote(entry) ? {} : { dimColor: true })}
       </Box>

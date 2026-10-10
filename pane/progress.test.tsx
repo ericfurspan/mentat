@@ -1650,7 +1650,7 @@ test('the Feed of both panes shows the notes newest first, each with its kind\'s
   await note($, 'The tests read the old log', 'surprise')
   await note($, 'Merged', 'done')
   for (const surface of SURFACES) {
-    expect(await lines($, surface)).toEqual(['✓ Merged', '! The tests read the old log', '◆ Keep the notes for #150'])
+    expect(await lines($, surface)).toEqual(['✓ Merged', '! The tests read the old log', 'Keep the notes for #150'])
   }
   const term = await mount($, TERM, 'terminal')
   expect((await term.findAll({ type: 'Text', text: '!' }))[0]!.props?.color).toBe('warning')
@@ -2132,6 +2132,20 @@ test('the check alert shows only its final line, however many problems there are
 // ---- the Log (the Feed) ---------------------------------------------------------------------------------
 
 const GH = 'https://github.com/o/r'
+// The Feed's log rows from the Texts of a drawing, newest first, as time, mark and text. Each row has all three
+// Texts: the time is blank (a space) after the first row of a run of the same time and the mark is a space for
+// an entry with none; both read back as ''. The one space between the pinned agents and the log is skipped.
+const feedRowsOf = (t: string[]) => {
+  const rows: { time: string; icon: string; text: string }[] = []
+  for (let i = t.indexOf('FEED') + 1; i > 0 && i + 2 < t.length; i++) {
+    const isTime = /^\d+:\d\d [AP]M$/.test(t[i]!)
+    if (!isTime && !(t[i] === ' ' && !/^\d+:\d\d [AP]M$/.test(t[i + 1]!))) continue
+    rows.push({ time: t[i]!.trim(), icon: t[i + 1]!.trim(), text: t[i + 2]! })
+    i += 2
+  }
+
+  return rows
+}
 // The log rows the pane draws (newest first), as time, icon and text, and the label of the toggle button, if any.
 const logOf = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => {
   const pane = await mount($, PANE, surface, { bodyColumns: 60 })
@@ -2139,29 +2153,13 @@ const logOf = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => 
   const toggle = (await pane.findAll({ type: 'Button' })).filter(b => b.key === 'log-toggle').map(b => String(b.props?.label))
   const hasSvg = (await pane.findAll({ type: 'Svg' })).length > 0
   await pane.unmount()
-  const rows: { time: string; icon: string; text: string }[] = []
-  // The Feed on either surface: the pinned agents, then a time, an icon and the text per entry.
-  for (let i = t.indexOf('FEED') + 1; i > 0 && i + 2 < t.length; i++) {
-    if (!/^\d+:\d\d [AP]M$/.test(t[i]!)) continue
-    rows.push({ time: t[i]!, icon: t[i + 1]!, text: t[i + 2]! })
-    i += 2
-  }
 
-  return { rows, toggle, hasSvg }
+  return { rows: feedRowsOf(t), toggle, hasSvg }
 }
 // The Feed rows of a terminal pane that is already mounted (only one can be at a time), newest first, as icon and text.
-const feedLines = async (d: Drawing) => {
-  const t = await textsOf(d)
-  const out: string[] = []
-  for (let i = t.indexOf('FEED') + 1; i > 0 && i + 2 < t.length; i++) {
-    if (!/^\d+:\d\d [AP]M$/.test(t[i]!)) continue
-    out.push(`${t[i + 1]} ${t[i + 2]}`)
-    i += 2
-  }
-
-  return out
-}
-const lines = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => (await logOf($, surface)).rows.map(r => `${r.icon} ${r.text}`)
+const lineOf = (r: { icon: string; text: string }) => (r.icon === '' ? r.text : `${r.icon} ${r.text}`)
+const feedLines = async (d: Drawing) => feedRowsOf(await textsOf(d)).map(lineOf)
+const lines = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => (await logOf($, surface)).rows.map(lineOf)
 // The agent adds a note.
 const note = ($: never, text: string, kind?: string) => eng($).tool.call({ tool: NOTE, text, ...(kind === undefined ? {} : { kind }) })
 
@@ -2186,26 +2184,26 @@ test('a note adds one entry with its time, kind icon and line; the kind defaults
   const ack = await note($, 'Only the Log changes in this pull request')
   expect(ack).toEqual({ result: 'Noted.' })
   // 12:00 UTC is 8:00 AM in New York.
-  expect((await logOf($)).rows).toEqual([{ time: '8:00 AM', icon: '▸', text: 'Only the Log changes in this pull request' }])
+  expect((await logOf($)).rows).toEqual([{ time: '8:00 AM', icon: '', text: 'Only the Log changes in this pull request' }])
   await note($, 'Keep the band for #150', 'decision')
   await note($, 'The mod tests also read the old log', 'surprise')
   await note($, 'Waiting on your merge of #148', 'waiting')
   await note($, 'The Log card is built', 'done')
   await note($, 'Next: the rules', 'plan')
-  expect(await lines($, 'desktop')).toEqual(['▸ Next: the rules', '✓ The Log card is built', '◌ Waiting on your merge of #148', '! The mod tests also read the old log', '◆ Keep the band for #150', '▸ Only the Log changes in this pull request'])
+  expect(await lines($, 'desktop')).toEqual(['Next: the rules', '✓ The Log card is built', 'Waiting on your merge of #148', '! The mod tests also read the old log', 'Keep the band for #150', 'Only the Log changes in this pull request'])
 })
 
 test('each kind has its own icon and color on both surfaces', async ($, on) => {
   boot(on)
   await startSession($)
-  const kinds = [['decision', '◆', 'suggestion'], ['plan', '▸', 'text'], ['surprise', '!', 'warning'], ['waiting', '◌', 'subtle'], ['done', '✓', 'success']] as const
+  // Only a done note (success) and a surprise (attention) are marked; the others have a blank mark.
+  const kinds = [['decision', ''], ['plan', ''], ['surprise', '!'], ['waiting', ''], ['done', '✓']] as const
   for (const [kind] of kinds) await note($, `A ${kind} note`, kind)
   for (const surface of SURFACES) {
-    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    for (const [, icon, color] of kinds) {
-      expect((await pane.findAll({ type: 'Text', text: icon })).map(t => t.props?.color)).toContain(color)
-    }
-    await pane.unmount()
+    const rows = (await logOf($, surface)).rows
+    for (const [kind, icon] of kinds) expect(rows.find(r => r.text === `A ${kind} note`)?.icon).toBe(icon)
+    expect((await drawnRow($, surface, '✓', 'A done note')).colors).toContain('success')
+    expect((await drawnRow($, surface, '!', 'A surprise note')).colors).toContain('warning')
   }
 })
 
@@ -2224,7 +2222,7 @@ test('a note is one line, kept in full and wrapped; only past the 1000 character
   }
   // Runs of spaces and line breaks make one line.
   await note($, 'two   words\nand a third line')
-  expect((await lines($))[0]).toBe('▸ two words and a third line')
+  expect((await lines($))[0]).toBe('two words and a third line')
   // Exactly the limit is kept whole; past it the line is cut with an ellipsis.
   await note($, 'x'.repeat(1000))
   expect([...(await logOf($)).rows[0]!.text]).toHaveLength(1000)
@@ -2251,10 +2249,10 @@ test('the same note twice in a row is added once; the same line after another no
   await startSession($)
   await note($, 'Waiting on you', 'waiting')
   await note($, 'Waiting on you', 'waiting')
-  expect(await lines($)).toEqual(['◌ Waiting on you'])
+  expect(await lines($)).toEqual(['Waiting on you'])
   await note($, 'Waiting on you', 'plan')
   await note($, 'Waiting on you', 'waiting')
-  expect(await lines($)).toEqual(['◌ Waiting on you', '▸ Waiting on you', '◌ Waiting on you'])
+  expect(await lines($)).toEqual(['Waiting on you', 'Waiting on you', 'Waiting on you'])
 })
 
 test('only the pane\'s own events are logged: a ready, a close, an issue, a Codex command and a merge add nothing', async ($, on) => {
@@ -2276,7 +2274,7 @@ test('only the pane\'s own events are logged: a ready, a close, an issue, a Code
   await bash(world, $, 'git push', '')
   await new Promise(r => setTimeout(r, 30))
   // Only the pane's own events: the PR opened, the item closed, the builder done.
-  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '✓ Closed: Merge the log card now? · Yes, merge', '↗ Opened PR #130'])
+  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '✓ Closed: Merge the log card now? · Yes, merge', 'Opened PR #130'])
   // The commands still ran as before.
   expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-on'])
 })
@@ -2403,14 +2401,14 @@ test('a new conversation empties the log; a reload and a compaction keep it', as
   await startSession($)
   await classic.SessionStart({ source: 'startup', session_id: 'kept' })
   await classic.SessionStart({ source: 'compact' })
-  expect(await lines($)).toEqual(['▸ Before'])
+  expect(await lines($)).toEqual(['Before'])
   for (const source of ['clear', 'resume', 'fork']) {
     await note($, `Second ${source}`)
     expect(await lines($)).toHaveLength(2)
     await classic.SessionStart({ source })
     expect(await lines($)).toEqual([])
     await note($, `After ${source}`)
-    expect(await lines($)).toEqual([`▸ After ${source}`])
+    expect(await lines($)).toEqual([`After ${source}`])
   }
 })
 
@@ -2428,7 +2426,7 @@ test('the pane never calls $.command.run, whatever its buttons do', async ($, on
   await eng($).tool.call({ tool: OPEN, question: 'Ship it?', accept: 'Yes' })
   await eng($).command.run({ command: 'mentat', args: 'pr 5' })
   await eng($).command.run({ command: 'mentat:come-again', args: '' })
-  expect((await lines($)).slice(-1)).toEqual(['▸ A note'])
+  expect((await lines($)).slice(-1)).toEqual(['A note'])
   for (const surface of SURFACES) {
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     for (const b of await pane.findAll({ type: 'Button' })) await pane.press({ key: String(b.key) })
@@ -3048,10 +3046,10 @@ test('dismissing a question while its answer waits writes the dismissal now and 
   const press = band.press({ key: 'accept-d1' })
   await new Promise(r => setTimeout(r, 20))
   await band.press({ key: 'dismiss-d1' })
-  expect((await feedLines(band)).reverse()).toEqual(['· You dismissed: Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual(['You dismissed: Mock it?'])
   turn.release()
   await press
-  expect((await feedLines(band)).reverse()).toEqual(['· You dismissed: Mock it?', '✓ You answered "Yes": Mock it?'])
+  expect((await feedLines(band)).reverse()).toEqual(['You dismissed: Mock it?', '✓ You answered "Yes": Mock it?'])
   await band.unmount()
 })
 
@@ -3062,15 +3060,16 @@ test('Dismiss writes a dim You dismissed line, once; the dismissal of a check it
   await band.press({ key: 'dismiss-d1' })
   await band.press({ key: 'dismiss-d1' }).catch(() => undefined)
   await band.unmount()
-  expect(await written($)).toEqual(['· You dismissed: Gone soon?'])
+  expect(await written($)).toEqual(['You dismissed: Gone soon?'])
   await bash(world, $, 'mentat check', FAILED_RUN)
   const alert = await mount($, TERM, 'terminal')
   await alert.press({ key: 'dismiss-check' })
   await alert.unmount()
-  expect((await lines($))[0]).toBe('· You dismissed: Check failed: 2 problem(s)')
+  expect((await lines($))[0]).toBe('You dismissed: Check failed: 2 problem(s)')
   for (const surface of SURFACES) {
-    const drawn = await drawnRow($, surface, '·', 'You dismissed: Gone soon?')
-    expect(drawn.colors).toContain('subtle')
+    // A dismissal has no mark.
+    const drawn = await drawnRow($, surface, ' ', 'You dismissed: Gone soon?')
+    expect(drawn.colors.filter(c => c !== undefined)).toEqual([])
     expect(drawn.dim).toEqual([true])
   }
 })
@@ -3106,14 +3105,14 @@ test('gh pr create that prints a pull request URL writes Opened PR #N, from the 
   await startSession($)
   // The line comes from the URL the command printed; the pane reads nothing from GitHub.
   await bash(world, $, 'gh pr create --title "feat: x" --body y', `Creating pull request\n${GH}/pull/130\n`)
-  expect(await written($)).toEqual(['↗ Opened PR #130'])
+  expect(await written($)).toEqual(['Opened PR #130'])
   await bash(world, $, 'gh pr create --title "feat: y"', 'something went wrong\n')
   await bash(world, $, 'gh pr ready 130', `${GH}/pull/130\n`)
   await bash(world, $, 'gh pr view 130', `${GH}/pull/130\n`)
   await bash(world, $, 'gh pr create --title "feat: z" --body y', `${GH}/pull/131\n`, { agentId: 'a1' })
   await new Promise(r => setTimeout(r, 30))
-  expect(await written($)).toEqual(['↗ Opened PR #130'])
-  for (const surface of SURFACES) expect((await drawnRow($, surface, '↗', 'Opened PR #130')).colors).toContain('suggestion')
+  expect(await written($)).toEqual(['Opened PR #130'])
+  for (const surface of SURFACES) expect((await drawnRow($, surface, ' ', 'Opened PR #130')).colors.filter(c => c !== undefined)).toEqual([])
 })
 
 test('events draw their text dim with their own mark and notes draw as before, on both surfaces', async ($, on) => {
@@ -3134,7 +3133,7 @@ test('events draw their text dim with their own mark and notes draw as before, o
     expect(failedRow.colors).toContain('error')
     expect(failedRow.dim).toEqual([true])
     expect((await drawnRow($, surface, '✓', 'A plain note')).dim).toEqual([false])
-    expect((await drawnRow($, surface, '▸', 'Another note')).dim).toEqual([false])
+    expect((await drawnRow($, surface, ' ', 'Another note')).dim).toEqual([false])
   }
   // A note's text carries no dimColor at all.
   const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
@@ -3153,7 +3152,7 @@ test('the Feed lists a note and an event line alike, newest first, with the even
   await eng($).tool.call({ tool: CLOSE, id: 'd2' })
   for (const surface of SURFACES) {
     expect((await lines($, surface))[0]).toBe('✓ Closed: Another?')
-    expect(await lines($, surface)).toContain('◆ Keep this one')
+    expect(await lines($, surface)).toContain('Keep this one')
   }
   const d = await mount($, DESK, 'desktop')
   const texts = await d.findAll({ type: 'Text' })
@@ -3189,11 +3188,11 @@ test('an equal note straight after another is added once; an event between two e
   boot(on)
   await note($, 'Same', 'waiting')
   await note($, 'Same', 'waiting')
-  expect(await written($)).toEqual(['◌ Same'])
+  expect(await written($)).toEqual(['Same'])
   await eng($).tool.call({ tool: OPEN, question: 'Q?' })
   await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   await note($, 'Same', 'waiting')
-  expect(await written($)).toEqual(['◌ Same', '✓ Closed: Q?', '◌ Same'])
+  expect(await written($)).toEqual(['Same', '✓ Closed: Q?', 'Same'])
 })
 
 test('an event line is kept in full and wrapped, cut only past 1000 characters, and events count toward the 200-line cap', async ($, on) => {
@@ -3548,7 +3547,7 @@ test('a restart of the same conversation (empty state, same id, source resume) b
     for (const q of ['Ship it?', 'Merge it?', 'Rotate the token', 'Check passed with 2 warnings']) expect(t).toContain(q)
   }
   // The Feed.
-  expect(await lines($)).toEqual(['? Asked you: Merge it?', '▸ Plan the release'])
+  expect(await lines($)).toEqual(['Asked you: Merge it?', 'Plan the release'])
   // The check result is kept, so the label is the warning one and no new check is run.
   expect(await footerTextOf($)).toBe('● Mentat · 4 waiting')
   expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'warning', dim: false })
@@ -3597,7 +3596,7 @@ test('a resume of this conversation inside the same process keeps everything and
   await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
   await classicOf($).SessionStart({ source: 'compact' })
   expect(await waitTexts($, 'terminal')).toContain('Stay?')
-  expect(await lines($)).toEqual(['▸ Before'])
+  expect(await lines($)).toEqual(['Before'])
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).result)).toBe('Closed decision d1.')
   expect((await eng($).tool.call({ tool: CLOSE, id: 'd1' })).deny).toContain('no record')
   expect(sessionsOf(world).S1!.items).toEqual([])
@@ -3628,7 +3627,7 @@ test('a resume to a different id that has stored state loads that state, and goi
   await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
   expect(await waitTexts($, 'terminal')).toContain('Alpha?')
   expect(await waitTexts($, 'terminal')).not.toContain('Beta?')
-  expect(await lines($)).toEqual(['▸ Alpha note'])
+  expect(await lines($)).toEqual(['Alpha note'])
   // Beta's item went as cleared (by /resume); numbering does not reuse an id that left.
   expect(String((await eng($).tool.call({ tool: CLOSE, id: 'd2' })).result)).toBe('Decision d2 was already cleared when a new conversation started (/resume).')
   expect(String((await eng($).tool.call({ tool: OPEN, question: 'Gamma?' })).result)).toBe('Opened decision d3.')
@@ -3788,4 +3787,106 @@ test('an item\'s buttons are in a row under its text, the detail at the left of 
   expect(deskTexts.slice(at, at + 2)).toEqual(['Ship it?', 'Recommended: After the release · 8:00 AM'])
   expect(await bandKeys(desk)).toEqual(['accept-d1', 'dismiss-d1'])
   await desk.unmount()
+})
+
+// A log kept from an earlier session: the way to put every kind of entry in the Feed at once.
+const withLog = async ($: never, on: never, log: { at: number; kind: string; text: string; source?: string; mark?: string }[]) => {
+  const { world } = boot(on, { store: { 'conv:S1': { savedAt: T0, items: [], nextId: 1, sent: [], log, checkResult: null, gone: [] } } })
+  await classicOf($).SessionStart({ source: 'resume', session_id: 'S1' })
+
+  return world
+}
+const ev = (kind: string, text: string, mark?: string, at = T0) => ({ at, kind, text, source: 'event', ...(mark === undefined ? {} : { mark }) })
+
+test('the Feed marks only a success (✓ green), a failure (✕ red) and what wants attention (! amber); every other entry has a blank mark', async ($, on) => {
+  await withLog($, on, [
+    { at: T0, kind: 'done', text: 'N done' },
+    { at: T0, kind: 'surprise', text: 'N surprise' },
+    { at: T0, kind: 'decision', text: 'N decision' },
+    { at: T0, kind: 'plan', text: 'N plan' },
+    { at: T0, kind: 'waiting', text: 'N waiting' },
+    ev('agentDone', 'E agent finished'),
+    ev('agentFailed', 'E agent failed'),
+    ev('answered', 'E answered or closed'),
+    ev('check', 'E check passed', 'pass'),
+    ev('check', 'E check warned', 'warn'),
+    ev('check', 'E check failed', 'fail'),
+    ev('dismissed', 'E dismissed'),
+    ev('prOpened', 'E pr opened'),
+    // A log from an earlier version: asked lines draw as plain text, an alert as attention.
+    ev('asked', 'E asked question', 'question'),
+    ev('asked', 'E asked action', 'action'),
+    ev('asked', 'E asked alert', 'alert'),
+  ])
+  const expected: Record<string, string> = {
+    'N done': '✓', 'N surprise': '!', 'N decision': '', 'N plan': '', 'N waiting': '',
+    'E agent finished': '✓', 'E agent failed': '✕', 'E answered or closed': '✓',
+    'E check passed': '✓', 'E check warned': '!', 'E check failed': '✕',
+    'E dismissed': '', 'E pr opened': '', 'E asked question': '', 'E asked action': '', 'E asked alert': '!',
+  }
+  // Show all of them.
+  const toggler = await mount($, TERM, 'terminal')
+  await toggler.press({ key: 'log-toggle' })
+  await toggler.unmount()
+  const colorOf: Record<string, string> = { '✓': 'success', '✕': 'error', '!': 'warning' }
+  for (const surface of SURFACES) {
+    const rows = (await logOf($, surface)).rows
+    expect(Object.fromEntries(rows.map(r => [r.text, r.icon]))).toEqual(expected)
+    for (const [icon, color] of Object.entries(colorOf)) {
+      const drawn = await drawnRow($, surface, icon, 'N done')
+      expect(drawn.colors.length).toBeGreaterThan(0)
+      // Every mark of that icon has its color.
+      expect(drawn.colors.every(c => c === color)).toBe(true)
+    }
+  }
+})
+
+test('the Feed shows a time only on the first row of a run of the same displayed time; the rows after it leave it blank, and a time that comes back is shown again', async ($, on) => {
+  await withLog($, on, [
+    // Oldest first; the Feed shows the newest first: 9:00, 8:01, 8:01, 8:00, 8:01, 8:00 (by minutes).
+    { at: T0, kind: 'plan', text: 'one' },
+    { at: T0 + 70_000, kind: 'plan', text: 'two' },
+    { at: T0 + 5_000, kind: 'plan', text: 'three' },
+    { at: T0 + 75_000, kind: 'plan', text: 'four' },
+    { at: T0 + 80_000, kind: 'plan', text: 'five' },
+    { at: T0 + 3_600_000, kind: 'plan', text: 'six' },
+  ])
+  for (const surface of SURFACES) {
+    expect((await logOf($, surface)).rows.map(r => [r.time, r.text])).toEqual([
+      ['9:00 AM', 'six'], ['8:01 AM', 'five'], ['', 'four'], ['8:00 AM', 'three'], ['8:01 AM', 'two'], ['8:00 AM', 'one'],
+    ])
+  }
+})
+
+test('a pinned agent row keeps its own state and time and takes no part in the Feed time runs; Show all keeps the first row of a run timed', async ($, on) => {
+  const world = await withLog($, on, Array.from({ length: 12 }, (_, i) => ({ at: T0 + i * 1000, kind: 'plan', text: `Note ${i}` })))
+  world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
+  for (const surface of SURFACES) {
+    const t = await paneTexts($, surface)
+    expect(t).toContain('Look around')
+    const rows = (await logOf($, surface)).rows
+    expect(rows).toHaveLength(10)
+    expect(rows.map(r => r.time)).toEqual(['8:00 AM', ...Array(9).fill('')])
+  }
+  const toggler = await mount($, TERM, 'terminal')
+  await toggler.press({ key: 'log-toggle' })
+  await toggler.unmount()
+  expect((await logOf($)).rows.map(r => r.time)).toEqual(['8:00 AM', ...Array(11).fill('')])
+})
+
+test('on the terminal there is one blank row between the items of Waiting on you, none after the last; the gap stays under 40 columns', async ($, on) => {
+  boot(on)
+  await eng($).tool.call({ tool: OPEN, question: 'One?', accept: 'Yes' })
+  await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Two' })
+  await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'Three' })
+  await eng($).tool.call({ tool: OPEN, question: 'Four?' })
+  for (const cols of [80, 50, 30]) {
+    const d = await mount($, PANE, 'terminal', { bodyColumns: cols })
+    const blocks = (await d.findAll({ type: 'Box' })).filter(b => String(b.key).startsWith('block-'))
+    // Most urgent first: the alert, then the questions (newest first), then the action.
+    expect(blocks.map(b => [b.key, b.props?.marginTop])).toEqual([['block-d3', 0], ['block-d4', 1], ['block-d1', 1], ['block-d2', 1]])
+    expect(blocks.every(b => b.props?.flexDirection === 'column')).toBe(true)
+    await d.unmount()
+  }
 })
