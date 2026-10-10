@@ -759,11 +759,35 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
   }
 }
 
-// What the main loop's `mentat check` run says: a failed run pins one alert (id CHECK_ID) with its
+// What a `mentat check` run says, recorded: a failed run pins one alert (id CHECK_ID) with its
 // PROBLEM lines, replacing the item a former run left; a passing run with warnings pins one warning card
 // with the WARN lines in its place; a clean pass removes it. The result is also kept for the footer label.
-// A failing check exits 1, so the Bash result may be an error: its text is then in `text` (what the
-// model read) and not in the typed record. All the parts are read.
+// isCurrent is asked inside the turn that writes: a run that is no longer the latest writes nothing.
+async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: () => boolean): Promise<void> {
+  const openedAt = await $.clock.now()
+  await inTurn(async () => {
+    if (!isCurrent()) return
+    await update($, items, list => {
+      const rest = list.filter(d => d.id !== CHECK_ID)
+      if (!outcome.passed) return [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, lines: outcome.problems, openedAt }]
+      if (outcome.warnings.length === 0) return rest
+      return [...rest, { id: CHECK_ID, kind: 'warning' as const, question: `Check passed with ${plural(outcome.warnings.length, 'warning', 'warnings')}`, lines: outcome.warnings, openedAt }]
+    })
+    await update($, checkResult, () => (outcome.passed ? { state: outcome.warnings.length > 0 ? ('warn' as const) : ('pass' as const), warnings: outcome.warnings } : { state: 'fail' as const, warnings: [] }))
+    await update($, answering, ids => ids.filter(x => x !== CHECK_ID))
+    await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
+  })
+  await invalidate($)
+}
+
+// Counts the check results being recorded: each run takes the next number when it starts (the
+// startup run) or when its result is read (the agent's run), and writes only while its number is the
+// latest. So an agent's run that lands while the startup run is in flight wins, and a new
+// conversation drops the run of the old one.
+let checkEpoch = 0
+
+// The main loop's `mentat check` run. A failing check exits 1, so the Bash result may be an error:
+// its text is then in `text` (what the model read) and not in the typed record. All the parts are read.
 async function afterCheck($: EngineInterface, command: string, ran: { result?: unknown; text?: unknown; deny?: unknown }): Promise<void> {
   try {
     if (!CHECK_COMMAND.test(command) || ran.deny !== undefined) return
@@ -775,21 +799,30 @@ async function afterCheck($: EngineInterface, command: string, ran: { result?: u
       .join('\n')
     const outcome = parseCheck(output)
     if (outcome === undefined) return
-    const openedAt = await $.clock.now()
-    await inTurn(async () => {
-      await update($, items, list => {
-        const rest = list.filter(d => d.id !== CHECK_ID)
-        if (!outcome.passed) return [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, lines: outcome.problems, openedAt }]
-        if (outcome.warnings.length === 0) return rest
-        return [...rest, { id: CHECK_ID, kind: 'warning' as const, question: `Check passed with ${plural(outcome.warnings.length, 'warning', 'warnings')}`, lines: outcome.warnings, openedAt }]
-      })
-      await update($, checkResult, () => (outcome.passed ? { state: outcome.warnings.length > 0 ? ('warn' as const) : ('pass' as const), warnings: outcome.warnings } : { state: 'fail' as const, warnings: [] }))
-      await update($, answering, ids => ids.filter(x => x !== CHECK_ID))
-      await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
-    })
-    await invalidate($)
+    const mine = ++checkEpoch
+    await recordCheck($, outcome, () => checkEpoch === mine)
   } catch {
     // the check's own output already told the agent
+  }
+}
+
+// The pane's own `mentat check`, at the start of a conversation (a startup or a reload, and after
+// /clear, /resume and a fork), so the footer label is current before any message. Only in a git work
+// tree: elsewhere (a folder that is not a repository) the check would fail for a reason that is not
+// the project's. A failing check exits 1 and still prints its `Check failed:` line, so the output is
+// read whatever the exit code; a `mentat` that cannot run, or output without a final line, records nothing.
+async function startCheck($: EngineInterface, cwd?: string): Promise<void> {
+  const mine = ++checkEpoch
+  try {
+    const dir = cwd ?? (await $.session.cwd())
+    const inside = await run($, ['git', 'rev-parse', '--is-inside-work-tree'], dir)
+    if (inside?.trim() !== 'true') return
+    const out = await $.process.run(['mentat', 'check'], { timeoutMs: 30_000, cwd: dir })
+    const outcome = parseCheck(`${out.stdout}\n${out.stderr}`)
+    if (outcome === undefined) return
+    await recordCheck($, outcome, () => checkEpoch === mine)
+  } catch {
+    // no mentat to run, or the engine is gone: the label stays as it is
   }
 }
 
@@ -1103,6 +1136,7 @@ export const register: Register = (on, _options) => {
     agentTimer = $.clock.every(1000, () => void agentTick($, effortByAgent))
     refreshTimer = $.clock.every(60_000, () => void refresh($))
     void refresh($)
+    void startCheck($, e.cwd)
 
     return next(e)
   })
@@ -1113,6 +1147,8 @@ export const register: Register = (on, _options) => {
   on('classic.SessionStart', async ($, e, next) => {
     if (e.source === 'clear' || e.source === 'resume' || e.source === 'fork') {
       await follow($, '')
+      // A check still running for the old conversation writes nothing.
+      checkEpoch += 1
       // Open questions belong to the conversation they were asked in.
       await inTurn(async () => {
         await update($, items, () => [])
@@ -1124,6 +1160,8 @@ export const register: Register = (on, _options) => {
         await update($, logAtom, () => [])
       })
       await invalidate($)
+      // The new conversation's check.
+      void startCheck($)
     }
 
     return next(e)
