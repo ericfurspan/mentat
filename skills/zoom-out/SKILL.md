@@ -13,4 +13,6 @@ The maintainer wants the whole picture, not the task in hand. This runs once: do
    - What is done this session.
    - Everything the maintainer raised that has no answer or decision yet. This is the part most easily missed: walk every maintainer message, not only the last. If the session was compacted and early messages survive only as a summary, say so here: asks from before it may be missing.
    - What looks like weeds or over-engineering, with evidence (counts, links).
+   - Are we solving the right problem, and is there a better approach? Answer in one or two sentences.
+   - Whether the goal or the plan itself should change, said plainly, not only the next step.
    - One recommended next step. If it needs a decision, end with the output style's closing `## Question` block.
