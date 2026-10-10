@@ -8,6 +8,7 @@ import { COMMANDS, resetAt, withoutSettled } from './progress'
 
 const OPEN = 'mcp__mentat__open_decision'
 const CLOSE = 'mcp__mentat__close_decision'
+const NOTE = 'mcp__mentat__note'
 const BAND = { plugin: 'mentat', component: 'AbovePrompt', props: { hasSurvey: false } }
 const PANE = { plugin: 'mentat', component: 'Pane', requestId: 'mentat' }
 const SURFACES = ['terminal', 'desktop'] as const
@@ -110,6 +111,8 @@ type World = {
   usageFails: boolean
   // The slash commands the plugin ran through $.command.run, in order.
   commands: string[]
+  // The tools the pane registered, as it described them.
+  tools: { name: string; description: string; inputSchema: { required: string[]; properties: Record<string, { enum?: string[] }> }; isDeferred: boolean }[]
 }
 
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
@@ -145,10 +148,14 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     steps: [],
     usageFails: false,
     commands: [],
+    tools: [],
   }
   let active = 0
   onFn('command.register', () => ({ value: { command: 'mentat' } }))
-  onFn('tool.register', () => ({ value: { tool: 'x' } }))
+  onFn('tool.register', (_$: unknown, e: World['tools'][number]) => {
+    world.tools.push(e)
+    return { value: { tool: 'x' } }
+  })
   onFn('session.start', (_$: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   onFn('ui.invalidate', () => ({ value: undefined }))
   onFn('ui.open', (_$: unknown, e: { id: string }) => {
@@ -2970,167 +2977,124 @@ const logOf = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => 
   return { rows, toggle, hasSvg }
 }
 const lines = async ($: never, surface: 'terminal' | 'desktop' = 'terminal') => (await logOf($, surface)).rows.map(r => `${r.icon} ${r.text}`)
-const codex = (name: 'off' | 'on') => ({ command: `mentat:codex-review-${name}`, args: '' })
+// The agent adds a note.
+const note = ($: never, text: string, kind?: string) => eng($).tool.call({ tool: NOTE, text, ...(kind === undefined ? {} : { kind }) })
 
-test('gh pr create logs the opened pull request with the title it was given; a failed create, or the same URL twice in a row, logs one entry at most', async ($, on) => {
+test('the note tool is registered with a required text, the five kinds, and a description that says when to add one', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
-  expect((await logOf($)).rows).toEqual([])
-  // A failed command prints no URL.
-  await bash(world, $, 'gh pr create --title "feat(pane): add a log" --body x', '', {}, 'error: no commits between main and the branch')
-  expect((await logOf($)).rows).toEqual([])
-  const create = 'gh pr create --title "feat(pane): add a log" --body x'
-  await bash(world, $, create, `${GH}/pull/130\n`)
-  // 12:00 UTC is 8:00 AM in New York.
-  expect((await logOf($)).rows).toEqual([{ time: '8:00 AM', icon: '↑', text: 'Opened PR #130: Add a log' }])
-  await bash(world, $, create, `${GH}/pull/130\n`)
-  expect(await lines($)).toEqual(['↑ Opened PR #130: Add a log'])
-  // Without a title in the command the entry is just the number.
-  await bash(world, $, 'gh pr create --fill', `${GH}/pull/131\n`)
-  expect(await lines($)).toEqual(['↑ Opened PR #131', '↑ Opened PR #130: Add a log'])
-  // An agent's Bash call is not the session's.
-  await bash(world, $, 'gh pr create --fill', `${GH}/pull/132\n`, { agentId: 'a1' })
-  expect(await lines($)).toHaveLength(2)
+  const tool = world.tools.find(t => t.name === 'note')!
+  expect(world.tools.map(t => t.name)).toEqual(['open_decision', 'close_decision', 'note'])
+  expect(tool.inputSchema.required).toEqual(['text'])
+  expect(Object.keys(tool.inputSchema.properties)).toEqual(['text', 'kind'])
+  expect(tool.inputSchema.properties.kind.enum).toEqual(['decision', 'plan', 'surprise', 'waiting', 'done'])
+  expect(tool.isDeferred).toBe(false)
+  for (const phrase of ['notable moment', 'a decision the user made', 'a change of plan', 'something surprising', 'what you now wait on', 'a piece of work finished', 'A few notes an hour at most', 'never for routine steps']) {
+    expect(tool.description).toContain(phrase)
+  }
 })
 
-test('gh pr ready and close, gh issue create and close are logged from the output; a failure prints no success line and logs nothing', async ($, on) => {
-  const { world } = boot(on)
+test('a note adds one entry with its time, kind icon and line; the kind defaults to plan; the tool acknowledges', async ($, on) => {
+  boot(on)
   await startSession($)
+  expect((await logOf($)).rows).toEqual([])
+  const ack = await note($, 'Only the Log changes in this pull request')
+  expect(ack).toEqual({ result: 'Noted.' })
+  // 12:00 UTC is 8:00 AM in New York.
+  expect((await logOf($)).rows).toEqual([{ time: '8:00 AM', icon: '▸', text: 'Only the Log changes in this pull request' }])
+  await note($, 'Keep the band for #150', 'decision')
+  await note($, 'The mod tests also read the old log', 'surprise')
+  await note($, 'Waiting on your merge of #148', 'waiting')
+  await note($, 'The Log card is built', 'done')
+  await note($, 'Next: the rules', 'plan')
+  expect(await lines($, 'desktop')).toEqual(['▸ Next: the rules', '✓ The Log card is built', '◌ Waiting on your merge of #148', '! The mod tests also read the old log', '◆ Keep the band for #150'])
+})
+
+test('each kind has its own icon and color on both surfaces', async ($, on) => {
+  boot(on)
+  await startSession($)
+  const kinds = [['decision', '◆', 'suggestion'], ['plan', '▸', 'text'], ['surprise', '!', 'warning'], ['waiting', '◌', 'subtle'], ['done', '✓', 'success']] as const
+  for (const [kind] of kinds) await note($, `A ${kind} note`, kind)
+  for (const surface of SURFACES) {
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    for (const [, icon, color] of kinds) {
+      expect((await pane.findAll({ type: 'Text', text: icon })).map(t => t.props?.color)).toContain(color)
+    }
+    await pane.unmount()
+  }
+})
+
+test('a note is one line of at most 80 characters, cut with an ellipsis', async ($, on) => {
+  boot(on)
+  await startSession($)
+  await note($, `Moving the ${'very long '.repeat(20)}plan`)
+  const [row] = (await logOf($)).rows
+  expect([...row!.text]).toHaveLength(80)
+  expect(row!.text.startsWith('Moving the very long very long')).toBe(true)
+  expect(row!.text.endsWith('…')).toBe(true)
+  // Exactly 80 characters is kept whole; runs of spaces and line breaks make one line.
+  await note($, 'x'.repeat(80))
+  expect([...(await logOf($)).rows[0]!.text]).toHaveLength(80)
+  expect((await logOf($)).rows[0]!.text.endsWith('…')).toBe(false)
+  await note($, 'two   words\nand a third line')
+  expect((await lines($))[0]).toBe('▸ two words and a third line')
+})
+
+test('a note without text, or with a kind that is not one of the five, is refused and adds nothing', async ($, on) => {
+  boot(on)
+  await startSession($)
+  expect((await eng($).tool.call({ tool: NOTE })).deny).toBe('note needs a line of text.')
+  expect((await note($, '   \n ')).deny).toBe('note needs a line of text.')
+  expect((await eng($).tool.call({ tool: NOTE, text: 42 })).deny).toBe('note needs a line of text.')
+  expect((await note($, 'A line', 'question')).deny).toBe('note kind must be decision, plan, surprise, waiting, done.')
+  expect(await lines($)).toEqual([])
+})
+
+test('the same note twice in a row is added once; the same line after another note, or with another kind, is added', async ($, on) => {
+  boot(on)
+  await startSession($)
+  await note($, 'Waiting on you', 'waiting')
+  await note($, 'Waiting on you', 'waiting')
+  expect(await lines($)).toEqual(['◌ Waiting on you'])
+  await note($, 'Waiting on you', 'plan')
+  await note($, 'Waiting on you', 'waiting')
+  expect(await lines($)).toEqual(['◌ Waiting on you', '▸ Waiting on you', '◌ Waiting on you'])
+})
+
+test('no mechanical event is logged: pull requests, issues, settled items, Codex commands, builders and a merge add nothing', async ($, on) => {
+  const { world } = boot(on)
+  await follow109($)
+  await bash(world, $, 'gh pr create --title "feat(pane): add a log" --body x', `${GH}/pull/130\n`)
   await bash(world, $, 'gh pr ready 130', '', {}, '✓ Pull request o/r#130 is marked as "ready for review"\n')
   await bash(world, $, 'gh pr close 131', '', {}, '✓ Closed pull request o/r#131 (feat: try a thing)\n')
   await bash(world, $, 'gh issue create --title "Log the session" --body x', `${GH}/issues/129\n`)
   await bash(world, $, 'gh issue close 129', '', {}, '✓ Closed issue o/r#129 (Log the session)\n')
-  expect(await lines($)).toEqual([
-    '● Closed issue #129: Log the session',
-    '○ Opened issue #129: Log the session',
-    '✕ Closed PR #131: Try a thing',
-    '↑ PR #130 ready for review',
-  ])
-  // Already done, no such number, no URL: nothing new.
-  await bash(world, $, 'gh pr ready 130', '', {}, '! Pull request o/r#130 is already "ready for review"\n')
-  await bash(world, $, 'gh pr close 999', '', {}, 'GraphQL: Could not resolve to a PullRequest with the number of 999.\n')
-  await bash(world, $, 'gh issue create --title "x"', '', {}, 'error\n')
-  await bash(world, $, 'gh issue close 5', '', {}, 'no issue found\n')
-  expect(await lines($)).toHaveLength(4)
-  // The success line may come in the text the model read instead.
-  await bash(world, $, 'gh issue close 7', '', { text: 'x' })
-  expect(await lines($)).toHaveLength(4)
-})
-
-test('a followed pull request that turns merged on a read is logged once; one already merged when first read is not', async ($, on) => {
-  const { world } = boot(on)
-  await follow109($)
-  expect(await lines($)).toEqual([])
+  const opened = await open(undefined, 'Merge the log card now?')($)
+  await eng($).tool.call({ tool: CLOSE, id: /d\d+/.exec(String(opened.result))![0], outcome: 'Yes, merge' })
+  await eng($).command.run({ command: 'mentat:codex-review-off', args: '' })
+  await eng($).command.run({ command: 'mentat:codex-review-on', args: '' })
+  world.agents = [{ id: 'b1', type: 'mentat:builder', description: 'Build the log', status: 'running' }]
+  await eng($).agent.spawn(spawn('b1', 'Build the log', 'mentat:builder'))
+  world.agents = [{ id: 'b1', type: 'mentat:builder', description: 'Build the log', status: 'completed' }]
+  await eng($).turn.complete(turnDone('b1'))
   world.pr = ok(prJson({ state: 'MERGED' }))
   await bash(world, $, 'git push', '')
-  for (let i = 0; i < 300 && (await lines($)).length === 0; i++) await new Promise(r => setTimeout(r, 5))
-  expect(await lines($)).toEqual(['✓ Merged PR #109: Label issues by kind'])
-  // More reads of the merged pull request add nothing.
   const reads = prViews(world)
-  await bash(world, $, 'git push', '')
-  await until(() => prViews(world) > reads, 'the next read')
-  await new Promise(r => setTimeout(r, 30))
-  expect(await lines($)).toEqual(['✓ Merged PR #109: Label issues by kind'])
-})
-
-test('a pull request that is merged on the first read logs no merge', async ($, on) => {
-  const { world } = boot(on)
-  world.pr = ok(prJson({ state: 'MERGED' }))
-  await follow109($)
+  await until(() => prViews(world) > reads, 'the read of the merged pull request')
   await new Promise(r => setTimeout(r, 30))
   expect(await lines($)).toEqual([])
-})
-
-test('close_decision logs the question, shortened, with its outcome; an action and an alert have their own icons', async ($, on) => {
-  boot(on)
-  const idOf = async (kind: string | undefined, question: string) => /d\d+/.exec(String((await open(kind, question)($ as never)).result))![0]
-  const q = await idOf(undefined, 'Merge the log card now?')
-  await eng($).tool.call({ tool: CLOSE, id: q, outcome: 'Yes, merge' })
-  const long = 'Should the pane keep the Log card on the desktop even when the app already draws its own chip for the pull request?'
-  const l = await idOf('question', long)
-  await eng($).tool.call({ tool: CLOSE, id: l, outcome: 'Keep it' })
-  const a = await idOf('action', 'Update the plugin after the merge')
-  await eng($).tool.call({ tool: CLOSE, id: a })
-  const x = await idOf('alert', 'CI is red on main')
-  await eng($).tool.call({ tool: CLOSE, id: x, outcome: 'Fixed' })
-  const got = await lines($)
-  expect(got[0]).toBe('! CI is red on main → Fixed')
-  expect(got[1]).toBe('→ Settled: Update the plugin after the merge')
-  expect(got[2]!.startsWith('? Should the pane keep the Log card')).toBe(true)
-  expect(got[2]!.endsWith('… → Keep it')).toBe(true)
-  expect([...got[2]!.slice(2)].length).toBeLessThanOrEqual(60)
-  expect(got[3]).toBe('? Merge the log card now? → Yes, merge')
-  // A refused close (no such item) logs nothing.
-  await eng($).tool.call({ tool: CLOSE, id: 'nope', outcome: 'x' })
-  expect(await lines($)).toHaveLength(4)
-})
-
-test('turning Codex reviews off and on is logged and the command runs as before; the same event twice in a row is logged once', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await eng($).command.run(codex('off'))
-  await eng($).command.run(codex('off'))
-  expect(await lines($)).toEqual(['⊘ Codex reviews turned off'])
-  await eng($).command.run(codex('on'))
-  await eng($).command.run({ command: 'codex-review-off', args: '' })
-  expect(await lines($)).toEqual(['⊘ Codex reviews turned off', '⊙ Codex reviews turned on', '⊘ Codex reviews turned off'])
-  // Every run reached the command beneath, and other commands log nothing.
-  expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-off', 'mentat:codex-review-on', 'codex-review-off'])
-  await eng($).command.run({ command: 'mentat:retro', args: '' })
-  expect(await lines($)).toHaveLength(3)
-})
-
-test('a builder started and finished, failed or stopped is logged; other agents are not', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  const spawnBuilder = async (n: string, description: string, type = 'mentat:builder') => {
-    world.agents = [...world.agents, { id: n, type, description, status: 'running' }]
-    await eng($).agent.spawn(spawn(n, description, type))
-  }
-  const end = async (n: string, status: string) => {
-    world.agents = world.agents.map(a => (a.id === n ? { ...a, status } : a))
-    await eng($).turn.complete(turnDone(n))
-  }
-  await spawnBuilder('b1', 'Build the log')
-  await spawnBuilder('e1', 'Look around', 'Explore')
-  expect(await lines($)).toEqual(['▸ Builder started: Build the log'])
-  await end('e1', 'completed')
-  expect(await lines($)).toEqual(['▸ Builder started: Build the log'])
-  await end('b1', 'completed')
-  expect(await lines($)).toEqual(['✓ Builder finished: Build the log', '▸ Builder started: Build the log'])
-  // A second sync of the finished builder adds nothing.
-  await eng($).turn.complete(turnDone('b1'))
-  expect(await lines($)).toHaveLength(2)
-  await spawnBuilder('b2', 'Build the card', 'builder')
-  await spawnBuilder('b3', 'Build the toggle')
-  await end('b2', 'failed')
-  await end('b3', 'killed')
-  expect((await lines($)).slice(0, 2)).toEqual(['✕ Builder stopped: Build the toggle', '✕ Builder failed: Build the card'])
-})
-
-test('a builder that vanishes from the engine\'s list is not logged as finished', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  world.agents = [{ id: 'b1', type: 'mentat:builder', description: 'Build it', status: 'running' }]
-  await eng($).agent.spawn(spawn('b1', 'Build it', 'mentat:builder'))
-  world.agents = []
-  await eng($).turn.complete(turnDone('b1'))
-  expect(await lines($)).toEqual(['▸ Builder started: Build it'])
+  expect(await paneTexts($)).not.toContain('LOG')
+  // The commands still ran as before.
+  expect(world.commands).toEqual(['mentat:codex-review-off', 'mentat:codex-review-on'])
 })
 
 test('the log shows the newest five; Show all N shows the rest and Show fewer goes back, on both surfaces, and the choice is kept', async ($, on) => {
   boot(on)
   await startSession($)
-  for (let i = 0; i < 3; i++) {
-    await eng($).command.run(codex('off'))
-    await eng($).command.run(codex('on'))
-  }
-  await eng($).command.run(codex('off'))
-  // Seven entries.
+  for (let i = 1; i <= 7; i++) await note($, `Note ${i}`)
   for (const surface of SURFACES) {
     const first = await logOf($, surface)
-    expect(first.rows).toHaveLength(5)
-    expect(first.rows[0]).toEqual({ time: '8:00 AM', icon: '⊘', text: 'Codex reviews turned off' })
+    expect(first.rows.map(r => r.text)).toEqual(['Note 7', 'Note 6', 'Note 5', 'Note 4', 'Note 3'])
     expect(first.toggle).toEqual(['Show all 7'])
   }
   for (const surface of SURFACES) {
@@ -3140,8 +3104,9 @@ test('the log shows the newest five; Show all N shows the rest and Show fewer go
     const all = await logOf($, surface)
     expect(all.rows).toHaveLength(7)
     expect(all.toggle).toEqual(['Show fewer'])
-    // A new entry joins the shown list, and the choice survives a remount.
+    // The choice survives a remount.
     const again = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await again.findAll({ type: 'Button' })).filter(b => b.key === 'log-toggle').map(b => String(b.props?.label))).toEqual(['Show fewer'])
     await again.press({ key: 'log-toggle' })
     await again.unmount()
     const fewer = await logOf($, surface)
@@ -3154,7 +3119,7 @@ test('with five entries or fewer there is no toggle; with none there is no Log c
   boot(on)
   await startSession($)
   expect(await paneTexts($)).not.toContain('LOG')
-  for (let i = 0; i < 5; i++) await eng($).command.run(codex(i % 2 === 0 ? 'off' : 'on'))
+  for (let i = 0; i < 5; i++) await note($, `Note ${i}`)
   const got = await logOf($)
   expect(got.rows).toHaveLength(5)
   expect(got.toggle).toEqual([])
@@ -3163,33 +3128,23 @@ test('with five entries or fewer there is no toggle; with none there is no Log c
 test('the log keeps the last 200 entries', async ($, on) => {
   boot(on)
   await startSession($)
-  for (let i = 0; i < 205; i++) await eng($).command.run(codex(i % 2 === 0 ? 'off' : 'on'))
+  for (let i = 0; i < 205; i++) await note($, `Note ${i}`)
   expect((await logOf($)).toggle).toEqual(['Show all 200'])
   const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   await pane.press({ key: 'log-toggle' })
   await pane.unmount()
-  expect((await logOf($)).rows).toHaveLength(200)
-})
-
-test('a log line is one line of at most 60 characters, cut with an ellipsis', async ($, on) => {
-  const { world } = boot(on)
-  await startSession($)
-  await bash(world, $, `gh pr create --title "feat: ${'very long '.repeat(20)}title"`, `${GH}/pull/130\n`)
-  const [row] = (await logOf($)).rows
-  expect([...row!.text]).toHaveLength(60)
-  expect(row!.text.startsWith('Opened PR #130: Very long very long')).toBe(true)
-  expect(row!.text.endsWith('…')).toBe(true)
-  // A title with runs of spaces is one line.
-  await bash(world, $, 'gh issue close 3', '', {}, '✓ Closed issue o/r#3 (two   words)\n')
-  expect((await lines($))[0]).toBe('● Closed issue #3: Two words')
+  const rows = (await logOf($)).rows
+  expect(rows).toHaveLength(200)
+  expect(rows[0]!.text).toBe('Note 204')
+  expect(rows[199]!.text).toBe('Note 5')
 })
 
 test('the time is the entry\'s clock time in the TZ zone, as h:mm AM or PM', async ($, on) => {
   const { clock } = boot(on, { zone: 'Asia/Kolkata' })
   await startSession($)
-  await eng($).command.run(codex('off'))
+  await note($, 'First')
   await clock.advance(7 * 60_000)
-  await eng($).command.run(codex('on'))
+  await note($, 'Second')
   // 12:00 UTC is 5:30 PM in Kolkata.
   expect((await logOf($)).rows.map(r => r.time)).toEqual(['5:37 PM', '5:30 PM'])
   // A two-digit evening hour and a one-digit morning hour: 5:37 PM + 4h35m is 10:12 PM, and 11 hours later 9:12 AM.
@@ -3198,9 +3153,9 @@ test('the time is the entry\'s clock time in the TZ zone, as h:mm AM or PM', asy
     for (let left = minutes; left > 0; left -= 20) await clock.advance(Math.min(left, 20) * 60_000)
   }
   await forward(4 * 60 + 35)
-  await eng($).command.run(codex('off'))
+  await note($, 'Third')
   await forward(11 * 60)
-  await eng($).command.run(codex('on'))
+  await note($, 'Fourth')
   expect((await logOf($)).rows.map(r => r.time)).toEqual(['9:12 AM', '10:12 PM', '5:37 PM', '5:30 PM'])
 })
 
@@ -3208,7 +3163,7 @@ test('the log is plain text rows on both surfaces, with no Svg and no tint, and 
   const { world } = boot(on)
   await startSession($)
   await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
-  await eng($).command.run(codex('off'))
+  await note($, 'A decision', 'decision')
   world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
   await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
   for (const surface of SURFACES) {
@@ -3233,7 +3188,7 @@ test('the log is plain text rows on both surfaces, with no Svg and no tint, and 
 test('on the terminal the log is under the pull request card; on the desktop there is no pull request card above it', async ($, on) => {
   const { world } = boot(on)
   await follow109($)
-  await eng($).command.run(codex('off'))
+  await note($, 'A note')
   world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
   await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
   const term = await paneTexts($, 'terminal')
@@ -3246,41 +3201,42 @@ test('on the terminal the log is under the pull request card; on the desktop the
   expect(desk).not.toContain('Nothing waiting on you.')
 })
 
-test('the desktop pane with only a log entry draws it and not the empty line', async ($, on) => {
+test('the desktop pane with only a note draws it and not the empty line', async ($, on) => {
   boot(on)
   await startSession($)
   expect(await paneTexts($, 'desktop')).toContain('Nothing waiting on you.')
-  await eng($).command.run(codex('off'))
+  await note($, 'A first note')
   const t = await paneTexts($, 'desktop')
   expect(t).not.toContain('Nothing waiting on you.')
-  expect(t).toContain('Codex reviews turned off')
+  expect(t).toContain('A first note')
 })
 
 test('a new conversation empties the log; a reload and a compaction keep it', async ($, on) => {
   boot(on)
   const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
   await startSession($)
-  await eng($).command.run(codex('off'))
+  await note($, 'Before')
   await startSession($)
   await classic.SessionStart({ source: 'startup' })
   await classic.SessionStart({ source: 'compact' })
-  expect(await lines($)).toEqual(['⊘ Codex reviews turned off'])
+  expect(await lines($)).toEqual(['▸ Before'])
   for (const source of ['clear', 'resume', 'fork']) {
-    await eng($).command.run(codex('on'))
+    await note($, `Second ${source}`)
     expect(await lines($)).toHaveLength(2)
     await classic.SessionStart({ source })
     expect(await lines($)).toEqual([])
-    await eng($).command.run(codex('off'))
-    expect(await lines($)).toEqual(['⊘ Codex reviews turned off'])
+    await note($, `After ${source}`)
+    expect(await lines($)).toEqual([`▸ After ${source}`])
   }
 })
 
-test('the log and settings: a command other than codex-review-off and -on is not logged, and the pane never calls $.command.run', async ($, on) => {
+test('the pane never calls $.command.run, whatever its buttons do', async ($, on) => {
   const { world } = boot(on)
   await startSession($)
+  await note($, 'A note')
   await eng($).command.run({ command: 'mentat', args: 'pr 5' })
   await eng($).command.run({ command: 'mentat:come-again', args: '' })
-  expect(await lines($)).toEqual([])
+  expect(await lines($)).toEqual(['▸ A note'])
   for (const surface of SURFACES) {
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     for (const b of await pane.findAll({ type: 'Button' })) await pane.press({ key: String(b.key) })
@@ -3296,7 +3252,7 @@ test('no terminal Box has a backgroundColor: a terminal draws an 8-digit hex tin
   await eng($).tool.call({ tool: OPEN, question: 'Open one?' })
   await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Merge it' })
   await eng($).tool.call({ tool: OPEN, kind: 'alert', question: 'CI is red' })
-  await eng($).command.run({ command: 'mentat:codex-review-off', args: '' })
+  await note($, 'A note')
   world.agents = [{ id: 'a1', type: 'Explore', description: 'Look around', status: 'running' }]
   await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
   const opener = await mount($, PANE, 'terminal')
