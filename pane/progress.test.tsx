@@ -3396,3 +3396,51 @@ test('after /clear the label goes dim, then the new conversation is checked; a r
   expect(await nothingYet($)).toEqual({ text: '● Mentat', color: 'success', dim: false })
   expect(world.calls.filter(a => isCall(a, 'mentat', 'check')).length).toBe(2)
 })
+
+// ---- the band is one row; an open question survives what happens around it ----------------------------------
+
+test('the band is one row: the text, then one Box that holds the answer button, Dismiss, the link and Details, on both surfaces', async ($, on) => {
+  boot(on)
+  await open('question', 'Ship it?', { accept: 'Yes' })($)
+  for (const surface of SURFACES) {
+    const d = await mount($, BAND, surface)
+    // The buttons are in one Box that does not shrink or wrap; there is no second row of controls.
+    const controls = (await d.findAll({ type: 'Box' })).filter(b => b.props?.flexShrink === 0)
+    expect(controls).toHaveLength(1)
+    expect(controls[0]!.props?.flexDirection).toBe('row')
+    expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1'])
+    expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1', 'open'])
+    // The same in every state: a quiet band has just Details in that Box.
+    await d.unmount()
+  }
+  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
+  for (const surface of SURFACES) {
+    const d = await mount($, BAND, surface)
+    expect((await d.findAll({ type: 'Box' })).filter(b => b.props?.flexShrink === 0)).toHaveLength(1)
+    expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
+    await d.unmount()
+  }
+})
+
+test('with the pane open, a question opened by the agent is still open after the user types a message, and close_decision settles it', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  const pane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  const opened = await eng($).tool.call({ tool: OPEN, question: 'Ship it?', recommendation: 'Yes', accept: 'Yes' })
+  expect(String(opened.result)).toContain('d1')
+  // What can happen in the session meanwhile: the user's message (the agent's turn goes on), a model
+  // request, a timer-driven read, a reload and a compaction. None of them touches the open question.
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  await eng($).turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 'turn-main', reason: 'end_turn' })
+  await step($, undefined)
+  await startSession($)
+  await classic.SessionStart({ source: 'startup' })
+  await classic.SessionStart({ source: 'compact' })
+  expect(await bandTexts($)).toContain('Ship it?')
+  const closed = await eng($).tool.call({ tool: CLOSE, id: 'd1', outcome: 'No, do not ship' })
+  expect(closed.deny).toBeUndefined()
+  expect(String(closed.result)).toBe('Closed decision d1.')
+  expect(await bandTexts($)).toEqual(['Mentat'])
+  expect(world.sent).toEqual([])
+  await pane.unmount()
+})

@@ -1295,17 +1295,22 @@ export const register: Register = (on, _options) => {
     const answer = urgent !== undefined && kindOf(urgent) === 'question' && sent === undefined ? urgent.accept : undefined
     const link = urgent !== undefined && kindOf(urgent) !== 'question' ? urgent.link : undefined
     const { Box, Button, Link, Text } = $.ui.resolve(e)
-    const controls = urgent === undefined ? null : (
-      <>
-        {answer !== undefined && <Button key={`accept-${urgent.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, urgent, answer)} />}
+    // One row, never wrapped: the answer button (or the sent line), Dismiss, the link, then Details. It
+    // is one Box with every child its own, not a fragment: a fragment's children are not laid out as one row.
+    const controls = () => (
+      <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
+        {answer !== undefined && urgent !== undefined && (
+          <Button key={`accept-${urgent.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, urgent, answer)} />
+        )}
         {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
-        <Button key={`dismiss-${urgent.id}`} label="Dismiss" onPress={() => dismissItem($, urgent.id)} />
+        {urgent !== undefined && <Button key={`dismiss-${urgent.id}`} label="Dismiss" onPress={() => dismissItem($, urgent.id)} />}
         {link !== undefined && (
           <Text>
             <Link href={link} label={linkLabel(link)} />
           </Text>
         )}
-      </>
+        <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
+      </Box>
     )
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
@@ -1323,10 +1328,7 @@ export const register: Register = (on, _options) => {
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
             <Svg source={bandSvg(W, left, more)} alt={alt} width={W} height={28} />
-            <Box flexDirection="row" alignItems="center" gap={1}>
-              {controls}
-              <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
-            </Box>
+            {controls()}
           </Box>
           {beneath}
         </Box>
@@ -1347,10 +1349,7 @@ export const register: Register = (on, _options) => {
             {left.kind !== 'budget' && left.kind !== 'quiet' && <Text wrap="truncate-end">{left.text}</Text>}
             {more !== '' && <Text dimColor>{more}</Text>}
           </Box>
-          <Box flexDirection="row" alignItems="center" gap={1}>
-            {controls}
-            <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
-          </Box>
+          {controls()}
         </Box>
         {beneath}
       </Box>

@@ -15,7 +15,7 @@ The band above the prompt is always there, on the desktop and the terminal, in o
 3. Otherwise, the newest note in the Log (see below): the kind's icon and the text.
 4. Otherwise, a quiet `Mentat` line.
 
-The Details button is at the right in every state and opens the pane, as does `/mentat`. The band reads nothing from GitHub: a pull request with a final check posted no longer raises it. The `Final check on <sha>` comment the review skills ask for is still posted; the band does not look for it.
+The band is one row on both surfaces: the icon and the text, cut with `…` to fit, then in one row at the right the answer button, Dismiss, the link and the Details button. Details is there in every state and opens the pane, as does `/mentat`. The band reads nothing from GitHub: a pull request with a final check posted no longer raises it. The `Final check on <sha>` comment the review skills ask for is still posted; the band does not look for it.
 
 The band is hidden only while the app shows a survey.
 
