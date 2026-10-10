@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { COMMANDS, resetAt, withoutSettled } from './progress'
+import { AGENT_HEAD_H, AGENT_ROW_H, COMMANDS, resetAt, withoutSettled } from './progress'
 
 // Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
@@ -430,12 +430,12 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   const alt = (prefix: string) => svgs.find(v => v.alt.startsWith(prefix))
   expect(svgs.map(v => v.alt)).toEqual([
     'Question: Open it?',
-    'Running agents: 1',
+    'Running agents: 1 (general-purpose: Check the docs)',
   ])
   expect(svgs.flatMap(v => v.drawn).some(x => /context|5-hour|%/i.test(x))).toBe(false)
   expect(alt('Question')!.drawn).toEqual(expect.arrayContaining(['Open it?', '→ Yes']))
   expect(alt('#109')).toBeUndefined()
-  expect(alt('Running agents')!.drawn).toEqual(expect.arrayContaining(['Running · 1', 'Check the docs', 'general-purpose', 'Opus 4.8 · high']))
+  expect(alt('Running agents')!.drawn).toEqual(expect.arrayContaining(['Running · 1', 'Check the docs', 'Opus 4.8 · high']))
   // The buttons stay native, under the question card.
   expect((await cardKeys(pane))).toEqual(['accept-d1', 'answer-open-d1', 'dismiss-d1'])
   await pane.unmount()
@@ -1546,14 +1546,27 @@ const untilFacts = async ($: never, surface: 'terminal' | 'desktop', description
   throw new Error(`the ${surface} pane never showed "${fact}"; it showed ${JSON.stringify(last)}`)
 }
 
-// The facts line of a terminal row: the text after the description, past the status mark at the end of its line.
+// The facts of a terminal row, which is one line: the model and effort, then the status word, elapsed
+// time and tokens, as the texts between the description and the status mark at the end of the line,
+// joined with ' | '. A row with neither has ''.
 const MARKS = ['●', '✓', '✕', '○']
 const rowFor = (t: string[], description: string) => {
   const i = t.indexOf(description)
   if (i === -1) return undefined
+  let j = i + 1
+  while (j < t.length && !MARKS.includes(t[j]!)) j++
 
-  return MARKS.includes(t[i + 1]!) ? t[i + 2] : t[i + 1]
+  return t.slice(i + 1, j).join(' | ')
 }
+// The status mark at the end of a terminal row.
+const markFor = (t: string[], description: string) => {
+  const i = t.indexOf(description)
+  let j = i + 1
+  while (i !== -1 && j < t.length && !MARKS.includes(t[j]!)) j++
+
+  return i === -1 ? undefined : t[j]
+}
+const MARK_OF: Record<string, string> = { running: '●', waiting: '●', idle: '○', pending: '●', completed: '✓', failed: '✕', killed: '✕', unknown: '○' }
 
 test('an agent shows its description, type, model, effort, status and elapsed time; elapsed freezes when it ends', async ($, on) => {
   const { world, clock } = boot(on)
@@ -1563,15 +1576,15 @@ test('an agent shows its description, type, model, effort, status and elapsed ti
   await eng($).agent.spawn(spawn(id))
   await clock.advance(65_000)
   await new Promise(r => setTimeout(r, 30))
-  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · running · 1m 05s')
+  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('Opus 4.8 · high | 1m 05s')
 
   world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'completed' }]
   await clock.advance(1_000)
   await new Promise(r => setTimeout(r, 30))
-  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · completed · 1m 06s')
+  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('Opus 4.8 · high | 1m 06s')
   await clock.advance(120_000)
   await new Promise(r => setTimeout(r, 30))
-  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · completed · 1m 06s')
+  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('Opus 4.8 · high | 1m 06s')
 })
 
 test('a turn that completes is not the end of a waiting agent; tokens are those last reported', async ($, on) => {
@@ -1581,11 +1594,11 @@ test('a turn that completes is not the end of a waiting agent; tokens are those 
   await eng($).agent.spawn(spawn('a1', 'Look around', 'Explore'))
   await eng($).turn.complete(turnDone('a1', { input_tokens: 100, cache_creation_input_tokens: 400, output_tokens: 500, cache_read_input_tokens: 99999, model: 'm' }))
   await clock.advance(10_000)
-  expect(rowFor(await paneTexts($), 'Look around')).toBe('Explore · Opus 4.8 · waiting · 10s · 1.0k reported')
+  expect(rowFor(await paneTexts($), 'Look around')).toBe('Opus 4.8 | waiting · 10s · 1.0k tokens')
 
   await eng($).turn.complete(turnDone('a1', { input_tokens: 1, cache_creation_input_tokens: 2, output_tokens: 12000, cache_read_input_tokens: 0, model: 'm' }))
   await clock.advance(114_000)
-  expect(rowFor(await paneTexts($), 'Look around')).toBe('Explore · Opus 4.8 · waiting · 2m 04s · 12k reported')
+  expect(rowFor(await paneTexts($), 'Look around')).toBe('Opus 4.8 | waiting · 2m 04s · 12k tokens')
 })
 
 test('every agent status is shown as it is, running and waiting first', async ($, on) => {
@@ -1600,7 +1613,12 @@ test('every agent status is shown as it is, running and waiting first', async ($
   const t = await paneTexts($)
   const order = t.filter(x => x.startsWith('Agent '))
   expect(order.slice(0, 2).sort()).toEqual(['Agent running', 'Agent waiting'])
-  for (const s of statuses) expect(rowFor(t, `Agent ${s}`)).toContain(` · ${s} · `)
+  // The mark says running and completed; the other statuses are also said in words.
+  for (const s of statuses) {
+    expect(markFor(t, `Agent ${s}`)).toBe(MARK_OF[s])
+    if (s === 'running' || s === 'completed') expect(rowFor(t, `Agent ${s}`)).not.toContain(s)
+    else expect(rowFor(t, `Agent ${s}`)).toContain(`${s} · `)
+  }
 })
 
 test('after a reload the mod keeps what it knew, shows unknown agents without a model or elapsed time, and notices ends', async ($, on) => {
@@ -1618,8 +1636,8 @@ test('after a reload the mod keeps what it knew, shows unknown agents without a 
   await startSession($)
   await new Promise(r => setTimeout(r, 30))
   const t = await paneTexts($)
-  expect(rowFor(t, 'Known one')).toBe('general-purpose · Opus 4.8 · completed · 30s')
-  expect(rowFor(t, 'Unseen one')).toBe('Explore · running')
+  expect(rowFor(t, 'Known one')).toBe('Opus 4.8 | 30s')
+  expect(rowFor(t, 'Unseen one')).toBe('')
 })
 
 test('an agent that vanishes from the engine\'s list is shown as ended, not as finished', async ($, on) => {
@@ -1631,7 +1649,7 @@ test('an agent that vanishes from the engine\'s list is shown as ended, not as f
   world.agents = []
   await clock.advance(1_000)
   await new Promise(r => setTimeout(r, 30))
-  expect(rowFor(await paneTexts($), 'Gone one')).toBe('general-purpose · Opus 4.8 · ended · 5s')
+  expect(rowFor(await paneTexts($), 'Gone one')).toBe('Opus 4.8 | ended · 5s')
 })
 
 // ---- the effort of each agent, and finished agents dimmed ---------------------------------------------------
@@ -1642,13 +1660,13 @@ test('a subagent\'s requests set the effort of its row on both surfaces; the Age
   const id = await callAgent(world, $, 'low')
   world.agents = [{ id, type: 'general-purpose', description: 'Check the docs', status: 'running' }]
   await eng($).agent.spawn(spawn(id))
-  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('general-purpose · Opus 4.8 · low · running · 0s')
+  expect(rowFor(await paneTexts($), 'Check the docs')).toBe('Opus 4.8 · low | 0s')
 
   await step($, id, 'high')
   await until(() => world.steps.length === 1, 'the step')
   for (const surface of SURFACES) {
     const t = await untilFacts($, surface, 'Check the docs', 'high')
-    if (surface === 'terminal') expect(rowFor(t, 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · running · 0s')
+    if (surface === 'terminal') expect(rowFor(t, 'Check the docs')).toBe('Opus 4.8 · high | 0s')
     else expect(t).toContain('Opus 4.8 · high')
   }
 
@@ -1660,7 +1678,7 @@ test('a subagent\'s requests set the effort of its row on both surfaces; the Age
 
   // A number is a budget.
   await step($, id, 8000, 2)
-  expect(rowFor(await untilFacts($, 'terminal', 'Check the docs', '8.0k budget'), 'Check the docs')).toContain('· 8.0k budget ·')
+  expect(rowFor(await untilFacts($, 'terminal', 'Check the docs', '8.0k budget'), 'Check the docs')).toContain('Opus 4.8 · 8.0k budget')
 })
 
 test('a request of the main session changes no row, and a request of an agent without effort changes nothing', async ($, on) => {
@@ -1674,7 +1692,7 @@ test('a request of the main session changes no row, and a request of an agent wi
   // The next request, which does change the row, shows the two before it changed nothing.
   await step($, id, 'high', 2)
   const t = await untilFacts($, 'terminal', 'Check the docs', 'high')
-  expect(rowFor(t, 'Check the docs')).toBe('general-purpose · Opus 4.8 · high · running · 0s')
+  expect(rowFor(t, 'Check the docs')).toBe('Opus 4.8 · high | 0s')
   expect(t.join('|')).not.toContain('max')
 })
 
@@ -1684,7 +1702,7 @@ test('a request that comes before the agent\'s row is kept for the row', async (
   await step($, 'a1', 'xhigh')
   world.agents = [{ id: 'a1', type: 'general-purpose', description: 'Late row', status: 'running' }]
   await eng($).agent.spawn(spawn('a1', 'Late row'))
-  expect(rowFor(await paneTexts($), 'Late row')).toBe('general-purpose · Opus 4.8 · xhigh · running · 0s')
+  expect(rowFor(await paneTexts($), 'Late row')).toBe('Opus 4.8 · xhigh | 0s')
 })
 
 test('an agent the mod never saw spawn takes the effort its requests used when the engine\'s list brings it in', async ($, on) => {
@@ -1695,7 +1713,7 @@ test('an agent the mod never saw spawn takes the effort its requests used when t
   await until(() => world.steps.length === 1, 'the step')
   world.agents = [{ id: 'z9', type: 'Explore', description: 'Unseen one', status: 'running' }]
   await startSession($)
-  expect(rowFor(await untilFacts($, 'terminal', 'Unseen one', 'xhigh'), 'Unseen one')).toBe('Explore · xhigh · running')
+  expect(rowFor(await untilFacts($, 'terminal', 'Unseen one', 'xhigh'), 'Unseen one')).toBe('xhigh')
   expect(await untilFacts($, 'desktop', 'Unseen one', 'xhigh')).toContain('xhigh')
 
   // y8 steps, and the engine's next check of its list (once a second, while an agent runs) brings it in.
@@ -1703,7 +1721,7 @@ test('an agent the mod never saw spawn takes the effort its requests used when t
   await until(() => world.steps.length === 2, 'the step')
   world.agents = [...world.agents, { id: 'y8', type: 'Plan', description: 'Other one', status: 'running' }]
   await clock.advance(1_000)
-  expect(rowFor(await untilFacts($, 'terminal', 'Other one', 'low'), 'Other one')).toBe('Plan · low · running')
+  expect(rowFor(await untilFacts($, 'terminal', 'Other one', 'low'), 'Other one')).toBe('low')
 })
 
 test('turn.step passes the request on unchanged and returns what is beneath', async ($, on) => {
@@ -1740,8 +1758,8 @@ test('finished agents are drawn dimmed, on the desktop in the muted color and on
   expect(classOf('Finished fine')).toBe('m')
   expect(classOf('Finished badly')).toBe('m')
   // The time, and the model and the facts after the type, are muted too; the mark keeps its color.
-  expect(agentsSvg.source).toMatch(/<tspan class="m"[^>]*>/)
-  expect(agentsSvg.source).toMatch(/<tspan class="s"[^>]*>/)
+  expect(agentsSvg.source).toMatch(/<text class="m"[^>]*font-size="12">Opus 4.8</)
+  expect(agentsSvg.source).toMatch(/<text class="s"[^>]*font-size="12">Opus 4.8</)
   expect(agentsSvg.source).toMatch(/<text class="m"[^>]*text-anchor="end"/)
   expect(agentsSvg.source).toMatch(/<text class="s"[^>]*text-anchor="end"/)
   expect(agentsSvg.source).toContain('stroke="#')
@@ -1753,7 +1771,8 @@ test('finished agents are drawn dimmed, on the desktop in the muted color and on
   expect(dim('Still going')).toBeFalsy()
   expect(dim('Finished fine')).toBe(true)
   expect(dim('Finished badly')).toBe(true)
-  expect(texts.find(x => x.text?.startsWith('general-purpose · Opus 4.8 · running'))?.props?.dimColor).toBe(true)
+  // The facts are dim on every row, running or finished; so is the role mark of a finished one.
+  expect(texts.filter(x => x.text === 'Opus 4.8').map(x => x.props?.dimColor)).toEqual([true, true, true])
 })
 
 // ---- the agents card: role icon, status on the right, running and finished groups ---------------------------
@@ -1770,7 +1789,7 @@ const untilRowsAre = async ($: never, list: { description: string; status: strin
   let last: string[] = []
   for (let i = 0; i < 300; i++) {
     last = await paneTexts($, 'terminal')
-    if (list.every(a => rowFor(last, a.description)?.includes(` · ${a.status === 'unknown' ? 'ended' : a.status}`))) return
+    if (list.every(a => markFor(last, a.description) === MARK_OF[a.status])) return
     await new Promise(r => setTimeout(r, 5))
   }
   throw new Error(`the rows never showed ${JSON.stringify(list)}; the pane showed ${JSON.stringify(last)}`)
@@ -1783,7 +1802,7 @@ const seedAgents = async (w: World, clock: { advance: (ms: number) => Promise<un
   await untilRowsAre($, list)
 }
 
-test('each agent row has the icon of its role, a role label in the role color, and the model and effort after it', async ($, on) => {
+test('each agent row has the icon of its role in the role color, no role name drawn, and the role in the alt text', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   await seedAgents(world, clock, $, [
@@ -1802,15 +1821,101 @@ test('each agent row has the icon of its role, a role label in the role color, a
   expect(count(/data-role="builder"/g)).toBe(2)
   for (const role of ['explore', 'plan', 'other']) expect(count(new RegExp(`data-role="${role}"`, 'g'))).toBe(1)
   expect(count(/data-role=/g)).toBe(5)
-  // The glyph and the label share the role's color.
-  const labelOf = (hue: string, text: string) => new RegExp(`<tspan fill="${hue}"[^>]*>${text}</tspan>`).test(src)
-  expect(count(new RegExp(`<tspan fill="${HUES.violet}"[^>]*>builder</tspan>`, 'g'))).toBe(2)
-  expect(labelOf(HUES.blue, 'explore')).toBe(true)
-  expect(labelOf(HUES.teal, 'plan')).toBe(true)
-  expect(labelOf(HUES.grey, 'general-purpose')).toBe(true)
-  expect(src).toContain(`<g data-role="explore" transform="translate(21 ${55 + 64 * 2}) scale(0.75)" fill="none" stroke="${HUES.blue}"`)
-  // The model and effort follow the label, in the secondary color.
-  expect(live!.drawn).toEqual(expect.arrayContaining(['builder', 'explore', 'plan', 'Opus 4.8']))
+  // The glyph is drawn in the role's color.
+  expect(count(new RegExp(`data-role="builder"[^>]*stroke="${HUES.violet}"`, 'g'))).toBe(2)
+  expect(src).toMatch(new RegExp(`data-role="explore"[^>]*stroke="${HUES.blue}"`))
+  expect(src).toMatch(new RegExp(`data-role="plan"[^>]*stroke="${HUES.teal}"`))
+  expect(src).toMatch(new RegExp(`data-role="other"[^>]*stroke="${HUES.grey}"`))
+  // The third row's icon is centered in its row: the header, then two rows above it.
+  const cy = AGENT_HEAD_H + AGENT_ROW_H * 2 + AGENT_ROW_H / 2
+  expect(src).toContain(`<g data-role="explore" transform="translate(${24 - 7.2} ${cy - 7.2}) scale(0.6)" fill="none" stroke="${HUES.blue}"`)
+  // The role is not drawn as a word; the model and effort are, once per row, in the secondary color.
+  expect(live!.drawn).not.toEqual(expect.arrayContaining(['builder']))
+  expect(live!.drawn.filter(x => ['builder', 'explore', 'plan', 'general-purpose'].includes(x))).toEqual([])
+  expect(live!.drawn.filter(x => x === 'Opus 4.8').length).toBe(5)
+  // It stays in the alt text.
+  expect(live!.alt).toBe('Running agents: 5 (builder: Build it; builder: Build more; explore: Look around; plan: Plan it; general-purpose: Do other things)')
+})
+
+test('an agent row is one line: icon, title, model and effort, then the stats and the status mark at the right', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  const id = await callAgent(world, $, 'high')
+  world.agents = [
+    { id, type: 'builder', description: 'Check the docs', status: 'running' },
+    { id: 'c1', type: 'Explore', description: 'Finished fine', status: 'completed' },
+  ]
+  await eng($).agent.spawn(spawn(id, 'Check the docs', 'builder'))
+  await eng($).agent.spawn(spawn('c1', 'Finished fine', 'Explore'))
+  await eng($).turn.complete(turnDone(id, { input_tokens: 1, cache_creation_input_tokens: 2, output_tokens: 12000, cache_read_input_tokens: 0, model: 'm' }))
+  await clock.advance(65_000)
+  await untilRowsAre($, [{ description: 'Finished fine', status: 'completed' }])
+  const W = 60 * 8 - 24
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const { live, done } = await agentSvgs(d)
+  await d.unmount()
+  // The card is the header and one row high, not three lines.
+  expect(AGENT_ROW_H).toBeLessThan(40)
+  expect(Number(/height="(\d+)"/.exec(live!.source)![1])).toBeLessThan(AGENT_HEAD_H + AGENT_ROW_H + 10)
+  const y = (re: RegExp) => Number(re.exec(live!.source)![1])
+  const titleY = y(/<text class="t"[^>]* y="([\d.]+)"[^>]*>Check the docs</)
+  const modelY = y(/<text class="s"[^>]* y="([\d.]+)"[^>]*>Opus 4.8 · high</)
+  const statsY = y(/<text class="s"[^>]* y="([\d.]+)"[^>]*text-anchor="end"[^>]*>12k tokens · 1m 05s</)
+  // All on one line: the baselines are within two pixels of each other.
+  expect(Math.max(titleY, modelY, statsY) - Math.min(titleY, modelY, statsY)).toBeLessThanOrEqual(2)
+  // Left to right: title, then the model and effort, then the stats, which end before the mark.
+  const titleX = y(/<text class="t" x="([\d.]+)"[^>]*>Check the docs</)
+  const modelX = y(/<text class="s" x="([\d.]+)"[^>]*>Opus 4.8 · high</)
+  const statsX = y(/<text class="s" x="([\d.]+)"[^>]*text-anchor="end"[^>]*>12k/)
+  expect(modelX).toBeGreaterThan(titleX)
+  expect(modelX).toBeLessThan(statsX)
+  expect(statsX).toBeLessThan(W - 26)
+  expect(done!.source).toContain('>Finished fine</text>')
+})
+
+test('a long title is cut with an ellipsis on the desktop, keeping the model, the stats and the mark in the row', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  const long = 'A very long agent description that goes on and on past the end of the row and then some more'
+  await seedAgents(world, clock, $, [{ id: 'r1', type: 'builder', description: long, status: 'running' }])
+  const W = 60 * 8 - 24
+  const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
+  const { live } = await agentSvgs(d)
+  await d.unmount()
+  const title = /<text class="t"[^>]*>([^<]*…)<\/text>/.exec(live!.source)![1]!
+  expect(title.length).toBeLessThan(long.length)
+  expect(long.startsWith(title.slice(0, -1))).toBe(true)
+  const titleX = Number(/<text class="t" x="([\d.]+)"/.exec(live!.source)![1])
+  const modelX = Number(/<text class="s" x="([\d.]+)"[^>]*>Opus 4.8</.exec(live!.source)![1])
+  const statsX = Number(/<text class="s" x="([\d.]+)"[^>]*text-anchor="end"/.exec(live!.source)![1])
+  // The cut title ends before the model, and the model before the stats.
+  expect(modelX).toBeGreaterThan(titleX + 40)
+  expect(modelX).toBeLessThan(statsX)
+  expect(statsX).toBeLessThan(W - 26)
+  // The alt text keeps the whole title.
+  expect(live!.alt).toContain(long)
+})
+
+test('a terminal agent row is one line with a truncating title, no background and the facts dim', async ($, on) => {
+  const { world, clock } = boot(on)
+  await startSession($)
+  await seedAgents(world, clock, $, [
+    { id: 'b1', type: 'builder', description: 'Build it', status: 'running' },
+    { id: 'c1', type: 'Explore', description: 'Finished fine', status: 'completed' },
+  ])
+  const t = await mount($, PANE, 'terminal', { bodyColumns: 60 })
+  const texts = await t.findAll({ type: 'Text' })
+  const boxes = await t.findAll({ type: 'Box' })
+  await t.unmount()
+  expect(texts.find(x => x.text === 'Build it')?.props?.wrap).toBe('truncate-end')
+  expect(texts.find(x => x.text === 'Finished fine')?.props?.wrap).toBe('truncate-end')
+  expect(boxes.some(b => b.props?.backgroundColor !== undefined)).toBe(false)
+  // The row reads: role mark, title, model, elapsed, status mark.
+  const all = texts.map(x => x.text)
+  const i = all.indexOf('Build it')
+  expect(all.slice(i - 1, i + 4)).toEqual(['◆', 'Build it', 'Opus 4.8', '1s', '●'])
+  const j = all.indexOf('Finished fine')
+  expect(all.slice(j - 1, j + 4)).toEqual(['◎', 'Finished fine', 'Opus 4.8', '1s', '✓'])
 })
 
 test('the status mark is at the right edge of the row, after the title; the role icon is at the left', async ($, on) => {
@@ -1828,7 +1933,7 @@ test('the status mark is at the right edge of the row, after the title; the role
   await d.unmount()
   const titleX = Number(/<text class="t" x="(\d+)"[^>]*>Still going<\/text>/.exec(live!.source)![1])
   const markX = (src: string, hue: string) => Number(new RegExp(`<circle cx="([\\d.]+)" cy="[\\d.]+" r="[\\d.]+" fill="${hue}"`).exec(src)![1])
-  const iconX = Number(/<g data-role="other" transform="translate\((\d+) /.exec(live!.source)![1])
+  const iconX = Number(/<g data-role="other" transform="translate\(([\d.]+) /.exec(live!.source)![1])
   for (const x of [markX(live!.source, HUES.blue), markX(done!.source, HUES.green), markX(done!.source, HUES.red)]) {
     expect(x).toBeGreaterThan(titleX)
     expect(x).toBeGreaterThan(W - 40)
@@ -1926,7 +2031,7 @@ test('a group with no rows is not drawn: no Finished button when none finished, 
   }
 })
 
-test('the third line has the tokens and the elapsed time, and leaves out what is missing', async ($, on) => {
+test('the row has the tokens and the elapsed time at the right, and leaves out what is missing', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   await seedAgents(world, clock, $, [
@@ -1944,7 +2049,7 @@ test('the third line has the tokens and the elapsed time, and leaves out what is
   const stats = [...live!.source.matchAll(/<text class="s"[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/g)].map(m => m[1])
   expect(stats).toContain('12k tokens · 2m 05s')
   expect(stats).toContain('2m 05s')
-  // An agent with neither has no third line at all.
+  // An agent with neither has no stats at all.
   expect(stats.length).toBe(2)
   expect(live!.source).toMatch(/text-anchor="end"/)
 })
@@ -1960,12 +2065,12 @@ test('below 48 columns secondary agent facts drop', async ($, on) => {
   await eng($).agent.spawn(spawn(id, 'Narrow one'))
   await eng($).turn.complete(turnDone(id, { input_tokens: 1000, cache_creation_input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, model: 'm' }))
   const wide = await paneTexts($, 'terminal', 60)
-  expect(rowFor(wide, 'Narrow one')).toContain('reported')
+  expect(rowFor(wide, 'Narrow one')).toContain('1.0k tokens')
   const narrow = await paneTexts($, 'terminal', 40)
   const facts = rowFor(narrow, 'Narrow one') ?? ''
-  expect(facts).not.toContain('reported')
+  expect(facts).not.toContain('tokens')
   expect(facts).not.toContain('high')
-  expect(facts).toContain('running')
+  expect(facts).toContain('Opus 4.8')
 })
 
 test('the pane shows no usage on either surface: no tiles, no meters, no resets', async ($, on) => {
@@ -3212,7 +3317,7 @@ test('the log is plain text rows on both surfaces, with no Svg and no tint, and 
   }
   // On the desktop the log is not an Svg: the Svg elements are the question and the agents.
   const d = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect((await svgsOf(d)).map(v => v.alt)).toEqual(['Question: Open one?', 'Running agents: 1'])
+  expect((await svgsOf(d)).map(v => v.alt)).toEqual(['Question: Open one?', 'Running agents: 1 (explore: Look around)'])
   await d.unmount()
 })
 
