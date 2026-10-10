@@ -73,24 +73,10 @@ export type ReviewSnapshot = {
   isFinalChecked: boolean
 }
 
-// The kinds of entry in the pane's Log card; each has its own icon.
-export type LogKind =
-  | 'pr-open'
-  | 'pr-ready'
-  | 'pr-close'
-  | 'pr-merge'
-  | 'issue-open'
-  | 'issue-close'
-  | 'question'
-  | 'action'
-  | 'alert'
-  | 'codex-off'
-  | 'codex-on'
-  | 'builder-start'
-  | 'builder-done'
-  | 'builder-fail'
+// The kinds of note in the pane's Log card; each has its own icon and color.
+export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
-// One line of the Log card: when it happened (clock time), its kind and its text (one line).
+// One line of the Log card, a note Claude Code added: when (clock time), its kind and its text (one line).
 export type LogEntry = { at: number; kind: LogKind; text: string }
 
 // The last `mentat check` of the main session: pass, pass with warnings, or fail.

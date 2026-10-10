@@ -16,6 +16,7 @@ const PANE = 'mentat'
 const TITLE = 'Mentat'
 const OPEN_TOOL = `mcp__${PLUGIN}__open_decision`
 const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
+const NOTE_TOOL = `mcp__${PLUGIN}__note`
 const CODEX_APP = 'chatgpt-codex-connector[bot]'
 const SUMMARY_MARK = '<!-- codex-pull-request-review-summary -->'
 const STALE_MS = 5 * 60_000
@@ -27,7 +28,7 @@ const SECTION_GAP = 2
 // The Log card keeps this many entries, shows the newest LOG_SHOWN until `Show all`, and cuts a line at LOG_WIDTH characters.
 const LOG_LIMIT = 200
 const LOG_SHOWN = 5
-const LOG_WIDTH = 60
+const LOG_WIDTH = 80
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
@@ -69,80 +70,22 @@ export const COMMANDS: { name: string; use: string }[] = [
 const commandsTable = (): string =>
   ['| Command | Use |', '| --- | --- |', ...COMMANDS.map(c => `| \`${c.name}\` | ${c.use} |`)].join('\n')
 
-// The pane's Log card: one line per event the pane saw, with an icon for its kind. The color is a
-// theme color, so the line reads on the terminal and the desktop.
+// The pane's Log card: the notes Claude Code adds with the `note` tool, each with an icon and a color for its
+// kind. The color is a theme color, so the line reads on the terminal and the desktop.
 const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
-  'pr-open': { icon: '↑', color: 'suggestion' },
-  'pr-ready': { icon: '↑', color: 'success' },
-  'pr-close': { icon: '✕', color: 'text' },
-  'pr-merge': { icon: '✓', color: 'success' },
-  'issue-open': { icon: '○', color: 'suggestion' },
-  'issue-close': { icon: '●', color: 'text' },
-  question: { icon: '?', color: 'warning' },
-  action: { icon: '→', color: 'suggestion' },
-  alert: { icon: '!', color: 'error' },
-  'codex-off': { icon: '⊘', color: 'warning' },
-  'codex-on': { icon: '⊙', color: 'success' },
-  'builder-start': { icon: '▸', color: 'suggestion' },
-  'builder-done': { icon: '✓', color: 'success' },
-  'builder-fail': { icon: '✕', color: 'error' },
+  decision: { icon: '◆', color: 'suggestion' },
+  plan: { icon: '▸', color: 'text' },
+  surprise: { icon: '!', color: 'warning' },
+  waiting: { icon: '◌', color: 'subtle' },
+  done: { icon: '✓', color: 'success' },
 }
+const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
+const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
 
 // ---- plain helpers (no $) -----------------------------------------------------------
 
 const cleanTitle = (t: string): string => t.replace(/^[a-z]+(\([^)]*\))?!?:\s*/, '').replace(/^\w/, c => c.toUpperCase())
 type LogDraft = { kind: LogKind; text: string }
-const withTitle = (head: string, title: string | undefined): string => (title === undefined || title.trim() === '' ? head : `${head}: ${cleanTitle(title.trim())}`)
-const lastMatch = (text: string, re: RegExp): RegExpMatchArray | undefined => [...text.matchAll(re)].pop()
-// The title a `gh ... create` command was given: `--title "..."`, `--title=...` or `-t ...`.
-const titleOf = (command: string): string | undefined => {
-  const m = /(?:^|\s)(?:--title|-t)(?:\s+|=)(?:"([^"]*)"|'([^']*)'|([^\s"']+))/.exec(command)
-
-  return m === null ? undefined : (m[1] ?? m[2] ?? m[3])
-}
-const GH_ISSUE_URL = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/(\d+)/g
-// What a main-session Bash call says happened to a pull request or an issue. A created pull request or
-// issue is known by its URL in the output; a ready or closed one by `gh`'s own success line (which `gh`
-// writes to stderr), so a failed command, which prints neither, logs nothing.
-const bashLog = (command: string, stdout: string, output: string): LogDraft[] => {
-  const drafts: LogDraft[] = []
-  if (/\bgh\s+pr\s+create\b/.test(command)) {
-    const url = lastMatch(stdout, ghPrUrl)
-    if (url !== undefined) drafts.push({ kind: 'pr-open', text: withTitle(`Opened PR #${url[2]}`, titleOf(command)) })
-  }
-  if (/\bgh\s+pr\s+ready\b/.test(command)) {
-    for (const m of output.matchAll(/Pull request \S*#(\d+) is marked as "ready for review"/g)) drafts.push({ kind: 'pr-ready', text: `PR #${m[1]} ready for review` })
-  }
-  if (/\bgh\s+pr\s+close\b/.test(command)) {
-    for (const m of output.matchAll(/Closed pull request \S*#(\d+)(?: \((.*)\))?/g)) drafts.push({ kind: 'pr-close', text: withTitle(`Closed PR #${m[1]}`, m[2]) })
-  }
-  if (/\bgh\s+issue\s+create\b/.test(command)) {
-    const url = lastMatch(stdout, GH_ISSUE_URL)
-    if (url !== undefined) drafts.push({ kind: 'issue-open', text: withTitle(`Opened issue #${url[1]}`, titleOf(command)) })
-  }
-  if (/\bgh\s+issue\s+close\b/.test(command)) {
-    for (const m of output.matchAll(/Closed issue \S*#(\d+)(?: \((.*)\))?/g)) drafts.push({ kind: 'issue-close', text: withTitle(`Closed issue #${m[1]}`, m[2]) })
-  }
-
-  return drafts
-}
-// A settled question, action or alert: its text cut to leave room for the outcome.
-const decisionLog = (d: Decision, outcome: string | undefined): LogDraft => {
-  const kind: LogKind = kindOf(d) === 'action' ? 'action' : kindOf(d) === 'alert' ? 'alert' : 'question'
-  const result = oneLine(outcome ?? '', 28)
-
-  return { kind, text: result === '' ? `Settled: ${d.question}` : `${oneLine(d.question, LOG_WIDTH - 3 - [...result].length)} → ${result}` }
-}
-// Builders that went from not ended to completed, failed or killed between two lists of rows.
-const builderEnds = (before: AgentRow[], after: AgentRow[]): LogDraft[] =>
-  after.flatMap((row): LogDraft[] => {
-    const was = before.find(r => r.id === row.id)
-    if (was === undefined || isEnded(was.status) || roleOf(row.type).role !== 'builder') return []
-    if (row.status === 'completed') return [{ kind: 'builder-done', text: `Builder finished: ${row.description}` }]
-    if (row.status === 'failed') return [{ kind: 'builder-fail', text: `Builder failed: ${row.description}` }]
-    if (row.status === 'killed') return [{ kind: 'builder-fail', text: `Builder stopped: ${row.description}` }]
-    return []
-  })
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 const shortModel = (model: string): string =>
   model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, ' $1.$2').replace(/^\w/, c => c.toUpperCase())
@@ -543,27 +486,13 @@ async function addLog($: EngineInterface, at: number, drafts: LogDraft[]): Promi
   })
 }
 
-// Logs events seen now, then redraws.
-async function logNow($: EngineInterface, drafts: LogDraft[]): Promise<void> {
-  if (drafts.length === 0) return
-  try {
-    const at = await $.clock.now()
-    await inTurn(() => addLog($, at, drafts))
-    await invalidate($)
-  } catch {
-    // the log is best effort
-  }
-}
-
 async function syncAgents($: EngineInterface, efforts: ReadonlyMap<string, string>): Promise<void> {
   try {
     const infos = (await $.agent.list()) as AgentInfoLike[]
     const now = await $.clock.now()
     await inTurn(async () => {
       const before = await read($, agents)
-      const after = reconcile(before, infos, now, efforts)
-      await update($, agents, () => after)
-      await addLog($, now, builderEnds(before, after))
+      await update($, agents, () => reconcile(before, infos, now, efforts))
     })
   } catch {
     // the next check tries again
@@ -610,13 +539,8 @@ async function commitPr($: EngineInterface, ref: string, seq: number, snapshot: 
       await update($, prMark, () => failedMark(mark, seq, at))
       return false
     }
-    const before = await read($, prAtom)
     await update($, prAtom, () => snapshot)
     await update($, prMark, () => ({ seq, okAt: at, failedAt: 0 }))
-    // A followed pull request that was open (or closed) on the last read and is merged on this one.
-    if (snapshot.state === 'MERGED' && before !== null && before.state !== 'MERGED') {
-      await addLog($, at, [{ kind: 'pr-merge', text: withTitle(`Merged PR #${snapshot.number}`, snapshot.title) }])
-    }
     const review = await read($, reviewAtom)
     if (review !== null && review.head !== snapshot.head) await update($, reviewAtom, () => null)
     return true
@@ -824,15 +748,6 @@ async function startCheck($: EngineInterface, cwd?: string): Promise<void> {
   } catch {
     // no mentat to run, or the engine is gone: the label stays as it is
   }
-}
-
-// Everything a Bash result says: its stdout and stderr, and the text the model read. The stderr
-// matters: `gh` writes its success lines for `pr ready`, `pr close` and `issue close` there.
-const ranOutput = (ran: { result?: unknown; text?: unknown }): string => {
-  const record = ran.result
-  const typed = typeof record === 'object' && record !== null ? (record as { stdout?: unknown; stderr?: unknown }) : undefined
-
-  return [typed?.stdout, typed?.stderr, typeof record === 'string' ? record : undefined, ran.text].filter((part): part is string => typeof part === 'string').join('\n')
 }
 
 // A `mentat review` command names its pull request before it runs, so the card is
@@ -1120,6 +1035,27 @@ export const register: Register = (on, _options) => {
       },
       isDeferred: false,
     })
+    await $.tool.register({
+      name: 'note',
+      description:
+        'Add one plain line to the Log in the user\'s Mentat pane, a short running record of the session. ' +
+        'Add a note only at a notable moment: a decision the user made, a change of plan, something surprising you found, what you now wait on, or a piece of work finished. ' +
+        'Write one line in plain words. A few notes an hour at most, and never for routine steps such as reading files, running tests or opening a pull request. ' +
+        'Returns a short acknowledgement.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'One plain line, about 80 characters at most; longer text is cut with an ellipsis' },
+          kind: {
+            type: 'string',
+            enum: [...NOTE_KINDS],
+            description: 'decision, plan (the default), surprise, waiting or done',
+          },
+        },
+        required: ['text'],
+      },
+      isDeferred: false,
+    })
 
     // A (re)load: reconcile the agents with the engine's list and start the timers
     // over; reads that a former load left running are told apart by their sequence number.
@@ -1185,20 +1121,6 @@ export const register: Register = (on, _options) => {
     return { text: `Following ${ref}.` }
   })
 
-  // Codex reviews turned off or on: the command is logged and runs as it would without this hook.
-  for (const [name, kind, text] of [
-    ['codex-review-off', 'codex-off', 'Codex reviews turned off'],
-    ['codex-review-on', 'codex-on', 'Codex reviews turned on'],
-  ] as const) {
-    for (const command of [`mentat:${name}`, name]) {
-      on('command.run', { command }, async ($, e, next) => {
-        await logNow($, [{ kind, text }])
-
-        return next(e)
-      })
-    }
-  }
-
   on('tool.call', { tool: OPEN_TOOL }, async ($, e) => {
     const input = e as unknown as { kind?: unknown; question?: unknown; recommendation?: unknown; accept?: unknown; link?: unknown }
     const question = typeof input.question === 'string' ? input.question.trim() : ''
@@ -1229,16 +1151,13 @@ export const register: Register = (on, _options) => {
   })
 
   on('tool.call', { tool: CLOSE_TOOL }, async ($, e) => {
-    const input = e as unknown as { id?: unknown; outcome?: unknown }
+    const input = e as unknown as { id?: unknown }
     const id = typeof input.id === 'string' ? input.id : ''
-    const outcome = typeof input.outcome === 'string' ? input.outcome : undefined
     const isClosed = await inTurn(async () => {
       const list = await read($, items)
-      const settled = list.find(d => d.id === id)
-      if (settled === undefined) {
+      if (!list.some(d => d.id === id)) {
         return false
       }
-      await addLog($, await $.clock.now(), [decisionLog(settled, outcome)])
       // A closed decision is dropped: nothing shows settled ones.
       await update($, items, all => all.filter(d => d.id !== id))
       await update($, sentAtom, sent => sent.filter(x => x.id !== id))
@@ -1250,6 +1169,22 @@ export const register: Register = (on, _options) => {
     await invalidate($)
 
     return { result: `Closed decision ${id}.` }
+  })
+
+  on('tool.call', { tool: NOTE_TOOL }, async ($, e) => {
+    const input = e as unknown as { text?: unknown; kind?: unknown }
+    const text = typeof input.text === 'string' ? oneLine(input.text, LOG_WIDTH) : ''
+    if (text === '') {
+      return { deny: 'note needs a line of text.' }
+    }
+    if (input.kind !== undefined && !isNoteKind(input.kind)) {
+      return { deny: `note kind must be ${NOTE_KINDS.join(', ')}.` }
+    }
+    const kind: LogKind = input.kind ?? 'plan'
+    await inTurn(async () => addLog($, await $.clock.now(), [{ kind, text }]))
+    await invalidate($)
+
+    return { result: 'Noted.' }
   })
 
   on('tool.call', async ($, e, next) => {
@@ -1264,7 +1199,6 @@ export const register: Register = (on, _options) => {
       const stdout = str(asObj((ran as { result?: unknown }).result).stdout)
       void afterBash($, e.command as string, stdout)
       await afterCheck($, e.command as string, ran as { result?: unknown; text?: unknown; deny?: unknown })
-      if ((ran as { deny?: unknown }).deny === undefined) await logNow($, bashLog(e.command as string, stdout, ranOutput(ran as { result?: unknown; text?: unknown })))
     }
 
     return ran
@@ -1289,7 +1223,6 @@ export const register: Register = (on, _options) => {
     effortByCall.delete(e.tool_use_id)
     await inTurn(async () => {
       await update($, agents, list => [...list.filter(a => a.id !== id), row].slice(-30))
-      if (roleOf(row.type).role === 'builder') await addLog($, startedAt, [{ kind: 'builder-start', text: `Builder started: ${row.description}` }])
     })
     await invalidate($)
 
