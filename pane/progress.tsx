@@ -30,7 +30,7 @@ const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
 const answering = atom({ plugin: 'mentat', key: 'decisionsAnswering' } as const, [])
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const queuedAtom = atom({ plugin: 'mentat', key: 'actionsQueued' } as const, [])
-const failedAtom = atom({ plugin: 'mentat', key: 'actionFailed' } as const, '')
+const failedAtom = atom({ plugin: 'mentat', key: 'actionFailed' } as const, null)
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
 const prRef = atom({ plugin: 'mentat', key: 'prRef' } as const, '')
@@ -456,11 +456,22 @@ async function runAction($: EngineInterface, action: PaneAction): Promise<void> 
   if (!isFirst) return
   try {
     await $.command.run({ command: action.command })
-    await inTurn(() => update($, failedAtom, () => ''))
-  } catch {
-    await inTurn(() => update($, failedAtom, () => action.command))
+    await inTurn(() => update($, failedAtom, () => null))
+  } catch (err) {
+    // A name the session does not have fails when typed too; the engine's list says whether it has it.
+    const isMissing = await hasNoCommand($, action.command)
+    await inTurn(() => update($, failedAtom, () => ({ command: action.command, isMissing })))
   } finally {
     await inTurn(() => update($, queuedAtom, list => list.filter(c => c !== action.command)))
+  }
+}
+
+// True when the session's command list is readable and lacks the command.
+async function hasNoCommand($: EngineInterface, command: string): Promise<boolean> {
+  try {
+    return !(await $.command.list()).some(c => c.name === command)
+  } catch {
+    return false
   }
 }
 
@@ -961,7 +972,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show the actions, what needs you, the pull request, the agents and the session budget in a pane',
+      description: 'Show the actions, what needs you, the pull request, the agents and, on the terminal, the session budget in a pane',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -1017,7 +1028,9 @@ export const register: Register = (on, _options) => {
     // offers its buttons again. A delivered answer stays marked.
     await inTurn(() => update($, sentAtom, list => list.filter(x => x.isDelivered === true)))
     // A command still waiting for the session is lost with the old load too: its button works again.
+    // So is the line of a failed press.
     await inTurn(() => update($, queuedAtom, () => []))
+    await inTurn(() => update($, failedAtom, () => null))
     reader = { isBusy: false, isAgain: false }
     agentTimer?.cancel()
     refreshTimer?.cancel()
@@ -1448,7 +1461,7 @@ export const register: Register = (on, _options) => {
     }
     // The actions row, above everything else on both surfaces. A queued command's button says so.
     const queued = await read($, queuedAtom)
-    const failedCommand = await read($, failedAtom)
+    const failedAction = await read($, failedAtom)
     const actionsRow = (
       <Box flexDirection="column">
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
@@ -1456,9 +1469,13 @@ export const register: Register = (on, _options) => {
             <Button key={a.key} label={queued.includes(a.command) ? `${a.label} · queued` : a.label} onPress={() => runAction($, a)} />
           ))}
         </Box>
-        {failedCommand !== '' && (
+        {failedAction !== null && (
           <Box marginTop={1}>
-            <Text color="warning">{`Could not run /${failedCommand} from the pane; type it in chat.`}</Text>
+            <Text color="warning">
+              {failedAction.isMissing
+                ? `/${failedAction.command} is not in this Mentat version; update the plugin.`
+                : `Could not run /${failedAction.command} from the pane; type it in chat.`}
+            </Text>
           </Box>
         )}
       </Box>

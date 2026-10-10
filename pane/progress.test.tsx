@@ -106,6 +106,8 @@ type World = {
   commandGate?: Promise<void>
   // The commands $.command.run rejects.
   rejectCommands: string[]
+  // The commands the session has no command for: absent from $.command.list(), and $.command.run rejects them.
+  missingCommands: string[]
 }
 
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
@@ -138,6 +140,7 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     usageFails: false,
     commands: [],
     rejectCommands: [],
+    missingCommands: [],
   }
   let active = 0
   onFn('command.register', () => ({ value: { command: 'mentat' } }))
@@ -183,9 +186,15 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     world.sent.push(e.text)
     return { text: e.text }
   })
+  onFn('command.list', () => ({
+    value: [...ACTION_ROW.map(a => a.command), 'mentat']
+      .filter(name => !world.missingCommands.includes(name))
+      .map(name => ({ name, description: '', source: 'plugin' })),
+  }))
   onFn('command.run', async (_$: unknown, e: { command: string }) => {
     await world.commandGate
-    if (world.rejectCommands.includes(e.command)) throw new Error(`unknown command ${e.command}`)
+    if (world.missingCommands.includes(e.command)) throw new Error(`no command named /${e.command} in this session`)
+    if (world.rejectCommands.includes(e.command)) throw new Error(`the session would not run ${e.command}`)
     world.commands.push(e.command)
     return { text: '' }
   })
@@ -3056,5 +3065,39 @@ test('a session start (reload) forgets a command still queued, so its button wor
   expect((await actionLabels(pane)).retro).toBe('Retro')
   turn.release()
   await lost
+  await pane.unmount()
+})
+
+const NOT_HERE = (command: string) => `/${command} is not in this Mentat version; update the plugin.`
+
+test('a command the engine does not have says to update the plugin, while another rejection says to type it in chat', async ($, on) => {
+  const { world } = boot(on)
+  for (const surface of SURFACES) {
+    world.missingCommands = ['mentat:codex-review-off', 'mentat:codex-review-on']
+    world.rejectCommands = ['mentat:retro']
+    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
+    await pane.press({ key: 'codex-review-off' })
+    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toEqual([NOT_HERE('mentat:codex-review-off')])
+    // Another rejection keeps the line that says to type it.
+    await pane.press({ key: 'retro' })
+    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toEqual([FALLBACK('mentat:retro')])
+    await pane.press({ key: 'codex-review-on' })
+    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toEqual([NOT_HERE('mentat:codex-review-on')])
+    // A press that runs clears it.
+    await pane.press({ key: 'compact' })
+    expect((await textsOf(pane)).some(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toBe(false)
+    await pane.unmount()
+  }
+})
+
+test('a session start (reload) clears the line of a failed press', async ($, on) => {
+  const { world } = boot(on)
+  world.rejectCommands = ['mentat:retro']
+  const pane = await mount($, PANE, 'terminal')
+  await pane.press({ key: 'retro' })
+  expect(await textsOf(pane)).toContain(FALLBACK('mentat:retro'))
+  await startSession($)
+  await new Promise(r => setTimeout(r, 20))
+  expect((await textsOf(pane)).some(t => t.startsWith('Could not run'))).toBe(false)
   await pane.unmount()
 })

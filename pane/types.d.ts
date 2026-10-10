@@ -93,8 +93,9 @@ declare module 'claude-code' {
       // The pane's action commands (for example mentat:retro) pressed and not yet run: a repeat press
       // of one does nothing until it has run.
       actionsQueued: string[]
-      // The command the last failed press of an action could not run, or '' when none failed since.
-      actionFailed: string
+      // The last failed press of an action, or null when none failed since: the command, and whether
+      // the engine said it has no such command (typing it fails too).
+      actionFailed: { command: string; isMissing: boolean } | null
       agents: AgentRow[]
       // True while the pane's Finished group of agents is collapsed (default: open).
       agentsFinishedHidden: boolean
