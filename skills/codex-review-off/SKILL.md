@@ -1,10 +1,10 @@
 ---
-name: no-review
-description: "Turns Codex off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges. Started by the maintainer."
+name: codex-review-off
+description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges, until the maintainer runs /mentat:codex-review-on. Started by the maintainer."
 disable-model-invocation: true
 ---
 
-The maintainer has turned Codex off for the rest of this session. Until they turn it back on in chat, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on.
+The maintainer has turned Codex off for the rest of this session. Until the maintainer runs `/mentat:codex-review-on` or says so in chat, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, with `/mentat:codex-review-on` or in chat.
 
 When started, say in one line that Codex is off for this session. If a `mentat review` or `mentat challenge` is running, stop it and say so.
 

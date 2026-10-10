@@ -18,7 +18,7 @@ When a session first starts change work in a repository, Claude Code runs `menta
 
 After compaction or a resumed session, Claude Code calls the skill for the step in progress again if its text is no longer in context.
 
-The maintainer can turn Codex off for a session with `/mentat:no-review`. Then that skill's rules replace the Codex review loop with one Claude review (the built-in `code-review` skill), and drop the plan challenge, until the maintainer turns Codex back on, after a compaction too, and Claude Code never merges in that session.
+The maintainer can turn Codex off for a session with `/mentat:codex-review-off`. Then that skill's rules replace the Codex review loop with one Claude review (the built-in `code-review` skill), and drop the plan challenge, until the maintainer turns Codex back on with `/mentat:codex-review-on` or in chat, after a compaction too, and Claude Code never merges in that session.
 
 ## Findings
 Claude Code sorts every review and challenge finding. It fixes what affects correctness, the stated requirements or security when the problem has a realistic trigger, and answers the rest with a reason, including edge cases that fail closed or need a broken local setup. A defect Claude Code agrees is real is fixed in the pull request, at any round; if it is not fixed, it goes to the maintainer, never into a follow-up issue on its own. Improvements that are not defects become cheap fixes or follow-up issues. Of the findings Claude Code disagrees with, only blocking ones go to the maintainer for a decision.
