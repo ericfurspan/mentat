@@ -40,7 +40,7 @@ If your repository requires an approval and the agent opens pull requests as you
 
 - The SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear, compact and fork.
 - The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. One exception, in a repository that opted in: a single merge API call through `gh api`, pinned to a commit with `sha=`, for a pull request opened by the account `gh` is signed in as, goes through Claude Code's normal permission rules without Mentat's prompt. The hook reads the opt-in from the repository's AGENTS.md on its default branch on GitHub each time, and `gh pr merge` always asks. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
-- The Mentat band and pane (desktop app and terminal) show what needs you and what is going on. How they work, and how to remove them, is in [pane/README.md](../pane/README.md).
+- The Mentat pane (desktop app and terminal) and band (desktop app) show what needs you and what is going on. How they work, and how to remove them, is in [pane/README.md](../pane/README.md).
 - The `mentat` command is available to Claude Code's Bash tool while the plugin is on. It is not on your own terminal's PATH; Claude Code runs it.
 
 ### Instructions, not guarantees
