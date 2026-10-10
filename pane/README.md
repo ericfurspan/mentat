@@ -49,6 +49,8 @@ The weekly reset is shown in the time zone of the `TZ` environment variable when
 
 The mod reads the Bash commands of the main session (not a subagent's) for `mentat check`. A Bash result has no exit code, so it reads the check's final line.
 
+The pane also runs `mentat check` itself, once at session start (a startup or a mod reload, and after `/clear`, `/resume` and a fork, once the label has gone back to dim), in the session's directory and without waiting for a message, so the footer label is current before the agent has run anything. It runs only when that directory is inside a git work tree (`git rev-parse --is-inside-work-tree` prints `true`); elsewhere, such as a folder that is not a repository, it does nothing. A failing check exits 1 and still prints its `Check failed:` line, so its output is read whatever the exit code. If `mentat` cannot be run (it is not on the `PATH`), nothing is recorded and the label stays dim. The result is recorded exactly as the agent's own run is, and the agent's run, which `rules.md` asks for before change work, still updates the label: the later result wins, so a slow startup run never overwrites an agent's run that landed first.
+
 The footer label shows the last result. It sits in the prompt footer, at the left of the engine's own mode labels (which stay after it, dimmed), on the terminal and the desktop:
 
 - `● Mentat`, dim, before any check has run in this conversation.

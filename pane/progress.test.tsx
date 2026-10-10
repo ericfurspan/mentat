@@ -79,6 +79,12 @@ type World = {
   issueComments: Answer
   pullComments: Answer
   reviews: Answer
+  // `git rev-parse --is-inside-work-tree`: by default not a work tree, so a session start runs no check.
+  git: Answer
+  // `mentat check` as the pane runs it at session start; 'missing' stands for no mentat on the PATH.
+  check: Answer | 'missing'
+  // The directories the commands ran in, by command name.
+  cwds: Record<string, string | undefined>
   bash: string
   // The stderr of a Bash call (where gh writes its success lines for pr ready, pr close and issue close).
   bashErr: string
@@ -121,6 +127,9 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     issueComments: ok(pages([])),
     pullComments: ok(pages([])),
     reviews: ok(pages([])),
+    git: { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' },
+    check: 'missing',
+    cwds: {},
     bash: '',
     bashErr: '',
     agents: [],
@@ -189,14 +198,19 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     world.toasts.push(JSON.stringify(e))
     return { value: undefined }
   })
-  onFn('process.run', async (_$: unknown, e: { argv: string[] }) => {
+  onFn('process.run', async (_$: unknown, e: { argv: string[]; init?: { cwd?: string } }) => {
     const argv = [...e.argv]
     world.calls.push(argv)
+    world.cwds[argv[0]!] = e.init?.cwd
     active += 1
     world.peak = Math.max(world.peak, active)
     try {
       let answer: Answer = { exitCode: 127, stdout: '', stderr: `unexpected: ${argv.join(' ')}` }
-      if (isCall(argv, 'gh', 'repo', 'view')) answer = world.repo
+      if (isCall(argv, 'git', 'rev-parse', '--is-inside-work-tree')) answer = world.git
+      else if (isCall(argv, 'mentat', 'check')) {
+        if (world.check === 'missing') throw new Error('spawn mentat ENOENT')
+        answer = world.check
+      } else if (isCall(argv, 'gh', 'repo', 'view')) answer = world.repo
       else if (isCall(argv, 'gh', 'pr', 'view')) answer = world.pr
       else if (isCall(argv, 'gh', 'pr', 'list')) answer = world.prList
       else if (isCall(argv, 'gh', 'api', 'user')) answer = world.me
@@ -3296,4 +3310,148 @@ test('no terminal Box has a backgroundColor: a terminal draws an 8-digit hex tin
     await term.unmount()
   }
   expect(await paneTexts($, 'terminal')).not.toContain('SESSION')
+})
+
+// ---- the check at session start -----------------------------------------------------
+
+const GIT_YES = ok('true\n')
+const nothingYet = async ($: never) => {
+  // Waits for the startup run (if any) to have had its chance: a footer read after a few turns of the event loop.
+  await new Promise(r => setTimeout(r, 50))
+  return (await footerOf($, 'terminal'))[0]
+}
+const untilFooter = async ($: never, surface: 'terminal' | 'desktop', text: string, color: string | undefined) => {
+  let last: unknown
+  for (let i = 0; i < 300; i++) {
+    last = (await footerOf($, surface))[0]
+    const f = last as { text: string; color?: string }
+    if (f.text === text && f.color === color) return
+    await new Promise(r => setTimeout(r, 5))
+  }
+  throw new Error(`the footer never read ${text} (${color}); it read ${JSON.stringify(last)}`)
+}
+
+const failedExit = (stdout: string): Run => ({ exitCode: 1, stdout, stderr: '' })
+
+test('a session start runs mentat check in the session directory, and a pass turns the label green with no card', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  world.check = ok(CLEAN_RUN)
+  await startSession($)
+  await until(() => world.cwds['mentat'] !== undefined, 'the startup check')
+  expect(world.cwds['mentat']).toBe('/work/r')
+  expect(world.cwds['git']).toBe('/work/r')
+  await untilFooter($, 'terminal', '● Mentat', 'success')
+  expect(await alertsOf($)).toEqual([])
+  expect(await checkItemsOf($)).toEqual([])
+})
+
+test('a session start with warnings pins the warning card and turns the label amber', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  world.check = ok(WARN_RUN)
+  await startSession($)
+  await untilFooter($, 'terminal', '● Mentat · 2 warnings', 'warning')
+  const cards = await checkItemsOf($)
+  expect(cards.length).toBe(1)
+  expect(cards[0]!.drawn).toContain('gh is old')
+  expect(cards[0]!.drawn).toContain('codex is old')
+})
+
+test('a session start with a failing check (exit 1) pins the alert and turns the label red', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  world.check = failedExit('PROBLEM: gh is not logged in\nCheck failed: 1 problem(s)\n')
+  await startSession($)
+  await untilFooter($, 'terminal', '● Mentat check failed', 'error')
+  const cards = await alertsOf($)
+  expect(cards.length).toBe(1)
+  expect(cards[0]!.alt).toBe('Alert: Check failed: 1 problem(s)')
+  expect(cards[0]!.drawn).toContain('gh is not logged in')
+})
+
+test('outside a git work tree a session start runs no check', async ($, on) => {
+  const { world } = boot(on)
+  world.check = ok(CLEAN_RUN)
+  // not a repository: git exits 128
+  await startSession($)
+  await until(() => world.calls.some(a => isCall(a, 'git', 'rev-parse')), 'the git probe')
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: undefined, dim: true })
+  expect(world.calls.some(a => isCall(a, 'mentat', 'check'))).toBe(false)
+  // inside a git directory that is not a work tree: git prints false
+  world.git = ok('false\n')
+  await startSession($)
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: undefined, dim: true })
+  expect(world.calls.some(a => isCall(a, 'mentat', 'check'))).toBe(false)
+})
+
+test('a missing mentat leaves the label dim', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  await startSession($)
+  await until(() => world.calls.some(a => isCall(a, 'mentat', 'check')), 'the startup check')
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: undefined, dim: true })
+  expect(await alertsOf($)).toEqual([])
+  // Output without a final line (a usage error) records nothing either.
+  world.check = failedExit('usage: mentat check\n')
+  await startSession($)
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: undefined, dim: true })
+})
+
+test('an agent run that lands while the startup run is in flight wins', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  let release: () => void = () => {}
+  const gate = new Promise<void>(r => (release = r))
+  world.check = async () => {
+    await gate
+    return failedExit('PROBLEM: stale\nCheck failed: 1 problem(s)\n')
+  }
+  await startSession($)
+  await until(() => world.calls.some(a => isCall(a, 'mentat', 'check')), 'the startup check')
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  await untilFooter($, 'terminal', '● Mentat', 'success')
+  release()
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: 'success', dim: false })
+  expect(await alertsOf($)).toEqual([])
+})
+
+test('a startup run that lands first is replaced by a later agent run', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  world.check = failedExit('PROBLEM: gh is not logged in\nCheck failed: 1 problem(s)\n')
+  await startSession($)
+  await untilFooter($, 'terminal', '● Mentat check failed', 'error')
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  await untilFooter($, 'terminal', '● Mentat', 'success')
+  expect(await alertsOf($)).toEqual([])
+})
+
+test('after /clear the label goes dim, then the new conversation is checked; a run of the old one writes nothing', async ($, on) => {
+  const { world } = boot(on)
+  world.git = GIT_YES
+  const gates: (() => void)[] = []
+  const results = [failedExit('PROBLEM: old\nCheck failed: 1 problem(s)\n'), ok(CLEAN_RUN)]
+  let n = 0
+  world.check = async () => {
+    const mine = n++
+    await new Promise<void>(r => gates.push(r))
+    return results[mine]!
+  }
+  await startSession($)
+  await until(() => gates.length === 1, 'the startup check')
+  const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
+  await classic.SessionStart({ source: 'clear' })
+  await until(() => gates.length === 2, 'the check after /clear')
+  expect(world.cwds['mentat']).toBe('/work/r')
+  // the old conversation's run ends first and writes nothing
+  gates[0]!()
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: undefined, dim: true })
+  expect(await alertsOf($)).toEqual([])
+  gates[1]!()
+  await untilFooter($, 'terminal', '● Mentat', 'success')
+  // /compact keeps the conversation: no new run
+  await classic.SessionStart({ source: 'compact' })
+  expect(await nothingYet($)).toEqual({ text: '● Mentat', color: 'success', dim: false })
+  expect(world.calls.filter(a => isCall(a, 'mentat', 'check')).length).toBe(2)
 })
