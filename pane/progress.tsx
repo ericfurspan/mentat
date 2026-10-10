@@ -877,6 +877,8 @@ const roleOf = (type: string): { role: Role; label: string } => {
   if (t === 'plan') return { role: 'plan', label: 'plan' }
   return { role: 'other', label: type }
 }
+// The terminal's one-character mark for a role, where the desktop draws its glyph.
+const ROLE_MARK: Record<Role, string> = { builder: '◆', explore: '◎', plan: '◇', other: '·' }
 // Glyphs on a 24 by 24 grid, drawn in the role color: a wrench, a magnifier, a compass, a dot.
 const GLYPH: Record<Role, string> = {
   builder: '<path d="M13 11L5 19"/><path d="M16.7 3.9A4.2 4.2 0 1 0 20.1 7.3"/>',
@@ -888,36 +890,53 @@ const GLYPH: Record<Role, string> = {
 const roleIcon = (cx: number, cy: number, role: Role, isDone: boolean): string => {
   const hue = ROLE_HUE[role]
 
-  return `<g opacity="${isDone ? 0.55 : 1}"><rect x="${cx - 15}" y="${cy - 15}" width="30" height="30" rx="8" fill="${hue}" opacity="0.14"/><g data-role="${role}" transform="translate(${cx - 9} ${cy - 9}) scale(0.75)" fill="none" stroke="${hue}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPH[role].replace('HUE', hue)}</g></g>`
+  return `<g opacity="${isDone ? 0.55 : 1}"><rect x="${cx - 12}" y="${cy - 12}" width="24" height="24" rx="7" fill="${hue}" opacity="0.14"/><g data-role="${role}" transform="translate(${cx - 7.2} ${cy - 7.2}) scale(0.6)" fill="none" stroke="${hue}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${GLYPH[role].replace('HUE', hue)}</g></g>`
 }
 
 type AgentCardRow = { status: AgentStatus; title: string; type: string; model: string; stats: string }
-const AGENT_ROW_H = 64
-const AGENT_HEAD_H = 34
-// One group of agents as its own card: an optional header, then roomy rows. The role icon is on
-// the left, the status mark on the right edge; the title, the role and model, and the stats
-// (right-aligned) take three lines.
+export const AGENT_ROW_H = 34
+export const AGENT_HEAD_H = 30
+// One group of agents as its own card: an optional header, then one-line rows. Left to right a row
+// has the role icon, the title, the model and effort (dimmer) after it, the stats (tokens and
+// elapsed time, right-aligned) and the status mark on the right edge. A long title is cut with an
+// ellipsis, and the model after it when there is still not room. The role is in the alt text.
 const agentsSvg = (W: number, header: string | undefined, rows: AgentCardRow[]): { svg: string; h: number } => {
-  const top = header === undefined ? 6 : AGENT_HEAD_H
-  const h = top + rows.length * AGENT_ROW_H + 6
-  const tx = 62
+  const top = header === undefined ? 4 : AGENT_HEAD_H
+  const h = top + rows.length * AGENT_ROW_H + 4
+  const tx = 48
+  const gap = 10
   const body = rows.map((r, i) => {
     const y = top + i * AGENT_ROW_H
+    const cy = y + AGENT_ROW_H / 2
     const done = isEnded(r.status)
-    const { role, label } = roleOf(r.type)
-    const model = r.model === '' ? '' : fit(r.model, 12, W - tx - textW(label, 12) - 30)
+    const { role } = roleOf(r.type)
+    const statsX = W - 44
+    const statsW = r.stats === '' ? 0 : textW(r.stats, 11.5)
+    // The room from the title's left edge to the stats (or the mark, when there are no stats).
+    const room = statsX - tx - (statsW === 0 ? 0 : statsW + 14)
+    const modelW = r.model === '' ? 0 : textW(r.model, 12)
+    let title = r.title
+    let model = r.model
+    if (textW(title, 14) + (modelW === 0 ? 0 : gap + modelW) > room) {
+      title = fit(r.title, 14, Math.max(room * 0.6, room - (modelW === 0 ? 0 : gap + modelW)))
+      const left = room - textW(title, 14) - gap
+      model = left < 40 ? '' : fit(r.model, 12, left)
+    }
     // A finished agent is drawn in the muted color, so running work stands out; its mark keeps its own.
-    return `${roleIcon(30, y + 30, role, done)}
-<text class="${done ? 'm' : 't'}" x="${tx}" y="${y + 21}" font-family="${FONT}" font-size="14.5" font-weight="${isActive(r.status) ? 600 : 500}">${xml(fit(r.title, 14.5, W - tx - 46))}</text>
-${agentMark(W - 26, y + 17, r.status)}
-<text x="${tx}" y="${y + 39}" font-family="${FONT}" font-size="12"><tspan fill="${ROLE_HUE[role]}" fill-opacity="${done ? 0.65 : 1}" font-weight="600">${xml(label)}</tspan>${model === '' ? '' : `<tspan class="${done ? 'm' : 's'}" dx="8">${xml(model)}</tspan>`}</text>
-${r.stats === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${W - 16}" y="${y + 56}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.stats)}</text>`}
+    return `${roleIcon(24, cy, role, done)}
+<text class="${done ? 'm' : 't'}" x="${tx}" y="${cy + 5}" font-family="${FONT}" font-size="14" font-weight="${isActive(r.status) ? 600 : 500}">${xml(title)}</text>
+${model === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${Math.round(tx + textW(title, 14) + gap)}" y="${cy + 4.5}" font-family="${FONT}" font-size="12">${xml(model)}</text>`}
+${r.stats === '' ? '' : `<text class="${done ? 'm' : 's'}" x="${statsX}" y="${cy + 4}" text-anchor="end" font-family="${FONT}" font-size="11.5" font-variant-numeric="tabular-nums">${xml(r.stats)}</text>`}
+${agentMark(W - 26, cy, r.status)}
 ${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2="${W - 16}" y2="${y + AGENT_ROW_H}"/>` : ''}`
   })
-  const head = header === undefined ? '' : `<text class="s" x="16" y="23" font-family="${FONT}" font-size="12.5" font-weight="600">${xml(header)}</text>`
+  const head = header === undefined ? '' : `<text class="s" x="16" y="21" font-family="${FONT}" font-size="12.5" font-weight="600">${xml(header)}</text>`
 
   return { svg: svgOf(W, h, `<rect class="card" x="0" y="0" width="${W}" height="${h}" rx="10"/>${head}${body.join('')}`), h }
 }
+// The alt text of a group: its heading and count, then each agent's role and title (the role is not drawn as text).
+const agentsAlt = (heading: string, rows: AgentCardRow[]): string =>
+  `${heading}: ${rows.length} (${rows.map(r => `${roleOf(r.type).label}: ${r.title}`).join('; ')})`
 
 // What the band's left side shows: the newest alert, question or check warning, the final-checked
 // pull request, a budget warning, or, when nothing else raises it, the newest action.
@@ -1416,33 +1435,37 @@ export const register: Register = (on, _options) => {
       </Box>
     )
 
-    // One agent on the terminal: the description with the status mark at the end of its line, then the facts.
+    // One agent on the terminal, on one line: a mark for its role, the description (cut with an
+    // ellipsis when long), the model and effort, the tokens and elapsed time, and the status mark at
+    // the end. The status is also said in words when the mark cannot (waiting, idle, failed, killed, ended).
+    // No background colors: the terminal draws the desktop's alpha tints as solid grey.
     const termRow = (a: AgentRow, i: number) => {
       const ms = a.startedAt === undefined ? undefined : (a.endedAt ?? now) - a.startedAt
-      const facts = [
-        a.type,
-        a.model === undefined ? undefined : shortModel(a.model),
-        isNarrow ? undefined : a.effort,
-        a.status === 'unknown' ? 'ended' : a.status,
-        ms === undefined ? undefined : duration(ms),
-        isNarrow || a.tokens === undefined ? undefined : `${kTokens(a.tokens)} reported`,
-      ]
+      const model = [a.model === undefined ? undefined : shortModel(a.model), isNarrow ? undefined : a.effort].filter(Boolean).join(' · ')
+      const word = a.status === 'running' || a.status === 'completed' ? undefined : a.status === 'unknown' ? 'ended' : a.status
+      const stats = [word, ms === undefined ? undefined : duration(ms), isNarrow || a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`]
         .filter(Boolean)
         .join(' · ')
       const color = isActive(a.status) ? 'suggestion' : a.status === 'failed' || a.status === 'killed' ? 'error' : a.status === 'completed' ? 'success' : 'subtle'
       return (
-        <Box key={a.id} flexDirection="column" marginTop={i === 0 ? 0 : 1}>
-          <Box flexDirection="row" gap={1}>
-            <Box flexGrow={1} flexShrink={1}>
-              <Text bold={isActive(a.status)} dimColor={isEnded(a.status)} wrap="truncate-end">
-                {a.description}
-              </Text>
-            </Box>
-            <Text color={color}>{isActive(a.status) ? '●' : a.status === 'completed' ? '✓' : a.status === 'failed' || a.status === 'killed' ? '✕' : '○'}</Text>
+        <Box key={a.id} flexDirection="row" gap={1}>
+          <Text dimColor={isEnded(a.status)}>{ROLE_MARK[roleOf(a.type).role]}</Text>
+          <Box flexGrow={1} flexShrink={1}>
+            <Text bold={isActive(a.status)} dimColor={isEnded(a.status)} wrap="truncate-end">
+              {a.description}
+            </Text>
           </Box>
-          <Text dimColor wrap="truncate-end">
-            {facts}
-          </Text>
+          {model !== '' && (
+            <Text dimColor wrap="truncate-end">
+              {model}
+            </Text>
+          )}
+          {stats !== '' && (
+            <Text dimColor wrap="truncate-end">
+              {stats}
+            </Text>
+          )}
+          <Text color={color}>{isActive(a.status) ? '●' : a.status === 'completed' ? '✓' : a.status === 'failed' || a.status === 'killed' ? '✕' : '○'}</Text>
         </Box>
       )
     }
@@ -1563,8 +1586,10 @@ export const register: Register = (on, _options) => {
           stats: [a.tokens === undefined ? undefined : `${kTokens(a.tokens)} tokens`, elapsed === '' ? undefined : elapsed].filter(Boolean).join(' · '),
         }
       }
-      const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRows.map(agentRow))
-      const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRows.map(agentRow))
+      const liveRowsSvg = liveRows.map(agentRow)
+      const doneRowsSvg = doneRows.map(agentRow)
+      const liveCard = liveRows.length === 0 ? undefined : agentsSvg(W, `Running · ${liveRows.length}`, liveRowsSvg)
+      const doneCard = doneRows.length === 0 || isHidden ? undefined : agentsSvg(W, undefined, doneRowsSvg)
       return (
         <Box flexDirection="column" paddingX={1}>
           {commandsCard}
@@ -1629,7 +1654,7 @@ export const register: Register = (on, _options) => {
           {logCard(SECTION_GAP)}
           {rows.length > 0 && (
             <Box flexDirection="column" marginTop={SECTION_GAP}>
-              {liveCard !== undefined && <Svg source={liveCard.svg} alt={`Running agents: ${liveRows.length}`} width={W} height={liveCard.h} />}
+              {liveCard !== undefined && <Svg source={liveCard.svg} alt={agentsAlt('Running agents', liveRowsSvg)} width={W} height={liveCard.h} />}
               {doneRows.length > 0 && (
                 <Box flexDirection="row" marginTop={liveCard === undefined ? 0 : 1}>
                   <Button key="finished-toggle" label={`${isHidden ? '▸' : '▾'} Finished · ${doneRows.length}`} onPress={toggleFinished} />
@@ -1637,7 +1662,7 @@ export const register: Register = (on, _options) => {
               )}
               {doneCard !== undefined && (
                 <Box marginTop={1}>
-                  <Svg source={doneCard.svg} alt={`Finished agents: ${doneRows.length}`} width={W} height={doneCard.h} />
+                  <Svg source={doneCard.svg} alt={agentsAlt('Finished agents', doneRowsSvg)} width={W} height={doneCard.h} />
                 </Box>
               )}
             </Box>
