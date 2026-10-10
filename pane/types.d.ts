@@ -33,42 +33,6 @@ export type AgentRow = {
   tokens?: number
 }
 
-export type Checks = { failed: number; running: number; passed: number }
-
-export type PrSnapshot = {
-  ref: string
-  seq: number
-  head: string
-  number: number
-  title: string
-  state: string
-  isDraft: boolean
-  reviewDecision: string
-  mergeState: string
-  checks: Checks
-  // Other open pull requests; isLimit when the list hit its limit.
-  others?: { count: number; isLimit: boolean }
-}
-
-export type CodexRead =
-  | { kind: 'running'; sha: string }
-  // hasReview: the app also posted a review object on the head (it may have no inline comment).
-  | { kind: 'completed'; sha: string; findings: number; replied: number; hasReview: boolean }
-  | { kind: 'failed'; sha: string }
-  // The app's summary is about another commit than the head.
-  | { kind: 'other'; sha: string }
-  | { kind: 'none' }
-  // A summary in a format this mod does not know.
-  | { kind: 'unknown' }
-
-export type ReviewSnapshot = {
-  ref: string
-  seq: number
-  head: string
-  codex: CodexRead
-  local?: { sha: string; result?: 'NO FINDINGS' | 'FINDINGS' }
-}
-
 // The kinds of note in the pane's Log card; each has its own icon and color.
 export type LogKind = 'decision' | 'plan' | 'surprise' | 'waiting' | 'done'
 
@@ -87,10 +51,6 @@ export type LogEntry = NoteEntry | EventEntry
 // The last `mentat check` of the main session: pass, pass with warnings, or fail.
 export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] }
 
-// okAt and failedAt are clock times of the last good and the last failed read (0: none).
-// cause 'user': the read that failed was the agent account's login, not the review itself.
-export type ReadMark = { seq: number; okAt: number; failedAt: number; cause?: 'user' }
-
 // An item that left the list without close_decision: dismissed in the band, or cleared when a new
 // conversation started (source: clear, resume or fork). at is the clock time it left.
 export type GoneEntry = { id: string; why: 'dismissed' | 'cleared'; source?: string; at: number }
@@ -106,15 +66,6 @@ declare module 'claude-code' {
       agents: AgentRow[]
       // True while the pane's Finished group of agents is collapsed (default: open).
       agentsFinishedHidden: boolean
-      // The session's pull request as owner/repo#N, or '' for none.
-      prRef: string
-      pr: PrSnapshot | null
-      prMark: ReadMark
-      review: ReviewSnapshot | null
-      reviewMark: ReadMark
-      // The login gh acts as: the agent account.
-      me: string
-      seq: number
       // The last `mentat check` run this conversation; null until one has run.
       checkResult: CheckResult | null
       // The session's log, oldest first (the pane shows it newest first); capped.

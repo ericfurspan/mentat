@@ -6,7 +6,7 @@ Mentat is for one developer on macOS who runs coding agents on their own GitHub 
 
 Mentat requires nothing of your repository's GitHub settings. It works within your rules, approvals and CI, and your AGENTS.md wins on preferences such as commit format and branch flow. One command turns it on or off.
 
-It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional output style, a hook that asks you before the agent merges a pull request or turns on auto-merge (with one narrow exception in a repository you opted in; see [Letting agents merge](docs/setup.md#letting-agents-merge)), a builder subagent, skills for planning, writing pull request descriptions, the review loop and session retrospectives, a [band and pane](pane/README.md) that show what needs you and what the agents are doing, and the `mentat` command.
+It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional output style, a hook that asks you before the agent merges a pull request or turns on auto-merge (with one narrow exception in a repository you opted in; see [Letting agents merge](docs/setup.md#letting-agents-merge)), a builder subagent, skills for planning, writing pull request descriptions, the review loop and session retrospectives, a [pane, and on the desktop a band](pane/README.md), that show what needs you and what the agents are doing, and the `mentat` command.
 
 ## How a change moves
 
