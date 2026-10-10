@@ -1162,7 +1162,8 @@ export const register: Register = (on, _options) => {
 
   // The footer label: Mentat's state in the prompt footer, before the engine's own mode labels.
   // `● Mentat`: dim until a `mentat check` has run, then green, amber with the warning count, or red. While
-  // items wait, `· N waiting` follows it, N counting every open item. On the terminal the label is a
+  // items wait it reads `● Mentat · N waiting` instead, N counting every open item, only the dot in the
+  // check's color. On the terminal the label is a
   // Button that opens the pane (there is no band there); on the desktop it is the same text, and the
   // band is there.
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
@@ -1179,17 +1180,20 @@ export const register: Register = (on, _options) => {
           : result.state === 'warn'
             ? [`● Mentat · ${plural(result.warnings.length, 'warning', 'warnings')}`, 'warning']
             : ['● Mentat', 'success']
-    const name = color === undefined ? <Text key="name" dimColor>{text}</Text> : <Text key="name" color={color}>{text}</Text>
-    const count = waiting === 0 ? [] : [<Text key="sep" dimColor>{' · '}</Text>, <Text key="count" color="warning">{`${waiting} waiting`}</Text>]
+    // Nothing open: the label as it was, all of it in the check's color. While items wait: only the dot is in
+    // the check's color, `Mentat` is plain, and the check's own words are left out (its item carries them).
+    const mark = (word: string) => (color === undefined ? <Text key="mark" dimColor>{word}</Text> : <Text key="mark" color={color}>{word}</Text>)
+    const parts =
+      waiting === 0
+        ? [mark(text)]
+        : [mark('●'), <Text key="name">{' Mentat'}</Text>, <Text key="sep" dimColor>{' · '}</Text>, <Text key="count" color="warning">{`${waiting} waiting`}</Text>]
     const label = e.surface === 'terminal' ? (
-      <Button key="mentat-open" plain label={`${text}${waiting === 0 ? '' : ` · ${waiting} waiting`}`} onPress={() => $.ui.open({ id: PANE, title: TITLE })}>
-        {name}
-        {count}
+      <Button key="mentat-open" plain label={waiting === 0 ? text : `● Mentat · ${waiting} waiting`} onPress={() => $.ui.open({ id: PANE, title: TITLE })}>
+        {parts}
       </Button>
     ) : (
       <Box key="mentat-label" flexDirection="row">
-        {name}
-        {count}
+        {parts}
       </Box>
     )
 

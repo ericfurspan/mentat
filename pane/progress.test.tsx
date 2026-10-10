@@ -2113,6 +2113,8 @@ test('a second failed run replaces the alert, so there is still one', async ($, 
 const WARN_RUN = 'OK: gh is installed\nWARN: gh is old\nWARN: codex is old\nCheck OK (2 warning(s))\n'
 const CLEAN_RUN = 'OK: gh is installed\nCheck OK (0 warning(s))\n'
 const SESSION_MODE = { plugin: 'mentat', component: 'SessionMode' }
+// The footer label's words as one string (its Texts joined), on the terminal.
+const footerTextOf = async ($: never) => (await footerOf($, 'terminal')).map(t => t.text).join('')
 // The footer label as drawn: each Text with its color and dim flag, in order.
 const footerOf = async ($: never, surface: 'terminal' | 'desktop', modes: string[] = []) => {
   const d = await mount($, SESSION_MODE, surface, { modes })
@@ -2162,15 +2164,17 @@ test('the footer label shows the last check: dim before one, green on a pass, am
   await bash(world, $, 'mentat check', WARN_RUN)
   for (const surface of SURFACES) {
     expect(await footerOf($, surface, ['focus'])).toEqual([
-      { text: '● Mentat · 2 warnings', color: 'warning', dim: false },
+      { text: '●', color: 'warning', dim: false },
+      { text: ' Mentat', color: undefined, dim: false },
       { text: ' · ', color: undefined, dim: true },
       { text: '1 waiting', color: 'warning', dim: false },
       { text: 'focus', color: undefined, dim: true },
     ])
   }
   await bash(world, $, 'mentat check', 'WARN: gh is old\nCheck OK (1 warning(s))\n')
-  expect((await footerOf($, 'terminal')).slice(0, 3)).toEqual([
-    { text: '● Mentat · 1 warning', color: 'warning', dim: false },
+  expect((await footerOf($, 'terminal')).slice(0, 4)).toEqual([
+    { text: '●', color: 'warning', dim: false },
+    { text: ' Mentat', color: undefined, dim: false },
     { text: ' · ', color: undefined, dim: true },
     { text: '1 waiting', color: 'warning', dim: false },
   ])
@@ -2178,7 +2182,8 @@ test('the footer label shows the last check: dim before one, green on a pass, am
   await bash(world, $, 'mentat check', FAILED_RUN)
   for (const surface of SURFACES) {
     expect(await footerOf($, surface, ['focus'])).toEqual([
-      { text: '● Mentat check failed', color: 'error', dim: false },
+      { text: '●', color: 'error', dim: false },
+      { text: ' Mentat', color: undefined, dim: false },
       { text: ' · ', color: undefined, dim: true },
       { text: '1 waiting', color: 'warning', dim: false },
       { text: 'focus', color: undefined, dim: true },
@@ -2186,16 +2191,42 @@ test('the footer label shows the last check: dim before one, green on a pass, am
   }
   // A run that says nothing certain leaves the label as it was.
   await bash(world, $, 'mentat check', 'usage: mentat check\n')
-  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat check failed')
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'error', dim: false })
   // A subagent's check does not change it either.
   await bash(world, $, 'mentat check', CLEAN_RUN, { agentId: 'a1' })
-  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat check failed')
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'error', dim: false })
   expect(toastTexts(world)).toEqual([])
   // Dismissing the item leaves the label as today: red, with nothing waiting.
   const pane = await mount($, TERM, 'terminal')
   await pane.press({ key: 'dismiss-check' })
   await pane.unmount()
   expect(await footerOf($, 'terminal')).toEqual([{ text: '● Mentat check failed', color: 'error', dim: false }])
+})
+
+test('with items open the footer reads `● Mentat · N waiting` with only the dot in the check color, whatever the check said', async ($, on) => {
+  const { world } = boot(on)
+  // A warn check with its item open: the dot and the count are both amber, and the check's words are left out.
+  await bash(world, $, 'mentat check', 'WARN: gh is old\nCheck OK (1 warning(s))\n')
+  for (const surface of SURFACES) {
+    expect(await footerOf($, surface)).toEqual([
+      { text: '●', color: 'warning', dim: false },
+      { text: ' Mentat', color: undefined, dim: false },
+      { text: ' · ', color: undefined, dim: true },
+      { text: '1 waiting', color: 'warning', dim: false },
+    ])
+    expect((await footerOf($, surface)).map(t => t.text).join('')).toBe('● Mentat · 1 waiting')
+  }
+  // A failed check with its item open: the dot is red.
+  await bash(world, $, 'mentat check', FAILED_RUN)
+  for (const surface of SURFACES) {
+    const f = await footerOf($, surface)
+    expect(f[0]).toEqual({ text: '●', color: 'error', dim: false })
+    expect(f.map(t => t.text).join('')).toBe('● Mentat · 1 waiting')
+  }
+  // A clean pass with an agent question open: the dot is green; before any check it is dim.
+  await bash(world, $, 'mentat check', CLEAN_RUN)
+  await eng($).tool.call({ tool: OPEN, question: 'One?' })
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'success', dim: false })
 })
 
 test('the footer label counts every open item and, on the terminal only, is a Button that opens the pane', async ($, on) => {
@@ -2216,7 +2247,7 @@ test('the footer label counts every open item and, on the terminal only, is a Bu
   await bash(world, $, 'mentat check', WARN_RUN)
   // Every open item counts, the check's warning item included.
   const terminal = await buttonsOf('terminal')
-  expect(terminal.found).toEqual([{ key: 'mentat-open', label: '● Mentat · 2 warnings · 3 waiting', plain: true }])
+  expect(terminal.found).toEqual([{ key: 'mentat-open', label: '● Mentat · 3 waiting', plain: true }])
   expect(terminal.texts.find(t => t.text === '3 waiting')?.color).toBe('warning')
   const desktop = await buttonsOf('desktop')
   expect(desktop.found).toEqual([])
@@ -2286,10 +2317,10 @@ test('a pass with warnings pins one warning item, a clean pass removes it, a fai
   expect(toastTexts(world)).toEqual([])
 })
 
-test('a warning count the output does not show is still counted in the footer label', async ($, on) => {
+test('a warning count the output does not show is still counted: in the item and its WARN lines, and the footer counts the item', async ($, on) => {
   const { world } = boot(on)
   await bash(world, $, 'mentat check', 'WARN: seen\nCheck OK (2 warning(s))\n')
-  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 2 warnings')
+  expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
   const [card] = await checkItemsOf($)
   expect(card!.alt).toBe('Check warnings: Check passed with 2 warnings')
   // The terminal pane lists the line it saw and one for the warning whose text it did not.
@@ -2298,7 +2329,7 @@ test('a warning count the output does not show is still counted in the footer la
 
   const warns = Array.from({ length: 8 }, (_, i) => `warning number ${i + 1}`)
   await bash(world, $, 'mentat check', `${warns.map(w => `WARN: ${w}`).join('\n')}\nCheck OK (8 warning(s))`)
-  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 8 warnings')
+  expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
   const [many] = await checkItemsOf($)
   expect(many!.alt).toBe('Check warnings: Check passed with 8 warnings')
   expect((await waitTexts($, 'terminal')).filter(t => t.startsWith('WARN: '))).toEqual(warns.map(w => `WARN: ${w}`))
@@ -2385,15 +2416,16 @@ test('a new conversation drops the check result and its warning card, and a mod 
   const classic = ($ as never as { classic: { SessionStart: (a: { source: string }) => Promise<unknown> } }).classic
   await bash(world, $, 'mentat check', WARN_RUN)
   await startSession($)
-  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 2 warnings')
+  expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
   expect((await checkItemsOf($)).length).toBe(1)
   await classic.SessionStart({ source: 'startup' })
   await classic.SessionStart({ source: 'compact' })
-  expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat · 2 warnings')
+  expect(await footerTextOf($)).toBe('● Mentat · 1 waiting')
+  expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'warning', dim: false })
 
   for (const source of ['clear', 'resume', 'fork']) {
     await bash(world, $, 'mentat check', FAILED_RUN)
-    expect((await footerOf($, 'terminal'))[0]!.text).toBe('● Mentat check failed')
+    expect((await footerOf($, 'terminal'))[0]).toEqual({ text: '●', color: 'error', dim: false })
     await classic.SessionStart({ source })
     expect(await footerOf($, 'terminal')).toEqual([{ text: '● Mentat', color: undefined, dim: true }])
     expect(await alertsOf($)).toEqual([])
@@ -2947,7 +2979,7 @@ test('a session start with warnings pins the warning item and turns the label am
   world.git = GIT_YES
   world.check = ok(WARN_RUN)
   await startSession($)
-  await untilFooter($, 'terminal', '● Mentat · 2 warnings', 'warning')
+  await untilFooter($, 'terminal', '●', 'warning')
   const cards = await checkItemsOf($)
   expect(cards.length).toBe(1)
   expect(cards[0]!.alt).toBe('Check warnings: Check passed with 2 warnings')
@@ -2958,7 +2990,7 @@ test('a session start with a failing check (exit 1) pins the alert and turns the
   world.git = GIT_YES
   world.check = failedExit('PROBLEM: gh is not logged in\nCheck failed: 1 problem(s)\n')
   await startSession($)
-  await untilFooter($, 'terminal', '● Mentat check failed', 'error')
+  await untilFooter($, 'terminal', '●', 'error')
   const cards = await alertsOf($)
   expect(cards.length).toBe(1)
   expect(cards[0]!.alt).toBe('Alert: Check failed: 1 problem(s)')
@@ -3015,7 +3047,7 @@ test('a startup run that lands first is replaced by a later agent run', async ($
   world.git = GIT_YES
   world.check = failedExit('PROBLEM: gh is not logged in\nCheck failed: 1 problem(s)\n')
   await startSession($)
-  await untilFooter($, 'terminal', '● Mentat check failed', 'error')
+  await untilFooter($, 'terminal', '●', 'error')
   await bash(world, $, 'mentat check', CLEAN_RUN)
   await untilFooter($, 'terminal', '● Mentat', 'success')
   expect(await alertsOf($)).toEqual([])

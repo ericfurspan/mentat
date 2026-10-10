@@ -23,7 +23,7 @@ The label sits in the prompt footer, at the left of the engine's own mode labels
 - `● Mentat`, green, after a check that passed with no warnings.
 - `● Mentat · N warning(s)`, amber, after a check that passed with warnings.
 - `● Mentat check failed`, red, after a check that failed.
-- While items wait, ` · N waiting` follows, in amber. N counts every open item, the check's warning item or alert included.
+- While items wait it reads `● Mentat · N waiting` instead: the dot in the check's color (dim, green, amber or red as above), `Mentat` plain, and `N waiting` in amber. N counts every open item, the check's warning item or alert included; the check's own words (`N warnings`, `check failed`) are left out, because that item in Waiting on you carries them.
 
 ### The pane
 
