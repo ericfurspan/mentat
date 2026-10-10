@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { resetAt, withoutSettled } from './progress'
+import { COMMANDS, resetAt, withoutSettled } from './progress'
 
 // Tests for pane/progress.tsx. The test's hooks stand for the engine: `gh` is a
 // table of canned answers (nothing talks to GitHub), `$.agent.list` and
@@ -102,12 +102,6 @@ type World = {
   usageFails: boolean
   // The slash commands the plugin ran through $.command.run, in order.
   commands: string[]
-  // When set, a command does not run until it resolves (as while a turn runs).
-  commandGate?: Promise<void>
-  // The commands $.command.run rejects.
-  rejectCommands: string[]
-  // The commands the session has no command for: absent from $.command.list(), and $.command.run rejects them.
-  missingCommands: string[]
 }
 
 const isCall = (argv: string[], ...words: string[]) => words.every((w, i) => argv[i] === w)
@@ -139,8 +133,6 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     steps: [],
     usageFails: false,
     commands: [],
-    rejectCommands: [],
-    missingCommands: [],
   }
   let active = 0
   onFn('command.register', () => ({ value: { command: 'mentat' } }))
@@ -186,15 +178,7 @@ const boot = (on: never, opts: { band?: boolean; zone?: string } = {}) => {
     world.sent.push(e.text)
     return { text: e.text }
   })
-  onFn('command.list', () => ({
-    value: [...ACTION_ROW.map(a => a.command), 'mentat']
-      .filter(name => !world.missingCommands.includes(name))
-      .map(name => ({ name, description: '', source: 'plugin' })),
-  }))
   onFn('command.run', async (_$: unknown, e: { command: string }) => {
-    await world.commandGate
-    if (world.missingCommands.includes(e.command)) throw new Error(`no command named /${e.command} in this session`)
-    if (world.rejectCommands.includes(e.command)) throw new Error(`the session would not run ${e.command}`)
     world.commands.push(e.command)
     return { text: '' }
   })
@@ -249,17 +233,9 @@ const mount = async ($: never, spec: object, surface: 'terminal' | 'desktop', pr
     surface,
     props: { ...(spec as { props?: object }).props, ...props },
   })) as Drawing
-// The actions row at the top of the pane: its buttons' keys, labels and commands.
-const ACTION_ROW = [
-  { key: 'come-again', label: 'Come again?', command: 'mentat:come-again' },
-  { key: 'retro', label: 'Retro', command: 'mentat:retro' },
-  { key: 'codex-review-off', label: 'Codex review off', command: 'mentat:codex-review-off' },
-  { key: 'codex-review-on', label: 'Codex review on', command: 'mentat:codex-review-on' },
-  { key: 'compact', label: 'Compact', command: 'compact' },
-]
-// The keys of a drawing's buttons, without the actions row's.
+// The keys of a drawing's buttons, without the Commands card's toggle.
 const cardKeys = async (d: Drawing) =>
-  (await d.findAll({ type: 'Button' })).map(b => b.key).filter(k => !ACTION_ROW.some(a => a.key === k))
+  (await d.findAll({ type: 'Button' })).map(b => b.key).filter(k => k !== 'commands-toggle')
 // What each Svg element of the drawing says: its alt text and the text drawn in it.
 const svgsOf = async (d: Drawing) =>
   (await d.findAll({ type: 'Svg' })).map(x => {
@@ -2040,7 +2016,7 @@ test('/mentat opens the pane at once when there is something to show', async ($,
   expect(ran.text ?? '').not.toBe('')
 })
 
-test('/mentat with nothing else to show opens the pane, so the actions row is reachable', async ($, on) => {
+test('/mentat with nothing else to show opens the pane, so the Commands card is reachable', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
   await startSession($)
@@ -2093,7 +2069,7 @@ test('the band shows for a rate limit at 80 and not at 79, on both surfaces', as
   for (const surface of SURFACES) {
     const t = await bandTexts($, surface)
     expect(t).toContain('5-hour limit 80% · resets in 1h 29m')
-    // Both keep their Details button: the pane holds the actions row.
+    // Both keep their Details button: the pane holds the Commands card.
     const d = await mount($, BAND, surface)
     expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['open'])
     await d.unmount()
@@ -2142,9 +2118,9 @@ test('the desktop pane with nothing to show says so in one line; the terminal pa
   const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
   expect(await textsOf(desktop)).toEqual(['Nothing waiting on you.'])
   expect((await desktop.findAll({ type: 'Svg' })).length).toBe(0)
-  // The actions row stays beside the line.
+  // The Commands card's toggle stays beside the line.
   expect(await cardKeys(desktop)).toEqual([])
-  expect((await desktop.findAll({ type: 'Button' })).map(b => b.key)).toEqual(ACTION_ROW.map(a => a.key))
+  expect((await desktop.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
   await desktop.unmount()
 
   // Something open: the line goes.
@@ -2926,20 +2902,28 @@ test('a long list of problems is cut to six lines, the last counting the rest, o
   expect(t).not.toContain('problem number 6')
 })
 
-// ---- the actions row ------------------------------------------------------------------------
+// ---- the Commands card -------------------------------------------------------------------
 
-// The label each button draws, by key.
-const actionLabels = async (d: Drawing) =>
-  Object.fromEntries((await d.findAll({ type: 'Button' })).map(b => [String(b.key), String(b.text ?? b.props?.label ?? '')]))
+const LINES = [
+  '/mentat · /mentat pr <n>: open this pane, or follow a pull request',
+  '/mentat:come-again: restate the last message',
+  '/mentat:retro: look back at a session that went badly',
+  '/mentat:codex-review-off · /mentat:codex-review-on: Codex reviews off or back on for the session',
+  'mentat check (in a terminal): check what Mentat needs',
+]
+const toggleLabel = async (d: Drawing) =>
+  (await d.findAll({ type: 'Button' })).filter(b => b.key === 'commands-toggle').map(b => String(b.text ?? b.props?.label ?? ''))
+// The card's lines among the drawing's texts.
+const commandLines = async (d: Drawing) => (await textsOf(d)).filter(t => LINES.includes(t))
 
-const FALLBACK = (command: string) => `Could not run /${command} from the pane; type it in chat.`
-
-test('the actions row has the five buttons at the top of the pane on both surfaces, above the open items and beside the empty-pane line', async ($, on) => {
+test('the Commands card starts collapsed on both surfaces: only the toggle shows, above the open items and beside the empty-pane line', async ($, on) => {
   boot(on)
   for (const surface of SURFACES) {
     const empty = await mount($, PANE, surface, { bodyColumns: 60 })
-    expect(Object.values(await actionLabels(empty))).toEqual(['Come again?', 'Retro', 'Codex review off', 'Codex review on', 'Compact'])
-    expect((await empty.findAll({ type: 'Button' })).map(b => b.key)).toEqual(ACTION_ROW.map(a => a.key))
+    expect(await toggleLabel(empty)).toEqual(['▸ Commands'])
+    expect((await empty.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
+    expect(await commandLines(empty)).toEqual([])
+    expect((await textsOf(empty)).some(t => t.includes('/mentat'))).toBe(false)
     // Nothing else to show: the desktop keeps its line.
     expect((await textsOf(empty)).includes('Nothing waiting on you.')).toBe(surface === 'desktop')
     await empty.unmount()
@@ -2949,7 +2933,7 @@ test('the actions row has the five buttons at the top of the pane on both surfac
   for (const surface of SURFACES) {
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
     expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual([
-      ...ACTION_ROW.map(a => a.key),
+      'commands-toggle',
       'dismiss-d1',
       'accept-d2',
       'answer-open-d2',
@@ -2960,144 +2944,40 @@ test('the actions row has the five buttons at the top of the pane on both surfac
   }
 })
 
-test('each action button runs its command through $.command.run, on both surfaces', async ($, on) => {
+test('pressing the toggle shows every command line, pressing again hides them, and the choice survives a remount', async ($, on) => {
   const { world } = boot(on)
   for (const surface of SURFACES) {
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    for (const a of ACTION_ROW) {
-      world.commands.length = 0
-      await pane.press({ key: a.key })
-      expect(world.commands).toEqual([a.command])
-    }
-    // The press has run: no button says queued and no failure line shows.
-    expect(Object.values(await actionLabels(pane))).toEqual(['Come again?', 'Retro', 'Codex review off', 'Codex review on', 'Compact'])
-    expect((await textsOf(pane)).some(t => t.startsWith('Could not run'))).toBe(false)
+    await pane.press({ key: 'commands-toggle' })
+    expect(await toggleLabel(pane)).toEqual(['▾ Commands'])
+    expect(await commandLines(pane)).toEqual(LINES)
+    // The toggle is the only Button, and pressing it ran no command.
+    expect((await pane.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['commands-toggle'])
     await pane.unmount()
-  }
-})
 
-test('a pressed action shows it is queued until it has run, and a repeat press runs it once', async ($, on) => {
-  const { world } = boot(on)
-  for (const surface of SURFACES) {
-    world.commands.length = 0
-    const turn = held()
-    world.commandGate = turn.gate
-    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    // Three presses while the session is busy, the last two before the drawing could have changed.
-    const presses = [pane.press({ key: 'retro' }), pane.press({ key: 'retro' }), pane.press({ key: 'retro' })]
-    await new Promise(r => setTimeout(r, 20))
-    expect(world.commands).toEqual([])
-    expect(await actionLabels(pane)).toEqual({
-      'come-again': 'Come again?',
-      retro: 'Retro · queued',
-      'codex-review-off': 'Codex review off',
-      'codex-review-on': 'Codex review on',
-      compact: 'Compact',
-    })
-    // Another button is not held back by it.
-    const other = pane.press({ key: 'compact' })
-    await new Promise(r => setTimeout(r, 20))
-    expect((await actionLabels(pane)).compact).toBe('Compact · queued')
-    turn.release()
-    await Promise.all([...presses, other])
-    expect(world.commands.slice().sort()).toEqual(['compact', 'mentat:retro'])
-    expect((await actionLabels(pane)).retro).toBe('Retro')
-    // Once it has run, a press runs it again.
-    world.commandGate = undefined
-    await pane.press({ key: 'retro' })
-    expect(world.commands.filter(c => c === 'mentat:retro').length).toBe(2)
-    await pane.unmount()
-  }
-})
-
-test('a command the engine rejects leaves one line naming it, and the next press that runs clears the line', async ($, on) => {
-  const { world } = boot(on)
-  for (const surface of SURFACES) {
-    world.commands.length = 0
-    world.rejectCommands = ['mentat:codex-review-off', 'mentat:come-again']
-    const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    await pane.press({ key: 'codex-review-off' })
-    expect(world.commands).toEqual([])
-    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run'))).toEqual([FALLBACK('mentat:codex-review-off')])
-    // The queued mark is gone with the rejection: the button is pressable again.
-    expect((await actionLabels(pane))['codex-review-off']).toBe('Codex review off')
-    // A second failure replaces the line; there is still one.
-    await pane.press({ key: 'come-again' })
-    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run'))).toEqual([FALLBACK('mentat:come-again')])
-    // The line is in state, so a pane opened again shows it too.
-    await pane.unmount()
     const again = await mount($, PANE, surface, { bodyColumns: 60 })
-    expect(await textsOf(again)).toContain(FALLBACK('mentat:come-again'))
-    // A press that runs clears it.
-    await again.press({ key: 'retro' })
-    expect(world.commands).toEqual(['mentat:retro'])
-    expect((await textsOf(again)).some(t => t.startsWith('Could not run'))).toBe(false)
+    expect(await toggleLabel(again)).toEqual(['▾ Commands'])
+    expect(await commandLines(again)).toEqual(LINES)
+    await again.press({ key: 'commands-toggle' })
+    expect(await toggleLabel(again)).toEqual(['▸ Commands'])
+    expect(await commandLines(again)).toEqual([])
     await again.unmount()
+
+    const last = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect(await toggleLabel(last)).toEqual(['▸ Commands'])
+    await last.unmount()
   }
+  expect(world.commands).toEqual([])
 })
 
-test('a rejection that comes after a wait clears the queued mark and shows the line', async ($, on) => {
+test('the card lists the same lines the mod exports, and the pane never calls $.command.run', async ($, on) => {
   const { world } = boot(on)
-  const turn = held()
-  world.commandGate = turn.gate
-  world.rejectCommands = ['compact']
-  const pane = await mount($, PANE, 'terminal')
-  const press = pane.press({ key: 'compact' })
-  await new Promise(r => setTimeout(r, 20))
-  expect((await actionLabels(pane)).compact).toBe('Compact · queued')
-  turn.release()
-  await press
-  expect((await actionLabels(pane)).compact).toBe('Compact')
-  expect(await textsOf(pane)).toContain(FALLBACK('compact'))
-  await pane.unmount()
-})
-
-test('a session start (reload) forgets a command still queued, so its button works again', async ($, on) => {
-  const { world } = boot(on)
-  const turn = held()
-  world.commandGate = turn.gate
-  const pane = await mount($, PANE, 'terminal')
-  const lost = pane.press({ key: 'retro' })
-  await new Promise(r => setTimeout(r, 20))
-  expect((await actionLabels(pane)).retro).toBe('Retro · queued')
-  await startSession($)
-  await new Promise(r => setTimeout(r, 20))
-  expect((await actionLabels(pane)).retro).toBe('Retro')
-  turn.release()
-  await lost
-  await pane.unmount()
-})
-
-const NOT_HERE = (command: string) => `/${command} is not in this Mentat version; update the plugin.`
-
-test('a command the engine does not have says to update the plugin, while another rejection says to type it in chat', async ($, on) => {
-  const { world } = boot(on)
+  expect(COMMANDS.map(c => `${c.names.join(' · ')}: ${c.use}`)).toEqual(LINES)
   for (const surface of SURFACES) {
-    world.missingCommands = ['mentat:codex-review-off', 'mentat:codex-review-on']
-    world.rejectCommands = ['mentat:retro']
     const pane = await mount($, PANE, surface, { bodyColumns: 60 })
-    await pane.press({ key: 'codex-review-off' })
-    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toEqual([NOT_HERE('mentat:codex-review-off')])
-    // Another rejection keeps the line that says to type it.
-    await pane.press({ key: 'retro' })
-    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toEqual([FALLBACK('mentat:retro')])
-    await pane.press({ key: 'codex-review-on' })
-    expect((await textsOf(pane)).filter(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toEqual([NOT_HERE('mentat:codex-review-on')])
-    // A press that runs clears it.
-    await pane.press({ key: 'compact' })
-    expect((await textsOf(pane)).some(t => t.startsWith('Could not run') || t.includes('not in this Mentat'))).toBe(false)
+    await pane.press({ key: 'commands-toggle' })
+    for (const b of await pane.findAll({ type: 'Button' })) await pane.press({ key: String(b.key) })
     await pane.unmount()
   }
-})
-
-test('a session start (reload) clears the line of a failed press', async ($, on) => {
-  const { world } = boot(on)
-  world.rejectCommands = ['mentat:retro']
-  const pane = await mount($, PANE, 'terminal')
-  await pane.press({ key: 'retro' })
-  expect(await textsOf(pane)).toContain(FALLBACK('mentat:retro'))
-  await startSession($)
-  await new Promise(r => setTimeout(r, 20))
-  expect((await textsOf(pane)).some(t => t.startsWith('Could not run'))).toBe(false)
-  await pane.unmount()
+  expect(world.commands).toEqual([])
 })
