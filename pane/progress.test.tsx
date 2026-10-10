@@ -448,8 +448,8 @@ test('on the desktop the band and each card are one drawn Svg, found by alt text
   const tPane = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await tPane.findAll({ type: 'Svg' })).length).toBe(0)
   const t = await textsOf(tPane)
-  for (const x of ['Open it?', 'Approval required', '✓', '1 other open PR in this repository', 'Check the docs', 'Context', '41%', 'resets in 1h 0m']) expect(t).toContain(x)
-  expect(t.some(x => /[█░]/.test(x))).toBe(true)
+  for (const x of ['Open it?', 'Approval required', '✓', '1 other open PR in this repository', 'Check the docs']) expect(t).toContain(x)
+  expect(t.some(x => /[█░]|Context|resets in/.test(x))).toBe(false)
   await tPane.unmount()
 })
 
@@ -1951,22 +1951,7 @@ test('the third line has the tokens and the elapsed time, and leaves out what is
 
 // ---- the session card and width --------------------------------------------------------------------------------
 
-test('the session card shows context and the rate limits with percent and reset time', async ($, on) => {
-  const { world } = boot(on)
-  world.usage = {
-    context: 41.6,
-    limits: [
-      { kind: 'five_hour', percentUsed: 12.2, resetsAt: new Date(T0 + 2 * 3600_000 + 10 * 60_000).toISOString() },
-      { kind: 'seven_day', percentUsed: 88, resetsAt: new Date(T0 + 3 * 86400_000).toISOString() },
-    ],
-  }
-  const t = await paneTexts($, 'terminal', 60)
-  // The 5-hour reset is a countdown; the weekly one is the weekday and local time (Mon 12:00Z is 8:00 AM in New York).
-  for (const x of ['Context', '5-hour', 'Week', '42%', '12%', '88%', 'resets in 2h 10m', 'resets Mon 8:00 AM']) expect(t).toContain(x)
-  expect(t.some(x => x.includes('3d'))).toBe(false)
-})
-
-test('below 48 columns reset times and secondary agent facts drop', async ($, on) => {
+test('below 48 columns secondary agent facts drop', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [{ kind: 'five_hour', percentUsed: 12, resetsAt: new Date(T0 + 3600_000).toISOString() }] }
   await startSession($)
@@ -1975,34 +1960,35 @@ test('below 48 columns reset times and secondary agent facts drop', async ($, on
   await eng($).agent.spawn(spawn(id, 'Narrow one'))
   await eng($).turn.complete(turnDone(id, { input_tokens: 1000, cache_creation_input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, model: 'm' }))
   const wide = await paneTexts($, 'terminal', 60)
-  expect(wide.some(x => x.startsWith('resets in'))).toBe(true)
   expect(rowFor(wide, 'Narrow one')).toContain('reported')
   const narrow = await paneTexts($, 'terminal', 40)
-  expect(narrow.some(x => x.startsWith('resets in'))).toBe(false)
-  expect(narrow).toContain('12%')
   const facts = rowFor(narrow, 'Narrow one') ?? ''
   expect(facts).not.toContain('reported')
   expect(facts).not.toContain('high')
   expect(facts).toContain('running')
 })
 
-test('the desktop pane draws no usage tiles or meters; the terminal draws text meters', async ($, on) => {
+test('the pane shows no usage on either surface: no tiles, no meters, no resets', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 41, limits: [limit('five_hour', 85, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
-  const desktop = await mount($, PANE, 'desktop', { bodyColumns: 60 })
-  expect((await desktop.findAll({ type: 'Svg' })).length).toBe(0)
-  expect((await textsOf(desktop)).some(t => /context|5-hour|week|resets|%|[█░]/i.test(t))).toBe(false)
-  await desktop.unmount()
-  // With something to show, the desktop pane draws its card and still no tile.
+  const usage = /context|session|5-hour|week|resets|%|[█░]/i
+  for (const surface of SURFACES) {
+    const empty = await mount($, PANE, surface, { bodyColumns: 60 })
+    expect((await empty.findAll({ type: 'Svg' })).length).toBe(0)
+    expect((await textsOf(empty)).some(t => usage.test(t))).toBe(false)
+    await empty.unmount()
+  }
+  // The band still warns at 80%.
+  expect(await bandTexts($, 'terminal')).toContain('5-hour limit 85% · resets in 1h 29m')
+  // With something to show, still no usage; the desktop draws only its own cards.
   await eng($).tool.call({ tool: OPEN, question: 'Anything?' })
   const withCard = await mount($, PANE, 'desktop', { bodyColumns: 60 })
   expect((await altsOf(withCard)).filter(a => !a.startsWith('Question'))).toEqual([])
-  expect((await textsOf(withCard)).some(t => /context|5-hour|week|resets|[█░]/i.test(t))).toBe(false)
+  expect((await textsOf(withCard)).some(t => usage.test(t))).toBe(false)
   await withCard.unmount()
-  await eng($).tool.call({ tool: CLOSE, id: 'd1' })
   const terminal = await mount($, PANE, 'terminal', { bodyColumns: 60 })
   expect((await terminal.findAll({ type: 'Svg' })).length).toBe(0)
-  expect((await textsOf(terminal)).some(t => /[█░]/.test(t))).toBe(true)
+  expect((await textsOf(terminal)).some(t => usage.test(t))).toBe(false)
   await terminal.unmount()
 })
 
@@ -2012,7 +1998,6 @@ test('no card is drawn for what there is not: no pull request, no agents, no que
   expect(t.some(x => x.toUpperCase().startsWith('AGENTS'))).toBe(false)
   expect(t).not.toContain('GitHub')
   expect(t.some(x => x.toLowerCase().includes('no ') && x.toLowerCase().includes('yet'))).toBe(false)
-  expect(t).toContain('Context')
 })
 
 const RESET_5H = () => new Date(T0 + 3600_000 + 29 * 60_000).toISOString()
@@ -2143,15 +2128,11 @@ test('the desktop pane with nothing to show says so in one line; the terminal pa
   await busy.unmount()
 })
 
-test('the weekly reset prints as weekday and local time in the band and the terminal meters; the 5-hour one stays a countdown', async ($, on) => {
+test('the weekly reset prints as weekday and local time in the band; the 5-hour one stays a countdown', async ($, on) => {
   const { world } = boot(on)
   world.usage = { context: 10, limits: [limit('five_hour', 12, RESET_5H()), limit('seven_day', 91, RESET_WEEK())] }
   expect(await bandTexts($, 'terminal')).toContain('Week limit 91% · resets Thu 7:00 PM')
   expect(await bandTexts($, 'desktop')).toContain('Week limit 91% · resets Thu 7:00 PM')
-  await startSession($)
-  const t = await paneTexts($, 'terminal', 60)
-  expect(t).toContain('resets in 1h 29m')
-  expect(t).toContain('resets Thu 7:00 PM')
 
   // The 5-hour limit alone keeps its countdown in the band.
   world.usage = { context: 10, limits: [limit('five_hour', 90, RESET_5H()), limit('seven_day', 8, RESET_WEEK())] }
@@ -3304,6 +3285,5 @@ test('no terminal Box has a backgroundColor: a terminal draws an 8-digit hex tin
     expect(boxes.filter(b => b.props?.backgroundColor !== undefined)).toEqual([])
     await term.unmount()
   }
-  // The terminal's session meters are still drawn, as text.
-  expect(await paneTexts($, 'terminal')).toContain('SESSION')
+  expect(await paneTexts($, 'terminal')).not.toContain('SESSION')
 })

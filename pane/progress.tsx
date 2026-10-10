@@ -1,5 +1,5 @@
 // Mentat's band and pane: what needs the maintainer, where this session's pull
-// request stands, what the agents are doing and how much session budget is left.
+// request stands and what the agents are doing; its band also warns when a rate limit runs low.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -20,7 +20,7 @@ const CODEX_APP = 'chatgpt-codex-connector[bot]'
 const SUMMARY_MARK = '<!-- codex-pull-request-review-summary -->'
 const STALE_MS = 5 * 60_000
 const LIST_LIMIT = 100
-// A rate limit this far gone raises the band; the terminal pane's meters turn amber here too.
+// A rate limit this far gone raises the band.
 const WARN_PERCENT = 80
 // Rows between the desktop pane's sections.
 const SECTION_GAP = 2
@@ -200,30 +200,18 @@ const oneLine = (text: string, max: number = LOG_WIDTH): string => {
   return chars.length <= max ? chars.join('') : `${chars.slice(0, max - 1).join('').trimEnd()}…`
 }
 
-const textMeter = (cells: number, percent: number): string => {
-  const filled = Math.round((Math.max(0, Math.min(100, percent)) / 100) * cells)
-  return '█'.repeat(filled) + '░'.repeat(cells - filled)
-}
-
 type Meter = { kind: string; label: string; percent: number; reset: string }
 type Usage = Awaited<ReturnType<EngineInterface['session']['usage']>>
 
-// The session budget as the terminal pane, the band and `/mentat` all read it: the context
-// window and each rate limit, with their percent and the reset: a countdown for the 5-hour
-// limit, the weekday and local time for the weekly one.
-const metersOf = (usage: Usage | undefined, now: number, zone?: string): { meters: Meter[]; limits: Meter[] } => {
-  const limits = (usage?.rateLimits ?? []).map(r => ({
+// The rate limits as the band reads them, each with its percent and the reset: a countdown for the
+// 5-hour limit, the weekday and local time for the weekly one.
+const limitsOf = (usage: Usage | undefined, now: number, zone?: string): Meter[] =>
+  (usage?.rateLimits ?? []).map(r => ({
     kind: r.kind,
     label: r.kind === 'five_hour' ? '5-hour' : r.kind === 'seven_day' ? 'Week' : r.kind,
     percent: Math.round(r.percentUsed),
     reset: r.kind === 'seven_day' ? resetAt(r.resetsAt, now, zone) : resetIn(r.resetsAt, now),
   }))
-  const context = usage?.context.percent
-  return {
-    limits,
-    meters: [...(context === undefined ? [] : [{ kind: 'context', label: 'Context', percent: Math.round(context), reset: '' }]), ...limits],
-  }
-}
 
 // The band's budget text, for the most used of the 5-hour and weekly limits when it
 // is at WARN_PERCENT or more. The context window never raises the band.
@@ -1338,7 +1326,7 @@ export const register: Register = (on, _options) => {
     // Budget raises it only when nothing above it does. Nothing redraws the band for a
     // change of usage alone; it is read when the band is drawn (see the report).
     const isAbove = alert !== undefined || question !== undefined || warning !== undefined || isChecked
-    const budget = !isAbove ? budgetAlert(metersOf(await readUsage($), now, await readZone($)).limits) : undefined
+    const budget = !isAbove ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
     const action = !isAbove && budget === undefined ? newest('action') : undefined
     if (!isAbove && budget === undefined && action === undefined) {
       return next(e)
@@ -1590,7 +1578,6 @@ export const register: Register = (on, _options) => {
     const isReviewed = pr !== null && review !== null && review.head === pr.head
     const ci = pr === null ? undefined : ciLine(pr.checks)
     const others = pr?.others
-    const cells = isNarrow ? 6 : 10
     if (Svg !== undefined) {
       const W = Math.max(220, Math.min(900, cols * 8 - 24))
       const agentRow = (a: AgentRow): AgentCardRow => {
@@ -1713,8 +1700,6 @@ export const register: Register = (on, _options) => {
       )
     }
 
-    const { meters } = metersOf(await readUsage($), now, await readZone($))
-
     return (
       <Box flexDirection="column" paddingX={1}>
         {commandsCard}
@@ -1827,24 +1812,6 @@ export const register: Register = (on, _options) => {
                 {!isHidden && <Box flexDirection="column" marginTop={1}>{doneRows.map((a, i) => termRow(a, i))}</Box>}
               </Box>
             )}
-          </Card>
-        )}
-
-        {meters.length > 0 && (
-          <Card>
-            <Heading label="Session" />
-            {meters.map(m => (
-              <Box key={m.label} flexDirection="row" gap={1} alignItems="center">
-                <Box width={8}>
-                  <Text dimColor>{m.label}</Text>
-                </Box>
-                <Text color={m.percent >= WARN_PERCENT ? 'warning' : 'suggestion'}>{textMeter(cells, m.percent)}</Text>
-                <Box width={5}>
-                  <Text>{`${m.percent}%`}</Text>
-                </Box>
-                {!isNarrow && m.reset !== '' && <Text dimColor>{m.reset}</Text>}
-              </Box>
-            ))}
           </Card>
         )}
       </Box>
