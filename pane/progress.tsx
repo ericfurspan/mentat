@@ -11,7 +11,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { AgentRow, AgentStatus, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
+import type { AgentRow, AgentStatus, CheckResult, Decision, DecisionKind, EventKind, EventMark, GoneEntry, LogEntry, LogKind, NoteEntry } from './types'
 
 const PLUGIN = 'mentat'
 const PANE = 'mentat'
@@ -696,13 +696,28 @@ const ITEM_MARK: Record<DecisionKind, { char: string; color: string | undefined 
   action: { char: '→', color: 'suggestion' },
 }
 
-// The pane on the terminal. `e` is the Pane's own render argument; `cols` its body width.
-async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], cols: number) {
-  const { Box, Button, Link, Text } = $.ui.resolve(e)
+// What both panes draw, read once: the same sections, entries and order on the terminal and the desktop, so
+// the two cannot drift. Each drawer only lays it out.
+type PaneData = {
+  now: number
+  zone: string | undefined
+  // Open items, most urgent first.
+  open: Decision[]
+  sentList: { id: string; text: string; isDelivered?: boolean }[]
+  result: CheckResult | null
+  // Agents that have not ended: working ones first, then the newest start first.
+  live: AgentRow[]
+  logList: LogEntry[]
+  isLogAll: boolean
+  // The Feed's log lines, newest first (`n` is the entry's place in the stored log), cut to FEED_SHOWN unless all.
+  entries: { entry: LogEntry; n: number }[]
+  // The toggle's label, when the log is longer than FEED_SHOWN.
+  toggle: string | undefined
+  budget: string | undefined
+}
+async function paneData($: EngineInterface): Promise<PaneData> {
   const now = await $.clock.now()
   const zone = await readZone($)
-  const layout = layoutOf(cols)
-  const isShort = layout === 'narrow'
   const open = urgentFirst(await read($, items))
   const sentList = await read($, sentAtom)
   const result = await read($, checkResult)
@@ -715,7 +730,39 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   const logList = await read($, logAtom)
   const isLogAll = await read($, logAll)
   const budget = budgetAlert(limitsOf(await readUsage($), now, zone))
-  const toggleLog = () => inTurn(() => update($, logAll, v => !v))
+  const newest = logList.map((entry, n) => ({ entry, n })).reverse()
+  const toggle = logList.length > FEED_SHOWN ? (isLogAll ? 'Show fewer' : `Show all ${logList.length}`) : undefined
+
+  return { now, zone, open, sentList, result, live, logList, isLogAll, entries: isLogAll ? newest : newest.slice(0, FEED_SHOWN), toggle, budget }
+}
+const toggleLogAll = ($: EngineInterface) => inTurn(() => update($, logAll, v => !v))
+// What an open item shows besides its text: the answer button or the sent line, the link, the line under it
+// (`Recommended: <text> · <time>`, else the time) and, for the check's warning item, the WARN lines.
+const itemView = (d: Decision, data: PaneData) => {
+  const kind = kindOf(d)
+  const sent = data.sentList.find(x => x.id === d.id)
+  const time = clockAt(d.openedAt, data.zone)
+
+  return {
+    kind,
+    sent,
+    answer: kind === 'question' && sent === undefined ? d.accept : undefined,
+    link: kind !== 'question' ? d.link : undefined,
+    detail: d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`,
+    warns: d.id === CHECK_ID && kind === 'warning' ? (data.result?.warnings ?? []).map(w => `WARN: ${w}`) : [],
+  }
+}
+// A live agent's state word as the engine reports it, and the time it has run when its start is known.
+const agentClock = (a: AgentRow, now: number): string | undefined => (a.startedAt === undefined ? undefined : duration(now - a.startedAt))
+
+// The pane on the terminal. `e` is the Pane's own render argument; `cols` its body width.
+async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], cols: number) {
+  const { Box, Button, Link, Text } = $.ui.resolve(e)
+  const data = await paneData($)
+  const { now, zone, open, live, logList, budget } = data
+  const layout = layoutOf(cols)
+  const isShort = layout === 'narrow'
+  const toggleLog = () => toggleLogAll($)
 
   // One body row: in a frame between the dim side lines, else bare. The middle grows and shrinks, so a row
   // that ends in Buttons needs no width arithmetic and the right edge stays where it is.
@@ -761,10 +808,7 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   // Waiting on you: every open item, most urgent first. The first line holds the mark, the text and the buttons;
   // under it, dim, the recommendation and the time, and for the check's warning item its WARN lines.
   const waiting = open.flatMap(d => {
-    const kind = kindOf(d)
-    const sent = sentList.find(x => x.id === d.id)
-    const answer = kind === 'question' && sent === undefined ? d.accept : undefined
-    const link = kind !== 'question' ? d.link : undefined
+    const { kind, sent, answer, link, detail: recommended, warns } = itemView(d, data)
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
       // The mark never shrinks and keeps its space after it (a margin, which a tight row cannot take away);
@@ -797,11 +841,8 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
       ], 0),
     ]
     if (!isShort) {
-      const time = clockAt(d.openedAt, zone)
-      lines.push(detail(`detail-${d.id}`, d.recommendation === undefined ? time : `Recommended: ${d.recommendation} · ${time}`))
-      if (d.id === CHECK_ID && kind === 'warning') {
-        ;(result?.warnings ?? []).forEach((w, i) => lines.push(detail(`warn-${i}`, `WARN: ${w}`)))
-      }
+      lines.push(detail(`detail-${d.id}`, recommended))
+      warns.forEach((w, i) => lines.push(detail(`warn-${i}`, w)))
     }
 
     return lines
@@ -809,8 +850,8 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
 
   // The Feed: the agents that have not ended, pinned, then the log newest first.
   const feedRows: RenderElement[] = live.map(a => {
-    const ms = a.startedAt === undefined ? undefined : now - a.startedAt
-    const state = ms === undefined ? a.status : `${a.status} · ${duration(ms)}`
+    const ran = agentClock(a, now)
+    const state = ran === undefined ? a.status : `${a.status} · ${ran}`
 
     return row(`agent-${a.id}`, [
       <Text key="mark">{ROLE_MARK[roleOf(a.type).role]}</Text>,
@@ -825,8 +866,7 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     ])
   })
   if (live.length > 0 && logList.length > 0) feedRows.push(row('feed-gap', [<Text key="gap"> </Text>]))
-  const entries = logList.map((entry, n) => ({ entry, n })).reverse()
-  for (const { entry, n } of isLogAll ? entries : entries.slice(0, FEED_SHOWN)) {
+  for (const { entry, n } of data.entries) {
     const { icon, color } = styleOf(entry)
     feedRows.push(
       row(`log-${n}`, [
@@ -848,8 +888,8 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
       ]),
     )
   }
-  if (logList.length > FEED_SHOWN) {
-    const label = isLogAll ? 'Show fewer' : `Show all ${logList.length}`
+  if (data.toggle !== undefined) {
+    const label = data.toggle
     feedRows.push(
       row('log-toggle-row', [
         <Button key="log-toggle" plain label={label} onPress={toggleLog}>
