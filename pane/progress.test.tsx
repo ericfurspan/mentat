@@ -1062,7 +1062,7 @@ test('a live agent row on the desktop is the state word in blue, a dot, the bold
   expect(prop('running', 'color')).toBe('suggestion')
   expect(prop('●', 'color')).toBe('suggestion')
   expect(prop('Still going', 'bold')).toBe(true)
-  expect(prop('Still going', 'wrap')).toBe('truncate-end')
+  expect(prop('Still going', 'wrap')).toBe('wrap')
   expect(prop('1s', 'dimColor')).toBe(true)
   // Ended agents are not agent rows in the Feed: only their event lines (dim) say how they ended.
   expect(all).not.toContain('Finished fine')
@@ -1109,7 +1109,7 @@ const seedAgents = async (w: World, clock: { advance: (ms: number) => Promise<un
   await untilRowsAre($, list)
 }
 
-test('a terminal agent line is one line: role mark, bold truncating title, then its state and elapsed time dim; no background', async ($, on) => {
+test('a terminal agent line: role mark, bold wrapping title, then its state and elapsed time dim; no background', async ($, on) => {
   const { world, clock } = boot(on)
   await startSession($)
   await seedAgents(world, clock, $, [
@@ -1122,13 +1122,13 @@ test('a terminal agent line is one line: role mark, bold truncating title, then 
   const boxes = await t.findAll({ type: 'Box' })
   await t.unmount()
   const build = texts.find(x => x.text === 'Build it')!
-  expect(build.props?.wrap).toBe('truncate-end')
+  expect(build.props?.wrap).toBe('wrap')
   expect(build.props?.bold).toBe(true)
   expect(boxes.some(b => b.props?.backgroundColor !== undefined)).toBe(false)
-  // The line reads: role mark, title, state and elapsed time, between the side lines.
+  // The line reads: role mark, title, state and elapsed time.
   const all = texts.map(x => x.text)
   const i = all.indexOf('Build it')
-  expect(all.slice(i - 2, i + 3)).toEqual(['│ ', '◆', 'Build it', 'running · 1s', ' │'])
+  expect(all.slice(i - 1, i + 2)).toEqual(['◆', 'Build it', 'running · 1s'])
   const j = all.indexOf('Look around')
   expect(all.slice(j - 1, j + 2)).toEqual(['◎', 'Look around', 'waiting · 1s'])
   expect(texts.find(x => x.text === 'running · 1s')?.props?.dimColor).toBe(true)
@@ -1603,7 +1603,7 @@ test('the terminal pane draws a GitHub issue or pull request link as #<number>, 
   }
 })
 
-test('a terminal row with a link keeps the mark and the space after it, and the text is what is cut', async ($, on) => {
+test('a terminal row with a link keeps the mark and the space after it, and the text is what wraps', async ($, on) => {
   boot(on)
   await open('action', 'Rotate the token that the deploy job reads from the secrets store', { link: 'https://github.com/ericfurspan/mentat/issues/160' })($)
   for (const cols of [60, 85]) {
@@ -1613,15 +1613,15 @@ test('a terminal row with a link keeps the mark and the space after it, and the 
     const mark = boxes.find(b => b.key === 'mark-box')!
     expect(mark.props?.flexShrink).toBe(0)
     expect(mark.props?.marginRight).toBe(1)
-    // The text can shrink and is cut with an ellipsis; the controls do not shrink.
+    // The text can shrink and wraps under itself; the controls do not shrink.
     expect(boxes.find(b => b.key === 'text')?.props?.flexShrink).toBe(1)
     expect(boxes.find(b => b.key === 'controls')?.props?.flexShrink).toBe(0)
     const texts = await d.findAll({ type: 'Text' })
-    expect(texts.find(t => t.text === 'Rotate the token that the deploy job reads from the secrets store')?.props?.wrap).toBe('truncate-end')
-    // Left to right: the side line, the mark, the text, the short link, Dismiss, the side line.
+    expect(texts.find(t => t.text === 'Rotate the token that the deploy job reads from the secrets store')?.props?.wrap).toBe('wrap')
+    // Left to right: the mark, the text, the short link, Dismiss.
     const all = texts.map(t => t.text)
-    const i = all.indexOf('│ ')
-    expect(all.slice(i, i + 6)).toEqual(['│ ', '→', 'Rotate the token that the deploy job reads from the secrets store', '#160', 'Dismiss', ' │'])
+    const i = all.indexOf('→')
+    expect(all.slice(i, i + 4)).toEqual(['→', 'Rotate the token that the deploy job reads from the secrets store', '#160', 'Dismiss'])
     await d.unmount()
   }
 })
@@ -2585,39 +2585,70 @@ const layoutWorld = async ($: never, w: World) => {
 // The pieces of the edge that starts at `start` (the title's section), joined.
 const edgeAt = (t: string[], start: string, parts: number) => t.slice(t.indexOf(start), t.indexOf(start) + parts).join('')
 
-test('from 60 columns each section is a frame: edges exactly as wide as the body, the title bold in the top edge, side lines on every row', async ($, on) => {
+test('from 60 columns each section is a Box with a dim round border and its heading as the first row; no edge strings or side lines', async ($, on) => {
   const { world } = boot(on)
   await layoutWorld($, world)
   for (const cols of [60, 72, 100]) {
     const d = await mount($, PANE, 'terminal', { bodyColumns: cols })
     const t = await textsOf(d)
     const texts = await d.findAll({ type: 'Text' })
-    const top = (title: string) => {
-      const i = t.indexOf(title)
-      return t.slice(i - 1, i + 3).join('')
+    const boxes = await d.findAll({ type: 'Box' })
+    for (const key of ['waiting', 'feed']) {
+      const section = boxes.find(b => b.key === key)!
+      expect(section.props).toMatchObject({ flexDirection: 'column', borderStyle: 'round', borderDimColor: true, paddingX: 1 })
+      // The heading row is the first thing inside it.
+      const head = boxes.find(b => b.key === `${key}-top`)!
+      expect(head.props?.flexDirection).toBe('row')
+      expect(boxes.indexOf(head)).toBe(boxes.indexOf(section) + 1)
     }
-    // `╭─ WAITING ON YOU 2 ───…╮` and `╭─ FEED 4 ───…╮`.
-    const waiting = top('WAITING ON YOU')
-    expect(waiting.startsWith('╭─ WAITING ON YOU 2 ─')).toBe(true)
-    expect(waiting.endsWith('─╮')).toBe(true)
-    expect([...waiting]).toHaveLength(cols)
-    const feed = top('FEED')
-    expect(feed.startsWith('╭─ FEED 4 ─')).toBe(true)
-    expect([...feed]).toHaveLength(cols)
-    // The bottom edges.
-    const bottoms = t.filter(x => x.startsWith('╰'))
-    expect(bottoms).toEqual([`╰${'─'.repeat(cols - 2)}╯`, `╰${'─'.repeat(cols - 2)}╯`])
-    // The title is bold and its count dim, the lines dim.
-    expect(texts.find(x => x.text === 'WAITING ON YOU')?.props?.bold).toBe(true)
-    expect(texts.find(x => x.text === ' 2')?.props?.dimColor).toBe(true)
-    expect(texts.find(x => x.text === '│ ')?.props?.dimColor).toBe(true)
-    // Every body row has both side lines: Waiting on you has 2 items (with details and WARN lines), the Feed 4 rows.
-    expect(t.filter(x => x === '│ ').length).toBe(t.filter(x => x === ' │').length)
-    expect(t.filter(x => x === '│ ').length).toBeGreaterThanOrEqual(8)
-    // The middle of a row grows and shrinks, and its text is cut with an ellipsis rather than wrapped.
-    expect(texts.find(x => x.text === 'Ship the change now?')?.props?.wrap).toBe('truncate-end')
+    // The title is bold and its count dim, side by side: `WAITING ON YOU 2`, `FEED 4`.
+    for (const [title, count] of [['WAITING ON YOU', '2'], ['FEED', '4']] as const) {
+      const i = texts.findIndex(x => x.text === title)
+      expect(texts[i]!.props?.bold).toBe(true)
+      expect(texts[i + 1]).toMatchObject({ text: count, props: { dimColor: true } })
+    }
+    // The border is the Box's own: no edge or side-line strings are drawn as text.
+    expect(t.some(x => /[╭╮╰╯│]/.test(x))).toBe(false)
     await d.unmount()
   }
+})
+
+test('the text of an item, its detail lines, a Feed entry and an agent wraps under itself on both surfaces, beside a top-aligned mark and buttons that do not shrink', async ($, on) => {
+  const { world } = boot(on)
+  await startSession($)
+  await eng($).tool.call({ tool: OPEN, question: 'Rotate the token that the deploy job reads from the secrets store', recommendation: 'Do it after the release, not before', accept: 'Yes' })
+  await bash(world, $, 'mentat check', WARN_RUN)
+  await note($, 'A long note that goes on and on past the end of the row, wrapped under itself')
+  world.agents = [{ id: 'a1', type: 'Explore', description: 'A long agent description that goes on and on past the end of the row', status: 'running' }]
+  await eng($).agent.spawn(spawn('a1', 'A long agent description that goes on and on past the end of the row', 'Explore'))
+  for (const [surface, spec] of [['terminal', TERM], ['desktop', DESK]] as const) {
+    const d = await mount($, spec, surface)
+    const texts = await d.findAll({ type: 'Text' })
+    const boxes = await d.findAll({ type: 'Box' })
+    for (const line of [
+      'Rotate the token that the deploy job reads from the secrets store',
+      'A long note that goes on and on past the end of the row, wrapped under itself',
+      'A long agent description that goes on and on past the end of the row',
+    ]) expect(texts.find(x => x.text === line)?.props?.wrap).toBe('wrap')
+    for (const x of texts.filter(x => /^(Recommended: |WARN: )/.test(x.text ?? ''))) expect(x.props).toMatchObject({ wrap: 'wrap', dimColor: true })
+    expect(texts.filter(x => x.props?.wrap === 'truncate-end').map(x => x.text)).toEqual([])
+    // The item's first line is top-aligned: the mark at the left, the buttons at the right, neither shrinking.
+    const first = boxes.find(b => b.key === 'item-d1')!
+    const row = surface === 'terminal' ? first : boxes[boxes.indexOf(first) + 1]!
+    expect(row.props).toMatchObject({ flexDirection: 'row', alignItems: 'flex-start' })
+    const parts = boxes.filter(b => b.key === 'mark-box' || b.key === 'controls' || (surface === 'desktop' && b.props?.flexShrink === 0 && b.props?.flexDirection === 'row'))
+    expect(parts.length).toBeGreaterThan(0)
+    for (const b of parts) expect(b.props?.flexShrink).toBe(0)
+    // The text Box takes the rest; Feed rows are top-aligned too.
+    for (const b of boxes.filter(b => /^(agent|log)-/.test(String(b.key)))) expect(b.props?.alignItems).toBe('flex-start')
+    for (const b of boxes.filter(b => b.key === 'text' && surface === 'terminal')) expect(b.props).toMatchObject({ flexGrow: 1, flexShrink: 1 })
+    if (surface === 'desktop') for (const b of boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1)) expect(b.props).toMatchObject({ minWidth: 0 })
+    await d.unmount()
+  }
+  // The band stays one line, cut with an ellipsis.
+  const band = await mount($, BAND, 'desktop')
+  expect((await band.findAll({ type: 'Text' }))[0]!.props?.wrap).toBe('truncate-end')
+  await band.unmount()
 })
 
 test('from 40 to 59 columns each section is headed by a rule to the full width, with no side lines or bottom edge', async ($, on) => {
@@ -2864,7 +2895,7 @@ test('the desktop band has one Box that holds the answer button, Dismiss, the li
   await quiet.unmount()
 })
 
-test('a terminal pane row ends in its buttons without width arithmetic: side lines, a growing middle and one controls Box that does not shrink', async ($, on) => {
+test('a terminal pane row ends in its buttons without width arithmetic: a growing middle and one controls Box that does not shrink', async ($, on) => {
   boot(on)
   await open('question', 'Ship it?', { accept: 'Yes' })($)
   const d = await mount($, TERM, 'terminal')
@@ -2872,13 +2903,13 @@ test('a terminal pane row ends in its buttons without width arithmetic: side lin
   const row = boxes.find(b => b.key === 'item-d1')!
   expect(row.props?.flexDirection).toBe('row')
   // The middle grows and shrinks; the controls keep their size.
-  expect(boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1 && b.props?.flexDirection === 'row')).not.toHaveLength(0)
+  expect(boxes.filter(b => b.key === 'text' && b.props?.flexGrow === 1 && b.props?.flexShrink === 1)).not.toHaveLength(0)
   const controls = boxes.filter(b => b.key === 'controls')
   expect(controls).toHaveLength(1)
   expect(controls[0]!.props?.flexDirection).toBe('row')
   expect(controls[0]!.props?.flexShrink).toBe(0)
   const texts = await textsOf(d)
-  expect(texts.slice(texts.indexOf('│ '), texts.indexOf(' │') + 1)).toEqual(['│ ', '?', 'Ship it?', 'Yes', 'Dismiss', ' │'])
+  expect(texts.slice(texts.indexOf('?'), texts.indexOf('Dismiss') + 1)).toEqual(['?', 'Ship it?', 'Yes', 'Dismiss'])
   expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1'])
   expect((await d.findAll({ type: 'Button' })).map(b => b.key)).toEqual(['accept-d1', 'dismiss-d1'])
   await d.unmount()
@@ -3369,13 +3400,13 @@ test('a desktop item row is a mark, the text that shrinks, the controls that do 
   // The text Box grows and shrinks and the Text is cut with an ellipsis; the controls keep their size.
   const row = boxes.find(b => b.key === 'item-d1')!
   expect(row.props?.flexDirection).toBe('column')
-  expect(texts.find(t => t.text === 'Ship the change now?')?.props?.wrap).toBe('truncate-end')
+  expect(texts.find(t => t.text === 'Ship the change now?')?.props?.wrap).toBe('wrap')
   expect(boxes.filter(b => b.props?.flexGrow === 1 && b.props?.flexShrink === 1).length).toBeGreaterThan(0)
   expect(boxes.filter(b => b.props?.flexShrink === 0 && b.props?.flexDirection === 'row').length).toBeGreaterThan(0)
   // The line under the text is muted and cut; the check's item has its WARN lines each on one muted line.
   for (const line of ['Recommended: Yes, it passed · 8:00 AM', '8:00 AM', 'WARN: gh is old', 'WARN: codex is old']) {
     const t = texts.find(x => x.text === line)
-    expect(t?.props).toMatchObject({ dimColor: true, wrap: 'truncate-end' })
+    expect(t?.props).toMatchObject({ dimColor: true, wrap: 'wrap' })
   }
   // The pane reads left to right: the mark, the text, then the buttons, in the terminal's order.
   expect(await bandKeys(d)).toEqual(['accept-d1', 'dismiss-d1', 'dismiss-check'])
@@ -3487,7 +3518,7 @@ test('the desktop pane puts the budget warning first, says Nothing waiting on yo
   expect(new Set(drawn).size).toBe(1)
 })
 
-test('every desktop Box that can shrink has minWidth 0, and the text Boxes hide their overflow, so a narrow pane cuts the text and not the card', async ($, on) => {
+test('every desktop Box that can shrink has minWidth 0, so a narrow pane wraps the text and does not push past the card', async ($, on) => {
   const { world } = boot(on)
   await deskWorld($, world)
   await eng($).tool.call({ tool: OPEN, kind: 'action', question: 'Rotate the token that the deploy job reads from the secrets store', link: 'https://github.com/o/r/issues/160' })
@@ -3502,10 +3533,11 @@ test('every desktop Box that can shrink has minWidth 0, and the text Boxes hide 
   const shrinking = boxes.filter(b => !fixed(b))
   expect(shrinking.length).toBeGreaterThan(10)
   for (const b of shrinking) expect({ key: b.key, minWidth: b.props?.minWidth }).toEqual({ key: b.key, minWidth: 0 })
-  // The text Boxes are the ones that grow and shrink: they also hide the overflow.
+  // The text Boxes are the ones that grow and shrink; the text wraps under itself, so none hides its overflow.
   const text = boxes.filter(b => b.props?.flexShrink === 1)
   expect(text.length).toBeGreaterThanOrEqual(8)
-  for (const b of text) expect(b.props).toMatchObject({ flexGrow: 1, minWidth: 0, overflow: 'hidden' })
+  for (const b of text) expect(b.props).toMatchObject({ flexGrow: 1, minWidth: 0 })
+  for (const b of text) expect(b.props?.overflow).toBeUndefined()
   // The cards and the pane's outer column are among those with minWidth 0.
   for (const key of ['card-waiting', 'card-feed', 'item-d1', 'item-d2', 'item-check']) expect(boxes.find(b => b.key === key)?.props?.minWidth).toBe(0)
   // Marks (the 3-cell column), time columns and the button groups never shrink; a group holds the link.

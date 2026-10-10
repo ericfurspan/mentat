@@ -22,7 +22,7 @@ const CLOSE_TOOL = `mcp__${PLUGIN}__close_decision`
 const NOTE_TOOL = `mcp__${PLUGIN}__note`
 // A rate limit this far gone raises the band.
 const WARN_PERCENT = 80
-// The terminal pane's width classes, in body columns: sections are framed from FRAME_COLUMNS, headed by a
+// The terminal pane's width classes, in body columns: sections have a border from FRAME_COLUMNS, headed by a
 // rule from RULE_COLUMNS, and below that also drop the times, the recommendation and the WARN lines.
 const FRAME_COLUMNS = 60
 const RULE_COLUMNS = 40
@@ -565,16 +565,15 @@ const SOURCE_WORDS: Record<string, string> = { clear: '/clear', resume: '/resume
 
 type Layout = 'frame' | 'rule' | 'narrow'
 const layoutOf = (cols: number): Layout => (cols >= FRAME_COLUMNS ? 'frame' : cols >= RULE_COLUMNS ? 'rule' : 'narrow')
-// The pieces of a section's top edge, which together are exactly `cols` characters wide: `╭─ TITLE 3 ───╮`
-// in a frame, `── TITLE 3 ───` as a rule. The title is drawn bold and the count dim, so they are apart.
-const topEdge = (layout: Layout, title: string, count: number, cols: number): { head: string; title: string; count: string; fill: string } => {
-  const head = layout === 'frame' ? '╭─ ' : '── '
+// The pieces of a heading rule, which together are exactly `cols` characters wide: `── TITLE 3 ───`. The title is
+// drawn bold and the count dim, so they are apart. (A frame has a real Box border and a plain heading row.)
+const ruleEdge = (title: string, count: number, cols: number): { head: string; title: string; count: string; fill: string } => {
+  const head = '── '
   const shown = ` ${count}`
-  const room = cols - head.length - title.length - shown.length - 1 - (layout === 'frame' ? 1 : 0)
+  const room = cols - head.length - title.length - shown.length - 1
 
-  return { head, title, count: shown, fill: ` ${'─'.repeat(Math.max(0, room))}${layout === 'frame' ? '╮' : ''}` }
+  return { head, title, count: shown, fill: ` ${'─'.repeat(Math.max(0, room))}` }
 }
-const bottomEdge = (cols: number): string => `╰${'─'.repeat(Math.max(0, cols - 2))}╯`
 // The mark of each kind of open item and its theme color.
 const ITEM_MARK: Record<DecisionKind, { char: string; color: string | undefined }> = {
   question: { char: '?', color: undefined },
@@ -651,43 +650,50 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
   const isShort = layout === 'narrow'
   const toggleLog = () => toggleLogAll($)
 
-  // One body row: in a frame between the dim side lines, else bare. The middle grows and shrinks, so a row
-  // that ends in Buttons needs no width arithmetic and the right edge stays where it is.
+  // One body row. The text Box grows and shrinks and wraps under itself, so a row that ends in Buttons needs no
+  // width arithmetic and the right edge stays where it is; the other parts are top-aligned beside it.
   const row = (key: string, children: RenderElement[], gap = 1) => (
-    <Box key={key} flexDirection="row">
-      {layout === 'frame' && <Text dimColor>│ </Text>}
-      <Box flexGrow={1} flexShrink={1} flexDirection="row" gap={gap}>
-        {children}
-      </Box>
-      {layout === 'frame' && <Text dimColor> │</Text>}
+    <Box key={key} flexDirection="row" alignItems="flex-start" gap={gap}>
+      {children}
     </Box>
   )
-  // A dim line under an item's text, indented to it.
+  // A dim line under an item's text, indented to it (the mark and the space after it), wrapped.
   const detail = (key: string, text: string) =>
     row(key, [
       <Box key="text" flexGrow={1} flexShrink={1} paddingLeft={2}>
-        <Text dimColor wrap="truncate-end">
+        <Text dimColor wrap="wrap">
           {text}
         </Text>
       </Box>,
     ])
+  // A section: in a frame (from FRAME_COLUMNS) a Box with a dim round border and the heading as its first row;
+  // below that the heading is a rule of exactly `cols` characters, with no border.
   const section = (key: string, title: string, count: number, rows: RenderElement[], gap: boolean) => {
-    const edge = topEdge(layout, title, count, cols)
-
-    return (
-      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0}>
+    const edge = ruleEdge(title, count, cols)
+    const heading =
+      layout === 'frame' ? (
+        <Box key={`${key}-top`} flexDirection="row" gap={1}>
+          <Text bold>{title}</Text>
+          <Text dimColor>{count}</Text>
+        </Box>
+      ) : (
         <Box key={`${key}-top`} flexDirection="row">
           <Text dimColor>{edge.head}</Text>
           <Text bold>{edge.title}</Text>
           <Text dimColor>{edge.count}</Text>
           <Text dimColor>{edge.fill}</Text>
         </Box>
+      )
+
+    return layout === 'frame' ? (
+      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0} borderStyle="round" borderDimColor paddingX={1}>
+        {heading}
         {rows}
-        {layout === 'frame' && (
-          <Box key={`${key}-bottom`} flexDirection="row">
-            <Text dimColor>{bottomEdge(cols)}</Text>
-          </Box>
-        )}
+      </Box>
+    ) : (
+      <Box key={key} flexDirection="column" marginTop={gap ? 1 : 0}>
+        {heading}
+        {rows}
       </Box>
     )
   }
@@ -699,13 +705,13 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     const mark = ITEM_MARK[kind]
     const lines: RenderElement[] = [
       // The mark never shrinks and keeps its space after it (a margin, which a tight row cannot take away);
-      // the text is what is cut. The controls keep their size and their space before them.
+      // the text is what wraps. The controls keep their size and their space before them.
       row(`item-${d.id}`, [
         <Box key="mark-box" flexShrink={0} marginRight={1}>
           {mark.color === undefined ? <Text key="mark" dimColor>{mark.char}</Text> : <Text key="mark" color={mark.color}>{mark.char}</Text>}
         </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
-          <Text wrap="truncate-end">{d.question}</Text>
+          <Text wrap="wrap">{d.question}</Text>
         </Box>,
         <Box key="controls" flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
           {answer !== undefined && (
@@ -741,15 +747,17 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
     const state = ran === undefined ? a.status : `${a.status} · ${ran}`
 
     return row(`agent-${a.id}`, [
-      <Text key="mark">{ROLE_MARK[roleOf(a.type)]}</Text>,
+      <Box key="mark" flexShrink={0}>
+        <Text>{ROLE_MARK[roleOf(a.type)]}</Text>
+      </Box>,
       <Box key="text" flexGrow={1} flexShrink={1}>
-        <Text bold wrap="truncate-end">
+        <Text bold wrap="wrap">
           {a.description}
         </Text>
       </Box>,
-      <Text key="state" dimColor>
-        {state}
-      </Text>,
+      <Box key="state" flexShrink={0}>
+        <Text dimColor>{state}</Text>
+      </Box>,
     ])
   })
   if (live.length > 0 && logList.length > 0) feedRows.push(row('feed-gap', [<Text key="gap"> </Text>]))
@@ -764,11 +772,11 @@ async function terminalPane($: EngineInterface, e: Parameters<EngineInterface['u
                 <Text dimColor>{clockAt(entry.at, zone)}</Text>
               </Box>,
             ]),
-        <Text key="icon" color={color}>
-          {icon}
-        </Text>,
+        <Box key="icon" flexShrink={0}>
+          <Text color={color}>{icon}</Text>
+        </Box>,
         <Box key="text" flexGrow={1} flexShrink={1}>
-          <Text wrap="truncate-end" {...(isNote(entry) ? {} : { dimColor: true })}>
+          <Text wrap="wrap" {...(isNote(entry) ? {} : { dimColor: true })}>
             {entry.text}
           </Text>
         </Box>,
@@ -819,7 +827,7 @@ const markSvg = (char: string, hue: string): string =>
   svgOf(MARK_SIZE, MARK_SIZE, `<circle cx="10" cy="10" r="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="10" y="14.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(char)}</text>`)
 
 // The pane on the desktop: the same sections, entries and order as the terminal's, drawn as rows of native
-// Box and Text. Nothing here is measured: the text row grows and shrinks (and is cut with an ellipsis), so
+// Box and Text. Nothing here is measured: the text Box grows and shrinks (and the text wraps under itself), so
 // the rows follow the divider without a redraw from the mod.
 async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0] & { surface: 'desktop' }) {
   const { Box, Button, Link, Svg, Text } = $.ui.resolve(e)
@@ -840,10 +848,10 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
       {body}
     </Box>
   )
-  // The text of a row: the only part that shrinks.
+  // The text of a row: the only part that shrinks. It wraps under itself, so no overflow is hidden.
   const cut = (text: string, props: { bold?: boolean; dimColor?: boolean } = {}) => (
-    <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-      <Text wrap="truncate-end" {...props}>
+    <Box flexGrow={1} flexShrink={1} minWidth={0}>
+      <Text wrap="wrap" {...props}>
         {text}
       </Text>
     </Box>
@@ -855,7 +863,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
 
     return (
       <Box key={`item-${d.id}`} flexDirection="column" minWidth={0}>
-        <Box flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+        <Box flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
           <Box width={MARK_CELLS} flexShrink={0}>
             <Svg source={markSvg(mark.char, mark.hue)} alt={ITEM_ALT[kind]} width={MARK_SIZE} height={MARK_SIZE} />
           </Box>
@@ -890,7 +898,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
     const ran = agentClock(a, now)
 
     return (
-      <Box key={`agent-${a.id}`} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+      <Box key={`agent-${a.id}`} flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
         {timeColumn(<Text color="suggestion">{a.status}</Text>)}
         <Box flexShrink={0}>
           <Text color="suggestion">●</Text>
@@ -908,7 +916,7 @@ async function desktopPane($: EngineInterface, e: Parameters<EngineInterface['ui
     const { icon, color } = styleOf(entry)
 
     return (
-      <Box key={`log-${n}`} flexDirection="row" alignItems="center" gap={1} minWidth={0}>
+      <Box key={`log-${n}`} flexDirection="row" alignItems="flex-start" gap={1} minWidth={0}>
         {timeColumn(<Text dimColor>{clockAt(entry.at, zone)}</Text>)}
         <Box flexShrink={0}>
           <Text color={color}>{icon}</Text>
