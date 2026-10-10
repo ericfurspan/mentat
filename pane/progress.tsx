@@ -1,5 +1,6 @@
-// Mentat's band and pane: what needs the maintainer, where this session's pull
-// request stands and what the agents are doing; its band also warns when a rate limit runs low.
+// Mentat's band and pane. The band is always there, one line: what waits on the maintainer, else a
+// warning that a rate limit runs low, else the newest note, else a quiet line. The pane holds the
+// Commands card, the Log, the agents and, on the terminal, where this session's pull request stands.
 // Claude Code reads this file as a mod (hooks/hooks.json lists it under "modules");
 // it approves, denies or changes no other tool call.
 //
@@ -32,7 +33,6 @@ const LOG_WIDTH = 80
 
 const items = atom({ plugin: 'mentat', key: 'decisionsItems' } as const, [])
 const nextId = atom({ plugin: 'mentat', key: 'decisionsNextId' } as const, 1)
-const answering = atom({ plugin: 'mentat', key: 'decisionsAnswering' } as const, [])
 const sentAtom = atom({ plugin: 'mentat', key: 'decisionsSent' } as const, [])
 const agents = atom({ plugin: 'mentat', key: 'agents' } as const, [])
 const finishedHidden = atom({ plugin: 'mentat', key: 'agentsFinishedHidden' } as const, false)
@@ -48,11 +48,8 @@ const checkResult = atom({ plugin: 'mentat', key: 'checkResult' } as const, null
 const logAtom = atom({ plugin: 'mentat', key: 'log' } as const, [])
 const logAll = atom({ plugin: 'mentat', key: 'logAll' } as const, false)
 
-// The amber tint of the desktop's answer field, which reads on dark and light. Only the desktop draws it: a terminal
-// shows an 8-digit hex color as an opaque grey, so the terminal pane has no backgrounds.
-const TINT = { you: '#d2992224' }
 // The id of the item the mod itself pins for a `mentat check`: an alert after a failed run, a
-// warning card after a passing run with warnings. The next run replaces it, and a clean pass removes it.
+// warning after a passing run with warnings. The next run replaces it, and a clean pass removes it.
 const CHECK_ID = 'check'
 
 // The pane's Commands card: the commands the maintainer types, one per row, each with when to use
@@ -70,14 +67,15 @@ export const COMMANDS: { name: string; use: string }[] = [
 const commandsTable = (): string =>
   ['| Command | Use |', '| --- | --- |', ...COMMANDS.map(c => `| \`${c.name}\` | ${c.use} |`)].join('\n')
 
-// The pane's Log card: the notes Claude Code adds with the `note` tool, each with an icon and a color for its
-// kind. The color is a theme color, so the line reads on the terminal and the desktop.
-const LOG_STYLE: Record<LogKind, { icon: string; color: string }> = {
-  decision: { icon: '◆', color: 'suggestion' },
-  plan: { icon: '▸', color: 'text' },
-  surprise: { icon: '!', color: 'warning' },
-  waiting: { icon: '◌', color: 'subtle' },
-  done: { icon: '✓', color: 'success' },
+// The notes Claude Code adds with the `note` tool, in the pane's Log card and as the band's line: each kind has an
+// icon and a color. The color is a theme color, so the line reads on the terminal and the desktop; the hue is
+// the same color for the desktop band's drawing.
+const LOG_STYLE: Record<LogKind, { icon: string; color: string; hue: string }> = {
+  decision: { icon: '◆', color: 'suggestion', hue: '#3D7FE6' },
+  plan: { icon: '▸', color: 'text', hue: '#8f8f8a' },
+  surprise: { icon: '!', color: 'warning', hue: '#C98A0E' },
+  waiting: { icon: '◌', color: 'subtle', hue: '#8f8f8a' },
+  done: { icon: '✓', color: 'success', hue: '#2F9461' },
 }
 const NOTE_KINDS: readonly LogKind[] = ['decision', 'plan', 'surprise', 'waiting', 'done']
 const isNoteKind = (v: unknown): v is LogKind => NOTE_KINDS.includes(v as LogKind)
@@ -292,11 +290,7 @@ const readReview = (issueComments: unknown[], pullComments: unknown[], reviews: 
     const result = /^REVIEW RESULT: (NO FINDINGS|FINDINGS)$/.exec(lines[lines.length - 1] ?? '')
     local = result === null ? { sha: head } : { sha: head, result: result[1] as 'NO FINDINGS' | 'FINDINGS' }
   }
-  const isFinalChecked = mine.some(c => {
-    const m = /^Final check on ([0-9a-f]{7,40})\b/.exec(str(c.body))
-    return m !== null && head.startsWith(m[1]!)
-  })
-  return { codex, local, isFinalChecked }
+  return { codex, local }
 }
 
 const sha7 = (sha: string): string => sha.slice(0, 7)
@@ -381,7 +375,6 @@ const parseRef = (ref: string): { repo: string; number: number } => {
 // The kinds of open item, in the order the pane lists them. An item stored without a kind is a question.
 const KIND_RANK: Record<DecisionKind, number> = { alert: 0, question: 1, warning: 2, action: 3 }
 const kindOf = (d: { kind?: DecisionKind }): DecisionKind => d.kind ?? 'question'
-const byKind = (list: Decision[]): Decision[] => [...list].sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])
 // The kinds the agent may open. A warning is the mod's own, for a passing `mentat check` with warnings.
 const isKind = (v: unknown): v is Exclude<DecisionKind, 'warning'> => v === 'question' || v === 'action' || v === 'alert'
 // A link is drawn only when it is an https URL.
@@ -396,10 +389,10 @@ const linkLabel = (link: string): string => link.replace(/^https:\/\//, '')
 // around mentat, before `2>&1` or a pipe.
 const CHECK_COMMAND = /(?:^|[\s;&|(/"'])mentat["']?\s+check(?=$|[\s;&|)"'])/
 // What a `mentat check` run says: its final line (`Check OK (N warning(s))` or `Check failed:
-// N problem(s)`), its PROBLEM lines and its WARN lines. A Bash result has no exit code, so the final line is the
+// N problem(s)`) and its WARN lines (counted). A Bash result has no exit code, so the final line is the
 // signal; without one (an interrupted run, a usage error, output cut by a pipe) there is nothing
 // to record. A line that came twice (the same output in two parts of the result) counts once.
-type CheckRead = { passed: true; warnings: string[] } | { passed: false; failedLine: string; problems: string[] }
+type CheckRead = { passed: true; warnings: string[] } | { passed: false; failedLine: string }
 // Stands for a warning the final line counts but the output did not show (a cut or doubled line).
 const UNSHOWN_WARNING = 'A warning whose text was not in the output'
 const parseCheck = (output: string): CheckRead | undefined => {
@@ -413,7 +406,7 @@ const parseCheck = (output: string): CheckRead | undefined => {
     while (warns.length < count) warns.push(UNSHOWN_WARNING)
     return { passed: true, warnings: warns }
   }
-  return { passed: false, failedLine: failedLine!, problems: lines.filter(l => l.startsWith('PROBLEM: ')).map(l => l.slice(9)) }
+  return { passed: false, failedLine: failedLine! }
 }
 
 // The stored list is treated as unknown-shaped JSON: an entry with a closedAt was
@@ -683,9 +676,8 @@ async function afterBash($: EngineInterface, command: string, stdout: string): P
   }
 }
 
-// What a `mentat check` run says, recorded: a failed run pins one alert (id CHECK_ID) with its
-// PROBLEM lines, replacing the item a former run left; a passing run with warnings pins one warning card
-// with the WARN lines in its place; a clean pass removes it. The result is also kept for the footer label.
+// What a `mentat check` run says, recorded: a failed run pins one alert (id CHECK_ID), replacing the
+// item a former run left; a passing run with warnings pins one warning item in its place; a clean pass removes it. The result is also kept for the footer label.
 // isCurrent is asked inside the turn that writes: a run that is no longer the latest writes nothing.
 async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: () => boolean): Promise<void> {
   const openedAt = await $.clock.now()
@@ -693,12 +685,11 @@ async function recordCheck($: EngineInterface, outcome: CheckRead, isCurrent: ()
     if (!isCurrent()) return
     await update($, items, list => {
       const rest = list.filter(d => d.id !== CHECK_ID)
-      if (!outcome.passed) return [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, lines: outcome.problems, openedAt }]
+      if (!outcome.passed) return [...rest, { id: CHECK_ID, kind: 'alert' as const, question: outcome.failedLine, openedAt }]
       if (outcome.warnings.length === 0) return rest
-      return [...rest, { id: CHECK_ID, kind: 'warning' as const, question: `Check passed with ${plural(outcome.warnings.length, 'warning', 'warnings')}`, lines: outcome.warnings, openedAt }]
+      return [...rest, { id: CHECK_ID, kind: 'warning' as const, question: `Check passed with ${plural(outcome.warnings.length, 'warning', 'warnings')}`, openedAt }]
     })
     await update($, checkResult, () => (outcome.passed ? { state: outcome.warnings.length > 0 ? ('warn' as const) : ('pass' as const), warnings: outcome.warnings } : { state: 'fail' as const, warnings: [] }))
-    await update($, answering, ids => ids.filter(x => x !== CHECK_ID))
     await update($, sentAtom, list => list.filter(x => x.id !== CHECK_ID))
   })
   await invalidate($)
@@ -788,8 +779,8 @@ async function resolveTarget($: EngineInterface, arg: string): Promise<string | 
 // ---- Drawn desktop design: each card is one themed Svg; buttons stay native. ----
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif"
 const CSS = `<style>
-.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}.q{fill:#fbf3e2}.qr{fill:#fbeceb}.qb{fill:#e9f0fc}
-@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}.q{fill:#2b2618}.qr{fill:#2d1b1a}.qb{fill:#18222f}}
+.t{fill:#1d1d1b}.s{fill:#6b6b67}.m{fill:#9b9b96}.k{fill:#e9e8e4}.card{fill:#f6f5f2}.ln{stroke:#e6e5e1}
+@media (prefers-color-scheme: dark){.t{fill:#ededeb}.s{fill:#a9a9a4}.m{fill:#7c7c78}.k{fill:#2d2d2b}.card{fill:#1f1f1d}.ln{stroke:#33332f}}
 </style>`
 const HUE = { amber: '#C98A0E', blue: '#3D7FE6', green: '#2F9461', red: '#D0453F', violet: '#8B5CF6', teal: '#1E9E9A', grey: '#8f8f8a' }
 
@@ -805,61 +796,8 @@ const fit = (s: string, size: number, maxW: number): string => {
   }
   return out + '…'
 }
-// Word-wraps `s` into at most `lines` lines of `maxW` pixels; the last line is cut with an ellipsis.
-const wrap = (s: string, size: number, maxW: number, lines: number): string[] => {
-  const out: string[] = []
-  let cur = ''
-  const words = s.split(/\s+/)
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i]!
-    const next = cur === '' ? w : `${cur} ${w}`
-    if (textW(next, size) <= maxW) { cur = next; continue }
-    if (out.length === lines - 1) { out.push(fit(`${cur} ${words.slice(i).join(' ')}`.trim(), size, maxW)); return out }
-    out.push(fit(cur === '' ? w : cur, size, maxW))
-    cur = cur === '' ? '' : w
-  }
-  if (cur !== '') out.push(fit(cur, size, maxW))
-  return out
-}
 const svgOf = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${CSS}${body}</svg>`
-const label = (x: number, y: number, text: string, color?: string): string =>
-  `<text ${color === undefined ? 'class="m"' : `fill="${color}"`} x="${x}" y="${y}" font-family="${FONT}" font-size="10.5" font-weight="600" letter-spacing="0.6">${xml(text.toUpperCase())}</text>`
-// The card of one open item: a tinted panel with a bar and a label in the kind's color, the
-// text (up to three lines), detail lines (the PROBLEM or WARN lines of a check item, each wrapped
-// over up to three lines) and the recommendation.
-const CARD_STYLE: Record<DecisionKind, { label: string; hue: string; fill: string; alt: string }> = {
-  question: { label: 'Question for you', hue: HUE.amber, fill: 'q', alt: 'Question' },
-  action: { label: 'Waiting on you', hue: HUE.blue, fill: 'qb', alt: 'Waiting on you' },
-  alert: { label: 'Alert', hue: HUE.red, fill: 'qr', alt: 'Alert' },
-  warning: { label: 'Check warnings', hue: HUE.amber, fill: 'q', alt: 'Check warnings' },
-}
-// An alert shows at most this many detail lines, the last of them `+N more` when there are more.
-const DETAIL_LINES = 6
-const cutLines = (details: string[]): string[] =>
-  details.length > DETAIL_LINES ? [...details.slice(0, DETAIL_LINES - 1), `+${details.length - DETAIL_LINES + 1} more`] : details
-const cardSvg = (W: number, kind: DecisionKind, text: string, recommendation: string | undefined, details: string[] = []): { svg: string; h: number } => {
-  const { label: title, hue, fill } = CARD_STYLE[kind]
-  const tx = 18
-  const lines = wrap(text, 14, W - tx - 14, 3)
-  const shown = cutLines(details)
-  let y = 42 + (lines.length - 1) * 19
-  // A detail line wraps (up to three lines, the last cut with an ellipsis) and the card grows to hold it.
-  const detailSvg = shown.flatMap(d =>
-    wrap(d, 12, W - tx - 14, 3).map((part, i) => {
-      y += i === 0 ? 18 : 15
-      return `<text class="s" x="${tx}" y="${y}" font-family="${FONT}" font-size="12">${xml(part)}</text>`
-    }),
-  )
-  const recY = y + 20
-  const h = recommendation === undefined ? y + 16 : recY + 14
-  const body = `<rect class="${fill}" x="0" y="0" width="${W}" height="${h}" rx="10"/><rect x="0" y="0" width="4" height="${h}" rx="2" fill="${hue}"/>
-${label(tx, 20, title, hue)}
-${lines.map((l, i) => `<text class="t" x="${tx}" y="${42 + i * 19}" font-family="${FONT}" font-size="14" font-weight="600">${xml(l)}</text>`).join('')}
-${detailSvg.join('')}${recommendation === undefined ? '' : `<text class="s" x="${tx}" y="${recY}" font-family="${FONT}" font-size="12">${xml(fit(`→ ${recommendation}`, 12, W - tx - 14))}</text>`}`
-  return { svg: svgOf(W, h, body), h }
-}
-
 const agentMark = (x: number, y: number, status: AgentStatus): string => {
   if (isActive(status)) return `<circle cx="${x}" cy="${y}" r="7" fill="${HUE.blue}" opacity="0.18"/><circle cx="${x}" cy="${y}" r="3.5" fill="${HUE.blue}"/>`
   if (status === 'completed') return `<circle cx="${x}" cy="${y}" r="8" fill="${HUE.green}" opacity="0.14"/><path d="M${x - 3.5} ${y}l2.5 2.5 4.5-5" fill="none" stroke="${HUE.green}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
@@ -938,44 +876,83 @@ ${i < rows.length - 1 ? `<line class="ln" x1="${tx}" y1="${y + AGENT_ROW_H}" x2=
 const agentsAlt = (heading: string, rows: AgentCardRow[]): string =>
   `${heading}: ${rows.length} (${rows.map(r => `${roleOf(r.type).label}: ${r.title}`).join('; ')})`
 
-// What the band's left side shows: the newest alert, question or check warning, the final-checked
-// pull request, a budget warning, or, when nothing else raises it, the newest action.
-type BandLeft = { kind: 'alert' | 'question' | 'warning' | 'action' | 'budget'; text: string } | { kind: 'pr'; number: number; title: string }
-const MARK: Record<'alert' | 'question' | 'warning' | 'action' | 'budget', { char: string; hue: string }> = {
+// What the band's left side shows, in this order: the item that waits on the maintainer (the most
+// urgent: alert, question, check warning, action; the newest within a kind), a budget warning,
+// the newest Log note, and last a quiet `Mentat` line.
+type BandKind = DecisionKind | 'budget'
+type BandLeft = { kind: BandKind; text: string } | { kind: 'note'; text: string; icon: string; hue: string } | { kind: 'quiet'; text: string }
+const MARK: Record<BandKind, { char: string; hue: string }> = {
   alert: { char: '!', hue: HUE.red },
   question: { char: '?', hue: HUE.amber },
   warning: { char: '!', hue: HUE.amber },
   action: { char: '→', hue: HUE.blue },
   budget: { char: '!', hue: HUE.amber },
 }
-// The pill that counts the open items: `N questions` when all are questions, else `N items`.
-const pillLabel = (list: Decision[]): string =>
-  list.every(d => kindOf(d) === 'question') ? plural(list.length, 'question', 'questions') : plural(list.length, 'item', 'items')
-// The pill's color follows the most urgent open item.
-const pillHue = (list: Decision[]): string =>
-  list.some(d => kindOf(d) === 'alert') ? HUE.red : list.some(d => kindOf(d) === 'question' || kindOf(d) === 'warning') ? HUE.amber : HUE.blue
+// The description of an item in the desktop band's alt text.
+const ITEM_ALT: Record<DecisionKind, string> = { question: 'Question', action: 'Waiting on you', alert: 'Alert', warning: 'Check warnings' }
+// The item that waits on the maintainer and comes first: alert, then question, check warning, action;
+// the newest of its kind. The rest are counted in `+N more`.
+const mostUrgent = (list: Decision[]): Decision | undefined =>
+  [...list].reverse().sort((a, b) => KIND_RANK[kindOf(a)] - KIND_RANK[kindOf(b)])[0]
 
-const bandSvg = (W: number, left: BandLeft, count: number, pillText: string, pillColor: string): string => {
-  const shownPill = count > 0 ? pillText : ''
-  const pillW = shownPill === '' ? 0 : Math.round(20 + textW(shownPill, 12))
+// One line, drawn as a single Svg on the desktop: a mark and the text, and at the right the `+N more` pill
+// when more than one item waits. The buttons are native, beside it.
+const bandSvg = (W: number, left: BandLeft, more: string): string => {
+  const pillW = more === '' ? 0 : Math.round(20 + textW(more, 12))
   const room = W - pillW - 16
-  let leftSvg: string
-  if (left.kind !== 'pr') {
-    const mark = MARK[left.kind]
-    leftSvg = `<circle cx="11" cy="14" r="8" fill="${mark.hue}" opacity="0.18"/><text fill="${mark.hue}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${mark.char}</text>
+  const mark = left.kind === 'quiet' ? undefined : left.kind === 'note' ? { char: left.icon, hue: left.hue } : MARK[left.kind]
+  const leftSvg =
+    mark === undefined
+      ? `<text class="m" x="2" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(left.text)}</text>`
+      : `<circle cx="11" cy="14" r="8" fill="${mark.hue}" opacity="0.18"/><text fill="${mark.hue}" x="11" y="18.5" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700">${xml(mark.char)}</text>
 <text class="t" x="27" y="18.5" font-family="${FONT}" font-size="13" font-weight="500">${xml(fit(left.text, 13, room - 30))}</text>`
-  } else {
-    const num = `#${left.number}`
-    const tag = 'Final check posted'
-    const tagW = Math.round(20 + textW(tag, 11.5))
-    const numW = textW(num, 13) + 8
-    leftSvg = `<text class="t" x="2" y="18.5" font-family="${FONT}" font-size="13" font-weight="600">${num}</text>
-<text class="s" x="${2 + numW}" y="18.5" font-family="${FONT}" font-size="13">${xml(fit(left.title, 13, room - numW - tagW - 14))}</text>
-<rect x="${room - tagW}" y="4" width="${tagW}" height="20" rx="10" fill="${HUE.green}" opacity="0.16"/><text fill="${HUE.green}" x="${room - tagW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="11.5" font-weight="600">${tag}</text>`
-  }
-  const pill = shownPill === '' ? '' : `<rect x="${W - pillW}" y="4" width="${pillW}" height="20" rx="10" fill="${pillColor}" opacity="0.18"/><text fill="${pillColor}" x="${W - pillW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600">${shownPill}</text>`
+  const hue = mark?.hue ?? HUE.grey
+  const pill = more === '' ? '' : `<rect x="${W - pillW}" y="4" width="${pillW}" height="20" rx="10" fill="${hue}" opacity="0.18"/><text fill="${hue}" x="${W - pillW / 2}" y="18" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600">${xml(more)}</text>`
   return svgOf(W, 28, leftSvg + pill)
 }
+// The width a native button takes beside the band's Svg, roughly.
+const buttonW = (text: string): number => Math.round(textW(text, 13) + 40)
+
+// The short line that takes the place of a question's answer button once the answer is sent; it says
+// the answer is queued until the prompt has entered the session.
+const sentLine = (entry: { text: string; isDelivered?: boolean }): string => {
+  const text = entry.text.length > 20 ? `${entry.text.slice(0, 19)}…` : entry.text
+
+  return `Sent: ${text}${entry.isDelivered === true ? '' : ' · queued'}`
+}
+// True when the answer was taken (queued or in the conversation). The prompt of a plugin runs once
+// Claude Code is idle, so while a turn runs this waits for the turn: the question is marked sent
+// first, and a second press for it does nothing. When the prompt did not enter, say so: a press
+// that vanishes looks broken.
+async function sendAnswer($: EngineInterface, d: { id: string; question: string }, text: string): Promise<boolean> {
+  const isFirst = await inTurn(async () => {
+    if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
+    await update($, sentAtom, list => [...list, { id: d.id, text }])
+    return true
+  })
+  if (!isFirst) return false
+  // A submit the engine rejects (for example around a reload) did not enter either.
+  let isTaken = false
+  try {
+    const sent = await $.prompt.submit({ text: `Answer to decision ${d.id} ("${d.question}"): ${text}` })
+    isTaken = sent.drop === undefined
+  } catch {
+    isTaken = false
+  }
+  if (!isTaken) {
+    await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
+    $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
+    return false
+  }
+  // The answer entered the session; the line stops saying it waits.
+  await inTurn(() => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
+  return true
+}
+const dismissItem = ($: EngineInterface, id: string) =>
+  inTurn(async () => {
+    await update($, items, all => all.filter(x => x.id !== id))
+    await update($, sentAtom, list => list.filter(x => x.id !== id))
+  })
 
 export const register: Register = (on, _options) => {
   // The effort an Agent call asked for, until the agent it spawns is recorded.
@@ -989,7 +966,7 @@ export const register: Register = (on, _options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mentat',
-      description: 'Show the commands, what needs you, the pull request, the agents and, on the terminal, the session budget in a pane',
+      description: 'Show the commands, the log, the agents and, on the terminal, the pull request in a pane',
       argumentHint: '[pr <number>]',
       immediate: true,
     })
@@ -1088,7 +1065,6 @@ export const register: Register = (on, _options) => {
       // Open questions belong to the conversation they were asked in.
       await inTurn(async () => {
         await update($, items, () => [])
-        await update($, answering, () => [])
         await update($, sentAtom, () => [])
         // The last check was of the old conversation too.
         await update($, checkResult, () => null)
@@ -1294,64 +1270,65 @@ export const register: Register = (on, _options) => {
     if (e.props.hasSurvey) {
       return next(e)
     }
+    // The band is always there: what waits on the maintainer, else a budget warning, else the newest
+    // Log note, else a quiet line. Nothing in it comes from GitHub.
     const open = await read($, items)
-    const pr = await read($, prAtom)
-    const review = await read($, reviewAtom)
     const now = await $.clock.now()
-    const pm = await read($, prMark)
-    const rm = await read($, reviewMark)
-    // What raises the band, most urgent first: an alert, a question, a pull request whose current
-    // head has Claude Code's final check, a budget warning, and last an action, so a lone action is
-    // not invisible. The rest of the open items are counted beside the first. The stored facts of
-    // the PR may be of an old head, so the latest read of the PR and of its review must have
-    // succeeded and be fresh; otherwise the pane still shows them, with their lines.
-    const newest = (kind: DecisionKind) => open.filter(d => kindOf(d) === kind).pop()
-    const alert = newest('alert')
-    const question = newest('question')
-    const warning = newest('warning')
-    const isCurrent = (m: ReadMark) => m.okAt > m.failedAt && now - m.okAt <= STALE_MS
-    const isChecked =
-      pr !== null && pr.state === 'OPEN' && review !== null && review.head === pr.head && review.isFinalChecked &&
-      isCurrent(pm) && isCurrent(rm)
-    // Budget raises it only when nothing above it does. Nothing redraws the band for a
-    // change of usage alone; it is read when the band is drawn (see the report).
-    const isAbove = alert !== undefined || question !== undefined || warning !== undefined || isChecked
-    const budget = !isAbove ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
-    const action = !isAbove && budget === undefined ? newest('action') : undefined
-    if (!isAbove && budget === undefined && action === undefined) {
-      return next(e)
-    }
+    const urgent = mostUrgent(open)
+    // Budget raises it only when no item waits. Nothing redraws the band for a change of usage alone;
+    // it is read when the band is drawn (see the report).
+    const budget = urgent === undefined ? budgetAlert(limitsOf(await readUsage($), now, await readZone($))) : undefined
+    const logList = urgent === undefined && budget === undefined ? await read($, logAtom) : []
+    const note = logList[logList.length - 1]
     const left: BandLeft =
-      alert !== undefined
-        ? { kind: 'alert', text: alert.question }
-        : question !== undefined
-          ? { kind: 'question', text: question.question }
-          : warning !== undefined
-            ? { kind: 'warning', text: warning.question }
-            : isChecked
-              ? { kind: 'pr', number: pr.number, title: cleanTitle(pr.title) }
-              : budget !== undefined
-                ? { kind: 'budget', text: budget }
-                : { kind: 'action', text: action!.question }
-    const { Box, Button, Text } = $.ui.resolve(e)
+      urgent !== undefined
+        ? { kind: kindOf(urgent), text: urgent.question }
+        : budget !== undefined
+          ? { kind: 'budget', text: budget }
+          : note !== undefined
+            ? { kind: 'note', text: note.text, icon: LOG_STYLE[note.kind].icon, hue: LOG_STYLE[note.kind].hue }
+            : { kind: 'quiet', text: TITLE }
+    const more = open.length > 1 ? `+${open.length - 1} more` : ''
+    // The urgent item's controls: a question with a recommended answer has a one-press button (a line
+    // in its place once sent), every item has Dismiss, and an action or alert may carry a link.
+    const sent = urgent === undefined ? undefined : (await read($, sentAtom)).find(x => x.id === urgent.id)
+    const answer = urgent !== undefined && kindOf(urgent) === 'question' && sent === undefined ? urgent.accept : undefined
+    const link = urgent !== undefined && kindOf(urgent) !== 'question' ? urgent.link : undefined
+    const { Box, Button, Link, Text } = $.ui.resolve(e)
+    // One row, never wrapped: the answer button (or the sent line), Dismiss, the link, then Details. It
+    // is one Box with every child its own, not a fragment: a fragment's children are not laid out as one row.
+    const controls = () => (
+      <Box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
+        {answer !== undefined && urgent !== undefined && (
+          <Button key={`accept-${urgent.id}`} label={answer} variant="primary" onPress={() => sendAnswer($, urgent, answer)} />
+        )}
+        {sent !== undefined && <Text dimColor>{sentLine(sent)}</Text>}
+        {urgent !== undefined && <Button key={`dismiss-${urgent.id}`} label="Dismiss" onPress={() => dismissItem($, urgent.id)} />}
+        {link !== undefined && (
+          <Text>
+            <Link href={link} label={linkLabel(link)} />
+          </Text>
+        )}
+        <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
+      </Box>
+    )
     // The band is shared: what the plugins beneath draw stays, under this row.
     const beneath = await next(e)
     if (e.surface === 'desktop') {
       const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
-      const W = Math.max(200, (e.props.bodyColumns ?? 80) * 8 - 96)
-      const alt =
-        left.kind === 'pr'
-          ? `#${left.number} final check posted`
-          : left.kind === 'budget'
-            ? left.text
-            : `${CARD_STYLE[left.kind].alt}: ${left.text}`
-      // The count is left out when the one open item is the one shown.
-      const isLone = open.length === 1 && (left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action')
+      // The Svg leaves room for the native buttons beside it.
+      const beside =
+        (urgent === undefined ? 0 : buttonW('Dismiss') + 8) +
+        (answer === undefined ? 0 : buttonW(answer) + 8) +
+        (sent === undefined ? 0 : Math.round(textW(sentLine(sent), 12)) + 8) +
+        (link === undefined ? 0 : Math.round(textW(linkLabel(link), 13)) + 8)
+      const W = Math.max(160, (e.props.bodyColumns ?? 80) * 8 - 96 - beside)
+      const alt = `${left.kind === 'budget' || left.kind === 'quiet' ? '' : left.kind === 'note' ? 'Note: ' : `${ITEM_ALT[left.kind]}: `}${left.text}${more === '' ? '' : ` (${more})`}`
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-            <Svg source={bandSvg(W, left, isLone ? 0 : open.length, pillLabel(open), pillHue(open))} alt={alt} width={W} height={28} />
-            <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
+            <Svg source={bandSvg(W, left, more)} alt={alt} width={W} height={28} />
+            {controls()}
           </Box>
           {beneath}
         </Box>
@@ -1362,24 +1339,17 @@ export const register: Register = (on, _options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={2}>
           <Box flexDirection="row" alignItems="center" gap={1} flexShrink={1}>
-            {left.kind === 'pr' && <Text bold>{`#${left.number}`}</Text>}
-            {left.kind === 'pr' && <Text wrap="truncate-end">{left.title}</Text>}
-            {left.kind === 'pr' && <Text color="warning">· Final check posted</Text>}
             {left.kind === 'budget' && <Text color="warning" wrap="truncate-end">{left.text}</Text>}
             {left.kind === 'alert' && <Text color="error">!</Text>}
             {left.kind === 'question' && <Text dimColor>?</Text>}
             {left.kind === 'warning' && <Text color="warning">!</Text>}
             {left.kind === 'action' && <Text color="suggestion">→</Text>}
-            {(left.kind === 'alert' || left.kind === 'question' || left.kind === 'warning' || left.kind === 'action') && <Text wrap="truncate-end">{left.text}</Text>}
+            {left.kind === 'note' && <Text color={LOG_STYLE[note!.kind].color}>{left.icon}</Text>}
+            {left.kind === 'quiet' && <Text dimColor>{left.text}</Text>}
+            {left.kind !== 'budget' && left.kind !== 'quiet' && <Text wrap="truncate-end">{left.text}</Text>}
+            {more !== '' && <Text dimColor>{more}</Text>}
           </Box>
-          <Box flexDirection="row" alignItems="center" gap={1}>
-            {open.length > 0 && (
-              <Box flexDirection="row">
-                <Text color={alert !== undefined ? 'error' : question !== undefined || warning !== undefined ? 'warning' : 'suggestion'}>{pillLabel(open)}</Text>
-              </Box>
-            )}
-            <Button key="open" label="Details" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
-          </Box>
+          {controls()}
         </Box>
         {beneath}
       </Box>
@@ -1387,15 +1357,13 @@ export const register: Register = (on, _options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Input, Link, Markdown, Text } = $.ui.resolve(e)
+    const { Box, Button, Markdown, Text } = $.ui.resolve(e)
     const Svg = e.surface === 'desktop' ? $.ui.resolve(e as typeof e & { surface: 'desktop' }).Svg : undefined
     const now = await $.clock.now()
     const cols = e.props.bodyColumns ?? 50
     const isNarrow = cols < 48
-    // Alerts first, then questions, then check warnings, then actions; in the order opened within each.
-    const open = byKind(await read($, items))
-    const openAnswers = await read($, answering)
-    const sentList = await read($, sentAtom)
+    // What waits on the maintainer is in the band, not here; the pane only knows whether anything does.
+    const open = await read($, items)
     const ref = await read($, prRef)
     const pr = await read($, prAtom)
     const review = await read($, reviewAtom)
@@ -1469,52 +1437,6 @@ export const register: Register = (on, _options) => {
         </Box>
       )
     }
-
-    // True when the answer was taken (queued or in the conversation). The prompt of a
-    // plugin runs once Claude Code is idle, so while a turn runs this waits for the turn:
-    // the question is marked sent first, and a second press for it does nothing.
-    // When the prompt did not enter, say so: a press that vanishes looks broken.
-    const send = async (d: { id: string; question: string }, text: string): Promise<boolean> => {
-      const isFirst = await inTurn(async () => {
-        if ((await read($, sentAtom)).some(x => x.id === d.id)) return false
-        await update($, sentAtom, list => [...list, { id: d.id, text }])
-        return true
-      })
-      if (!isFirst) return false
-      // A submit the engine rejects (for example around a reload) did not enter either.
-      let isTaken = false
-      try {
-        const sent = await $.prompt.submit({ text: `Answer to decision ${d.id} ("${d.question}"): ${text}` })
-        isTaken = sent.drop === undefined
-      } catch {
-        isTaken = false
-      }
-      if (!isTaken) {
-        await inTurn(() => update($, sentAtom, list => list.filter(x => x.id !== d.id || x.isDelivered === true)))
-        $.ui.toast('Answer not sent: Claude Code did not take it. Press again.')
-        return false
-      }
-      // The answer entered the session; the line stops saying it waits.
-      await inTurn(() => update($, sentAtom, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x))))
-      return true
-    }
-    // The line that takes the place of the answer buttons once an answer is sent; it says
-    // the answer waits for the turn until the prompt has entered the session.
-    const sentLine = (id: string): string | undefined => {
-      const entry = sentList.find(x => x.id === id)
-      if (entry === undefined) return undefined
-      const { text } = entry
-
-      return `Sent: ${text.length > 60 ? `${text.slice(0, 59)}…` : text}.${entry.isDelivered === true ? '' : ' Claude Code reads it after its current turn.'}`
-    }
-    const dismiss = (id: string) =>
-      inTurn(async () => {
-        await update($, items, all => all.filter(x => x.id !== id))
-        await update($, answering, ids => ids.filter(x => x !== id))
-        await update($, sentAtom, list => list.filter(x => x.id !== id))
-      })
-    const setAnswering = (id: string, isOn: boolean) =>
-      inTurn(() => update($, answering, ids => (isOn ? [...ids.filter(x => x !== id), id] : ids.filter(x => x !== id))))
 
     // A freshness line only when a read failed or is more than five minutes old.
     const freshness = (what: string, mark: ReadMark): string | undefined => {
@@ -1598,59 +1520,6 @@ export const register: Register = (on, _options) => {
               <Text dimColor>Nothing waiting on you.</Text>
             </Box>
           )}
-          {open.map(d => {
-            const kind = kindOf(d)
-            const q = cardSvg(W, kind, d.question, d.recommendation, d.lines)
-            if (kind !== 'question') {
-              return (
-                <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
-                  <Svg source={q.svg} alt={`${CARD_STYLE[kind].alt}: ${d.question}`} width={W} height={q.h} />
-                  <Box flexDirection="row" alignItems="center" gap={1} marginTop={1}>
-                    <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
-                    {d.link !== undefined && (
-                      <Text>
-                        <Link href={d.link} label={linkLabel(d.link)} />
-                      </Text>
-                    )}
-                  </Box>
-                </Box>
-              )
-            }
-            return (
-              <Box key={d.id} flexDirection="column" marginTop={SECTION_GAP}>
-                <Svg source={q.svg} alt={`Question: ${d.question}`} width={W} height={q.h} />
-                {sentLine(d.id) !== undefined && (
-                  <Box marginTop={1}>
-                    <Text dimColor>{sentLine(d.id)}</Text>
-                  </Box>
-                )}
-                <Box flexDirection="row" gap={1} marginTop={1}>
-                  {sentLine(d.id) === undefined && d.accept !== undefined && (
-                    <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
-                  )}
-                  {sentLine(d.id) === undefined && (
-                    <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
-                  )}
-                  <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
-                </Box>
-                {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
-                  <Box marginTop={0.5} width="100%" backgroundColor={TINT.you} paddingX={2} paddingY={1}>
-                    <Input
-                      key={`answer-${d.id}`}
-                      autoFocus
-                      placeholder="Your answer"
-                      submitLabel="Send"
-                      onSubmit={async (answer: string) => {
-                        const text = answer.trim()
-                        if (text === '') return
-                        if (await send(d, text)) await setAnswering(d.id, false)
-                      }}
-                    />
-                  </Box>
-                )}
-              </Box>
-            )
-          })}
           {logCard(SECTION_GAP)}
           {rows.length > 0 && (
             <Box flexDirection="column" marginTop={SECTION_GAP}>
@@ -1671,77 +1540,9 @@ export const register: Register = (on, _options) => {
       )
     }
 
-    // The terminal card of an alert, a check warning or an action: no answer buttons, a Dismiss button and the link.
-    const otherCard = (d: Decision) => {
-      const kind = kindOf(d)
-      const details = cutLines(d.lines ?? [])
-
-      return (
-        <Card key={d.id}>
-          <Heading label={CARD_STYLE[kind].label} color={kind === 'alert' ? 'error' : kind === 'warning' ? 'warning' : 'suggestion'} />
-          <Text bold>{d.question}</Text>
-          {details.map((line, i) => (
-            <Text key={i} dimColor>{line}</Text>
-          ))}
-          {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
-          <Box flexDirection="row" alignItems="center" gap={1} marginTop={1}>
-            <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
-            {d.link !== undefined && (
-              <Text>
-                <Link href={d.link} label={linkLabel(d.link)} />
-              </Text>
-            )}
-          </Box>
-        </Card>
-      )
-    }
-
     return (
       <Box flexDirection="column" paddingX={1}>
         {commandsCard}
-
-        {open.filter(d => kindOf(d) === 'alert').map(otherCard)}
-
-        {open.filter(d => kindOf(d) === 'question').map(d => (
-          <Card key={d.id}>
-            <Heading label="Question for you" color="warning" />
-            <Text bold>{d.question}</Text>
-            {d.recommendation !== undefined && <Text dimColor>{`→ ${d.recommendation}`}</Text>}
-            {sentLine(d.id) !== undefined && (
-              <Box marginTop={1}>
-                <Text dimColor>{sentLine(d.id)}</Text>
-              </Box>
-            )}
-            <Box flexDirection="row" gap={1} marginTop={1}>
-              {sentLine(d.id) === undefined && d.accept !== undefined && (
-                <Button key={`accept-${d.id}`} label={d.accept} variant="primary" onPress={() => send(d, d.accept!)} />
-              )}
-              {sentLine(d.id) === undefined && (
-                <Button key={`answer-open-${d.id}`} label="Answer…" onPress={() => setAnswering(d.id, !openAnswers.includes(d.id))} />
-              )}
-              <Button key={`dismiss-${d.id}`} label="Dismiss" onPress={() => dismiss(d.id)} />
-            </Box>
-            {sentLine(d.id) === undefined && openAnswers.includes(d.id) && (
-              <Box marginTop={1} width="100%">
-                <Input
-                  key={`answer-${d.id}`}
-                  autoFocus
-                  placeholder="Your answer"
-                  submitLabel="Send"
-                  onSubmit={async (answer: string) => {
-                    const text = answer.trim()
-                    if (text === '') return
-                    if (await send(d, text)) await setAnswering(d.id, false)
-                  }}
-                />
-              </Box>
-            )}
-          </Card>
-        ))}
-
-        {open.filter(d => kindOf(d) === 'warning').map(otherCard)}
-
-        {open.filter(d => kindOf(d) === 'action').map(otherCard)}
 
         {ref !== '' && (
           <Card>

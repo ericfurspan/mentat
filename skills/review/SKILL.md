@@ -28,7 +28,7 @@ Each round's result is on the pull request (the review and the replies to it). A
 
 ## Final check
 
-Once the loop ends ready, read the diff and the description from GitHub, not from memory, and correct any claim in the description that does not hold. Then post one comment on the pull request, five lines at most, that does not repeat the description's summary or scope: the commit checked and its test and CI results, how each review finding was settled, what was not checked, and what most deserves the maintainer's eyes. The comment is the author's own check, not a review or an approval. Start it with `Final check on <sha>`, the commit checked, so the Mentat band can find it.
+Once the loop ends ready, read the diff and the description from GitHub, not from memory, and correct any claim in the description that does not hold. Then post one comment on the pull request, five lines at most, that does not repeat the description's summary or scope: the commit checked and its test and CI results, how each review finding was settled, what was not checked, and what most deserves the maintainer's eyes. The comment is the author's own check, not a review or an approval. Start it with `Final check on <sha>`, the commit checked.
 
 If the pull request is still a draft (a local review does not mark it ready), run `gh pr ready <N>`; if that fails, report it and stop. If the pull request's author is not the repository owner, request the owner's review with `gh pr edit <N> --add-reviewer <owner>`. If the author is the owner and the repository requires approvals, tell the maintainer that GitHub will not let them approve their own pull request. Then:
 
