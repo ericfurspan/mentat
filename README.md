@@ -27,19 +27,19 @@ It ships as a Claude Code plugin: the workflow rules (`rules.md`), an optional o
 
 ## Plugin commands
 
-Run these in a terminal, in the checkout. Pick one scope: `local` is only you in this checkout, `project` is everyone who clones it, `user` is every folder you open, so Mentat then runs in every repository.
+Run these in a terminal, in the checkout. Pick one scope: `local` is only you in this checkout (it writes `.claude/settings.local.json`, which git ignores), `project` is everyone who clones it (it writes `.claude/settings.json`, which you commit), `user` is every folder you open, so Mentat then runs in every repository.
 
 | What you want | Command |
 | --- | --- |
 | Add the marketplace (once per machine) | `claude plugin marketplace add ericfurspan/mentat` |
 | Turn Mentat on for you, in this checkout | `claude plugin install mentat@mentat --scope local` |
-| Turn it on for everyone who clones this checkout | `claude plugin install mentat@mentat --scope project` |
+| Turn it on in the repository (each clone installs it once) | `claude plugin install mentat@mentat --scope project` |
 | Turn it on in every folder | `claude plugin install mentat@mentat --scope user` |
-| Update | `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <scope>`, then `/reload-plugins` in a running session |
+| Update | `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <scope>`, then `/reload-plugins` in a running session; the updated rules load at the next session start, resume, `/clear` or compaction |
 | Turn it off | `claude plugin disable mentat@mentat` |
 | Turn it back on | `claude plugin enable mentat@mentat` |
 | Remove it | `claude plugin uninstall mentat@mentat --scope <scope>` |
-| See which scope a checkout uses | `claude plugin list` (shows each Mentat install with its scope) |
+| See where Mentat is installed, and at which scope | `claude plugin list` |
 
 Details, and what each command leaves behind, are in [Turning Mentat on and off](docs/setup.md).
 
