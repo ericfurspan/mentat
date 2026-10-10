@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The repository's one test command. Runs locally and in CI on macOS.
+# The repository's one test command. Runs locally on macOS; this repository has no CI.
 # A tool missing locally is reported as SKIP; in CI (CI=true) it fails the run.
 set -uo pipefail
 
