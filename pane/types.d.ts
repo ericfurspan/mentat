@@ -73,6 +73,26 @@ export type ReviewSnapshot = {
   isFinalChecked: boolean
 }
 
+// The kinds of entry in the pane's Log card; each has its own icon.
+export type LogKind =
+  | 'pr-open'
+  | 'pr-ready'
+  | 'pr-close'
+  | 'pr-merge'
+  | 'issue-open'
+  | 'issue-close'
+  | 'question'
+  | 'action'
+  | 'alert'
+  | 'codex-off'
+  | 'codex-on'
+  | 'builder-start'
+  | 'builder-done'
+  | 'builder-fail'
+
+// One line of the Log card: when it happened (clock time), its kind and its text (one line).
+export type LogEntry = { at: number; kind: LogKind; text: string }
+
 // The last `mentat check` of the main session: pass, pass with warnings, or fail.
 export type CheckResult = { state: 'pass' | 'warn' | 'fail'; warnings: string[] }
 
@@ -106,6 +126,10 @@ declare module 'claude-code' {
       seq: number
       // The last `mentat check` run this conversation; null until one has run.
       checkResult: CheckResult | null
+      // The session's log, oldest first (the pane shows it newest first); capped.
+      log: LogEntry[]
+      // True while the pane's Log card shows every entry (default: the last five).
+      logAll: boolean
     }
   }
 }
