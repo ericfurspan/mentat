@@ -391,7 +391,7 @@ c_finish() {
   printf 'Check OK (%d warning(s))\n' "$check_warnings"; exit 0
 }
 check() {
-  local repo tool n v
+  local repo tool v
   [ $# -eq 0 ] || die "usage: mentat check" 64
   for tool in git gh jq; do
     if command -v "$tool" >/dev/null 2>&1; then c_ok "$tool is installed"; else c_problem "$tool is not installed"; fi
@@ -407,16 +407,6 @@ check() {
   [ -n "$repo" ] || { c_problem "could not tell which GitHub repository this is; run mentat check inside a checkout of it"; c_finish; }
   if gh api -X GET "repos/$repo" --jq .full_name >/dev/null 2>&1; then c_ok "$repo is readable"
   else c_problem "could not read $repo"; c_finish; fi
-  # With write access, an agent can run a workflow on a branch before any review.
-  if n=$(gh api -X GET "repos/$repo/actions/secrets" --jq .total_count 2>/dev/null) && case "$n" in '' | *[!0-9]*) false ;; esac; then
-    if [ "$n" -gt 0 ]; then
-      c_warn "$repo has $n Actions secret(s); a workflow the agent pushes on a branch may be able to read them (access controls not checked)"
-    else
-      c_ok "no Actions secrets"
-    fi
-  else
-    c_warn "could not read whether $repo has Actions secrets"
-  fi
   c_finish
 }
 

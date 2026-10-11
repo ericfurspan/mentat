@@ -25,7 +25,6 @@ case "$1 $2" in
     [ "$3" = GET ] || { echo "$*" >>"$STUB/writes"; exit 98; }
     case "$4" in
       repos/owner/repo) [ -f "$STUB/unreadable" ] && exit 1; echo owner/repo ;;
-      repos/owner/repo/actions/secrets) [ -f "$STUB/secrets_unreadable" ] && exit 1; cat "$STUB/secrets" ;;
       *) exit 1 ;;
     esac ;;
   *) echo "$*" >>"$STUB/writes"; exit 99 ;;
@@ -40,7 +39,7 @@ STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/codex"
 export PATH="$root/bin:$PATH"
 
-reset() { rm -f "$STUB"/*; echo 0 >"$STUB/secrets"; }
+reset() { rm -f "$STUB"/*; }
 run() { (cd "$root/cwd" && "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
 
@@ -52,11 +51,6 @@ check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out
 check "prints the installed codex version" 'grep -qx "OK: codex is installed (codex-cli 9.9.9)" "$STUB/out"'
 reset; touch "$STUB/no_version"; rc=$(run)
 check "a codex with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: codex is installed (version unknown)" "$STUB/out"'
-
-reset; echo 3 >"$STUB/secrets"; rc=$(run)
-check "Actions secrets are a warning, not a failure" '[ "$rc" = 0 ] && grep -q "WARN: owner/repo has 3 Actions secret(s)" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
-reset; touch "$STUB/secrets_unreadable"; rc=$(run)
-check "unreadable secrets are a warning that says so" '[ "$rc" = 0 ] && grep -q "WARN: could not read whether" "$STUB/out"'
 
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'

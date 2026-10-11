@@ -1,17 +1,17 @@
 ---
 name: codex-review-off
-description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges, until the maintainer runs /mentat:codex-review-on. Started by the maintainer."
+description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges, until the maintainer says in chat to turn Codex back on. Started by the maintainer."
 disable-model-invocation: true
 ---
 
-The maintainer has turned Codex off for the rest of this session. Until the maintainer runs `/mentat:codex-review-on` or says so in chat, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, with `/mentat:codex-review-on` or in chat.
+The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds, the hold rule in step 6 included. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say in one line that Codex review is on again; that starts no review by itself. From then on the next review of any pull request, including one that had a Claude review round, is a Codex review (`mentat review`); a Claude review already running finishes and its findings are settled as usual.
 
 When started, say in one line that Codex is off for this session. If a `mentat review` or `mentat challenge` is running, stop it and say so.
 
 ## Pull requests
 
 1. Do not call `mentat:review` or run `mentat review` or `mentat review --local`.
-2. Once the test command passes on the head, push and update the description (Skill tool, `mentat:pr`). Its Evidence says the maintainer turned Codex off for this session and the Claude review is still to come; do not claim a review yet. Step 4 updates it.
+2. Once the test command passes on the head, push and update the description (Skill tool, `mentat:pr`). Its Evidence says the maintainer turned Codex off for this session and the Claude review is still to come; do not claim a review yet. Step 4 updates it. If the maintainer has said to hold the change (`rules.md` step 6), stop here: no `mentat ci`, no review, no `gh pr ready`, until they say it goes to the default branch.
 3. Run `mentat ci <N>`, which waits for CI on the head (up to 30 minutes; with no CI, about a minute) and reviews nothing itself. 0: go on. 3: the head moved; run it again. 4: failing checks: fix them, run the test command, push, and run it again; CI still running at the timeout: tell the maintainer. 1: tell the maintainer.
 4. Review with Claude. Call the Skill tool with `code-review` and the args `medium <N>`. Always pass the level: a bare call reuses the last level typed. The level that runs can differ from the one passed, so take the level from the skill's own output. Never pass `--fix`, which would edit files in the main session, or `--comment`.
    - If the review runs in the background, wait for its result before posting. A review that fails, times out or returns nothing is not a pass; it falls under the last bullet.
@@ -23,7 +23,7 @@ When started, say in one line that Codex is off for this session. If a `mentat r
 5. Read the diff and the description from GitHub, not from memory, and correct any claim that does not hold. Post one comment, five lines at most: the commit checked and its test and CI results, "Reviewed by Claude (code-review, <level>), not by Codex", with the level the skill's own output reports and the model this session ran on, how each finding was settled, what was not checked, and what most deserves the maintainer's eyes. If the Claude review did not run, write "Not reviewed" and why instead. Start it with `Final check on <sha>`, the commit checked.
 6. Run `gh pr ready <N>`; if that fails, report it and stop. Tell the maintainer in chat that the pull request is ready to merge, reviewed by Claude and not Codex (or unreviewed, if the review did not run), and stop.
 
-Never merge, even where the repository's AGENTS.md says agents may merge their own pull requests: that permission needs a Codex review loop that ended ready, and none ran. The Claude review does not replace it. The maintainer merges.
+The maintainer merges, as always.
 
 If OpenAI's Codex GitHub app is installed with automatic reviews, it may still review when the pull request is marked ready; that is the app's setting, not Mentat's. Tell the maintainer this once, the first time it applies. Do not wait for or act on such a review unless the maintainer asks.
 

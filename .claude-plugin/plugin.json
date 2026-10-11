@@ -1,6 +1,6 @@
 {
   "name": "mentat",
-  "description": "How coding agents work in your GitHub repositories: Claude Code builds, Codex reviews, you merge.",
+  "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code plans and builds, Codex reviews, the maintainer merges.",
   "author": { "name": "ericfurspan" },
   "repository": "https://github.com/ericfurspan/mentat"
 }
