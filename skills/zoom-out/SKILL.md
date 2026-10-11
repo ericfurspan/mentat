@@ -15,4 +15,4 @@ The maintainer wants the whole picture, not the task in hand. This runs once: do
    - What looks like weeds or over-engineering, with evidence (counts, links).
    - Are we solving the right problem, and is there a better approach? Answer in one or two sentences.
    - Whether the goal or the plan itself should change, said plainly, not only the next step.
-   - One recommended next step. If it needs a decision, end with the output style's closing `## Question` block.
+   - One recommended next step. If it needs a decision, end with the output style's closing question.
