@@ -14,8 +14,8 @@ This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its 
 - The requirements are in the pull request description and any linked issue. Flag code that does not do what they say, or a test result that does not match the final commit.
 - Flag any secret, token or credential added to the repository, including in tests, fixtures and workflow files. Placeholder values that are clearly fake are fine.
 - Flag workflow changes that give a job secrets, write permissions or deploy access it does not need. Workflows should declare `permissions` explicitly and pin third-party actions to a commit SHA.
-- Flag changes that weaken a guardrail: skipping or loosening `tests/run`, narrowing the merge hook (`hooks/no-merge`) so a merge command prompts less (`gh pr merge`, the merge API through `gh api` and auto-merge always prompt), or instructions that let an agent deploy, publish or release, or merge at all, including through auto-merge or `--admin`.
+- Flag changes that weaken a guardrail: skipping or loosening `tests/run`, narrowing the merge hook (`hooks/no-merge`) so a merge command prompts less (`gh pr merge`, the merge API through `gh api` and auto-merge always prompt), or instructions that let an agent deploy, publish or release, or merge at all, including through auto-merge or `--admin`; narrowing the push hook (`hooks/no-default-push`) so a push to the default branch prompts less.
 - Flag shell scripts that break on paths with spaces or ignore a failing command.
 - Do not flag wording or style in Markdown instructions unless it changes what an agent is told to do.
-- The merge hook is a net for mistakes, not a security boundary: another command form that would merge without a prompt is not a finding.
+- The merge and push hooks are nets for mistakes, not security boundaries: another command form that would merge, or push to the default branch, without a prompt is not a finding.
 - Flag only problems with a realistic trigger. A check that fails closed is not a finding, and neither is input that needs a broken or hostile setup on the maintainer's own machine. Prefer removing code to adding guards.
