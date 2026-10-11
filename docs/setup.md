@@ -53,6 +53,22 @@ Get his updates:
 npx skills update grilling -g
 ```
 
+### The Fool (optional)
+
+`the-fool` is Jeffallan's skeptic: it restates a plan or claim at its strongest, lets you pick a lens such as assumptions, counter-arguments, failure modes, attack or evidence, gives the 3 to 5 strongest challenges, waits for your reply, then strengthens the plan. It comes from [github.com/Jeffallan/claude-skills](https://github.com/Jeffallan/claude-skills) (MIT, `skills/the-fool`). Mentat does not ship a copy, so updates come from upstream. You can start it with `/the-fool`.
+
+Install it for your user:
+
+```bash
+npx skills add Jeffallan/claude-skills --skill the-fool -g
+```
+
+Get his updates:
+
+```bash
+npx skills update the-fool -g
+```
+
 ### Reviews
 
 - With the Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and in Codex's code review settings turn on automatic review for all pull requests, triggered on PR open. Without that setting it reviews only when you comment `@codex review`, and `mentat review` gives up after 20 minutes. Claude Code then runs `mentat review --local`.
