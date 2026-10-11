@@ -161,6 +161,7 @@ reset; echo "[$(ref owner repo 4)]" >"$STUB/closes"; rc=$(run)
 check "a linked issue that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q "could not read issue owner/repo#4" "$STUB/out" && [ ! -f "$STUB/prompt" ]'
 reset; rc=$(run)
 check "no linked issue: no issue block" '[ "$rc" = 0 ] && ! grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt"'
+check "asks Codex to open with the pull request's intent in one sentence" 'grep -q "Start your reply with one sentence stating the pull request.s intent" "$STUB/prompt"'
 check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$STUB/args"'
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
 reset; rc=$(cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1; echo $?)

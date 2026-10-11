@@ -7,10 +7,13 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 
 1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`.
 2. Use the repository's pull request template if it has one, adding any part below that it lacks; otherwise the template below. Where the repository has a `GLOSSARY.md`, use its terms.
-3. Every claim matches the diff on the head commit. After any push that changes what the diff does, update the body.
+3. If you cannot state the change's intent in one sentence, ask the maintainer before opening the pull request.
+4. Every claim matches the diff on the head commit. After any push that changes what the diff does, update the body.
 
 ```markdown
 ## Summary
+
+<One sentence: what the change is for, its intent and not a list of edits.>
 
 <What was asked and what this changes, in a sentence or two. A table only where it says it faster.>
 
