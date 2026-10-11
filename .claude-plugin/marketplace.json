@@ -1,12 +1,12 @@
 {
   "name": "mentat",
   "owner": { "name": "ericfurspan" },
-  "description": "Mentat, installed as a Claude Code plugin from its own repository.",
+  "description": "Mentat's own marketplace: the plugin, served from its repository.",
   "plugins": [
     {
       "name": "mentat",
       "source": "./",
-      "description": "How coding agents work in your GitHub repositories: Claude Code builds, Codex reviews, you merge."
+      "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code plans and builds, Codex reviews, the maintainer merges."
     }
   ]
 }

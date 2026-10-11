@@ -1,6 +1,5 @@
 # Finder
 .DS_Store
 
-# Local working files, never committed
-BUILD-PLAN.md
-SPEC.md
+# Claude Code worktrees
+.claude/worktrees/

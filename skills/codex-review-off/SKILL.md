@@ -1,10 +1,10 @@
 ---
 name: codex-review-off
-description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges, until the maintainer runs /mentat:codex-review-on. Started by the maintainer."
+description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges, until the maintainer says in chat to turn Codex back on. Started by the maintainer."
 disable-model-invocation: true
 ---
 
-The maintainer has turned Codex off for the rest of this session. Until the maintainer runs `/mentat:codex-review-on` or says so in chat, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, with `/mentat:codex-review-on` or in chat.
+The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds, the hold rule in step 6 included. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say in one line that Codex review is on again; that starts no review by itself. From then on the next review of any pull request, including one that had a Claude review round, is a Codex review (`mentat review`); a Claude review already running finishes and its findings are settled as usual.
 
 When started, say in one line that Codex is off for this session. If a `mentat review` or `mentat challenge` is running, stop it and say so.
 
@@ -23,7 +23,7 @@ When started, say in one line that Codex is off for this session. If a `mentat r
 5. Read the diff and the description from GitHub, not from memory, and correct any claim that does not hold. Post one comment, five lines at most: the commit checked and its test and CI results, "Reviewed by Claude (code-review, <level>), not by Codex", with the level the skill's own output reports and the model this session ran on, how each finding was settled, what was not checked, and what most deserves the maintainer's eyes. If the Claude review did not run, write "Not reviewed" and why instead. Start it with `Final check on <sha>`, the commit checked.
 6. Run `gh pr ready <N>`; if that fails, report it and stop. Tell the maintainer in chat that the pull request is ready to merge, reviewed by Claude and not Codex (or unreviewed, if the review did not run), and stop.
 
-Never merge, even where the repository's AGENTS.md says agents may merge their own pull requests: that permission needs a Codex review loop that ended ready, and none ran. The Claude review does not replace it. The maintainer merges.
+The maintainer merges, as always.
 
 If OpenAI's Codex GitHub app is installed with automatic reviews, it may still review when the pull request is marked ready; that is the app's setting, not Mentat's. Tell the maintainer this once, the first time it applies. Do not wait for or act on such a review unless the maintainer asks.
 
