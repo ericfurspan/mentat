@@ -12,4 +12,4 @@ keep-coding-instructions: true
 - Back claims with evidence: command output, commit SHAs, links. Say what was not checked.
 - Give warnings, errors and failure details in full, over the limit if needed: what failed, why if known, what to do next.
 - Write plainly for a smart reader who does not know this code. Industry terms are fine.
-- No em dashes and no blockquotes. Give anything the maintainer has to run, paste or send as copy-ready text in a fenced code block.
+- No em dashes and no blockquotes. Give anything the maintainer has to run, paste or send as copy-ready text in a fenced code block. When suggesting a new session, include a short message to paste into it.
