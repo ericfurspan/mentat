@@ -14,7 +14,7 @@ When a session first starts change work in a repository, Claude Code runs `menta
 3. There is one builder, one branch and one checkout per change. The builder is the Mentat plugin's `builder` subagent. Claude Code does not edit files in the main session, for the first build and for review fixes alike, so the maintainer's chat shows the plan and the builder's report, not diffs. Other subagents are mostly for read-only investigation. Claude Code gives the builder a brief: the checkout and branch, the AGENTS.md files that apply, what to build and what to leave alone, how the result will be checked, and the test command.
 4. The test command is the one AGENTS.md names; otherwise the one the repository shows (package scripts, a Makefile, its CI workflow). It runs before the pull request opens and after every fix. For a bug fix, the builder first writes a check that fails on the bug; for a change in behavior, it also runs the change the way a user would (a command, a request, a page) where the environment allows. Both are the pull request's evidence. Claude Code does not edit the maintainer's AGENTS.md to add one unless asked.
 5. Every pull request opens as a draft. Claude Code writes and updates its description by calling the Skill tool with `mentat:pr`.
-6. When the build is done and the test command passes, Claude Code pushes and calls the Skill tool with `mentat:review`; `mentat review` waits for CI on the head itself. It runs the review loop and ends with the final check. Then the maintainer merges. If the maintainer has said to hold the change ("hold", "still trying it" or the like), Claude Code still pushes and keeps the description current, but calls no review skill and runs no `gh pr ready`: the pull request stays a draft, unreviewed, until the maintainer says it goes to the default branch, and then this step runs as written.
+6. When the build is done and the test command passes, Claude Code pushes and calls the Skill tool with `mentat:review`; `mentat review` waits for CI on the head itself. It runs the review loop and ends with the final check. Then the maintainer merges. If the maintainer has said to hold the change ("hold", "still trying it" or the like), Claude Code still pushes and keeps the description current, but calls no review skill; if the pull request is already marked ready, it runs `gh pr ready <N> --undo`. The pull request stays a draft, unreviewed, until the maintainer says it goes to the default branch, and then this step runs as written.
 
 After compaction or a resumed session, Claude Code calls the skill for the step in progress again if its text is no longer in context.
 
@@ -31,11 +31,11 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Required reports and approvals are unchanged: check failures and warnings, exposed secrets, failure details, irreversible or outward actions, permission and access changes, and everything under "What agents never do".
 
 ## Approval
-- The maintainer merges every pull request. Claude Code never merges, never turns on auto-merge, never merges with `--admin`, and never works around a refusal. Mentat's merge hook asks the maintainer before any merge command.
+- The maintainer merges every pull request. Mentat's merge hook asks the maintainer before any merge command.
 - Approving or merging a pull request approves the code, not running it.
 
 ## What agents never do
-- Merge pull requests, or turn on auto-merge.
+- Merge pull requests, turn on auto-merge, merge with `--admin`, or work around a merge refusal.
 - Create releases, deploy, publish, change secrets, run production migrations or run destructive operations on outside systems. Agents prepare these; the maintainer runs them.
 - Commit secrets. An exposed secret must be rotated; deleting it is not enough, so the maintainer is told at once.
 - Push code changes to the default branch, force-push a shared branch, or change repository settings.
