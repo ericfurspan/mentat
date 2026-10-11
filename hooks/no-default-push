@@ -40,6 +40,34 @@ is_default() {
   return 1
 }
 
+# tokenize <text>: sets $words, split on blanks the way a shell does: single
+# and double quotes and backslashes keep a path with spaces in one word. An
+# unmatched quote ends at the end of the text.
+tokenize() {
+  local s=$1 c q="" cur="" has=0 i
+  words=()
+  for ((i = 0; i < ${#s}; i++)); do
+    c=${s:i:1}
+    if [ -n "$q" ]; then
+      if [ "$c" = "$q" ]; then
+        q=""
+      elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
+        i=$((i + 1)); cur+=${s:i:1}
+      else
+        cur+=$c
+      fi
+    else
+      case "$c" in
+        "'" | '"') q=$c; has=1 ;;
+        "\\") i=$((i + 1)); cur+=${s:i:1}; has=1 ;;
+        " " | $'\t') if [ "$has" -eq 1 ]; then words+=("$cur"); cur=""; has=0; fi ;;
+        *) cur+=$c; has=1 ;;
+      esac
+    fi
+  done
+  if [ "$has" -eq 1 ]; then words+=("$cur"); fi
+}
+
 nl=$'\n'
 pieces=${cmd//;/$nl}
 pieces=${pieces//|/$nl}
@@ -47,11 +75,9 @@ pieces=${pieces//&/$nl}
 
 # A command can chain several: look at each piece that starts with git ... push.
 while IFS= read -r seg; do
-  words=()
-  read -r -a words <<<"$seg" || true
+  tokenize "$seg"
   n=${#words[@]}
   [ "$n" -gt 0 ] || continue
-  for ((i = 0; i < n; i++)); do words[i]=${words[i]//[\"\']/}; done
 
   i=0
   while [ "$i" -lt "$n" ]; do

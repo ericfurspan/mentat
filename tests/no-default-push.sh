@@ -111,6 +111,24 @@ check "git -C <dir> push follows the directory (relative)" '[ "$(decision "$tmp"
 check "git -C <dir> push follows the directory (absolute)" '[ "$(decision / "git -C $tmp/repo push")" = ask ]'
 check "git -C <feature checkout> push leaves alone" '[ -z "$(decision "$tmp" "git -C feat push")" ]'
 
+# A checkout whose path has a space: quoting keeps it one word.
+cp -R "$tmp/repo" "$tmp/my repo"
+cp -R "$tmp/my repo" "$tmp/my feat"
+g -C "$tmp/my feat" checkout -q -b feat/x
+sp="$tmp/my repo"
+esc="${sp// /\\ }"
+check "path with a space, single quotes: asks" '[ "$(decision / "git -C '"'"'$sp'"'"' push")" = ask ]'
+check "path with a space, double quotes: asks" '[ "$(decision / "git -C \"$sp\" push")" = ask ]'
+check "path with a space, backslash: asks" '[ "$(decision / "git -C $esc push")" = ask ]'
+check "path with a space, relative and quoted: asks" '[ "$(decision "$tmp" "git -C \"my repo\" push origin main")" = ask ]'
+sf="$tmp/my feat"
+esf="${sf// /\\ }"
+check "path with a space on a feature branch, single quotes: leaves alone" '[ -z "$(decision / "git -C '"'"'$sf'"'"' push")" ]'
+check "path with a space on a feature branch, double quotes: leaves alone" '[ -z "$(decision / "git -C \"$sf\" push")" ]'
+check "path with a space on a feature branch, backslash: leaves alone" '[ -z "$(decision / "git -C $esf push")" ]'
+check "a quoted message with spaces stays one word" '[ -z "$(decision "$tmp/repo" "git commit -m \"push origin main now\"")" ]'
+check "an unmatched quote does not crash" '[ "$(decision "$tmp/repo" "git push origin main \"oops")" = ask ]'
+
 # The default branch is whatever origin/HEAD says.
 check "default trunk: asks before pushing trunk" '[ "$(decision "$tmp/trunk" "git push origin trunk")" = ask ]'
 check "default trunk: asks before a bare push on trunk" '[ "$(decision "$tmp/trunk" "git push")" = ask ]'
