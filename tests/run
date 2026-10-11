@@ -106,9 +106,9 @@ for f in skills/*/SKILL.md; do
 done
 
 # mentat review, review --local, challenge and check behave as specified (stub
-# gh and codex), and so does the merge hook.
+# gh and codex), and so does the merge hook and the push hook.
 if command -v jq >/dev/null 2>&1; then
-  for t in tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh; do
+  for t in tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh; do
     if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
   done
 else
@@ -129,10 +129,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh"
+  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/no-merge bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat tests/review.sh tests/review-local.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh"
   fi
 else
   fail "shellcheck not installed, shell scripts not checked"

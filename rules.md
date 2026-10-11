@@ -38,7 +38,7 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Merge pull requests, turn on auto-merge, merge with `--admin`, or work around a merge refusal.
 - Create releases, deploy, publish, change secrets, run production migrations or run destructive operations on outside systems. Agents prepare these; the maintainer runs them.
 - Commit secrets. An exposed secret must be rotated; deleting it is not enough, so the maintainer is told at once.
-- Push code changes to the default branch, force-push a shared branch, or change repository settings.
+- Push code changes to the default branch, force-push a shared branch, or change repository settings. Mentat's push hook asks the maintainer before a push to the default branch.
 - Bring production credentials into an agent session.
 
 ## Records
