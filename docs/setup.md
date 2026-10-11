@@ -35,7 +35,7 @@ Start a new session. On its first change, Claude Code runs `mentat check`, which
 
 ### Choosing the Mentat reply style
 
-Mentat ships an output style: result first, about 100 words, no narration, and anything that needs you comes last, under a `Question` or `Your action` heading. It is not forced on you. To use it in the terminal, pick Mentat with `/config` (Output style) or `/output-style`. In the desktop app, `/config` opens Settings instead of a menu, so set `outputStyle` in a settings file. To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`.
+Mentat ships an output style: result first, about 100 words, no narration, and anything that needs you comes last: a decision marked ❓ with the recommendation marked ➡️, or an action under a `Your action` heading. It is not forced on you. To use it in the terminal, pick Mentat with `/config` (Output style) or `/output-style`. In the desktop app, `/config` opens Settings instead of a menu, so set `outputStyle` in a settings file. To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`.
 
 ### Grilling (optional)
 
