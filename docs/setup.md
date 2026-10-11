@@ -37,6 +37,22 @@ Start a new session. On its first change, Claude Code runs `mentat check`, which
 
 Mentat ships an output style: result first, about 100 words, no narration, and anything that needs you comes last, under a `Question` or `Your action` heading. It is not forced on you. To use it in the terminal, pick Mentat with `/config` (Output style) or `/output-style`. In the desktop app, `/config` opens Settings instead of a menu, so set `outputStyle` in a settings file. To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`.
 
+### Grilling (optional)
+
+`grilling` is Matt Pocock's alignment interview: it questions your plan, recommends an answer to each question, and acts only once you agree. It comes from [github.com/mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Mentat does not ship a copy, so updates come from upstream. Claude Code offers it when a request leaves decisions open that only you can make, if it is installed, and you can start it with `/grilling`.
+
+Install it for your user:
+
+```bash
+npx skills add mattpocock/skills --skill grilling -g
+```
+
+Get his updates:
+
+```bash
+npx skills update grilling -g
+```
+
 ### Reviews
 
 - With the Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and in Codex's code review settings turn on automatic review for all pull requests, triggered on PR open. Without that setting it reviews only when you comment `@codex review`, and `mentat review` gives up after 20 minutes. Claude Code then runs `mentat review --local`.
