@@ -57,6 +57,8 @@ npx skills update grilling -g
 
 `the-fool` is Jeffallan's skeptic: it restates a plan or claim at its strongest, lets you pick a lens such as assumptions, counter-arguments, failure modes, attack or evidence, gives the 3 to 5 strongest challenges, waits for your reply, then strengthens the plan. It comes from [github.com/Jeffallan/claude-skills](https://github.com/Jeffallan/claude-skills) (MIT, `skills/the-fool`). Mentat does not ship a copy, so updates come from upstream. You can start it with `/the-fool`.
 
+The install screen shows a "Critical Risk" rating from one scanner, skills.sh's Gen Agent Trust Hub, which reports a FileRep malware hit and two flagged URLs without details. Socket and Snyk pass it. On 2026-10-10 its files were read in full: they are Markdown only, with no scripts or hidden characters, and link only to the author's GitHub, docs site and company site. Read the [audit page](https://skills.sh/jeffallan/claude-skills/the-fool/security/agent-trust-hub) and judge it yourself.
+
 Install it for your user:
 
 ```bash
