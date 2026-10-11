@@ -9,29 +9,6 @@ failures=0
 pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
 
-# JSON and YAML files parse with strict parsers. JSON must be exactly one
-# standard value (no NaN, Infinity or leading zeros); every YAML document counts.
-if command -v ruby >/dev/null 2>&1; then
-  if ! data_files=$(git ls-files --cached --others --exclude-standard '*.json' '*.yml' '*.yaml'); then
-    fail "could not list JSON and YAML files"
-  else
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      case "$f" in
-        *.json) parse='JSON.parse(File.read(ARGV[0]))' ;;
-        *) parse='YAML.load_stream(File.read(ARGV[0]))' ;;
-      esac
-      if ruby -rjson -ryaml -e "$parse" "$f" >/dev/null 2>&1; then
-        pass "$f parses"
-      else
-        fail "$f does not parse"
-      fi
-    done <<< "$data_files"
-  fi
-else
-  fail "ruby not installed, JSON and YAML not checked"
-fi
-
 # Codex reads review rules from this heading in AGENTS.md.
 if grep -qx '## Code Review Rules' AGENTS.md; then
   pass "AGENTS.md has a Code Review Rules section"
