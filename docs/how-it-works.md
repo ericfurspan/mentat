@@ -26,6 +26,8 @@ After a session that went badly, `/mentat:retro` reads it and proposes fixes to 
 
 When a message loses you, run `/mentat:come-again`: Claude Code says its last message again in at most three short lines, or the part you typed after the command, and changes nothing ([`skills/come-again`](../skills/come-again/SKILL.md)).
 
+When you want the whole picture, run `/mentat:zoom-out`: Claude Code finishes the step in flight, then says once the goal, what is done, what you raised that is still unanswered, what looks like over-engineering, and the next step, and changes nothing ([`skills/zoom-out`](../skills/zoom-out/SKILL.md)).
+
 To skip Codex for a session, run `/mentat:codex-review-off`. Claude Code then runs one Claude `code-review`, asked for at medium effort, per pull request (at most two rounds) instead of the Codex review, and no plan challenges: it still runs the tests, waits for CI and posts its final check marked reviewed by Claude, not Codex, then tells you the pull request is ready, and never merges it itself, even in a repository opted in to agent merges; you still merge. If `code-review` cannot run, the final check says "Not reviewed" and why. The limit: the reviewer is the same model family as the builder, so it is weaker than a cross-model review. OpenAI's Codex GitHub app, if installed with automatic reviews, can still review when the pull request is marked ready; that is the app's setting. Run `/mentat:codex-review-on`, or say so in chat, to turn Codex back on ([`skills/codex-review-off`](../skills/codex-review-off/SKILL.md), [`skills/codex-review-on`](../skills/codex-review-on/SKILL.md)).
 
 ## The repository comes first
