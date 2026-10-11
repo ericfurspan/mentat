@@ -138,19 +138,16 @@ else
   fail "jq not installed, mentat review, challenge, check and the hooks not tested"
 fi
 
-# The Mentat pane is a Claude Code mod: the plugin validates (warnings are fine,
-# only a failure counts) and the mod's own tests, pane/*.test.tsx, pass.
+# The plugin's manifests validate (warnings are fine, only a failure counts).
 if command -v claude >/dev/null 2>&1; then
-  for sub in validate test; do
-    if out=$(claude plugin "$sub" . 2>&1); then
-      pass "claude plugin $sub ."
-    else
-      printf '%s\n' "$out"
-      fail "claude plugin $sub ."
-    fi
-  done
+  if out=$(claude plugin validate . 2>&1); then
+    pass "claude plugin validate ."
+  else
+    printf '%s\n' "$out"
+    fail "claude plugin validate ."
+  fi
 else
-  fail "claude not installed, the Mentat pane not validated or tested"
+  fail "claude not installed, the plugin manifests not validated"
 fi
 
 # Shell scripts pass shellcheck.
