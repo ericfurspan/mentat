@@ -50,7 +50,7 @@ npx skills add mattpocock/skills --skill grilling -g
 Get his updates:
 
 ```bash
-npx skills update grilling
+npx skills update grilling -g
 ```
 
 ### Reviews
