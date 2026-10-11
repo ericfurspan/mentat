@@ -37,39 +37,10 @@ Start a new session. On its first change, Claude Code runs `mentat check`, which
 
 Mentat ships an output style: result first, about 100 words, no narration, and anything that needs you comes last: a decision marked ❓ with the recommendation marked ➡️, or an action under a `Your action` heading. It is not forced on you. To use it in the terminal, pick Mentat with `/config` (Output style) or `/output-style`. In the desktop app, `/config` opens Settings instead of a menu, so set `outputStyle` in a settings file. To choose it for one repository, set `outputStyle` in that repository's `.claude/settings.json` or `.claude/settings.local.json` to the value `/config` saves; this repository uses `"mentat:Mentat"`.
 
-### Grilling (optional)
+### Optional skills
 
-`grilling` is Matt Pocock's alignment interview: it questions your plan, recommends an answer to each question, and acts only once you agree. It comes from [github.com/mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Mentat does not ship a copy, so updates come from upstream. Claude Code offers it when a request leaves decisions open that only you can make, if it is installed, and you can start it with `/grilling`.
-
-Install it for your user:
-
-```bash
-npx skills add mattpocock/skills --skill grilling -g
-```
-
-Get his updates:
-
-```bash
-npx skills update grilling -g
-```
-
-### The Fool (optional)
-
-`the-fool` is Jeffallan's skeptic: it restates a plan or claim at its strongest, lets you pick a lens such as assumptions, counter-arguments, failure modes, attack or evidence, gives the 3 to 5 strongest challenges, waits for your reply, then strengthens the plan. It comes from [github.com/Jeffallan/claude-skills](https://github.com/Jeffallan/claude-skills) (MIT, `skills/the-fool`). Mentat does not ship a copy, so updates come from upstream. You can start it with `/the-fool`.
-
-The install screen shows a "Critical Risk" rating from one scanner, skills.sh's Gen Agent Trust Hub, which reports a FileRep malware hit and two flagged URLs without details. Socket and Snyk pass it. On 2026-10-10 its files were read in full: they are Markdown only, with no scripts or hidden characters, and link only to the author's GitHub, docs site and company site. Read the [audit page](https://skills.sh/jeffallan/claude-skills/the-fool/security/agent-trust-hub) and judge it yourself.
-
-Install it for your user:
-
-```bash
-npx skills add Jeffallan/claude-skills --skill the-fool -g
-```
-
-Get his updates:
-
-```bash
-npx skills update the-fool -g
-```
+- [`grilling`](https://skills.sh/mattpocock/skills/grilling) (Matt Pocock's) interviews you about a plan until you agree on it. Mentat offers it when installed.
+- [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) (Jeffallan's) challenges a plan or claim and ends with a stronger version. Mentat offers it when installed.
 
 ### Reviews
 
