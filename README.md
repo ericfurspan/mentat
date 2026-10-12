@@ -32,4 +32,4 @@ The full flow, what holds and how, the `mentat` commands and what Mentat does no
 
 ## Credits
 
-The pull request body format comes from Matt Pocock's `pr` skill, the ❓/💡 decision format from his `grilling`, and zoom-out's reframing question from team-attention's `step-back` and the BMAD Method. Each `CREDITS.md` under `skills/` has the details and licenses.
+The pull request body format comes from Matt Pocock's `pr` skill, the ❓/💡 decision format from his `grilling`, and zoom-out's reframing question from team-attention's `step-back` and the BMAD Method, and the one-sentence intent check in reviews from Jeffallan's [`code-reviewer`](https://jeffallan.github.io/claude-skills/skills/quality/code-reviewer/) skill. Each `CREDITS.md` under `skills/` has the details and licenses.

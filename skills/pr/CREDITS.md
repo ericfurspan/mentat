@@ -2,6 +2,8 @@
 
 Adapted from the `pr` skill in [mattpocock/skills](https://github.com/mattpocock/skills) (`skills/engineering/pr/SKILL.md`): the Summary, Evidence and Merge danger sections, and the one-way and two-way door framing.
 
+Matt Pocock's `pr` skill itself credits Dex Horthy's [`show-me`](https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md) skill (Humanlayer).
+
 Changes for Mentat: Summary leads with plain prose because Codex reviews against the body; a Not in scope section; repository templates and glossaries come first; the menu of visuals is left out.
 
 The source is under the MIT License:

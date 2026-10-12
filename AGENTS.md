@@ -7,7 +7,7 @@ This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its 
 - The one test command is `tests/run`. It runs locally on macOS; this repository has no CI.
 - Every file here is Mentat's own. This repository's own choices, which Mentat inherits like any other: the maintainer merges every pull request (the agent account cannot approve its own pull requests), and `.claude/settings.json` chooses the Mentat output style.
 - Keep scripts plain bash that also runs on macOS's bash 3.2.
-- Change Mentat when a real session shows a need or a failure, and keep it simple to describe.
+- Weigh a change to Mentat on its value against its cost, whether the idea comes from a real session or from others' work, and keep it simple to describe.
 - After the maintainer merges a pull request here, run `claude plugin marketplace update mentat` and `claude plugin update mentat@mentat --scope project`, so the next session here loads the merged plugin. The maintainer gave standing permission for these two commands. A running session keeps the version it loaded until it restarts. Other checkouts update whenever they next update their plugins; nothing here depends on it.
 
 ## Code Review Rules
