@@ -42,7 +42,7 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Bring production credentials into an agent session.
 
 ## Records
-- Issues are the backlog. Where the repository uses them, the pinned issue holds the maintainer's order of agreed work, next first; Claude Code drops closed issues from it whenever it reads or updates it. Each issue gets one label for what it is, from the repository's own (on GitHub's defaults: `bug`, `enhancement`, `documentation`, `question`).
+- Issues are the backlog. Where the repository uses them, the pinned issue holds the maintainer's order of agreed work, next first; Claude Code drops closed issues from it whenever it updates it. Each issue gets one label for what it is, from the repository's own (on GitHub's defaults: `bug`, `enhancement`, `documentation`, `question`).
 - Where the repository has stage labels, each open issue also carries one: `idea` (not agreed), `ready` (the maintainer agreed to build it), `in progress` (a branch or pull request exists) or `waiting` (waiting on the maintainer). Claude Code moves issues between stages as the work moves, and to `ready` when the maintainer agrees. Once an issue closes, its close reason (completed, not planned or duplicate) says how it ended, and any stage label left on it no longer counts. Pull requests get no stage label.
 - Pull request titles follow Conventional Commits unless the repository says otherwise.
 - Work is referred to as `#N` inside a repository and `owner/repo#N` across repositories.
