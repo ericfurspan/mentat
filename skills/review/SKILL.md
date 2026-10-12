@@ -24,7 +24,7 @@ Each round's result is on the pull request (the review and the replies to it). A
    - 3: the head moved. Run the same command again.
    - 4: CI did not pass on that head, and nothing was reviewed. Failing checks: fix them, push, and run the same command again. CI still running at the timeout: tell the maintainer.
 3. Sort each finding as `rules.md` "Findings" says. The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
-4. Batch the fixes into one brief for the `mentat:builder` subagent (a new dispatch, or continuing the earlier builder). When it reports, run the test command, push, and update the description (Skill tool, `mentat:pr`). Then go to step 1 for the new head, unless the round limit says to stop. A result on an older head does not make the new head ready.
+4. Batch the fixes into one brief for the `mentat:builder` subagent (a new dispatch, or continuing the earlier builder). When it reports, run the test command on a clean working tree (`git status --porcelain` prints nothing) on the commit being pushed, push, and update the description (Skill tool, `mentat:pr`). Then go to step 1 for the new head, unless the round limit says to stop. A result on an older head does not make the new head ready.
 
 ## Final check
 

@@ -27,9 +27,10 @@ The full flow, what holds and how, the `mentat` commands and what Mentat does no
 
 - `/mentat:zoom-out`: the whole picture, once. The goal, what is done, what I raised that is still unanswered, what looks like over-engineering, and the next step. Changes nothing.
 - `/mentat:come-again`: the last message again, in at most three short lines.
+- `/mentat:retro`: what would have made the session go better, ranked by severity with evidence: changes to Mentat, AGENTS.md, checks and tooling. Changes nothing; I pick which become issues.
 - `/mentat:codex-review-off`: Codex off for the session. One Claude `code-review` per pull request replaces the Codex loop, with no plan challenges; the final check says so. Weaker than a cross-model review, which is why it is a switch and not the default. I turn Codex back on in chat.
 - `/grilling` (Matt Pocock's) and `/the-fool` (Jeffallan's) are other people's skills I keep installed; Mentat offers them when a request leaves decisions open or a plan deserves a skeptic.
 
 ## Credits
 
-The pull request body format comes from Matt Pocock's `pr` skill, the ❓/💡 decision format from his `grilling`, and zoom-out's reframing question from team-attention's `step-back` and the BMAD Method. Each `CREDITS.md` under `skills/` has the details and licenses.
+The pull request body format comes from Matt Pocock's `pr` skill, the ❓/💡 decision format from his `grilling`, and retro from his `retro`. Zoom-out's reframing question comes from team-attention's `step-back` and the BMAD Method, and the one-sentence intent check in reviews from Jeffallan's [`code-reviewer`](https://jeffallan.github.io/claude-skills/skills/quality/code-reviewer/) skill. Each `CREDITS.md` under `skills/` has the details and licenses.
