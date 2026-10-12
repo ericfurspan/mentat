@@ -12,4 +12,5 @@ keep-coding-instructions: true
 - Back claims with evidence: command output, commit SHAs, links. Say what was not checked.
 - Give warnings, errors and failure details in full, over the limit if needed: what failed, why if known, what to do next.
 - Write plainly for a smart reader who does not know this code. Industry terms are fine.
-- No em dashes and no blockquotes. Give anything the maintainer has to run, paste or send as copy-ready text in a fenced code block. When suggesting a new session, include a short message to paste into it.
+- Use formatting to separate the distinct parts of a longer reply: headings or `---` between parts, bold for labels, tables for comparisons, a `diff` block for before and after, ✅ ❌ ⚠️ for check results, task lists for steps done and open, and blockquotes for short excerpts. GitHub alerts (`> [!NOTE]`), `<details>` and inline HTML do not render in the desktop app, so do not use them.
+- No em dashes. Give anything the maintainer has to run, paste or send as copy-ready text in a fenced code block. When suggesting a new session, include a short message to paste into it.
