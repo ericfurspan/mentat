@@ -17,7 +17,7 @@ The full flow, what holds and how, the `mentat` commands and what Mentat does no
 | `rules.md` | The workflow rules, put into every session by a SessionStart hook. |
 | `skills/` | One skill per workflow step (`plan`, `pr`, `review`), called from `rules.md`, and three I start by hand (below). |
 | `agents/builder.md` | The builder subagent: one change on the current branch, then the test command, then a report. |
-| `output-styles/mentat.md` | The reply style: result first, about 100 words, decisions as prompts when the answers fit a few options, otherwise ❓/➡️ pairs at the end. |
+| `output-styles/mentat.md` | The reply style: result first, about 100 words, decisions as prompts when the answers fit a few options, otherwise ❓/💡 pairs at the end. |
 | `hooks/` | The SessionStart hook that loads the rules, and the PreToolUse hook that asks before a merge. |
 | `bin/mentat` | `mentat review`, `review --local`, `ci`, `challenge` and `check`, available to Claude Code's Bash tool. |
 | `tests/run` | The one test command. It runs locally on macOS; there is no CI. |
@@ -32,4 +32,4 @@ The full flow, what holds and how, the `mentat` commands and what Mentat does no
 
 ## Credits
 
-The pull request body format comes from Matt Pocock's `pr` skill, the ❓/➡️ decision format from his `grilling`, and zoom-out's reframing question from team-attention's `step-back` and the BMAD Method. Each `CREDITS.md` under `skills/` has the details and licenses.
+The pull request body format comes from Matt Pocock's `pr` skill, the ❓/💡 decision format from his `grilling`, and zoom-out's reframing question from team-attention's `step-back` and the BMAD Method. Each `CREDITS.md` under `skills/` has the details and licenses.
