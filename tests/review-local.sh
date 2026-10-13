@@ -78,7 +78,7 @@ live_probe() {
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
 root=$(mktemp -d)
 listener="" live_tmp="" live_vartmp=""
-cleanup() { [ -z "$listener" ] || kill "$listener" 2>/dev/null; rm -rf "$root" "$live_tmp" "$live_vartmp" "$live_vartmp.probe"; }
+cleanup() { [ -z "$listener" ] || kill "$listener" 2>/dev/null; rm -rf "$root" "$live_tmp" "$live_vartmp" ${live_vartmp:+"$live_vartmp.probe"}; }
 trap cleanup EXIT
 export STUB="$root/stub"
 mkdir -p "$STUB" "$root/bin"
