@@ -20,8 +20,6 @@ flowchart TD
 4. `mentat review` waits for CI on the head, then comments `@codex review` on the pull request, which starts the Codex app's review of that commit; or `mentat review --local` reviews it with local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again. A real defect is never left to a follow-up issue on its own; five rounds is a hard stop. When the loop ends ready, Claude Code posts a final check (its own check, not a review or an approval) and tells me the pull request is ready. If the loop is blocked, not reviewed, or reaches five rounds without being ready, it tells me why and stops ([`skills/review`](../skills/review/SKILL.md)).
 5. I merge, the way the repository merges.
 
-If I say to hold a change ("hold", "still trying it"), Claude Code still pushes and keeps the description current, but no review runs until I say it goes to main, and the description says at its top that the change is on hold.
-
 With Codex off for a session (`/mentat:codex-review-off`), one Claude `code-review` at medium effort replaces the Codex loop, at most two rounds, with no plan challenges. Claude Code still runs the tests, waits for CI with `mentat ci`, and posts the final check marked reviewed by Claude, not Codex; if `code-review` cannot run, the final check says "Not reviewed" and why. The Codex app, if its automatic review is on, may still review when the pull request opens; that is the app's setting.
 
 ## The repository comes first
@@ -50,7 +48,7 @@ Where a repository's AGENTS.md differs from `rules.md` on a preference (commit a
 
 - Linux, Windows, other Git hosts, organizations and team workflows.
 - Running deployments or infrastructure.
-- Changing a repository's GitHub settings. `mentat check` reads none of them. At the final check, Claude Code reads whether the repository requires approvals, to say when GitHub will not let the author approve.
+- Changing a repository's GitHub settings. `mentat check` reads none of them.
 
 ## Developing Mentat
 

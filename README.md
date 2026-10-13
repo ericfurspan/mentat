@@ -5,7 +5,7 @@
 1. I ask, in chat or as an issue. Claude Code reads the code and writes down what it will build, what it will leave alone and how the result will be checked. When the approach is uncertain, it writes a plan and has Codex challenge it first.
 2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a pull request with evidence and the merge risk.
 3. `mentat review` waits for CI, then Codex reviews that exact commit, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again until the loop is clean. Five rounds is a hard stop.
-4. Claude Code posts a final check and tells me the pull request is ready. If I said to hold the change, its description says so at the top and nothing reviews it until I say it goes to main.
+4. Claude Code posts a final check and tells me the pull request is ready.
 5. I merge. A hook asks me before any command that would merge or turn on auto-merge.
 
 The full flow, what holds and how, the `mentat` commands and what Mentat does not do: [docs/how-it-works.md](docs/how-it-works.md). What my machine and repositories need, and the plugin commands I run: [docs/setup.md](docs/setup.md).

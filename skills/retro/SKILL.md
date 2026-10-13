@@ -16,8 +16,9 @@ The maintainer wants to know what would have made the session go better. This ru
    - Tool economy: expensive calls that could be cheaper, such as a huge output read whole. Use when a call cost a lot for little.
    - Instructions that change nothing: steering that would not alter what an agent does. Use when a file is large.
    - Information the agent lacked: logs, access or context that would have settled something early. Use when a crucial fact was missing.
-4. Reply once. This overrides the output style's 100-word limit. List the candidates ranked by severity, worst first. Each gets:
-   - What to change, and where it would go (the file, the check or the hook).
-   - Its evidence from the session: a short quote, a command and its result, or a link. Quotes stay short and never include credentials or tokens.
+4. Present the candidates one at a time, worst first. This overrides the output style's 100-word limit. Each is in plain words:
+   - What happened, and what it means for the maintainer.
+   - The recommendation: what to change, and where it would go (the file, the check or the hook).
+   - Its evidence from the session in one short line: a short quote, a command and its result, or a link. Quotes never include credentials or tokens.
    Leave out a candidate with no evidence. If nothing is worth changing, say so.
-5. End with the output style's closing question: which candidates the maintainer wants as issues. Nothing is filed without their agreement.
+5. Each candidate gets its own file-or-skip prompt. Collect the answers, then file the agreed ones as issues at the end. Nothing is filed without the maintainer's agreement.

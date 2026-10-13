@@ -4,7 +4,7 @@
 
 This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its output style (`output-styles/`), its skills (`skills/`, one per workflow step, named from `rules.md`), its builder subagent (`agents/`) and the `mentat` command (`bin/mentat`). Its committed `.claude/settings.json` turns the plugin on here, so sessions in this repository follow `rules.md`.
 
-- The one test command is `tests/run`. It runs locally on macOS; this repository has no CI.
+- The one test command is `tests/run`. It takes about 80 seconds, so run it once with its output saved to a file and read the last line ("All checks passed" or "N check(s) failed"). It runs locally on macOS; this repository has no CI.
 - Every file here is Mentat's own. This repository's own choices, which Mentat inherits like any other: the maintainer merges every pull request (the agent account cannot approve its own pull requests), and `.claude/settings.json` chooses the Mentat output style.
 - Keep scripts plain bash that also runs on macOS's bash 3.2.
 - Weigh a change to Mentat on its value against its cost, whether the idea comes from a real session or from others' work, and keep it simple to describe.
