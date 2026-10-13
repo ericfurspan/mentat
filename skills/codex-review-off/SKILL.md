@@ -1,12 +1,12 @@
 ---
 name: codex-review-off
-description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them) and no plan challenges, until the maintainer says in chat to turn Codex back on. Started by the maintainer."
+description: "Turns Codex review off for the rest of the session: no Codex pull request reviews (one Claude code-review replaces them), no plan challenges and no `mentat weigh`, until the maintainer says in chat to turn Codex back on. Started by the maintainer."
 disable-model-invocation: true
 ---
 
-The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) with nothing. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say in one line that Codex review is on again; that starts no review by itself. From then on the next review of any pull request, including one that had a Claude review round, is a Codex review (`mentat review`); a Claude review already running finishes and its findings are settled as usual.
+The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) and `mentat weigh` (`rules.md` step 2) with nothing; Claude Code's own view of a request still runs. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say in one line that Codex review is on again; that starts no review by itself. From then on the next review of any pull request, including one that had a Claude review round, is a Codex review (`mentat review`); a Claude review already running finishes and its findings are settled as usual.
 
-When started, say in one line that Codex is off for this session. If a `mentat review` or `mentat challenge` is running, stop it and say so.
+When started, say in one line that Codex is off for this session. If a `mentat review`, `mentat challenge` or `mentat weigh` is running, stop it and say so.
 
 ## Pull requests
 
@@ -27,4 +27,4 @@ The maintainer merges, as always.
 
 ## Plans
 
-When `rules.md` step 2 calls for `mentat:plan`, still write the plan, but do not run `mentat challenge`. The handoff says the plan was not challenged because the maintainer turned Codex off. The Claude review does not apply to plans.
+When `rules.md` step 2 calls for `mentat:plan`, still write the plan, but do not run `mentat challenge`. The handoff says the plan was not challenged because the maintainer turned Codex off. The Claude review does not apply to plans. Likewise run no `mentat weigh`: give Claude Code's own view alone and say the weighing was skipped because the maintainer turned Codex off.
