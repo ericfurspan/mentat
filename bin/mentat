@@ -9,6 +9,7 @@
 #     request's head with local Codex and posts the result. Same exit codes.
 #   mentat review --grok <PR>  Waits for CI the same way, then reviews the pull
 #     request's head with Grok, if installed, and posts the result. Same exit codes.
+#     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800).
 #   mentat ci <PR>  Waits for CI on the pull request's head the same way, and
 #     reviews nothing. 0 CI passed (or there is none), 1 could not read, 3 the head
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
