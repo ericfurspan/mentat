@@ -2,7 +2,7 @@
 
 *For people. Agents follow `rules.md`, not this page.*
 
-What my machine and a repository need for Mentat to run, and the plugin commands I use. Mentat needs nothing from a repository's GitHub settings; rulesets, required approvals and CI are the repository's own and Mentat works within them.
+What a machine and a repository need for Mentat to run, and the plugin commands. Mentat needs nothing from a repository's GitHub settings; rulesets, required approvals and CI are the repository's own and Mentat works within them.
 
 ## What a machine needs
 
@@ -30,18 +30,18 @@ On a session's first change, Claude Code runs `mentat check`, which looks only a
 
 ## The reply style
 
-The plugin ships an output style, not forced: result first, about 100 words, no narration, and whatever needs me at the end, as numbered ❓ decisions with the recommendation marked 💡, and an action under a `Your action` heading. When I'm present and the likely answers fit a few fixed options, a decision comes as an interactive prompt (`AskUserQuestion`) instead. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file. This repository sets `"outputStyle": "mentat:Mentat"` in `.claude/settings.json`.
+The plugin ships an output style, not forced: result first, about 100 words, no narration, and whatever needs you at the end, as numbered ❓ decisions with the recommendation marked 💡, and an action under a `Your action` heading. When you are present and the likely answers fit a few fixed options, a decision comes as an interactive prompt (`AskUserQuestion`) instead. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file. This repository sets `"outputStyle": "mentat:Mentat"` in `.claude/settings.json`.
 
 ## Reviews
 
-- Codex GitHub app: the repository is connected to Codex in ChatGPT, the app is installed on it, and the app's automatic review is off (the repository's Review code setting and Personal preferences), so `mentat review` asks for each review with an `@codex review` comment. The GitHub account the agent uses (the one `gh` is signed in as) must be connected to my ChatGPT account (ChatGPT Settings → Connectors → GitHub → Connect another account); otherwise the app answers the comment with "To use Codex here, create a Codex account and connect to github" and no review runs. If the app does not answer within 20 minutes, `mentat review` gives up and Claude Code runs `mentat review --local`.
+- Codex GitHub app: the repository is connected to Codex in ChatGPT, the app is installed on it, and the app's automatic review is off (the repository's Review code setting and Personal preferences), so `mentat review` asks for each review with an `@codex review` comment. The GitHub account the agent uses (the one `gh` is signed in as) must be connected to your ChatGPT account (ChatGPT Settings → Connectors → GitHub → Connect another account); otherwise the app answers the comment with "To use Codex here, create a Codex account and connect to github" and no review runs. If the app does not answer within 20 minutes, `mentat review` gives up and Claude Code runs `mentat review --local`.
 - Without the app: a line in the repository's AGENTS.md says reviews are local, and Claude Code goes straight to `mentat review --local`.
-- Either way, Codex follows a `## Code Review Rules` section in AGENTS.md when there is one.
+- Either way, the reviewer follows a `## Code Review Rules` section in AGENTS.md when there is one.
 
 ## Optional skills
 
-- [`grilling`](https://skills.sh/mattpocock/skills/grilling) (Matt Pocock's) interviews me about a plan until we agree on it.
-- [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) (Jeffallan's) challenges a plan or claim and ends with a stronger version.
+- [`grilling`](https://skills.sh/mattpocock/skills/grilling) interviews you about a plan until you agree on it.
+- [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) challenges a plan or claim and ends with a stronger version.
 
 Mentat offers each when it is installed.
 
