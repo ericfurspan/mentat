@@ -105,6 +105,10 @@ reset; summary 1111111 Completed 2026-01-01T00:11:00Z someone >"$STUB/summary_af
 check "a summary from someone else does not count" '[ "$rc" = 1 ]'
 reset; printf '[%s]\n' "$(reaction "$APP" eyes 2026-01-01T00:04:00Z)" >"$STUB/reactions.json"; rc=$(run)
 check "refuses while the app is still reviewing" '[ "$rc" = 1 ] && grep -q "still reviewing" "$STUB/out" && ! grep -q -- "-X POST" "$STUB/calls"'
+reset; echo '[{"user":{"login":"someone"},"body":"@codex review","reactions":{"eyes":1}}]' >"$STUB/issue_comments.json"; rc=$(run)
+check "refuses while the app's 👀 is on an earlier @codex review comment" '[ "$rc" = 1 ] && grep -q "still reviewing" "$STUB/out" && ! grep -q -- "-X POST" "$STUB/calls"'
+reset; echo '[{"user":{"login":"someone"},"body":"@codex review","reactions":{"eyes":0}},{"user":{"login":"someone"},"body":"thanks","reactions":{"eyes":2}}]' >"$STUB/issue_comments.json"; rc=$(run)
+check "a 👀 on a comment that is not a trigger, or none on a trigger, does not block" '! grep -q "still reviewing" "$STUB/out" && grep -q -- "-X POST" "$STUB/calls"'
 reset; done_on 1111111; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"
 printf '[{"user":{"login":"%s"},"commit_id":"%s","path":"README.md","line":12,"html_url":"https://example.test/c1"}]\n' "$APP" "$H" >"$STUB/comments.json"; rc=$(run)
 check "a review of the head reports findings (exit 2)" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/review" "$STUB/out" && grep -q "README.md:12 https://example.test/c1" "$STUB/out"'

@@ -157,9 +157,14 @@ code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<
     grep -E '^\|[^|]*Code Review[^|]*\|' | head -n 1 |
     sed -nE 's/^\|[^|]*\|[^|]*\*\*([A-Za-z ]+)\*\*[^|]*datetime="([0-9T:-]+)(\.[0-9]+)?Z"[^|]*\|[[:space:]]*`([0-9a-f]{7,40})`[[:space:]]*\|.*/\1 \2Z \4/p'
 }
-app_reviewing() { # $1 repo, $2 pr: prints how many 👀 the app has on the pull request
-  gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" \
-    '[.[][] | select(.user.login == $a and .content == "eyes")] | length'
+app_reviewing() { # $1 repo, $2 pr: prints how many 👀 the app has on the pull request or on its "@codex review" comments
+  local pr_eyes comment_eyes
+  pr_eyes=$(gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" \
+    '[.[][] | select(.user.login == $a and .content == "eyes")] | length') || return 1
+  # The comment summary has no user filter: any 👀 there counts, which fails closed.
+  comment_eyes=$(gh api --paginate "repos/$1/issues/$2/comments" | jq -rs \
+    '[.[][] | select(.body | startswith("@codex review")) | .reactions.eyes // 0] | add // 0') || return 1
+  echo $((pr_eyes + comment_eyes))
 }
 review() {
   local pr="${1:-}" repo head asked="" secs=0 found n
