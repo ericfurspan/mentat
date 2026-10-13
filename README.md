@@ -32,4 +32,4 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed as issues.
 - `/mentat:codex-review-off`: turns the reviewer off for the session. One Claude code review replaces the review loop, and plans are not challenged.
 
-Third-party credits and licenses are in each skill's `CREDITS.md`.
+Third-party credits and licenses are in the `CREDITS.md` files under `skills/`.
