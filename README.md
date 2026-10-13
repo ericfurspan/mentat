@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/mentat-mark-dark.svg">
-    <img src="docs/images/mentat-mark.svg" alt="Mentat" width="44" height="44">
+    <img src="docs/images/mentat-mark.svg" alt="Mentat" width="80" height="80">
   </picture>
 </p>
 
