@@ -18,10 +18,10 @@ fi
 
 # The plugin's output style is named Mentat and is the owner's to choose, not
 # forced; this repository turns the plugin on and chooses it.
-if grep -qx 'name: Mentat' output-styles/mentat.md && ! grep -q '^force-for-plugin:' output-styles/mentat.md; then
-  pass "output-styles/mentat.md is the Mentat style, not forced"
+if grep -qx 'name: Mentat' prompts/output-style.md && ! grep -q '^force-for-plugin:' prompts/output-style.md; then
+  pass "prompts/output-style.md is the Mentat style, not forced"
 else
-  fail "output-styles/mentat.md must set name: Mentat and must not set force-for-plugin"
+  fail "prompts/output-style.md must set name: Mentat and must not set force-for-plugin"
 fi
 if command -v jq >/dev/null 2>&1; then
   if [ "$(jq -r '.enabledPlugins["mentat@mentat"]' .claude/settings.json)" = true ]; then
