@@ -7,7 +7,7 @@
 ```mermaid
 flowchart TD
     A["I ask"] --> B["Claude Code plans"]
-    B --> C["Claude Code builds and opens<br/>a draft pull request"]
+    B --> C["Claude Code builds and opens<br/>a pull request"]
     C --> D["Codex reviews"]
     D -- findings --> E["Claude Code fixes or answers"]
     E --> D
@@ -16,13 +16,13 @@ flowchart TD
 
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then writes down what it will build, what it will leave alone and how the result will be checked. An uncertain or consequential plan gets a Codex challenge first ([`skills/plan`](../skills/plan/SKILL.md)). When a request leaves decisions open that only I can make, it offers `/grilling`; when a plan deserves a skeptic, `/the-fool`.
 2. One builder, one branch, one checkout per change. The builder is a subagent, so its edits stay out of my chat: the main session plans, briefs and reports. Claude Code never edits files in the main session. The repository's test command runs before the pull request opens and after every fix; a bug fix starts with a check that fails on the bug.
-3. Every pull request opens as a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
-4. `mentat review` waits for CI on the head, then marks the pull request ready, which starts the Codex app's review of that commit; or `mentat review --local` reviews it with local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again. A real defect is never left to a follow-up issue on its own; five rounds is a hard stop. When the loop ends ready, Claude Code posts a final check (its own check, not a review or an approval) and tells me the pull request is ready. If the loop is blocked, not reviewed, or reaches five rounds without being ready, it tells me why and stops ([`skills/review`](../skills/review/SKILL.md)).
+3. Every pull request opens as a normal pull request, not a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
+4. `mentat review` waits for CI on the head, then comments `@codex review` on the pull request, which starts the Codex app's review of that commit; or `mentat review --local` reviews it with local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again. A real defect is never left to a follow-up issue on its own; five rounds is a hard stop. When the loop ends ready, Claude Code posts a final check (its own check, not a review or an approval) and tells me the pull request is ready. If the loop is blocked, not reviewed, or reaches five rounds without being ready, it tells me why and stops ([`skills/review`](../skills/review/SKILL.md)).
 5. I merge, the way the repository merges.
 
-If I say to hold a change ("hold", "still trying it"), Claude Code still pushes and keeps the description current, but the pull request stays a draft and no review runs until I say it goes to main. A draft is not reviewed: the Codex app has reviewed one here only after it was marked ready or someone commented `@codex review`, and `mentat review` is what marks it ready.
+If I say to hold a change ("hold", "still trying it"), Claude Code still pushes and keeps the description current, but no review runs until I say it goes to main, and the description says at its top that the change is on hold.
 
-With Codex off for a session (`/mentat:codex-review-off`), one Claude `code-review` at medium effort replaces the Codex loop, at most two rounds, with no plan challenges. Claude Code still runs the tests, waits for CI with `mentat ci`, and posts the final check marked reviewed by Claude, not Codex; if `code-review` cannot run, the final check says "Not reviewed" and why. The Codex app, if its automatic review is on, may still review when the pull request is marked ready; that is the app's setting.
+With Codex off for a session (`/mentat:codex-review-off`), one Claude `code-review` at medium effort replaces the Codex loop, at most two rounds, with no plan challenges. Claude Code still runs the tests, waits for CI with `mentat ci`, and posts the final check marked reviewed by Claude, not Codex; if `code-review` cannot run, the final check says "Not reviewed" and why. The Codex app, if its automatic review is on, may still review when the pull request opens; that is the app's setting.
 
 ## The repository comes first
 
@@ -40,7 +40,7 @@ Where a repository's AGENTS.md differs from `rules.md` on a preference (commit a
 
 | Command | What it does | Exit codes |
 |---|---|---|
-| `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), then marks the pull request ready, which starts the Codex app's review of that head, and waits up to 20 minutes for the result. A pull request already marked ready goes back to draft for a moment, then ready again, to start the review. With no result in time, Claude Code falls back to `--local` | 0 no findings, 2 findings posted (links printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
+| `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), then comments `@codex review` on the pull request, which starts the Codex app's review of that head, and waits up to 20 minutes for the result. Each round posts a new comment. With no result in time, Claude Code falls back to `--local` | 0 no findings, 2 findings posted (links printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
 | `mentat review --local <PR>` | Waits for CI the same way, then reviews the pull request's head with local Codex in a temporary checkout, and posts the result on the pull request if the head has not moved | same |
 | `mentat ci <PR>` | Waits for CI on the pull request's head the same way, and reviews nothing. Used when Codex is off | 0 CI passed or there is none, 1 could not read, 3 head moved, 4 CI did not pass |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |

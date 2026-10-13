@@ -3,9 +3,9 @@
 ## How a change moves
 
 1. I ask, in chat or as an issue. Claude Code reads the code and writes down what it will build, what it will leave alone and how the result will be checked. When the approach is uncertain, it writes a plan and has Codex challenge it first.
-2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a draft pull request with evidence and the merge risk.
+2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a pull request with evidence and the merge risk.
 3. `mentat review` waits for CI, then Codex reviews that exact commit, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again until the loop is clean. Five rounds is a hard stop.
-4. Claude Code posts a final check and tells me the pull request is ready. If I said to hold the change, it stays a draft and nothing reviews it until I say it goes to main.
+4. Claude Code posts a final check and tells me the pull request is ready. If I said to hold the change, its description says so at the top and nothing reviews it until I say it goes to main.
 5. I merge. A hook asks me before any command that would merge or turn on auto-merge.
 
 The full flow, what holds and how, the `mentat` commands and what Mentat does not do: [docs/how-it-works.md](docs/how-it-works.md). What my machine and repositories need, and the plugin commands I run: [docs/setup.md](docs/setup.md).
@@ -18,7 +18,7 @@ The full flow, what holds and how, the `mentat` commands and what Mentat does no
 | `skills/` | One skill per workflow step (`plan`, `pr`, `review`), called from `rules.md`, and three I start by hand (below). |
 | `agents/builder.md` | The builder subagent: one change on the current branch, then the test command, then a report. |
 | `output-styles/mentat.md` | The reply style: result first, about 100 words, decisions as prompts when the answers fit a few options, otherwise ❓/💡 pairs at the end. |
-| `hooks/` | The SessionStart hook that loads the rules, and the PreToolUse hook that asks before a merge. |
+| `hooks/` | The SessionStart hook that loads the rules, and the PreToolUse hooks that ask before a merge and before a push to the default branch. |
 | `bin/mentat` | `mentat review`, `review --local`, `ci`, `challenge` and `check`, available to Claude Code's Bash tool. |
 | `tests/run` | The one test command. It runs locally on macOS; there is no CI. |
 | `docs/` | How it works, and setup. |
