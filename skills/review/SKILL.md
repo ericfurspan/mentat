@@ -3,7 +3,7 @@ name: review
 description: "Review loop for a pull request: running mentat review, acting on its result, and the final check. Use when a pull request is built, its tests pass and it is pushed, and after every push of review fixes."
 ---
 
-Codex reviews each head commit of the pull request. Claude Code sorts the findings, fixes and pushes, and reviews again until the loop ends. Then it posts the final check, and the maintainer merges.
+Codex reviews each head commit of the pull request, and Grok, where installed, the first. Claude Code sorts the findings, fixes and pushes, and reviews again until the loop ends. Then it posts the final check, and the maintainer merges.
 
 ## When the loop ends
 
@@ -23,11 +23,19 @@ Each round's result is on the pull request (the review and the replies to it). A
    - 1: not reviewed. After the app path, run `mentat review --local <N>`; after the local path, tell the maintainer.
    - 3: the head moved. Run the same command again.
    - 4: CI did not pass on that head, and nothing was reviewed. Failing checks: fix them, push, and run the same command again. CI still running at the timeout: tell the maintainer.
-3. Sort each finding as `rules.md` "Findings" says. The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
+3. Sort each finding as `rules.md` "Findings" says, Grok's with Codex's (see "Grok"). The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
 4. Batch the fixes into one brief for the `mentat:builder` subagent (a new dispatch, or continuing the earlier builder). When it reports, run the test command on a clean working tree (`git status --porcelain` prints nothing) on the commit being pushed, push, and update the description (Skill tool, `mentat:pr`). Then go to step 1 for the new head, unless the round limit says to stop. A result on an older head does not make the new head ready.
+
+## Grok
+
+When `grok` is installed (`mentat check` prints its version), the first head also gets `mentat review --grok <N>`, run in parallel with step 1's Codex review. It takes 8 to 19 minutes, so wait for both before sorting findings, pushing fixes or declaring ready. Grok is not a round: it does not count toward the five and is not run again on later heads. Its exit codes are the review's: 0 no findings, 2 findings posted on the pull request, 1 not reviewed (Codex carries on alone), 3 the head moved, 4 CI did not pass.
+
+- Look for a `Grok review started on` comment on the pull request before running it. If there is none and the run exits 3 or 4, run it again for the next head, as the loop does for Codex.
+- Once a start comment exists, never start Grok on that pull request again. After a compaction or a resumed session, decide from the pull request's comments: a start comment followed by `Local Grok review of <sha>` means Grok is done; a start comment with `Grok review did not finish on <sha>`, or with no result, means Grok did not finish, and Codex's loop goes on without it.
+- Grok's findings are sorted like Codex's: fix what is a real defect, answer the rest with a reason. A fix is pushed with the next Codex round's fixes, not reviewed by Grok again.
 
 ## Final check
 
-Once the loop ends ready, read the diff, the description and the linked issue from GitHub, not from memory, and correct any claim in the description that does not hold. Then post one comment on the pull request, six lines at most, that does not repeat the description's summary or scope: the commit checked and its test and CI results, the reviewer's one-sentence statement of the pull request's intent (from the request and the diff, if the last round had none) and whether it matches the description's, how each review finding was settled, what was not checked, and what most deserves the maintainer's eyes. The comment is the author's own check, not a review or an approval. Start it with `Final check on <sha>`, the commit checked.
+Once the loop ends ready, read the diff, the description and the linked issue from GitHub, not from memory, and correct any claim in the description that does not hold. Then post one comment on the pull request, six lines at most, that does not repeat the description's summary or scope: the commit checked and its test and CI results, the reviewer's one-sentence statement of the pull request's intent (from the request and the diff, if the last round had none) and whether it matches the description's, how each review finding was settled (Codex's and, where it ran, Grok's, or that Grok did not run), what was not checked, and what most deserves the maintainer's eyes. The comment is the author's own check, not a review or an approval. Start it with `Final check on <sha>`, the commit checked.
 
 If the pull request is still a draft (opened before Mentat stopped using drafts), run `gh pr ready <N>`; if that fails, report it and stop. If the pull request's author is not the repository owner, request the owner's review with `gh pr edit <N> --add-reviewer <owner>`. Then tell the maintainer in chat that the pull request is ready to merge, and stop. The maintainer merges.

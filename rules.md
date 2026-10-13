@@ -2,7 +2,7 @@
 
 *Read by agents. For people: `README.md` and `docs/`.*
 
-The maintainer owns this repository. Claude Code plans and builds. Codex reviews pull requests, through OpenAI's Codex GitHub app or locally. The maintainer decides what matters and merges.
+The maintainer owns this repository. Claude Code plans and builds. Codex reviews pull requests, through OpenAI's Codex GitHub app or locally; where Grok is installed, it also reviews the first head beside Codex. The maintainer decides what matters and merges.
 
 The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a workflow they name that commits to the default branch, such as a journal), the repository wins, and Claude Code says so once. That exception covers only what the repository names; it is never leave to push code changes to the default branch. "Approval" and "What agents never do" below always hold.
 
