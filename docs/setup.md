@@ -9,7 +9,7 @@ What my machine and a repository need for Mentat to run, and the plugin commands
 - macOS, Claude Code, `git`, `jq`, and `gh` signed in.
 - For reviews, one of: OpenAI's Codex GitHub app on the repository (a ChatGPT plan with Codex code review), or the Codex CLI signed in, for local reviews. `mentat challenge` also uses the CLI.
 - Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node). Anywhere else, local Codex cannot start inside the permissions profile and the run fails closed.
-- A separate GitHub account for the agent, where the repository requires approvals: GitHub does not let an account approve its own pull request.
+- A separate GitHub account for the agent, where the repository requires an approval: GitHub does not let an account approve its own pull request.
 
 ## Plugin commands
 
