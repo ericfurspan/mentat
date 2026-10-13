@@ -34,7 +34,7 @@ The plugin ships an output style, not forced: result first, about 100 words, no 
 
 ## Reviews
 
-- Codex GitHub app: the repository is connected to Codex in ChatGPT, the app is installed on it, and the app's automatic review is off (the repository's Review code setting and Personal preferences), so `mentat review` asks for each review with an `@codex review` comment. If the app does not answer within 20 minutes, `mentat review` gives up and Claude Code runs `mentat review --local`.
+- Codex GitHub app: the repository is connected to Codex in ChatGPT, the app is installed on it, and the app's automatic review is off (the repository's Review code setting and Personal preferences), so `mentat review` asks for each review with an `@codex review` comment. The GitHub account the agent uses (the one `gh` is signed in as) must be connected to my ChatGPT account (ChatGPT Settings → Connectors → GitHub → Connect another account); otherwise the app answers the comment with "To use Codex here, create a Codex account and connect to github" and no review runs. If the app does not answer within 20 minutes, `mentat review` gives up and Claude Code runs `mentat review --local`.
 - Without the app: a line in the repository's AGENTS.md says reviews are local, and Claude Code goes straight to `mentat review --local`.
 - Either way, Codex follows a `## Code Review Rules` section in AGENTS.md when there is one.
 
