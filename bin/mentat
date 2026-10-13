@@ -359,8 +359,17 @@ GROK_PROFILE="mentat-review"
 GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
+# Grok reviews a pull request once. Only this account's own start comment counts:
+# anyone who can comment could otherwise post the text and keep Grok from running.
+grok_not_started() { # $1 repo, $2 pull request, $3 this account's login
+  local n
+  n=$(gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg me "$3" \
+    '[.[][] | select(.user.login == $me and (.body | startswith("Grok review started on ")))] | length') ||
+    not_reviewed "could not read the comments on #$2"
+  [ "$n" = 0 ] || not_reviewed "Grok already reviewed #$2 (its start comment is on the pull request); it runs once per pull request"
+}
 review_grok() {
-  local pr="${1:-}" repo info head base title body top mb fetched now issues tool grok_bin me started_by_me
+  local pr="${1:-}" repo info head base title body top mb fetched now issues tool grok_bin me
   local run="" started=no real_grok home_real tmpdir denied d entries cache ghome roots
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok <pull request number>" 64 ;; esac
   for tool in git gh jq grok; do
@@ -375,13 +384,8 @@ review_grok() {
   if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
     not_reviewed "could not read the repository with gh"
   fi
-  # Grok reviews a pull request once. Only this account's own start comment counts:
-  # anyone who can comment could otherwise post the text and keep Grok from running.
   me=$(gh api user --jq .login) && [ -n "$me" ] || not_reviewed "could not read which GitHub account gh is signed in as"
-  started_by_me=$(gh api --paginate "repos/$repo/issues/$pr/comments" | jq -rs --arg me "$me" \
-    '[.[][] | select(.user.login == $me and (.body | startswith("Grok review started on ")))] | length') ||
-    not_reviewed "could not read the comments on #$pr"
-  [ "$started_by_me" = 0 ] || not_reviewed "Grok already reviewed #$pr (its start comment is on the pull request); it runs once per pull request"
+  grok_not_started "$repo" "$pr" "$me"
   wait_for_ci "$repo" "$head"
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
@@ -499,7 +503,10 @@ review_grok() {
   }
 
   # The start record comes after CI passed and the head matched, and is what keeps
-  # the review loop from starting a second Grok review on this pull request.
+  # the review loop from starting a second Grok review on this pull request. The
+  # check is repeated here because a start comment may have appeared during the CI
+  # wait (this narrows the window; it does not serialize two sessions).
+  grok_not_started "$repo" "$pr" "$me"
   gh pr comment "$pr" --body "Grok review started on $head" >/dev/null || not_reviewed "could not post the start comment on #$pr"
   started=yes
   # The environment is rebuilt for Grok alone: nothing else of the agent's reaches it.

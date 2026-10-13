@@ -71,7 +71,10 @@ case "$1 $2" in
     printf 'Issue %s#%s: %s\n\n%s' "$r" "$3" "$(head -1 "$f")" "$(tail -n +2 "$f")" ;;
   "api --paginate")
     case "$3" in
-      */check-runs) cat "$STUB/check_runs.json" ;;
+      */check-runs)
+        # spoof_during_ci: this account's start comment appears while CI is being waited on.
+        [ -f "$STUB/spoof_during_ci" ] && jq -n --arg b "Grok review started on $(cat "$STUB/head")" '[{user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"
+        cat "$STUB/check_runs.json" ;;
       */comments) [ -f "$STUB/comments_fail" ] && exit 1; cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]' ;;
       *) exit 99 ;;
     esac ;;
@@ -252,6 +255,8 @@ reset; start_comment someone-else >"$STUB/issue_comments.json"; rc=$(run)
 check "a start comment from another account does not stop the review" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ]'
 reset; start_comment agent-bot >"$STUB/issue_comments.json"; rc=$(run)
 check "the signed-in account own start comment stops it: not reviewed, no new comment, Grok does not run" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; touch "$STUB/spoof_during_ci"; rc=$(run)
+check "a start comment that appears during the CI wait stops the run: no comment posted, Grok does not run" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ -z "$(left_over)" ]'
 reset; touch "$STUB/user_fails"; rc=$(run)
 check "an account that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q "could not read which GitHub account" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; touch "$STUB/comments_fail"; rc=$(run)
