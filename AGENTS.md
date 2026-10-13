@@ -2,7 +2,7 @@
 
 *Read by agents. For people: `README.md` and `docs/`.*
 
-This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its output style (`output-styles/`), its skills (`skills/`, one per workflow step, named from `rules.md`), its builder subagent (`agents/`) and the `mentat` command (`bin/mentat`). Its committed `.claude/settings.json` turns the plugin on here, so sessions in this repository follow `rules.md`.
+This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its output style (`prompts/output-style.md`), its skills (`skills/`, one per workflow step, named from `rules.md`), its builder subagent (`prompts/builder.md`) and the `mentat` command (`bin/mentat`, which loads `lib/*.sh`: `shared.sh`, `codex.sh`, `grok.sh`, `check.sh`). Its committed `.claude/settings.json` turns the plugin on here, so sessions in this repository follow `rules.md`.
 
 - The one test command is `tests/run`. It takes about 80 seconds, so run it once with its output saved to a file and read the last line ("All checks passed" or "N check(s) failed"). It runs locally on macOS; this repository has no CI.
 - Every file here is Mentat's own. This repository's own choices, which Mentat inherits like any other: the maintainer merges every pull request (the agent account cannot approve its own pull requests), and `.claude/settings.json` chooses the Mentat output style.

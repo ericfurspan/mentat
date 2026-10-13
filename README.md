@@ -25,10 +25,10 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 | --- | --- |
 | `rules.md` | The workflow rules, loaded into every session by a SessionStart hook. |
 | `skills/` | One skill per workflow step (`plan`, `pr`, `review`), plus four commands you run by hand. |
-| `agents/builder.md` | The builder subagent: one change on the current branch, then the test command, then a report. |
-| `output-styles/mentat.md` | The reply style: result first, short, one decision at a time. |
+| `prompts/` | The builder subagent (`builder.md`: one change on the current branch, then the test command, then a report) and the reply style (`output-style.md`: result first, short, one decision at a time). `plugin.json` points at both. |
 | `hooks/` | The SessionStart hook, and hooks that ask before a merge and before a push to the default branch. |
-| `bin/mentat` | The `mentat` command: `review`, `review --local`, `review --grok`, `ci`, `challenge` and `check`. |
+| `bin/mentat` | The `mentat` command: `review`, `review --local`, `review --grok`, `ci`, `challenge` and `check`. It only parses the command and loads `lib/`. |
+| `lib/` | The command's code: `shared.sh` (CI wait, pull request and issue reading, review criteria), `codex.sh`, `grok.sh` and `check.sh`. |
 | `tests/run` | The test suite. It runs locally on macOS. |
 | `docs/` | How it works, setup, and the logo images. |
 
