@@ -1,36 +1,35 @@
 # Mentat
 
+Mentat is a Claude Code plugin for shipping AI-written code changes through a fixed workflow: Claude Code plans and builds each change on its own branch, a second AI model reviews every pull request, and you merge.
+
 ## How a change moves
 
-1. I ask, in chat or as an issue. Claude Code reads the code and writes down what it will build, what it will leave alone and how the result will be checked. When the approach is uncertain, it writes a plan and has Codex challenge it first.
-2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a pull request with evidence and the merge risk.
-3. `mentat review` waits for CI, then Codex reviews that exact commit, through OpenAI's Codex GitHub app or local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again until the loop is clean. Five rounds is a hard stop.
-4. Claude Code posts a final check and tells me the pull request is ready.
-5. I merge. A hook asks me before any command that would merge or turn on auto-merge.
+1. A change starts from a request in chat or a GitHub issue. Claude Code reads the code and records what it will build, what it will leave alone, and how the result will be checked. When the approach is uncertain, it writes a plan and has the reviewer challenge it first.
+2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a pull request with the evidence and the merge risk.
+3. `mentat review` waits for CI, then has the reviewer check that exact commit. The reviewer today is OpenAI's Codex, through its GitHub app or CLI. Claude Code fixes findings with a realistic trigger, answers the rest with a reason, and repeats until a round comes back clean, up to five rounds.
+4. Claude Code posts a final check on the pull request and reports that it is ready.
+5. You merge. A hook asks for confirmation before any merge or auto-merge command.
 
-The full flow, what holds and how, the `mentat` commands and what Mentat does not do: [docs/how-it-works.md](docs/how-it-works.md). What my machine and repositories need, and the plugin commands I run: [docs/setup.md](docs/setup.md).
+See [How it works](docs/how-it-works.md) for the full flow and the `mentat` commands, and [Setup](docs/setup.md) for requirements and installation.
 
-## What is in this repository
+## Repository layout
 
-| Path | What it is |
+| Path | Contents |
 | --- | --- |
-| `rules.md` | The workflow rules, put into every session by a SessionStart hook. |
-| `skills/` | One skill per workflow step (`plan`, `pr`, `review`), called from `rules.md`, and three I start by hand (below). |
+| `rules.md` | The workflow rules, loaded into every session by a SessionStart hook. |
+| `skills/` | One skill per workflow step (`plan`, `pr`, `review`), plus four commands you run by hand. |
 | `agents/builder.md` | The builder subagent: one change on the current branch, then the test command, then a report. |
-| `output-styles/mentat.md` | The reply style: result first, about 100 words, decisions as prompts when the answers fit a few options, otherwise ❓/💡 pairs at the end. |
-| `hooks/` | The SessionStart hook that loads the rules, and the PreToolUse hooks that ask before a merge and before a push to the default branch. |
-| `bin/mentat` | `mentat review`, `review --local`, `ci`, `challenge` and `check`, available to Claude Code's Bash tool. |
-| `tests/run` | The one test command. It runs locally on macOS; there is no CI. |
+| `output-styles/mentat.md` | The reply style: result first, short, one decision at a time. |
+| `hooks/` | The SessionStart hook, and hooks that ask before a merge and before a push to the default branch. |
+| `bin/mentat` | The `mentat` command: `review`, `review --local`, `ci`, `challenge` and `check`. |
+| `tests/run` | The test suite. It runs locally on macOS. |
 | `docs/` | How it works, and setup. |
 
-## What I start by hand
+## Commands
 
-- `/mentat:zoom-out`: the whole picture, once. The goal, what is done, what I raised that is still unanswered, what looks like over-engineering, and the next step. Changes nothing.
-- `/mentat:come-again`: the last message again, in at most three short lines.
-- `/mentat:retro`: what would have made the session go better, ranked by severity with evidence: changes to Mentat, AGENTS.md, checks and tooling. Changes nothing; I pick which become issues.
-- `/mentat:codex-review-off`: Codex off for the session. One Claude `code-review` per pull request replaces the Codex loop, with no plan challenges; the final check says so. Weaker than a cross-model review, which is why it is a switch and not the default. I turn Codex back on in chat.
-- `/grilling` (Matt Pocock's) and `/the-fool` (Jeffallan's) are other people's skills I keep installed; Mentat offers them when a request leaves decisions open or a plan deserves a skeptic.
+- `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
+- `/mentat:come-again`: restates the last reply in three short lines or fewer.
+- `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed as issues.
+- `/mentat:codex-review-off`: turns the reviewer off for the session. One Claude code review replaces the review loop, and plans are not challenged.
 
-## Credits
-
-The pull request body format comes from Matt Pocock's `pr` skill, the ❓/💡 decision format from his `grilling`, and retro from his `retro`. Zoom-out's reframing question comes from team-attention's `step-back` and the BMAD Method, and the one-sentence intent check in reviews from Jeffallan's [`code-reviewer`](https://jeffallan.github.io/claude-skills/skills/quality/code-reviewer/) skill. Each `CREDITS.md` under `skills/` has the details and licenses.
+Third-party credits and licenses are in each skill's `CREDITS.md`.
