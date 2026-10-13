@@ -40,7 +40,7 @@ codex_filesystem() {
   local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
   gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
   [ -z "$gitdir" ] || table="$table, \"$gitdir\"=\"read\""
-  printf '{%s, "/tmp"="deny", "/private/tmp"="deny", ":workspace_roots"={"."="read", %s}}' "$table" "$CREDENTIAL_DENY"
+  printf '{%s, "/tmp"="deny", "/private/tmp"="deny", "/var/tmp"="deny", "/private/var/tmp"="deny", ":workspace_roots"={"."="read", %s}}' "$table" "$CREDENTIAL_DENY"
 }
 # Files inside the checkout that commonly hold credentials, denied to Codex even
 # though the rest of the checkout is readable. Glob denies are pre-expanded to
@@ -68,10 +68,13 @@ run_codex() {
   # ~/.gitconfig, so git runs without one.
   # Codex's shell gets only core environment variables, so tokens in the agent's
   # environment do not reach it.
+  # features.apps=false: the apps feature (the ChatGPT account's GitHub connector) is
+  # on by default and --ignore-user-config does not turn it off, so Codex could read
+  # GitHub beyond the change.
   (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
-    -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
+    -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c "web_search=\"$search\"" -o "$out" - <"$prompt") >"$log" 2>&1 &
   pid=$!

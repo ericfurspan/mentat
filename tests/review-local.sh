@@ -17,7 +17,7 @@ live_probe() {
   control() { printf 'control|%s\n' "$1" >>"$res"; }
   # Controls first, outside the sandbox: each fixture exists and is readable here, the
   # write target is writable, the worktree is not under a path the profile denies.
-  case "$(pwd -P)" in /tmp/* | /private/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies"; return 0 ;; esac
+  case "$(pwd -P)" in /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies"; return 0 ;; esac
   # shellcheck disable=SC2086 # the fixture names have no spaces
   for f in README $LIVE_FIXTURES; do
     { [ -f "$f" ] && [ -r "$f" ]; } || { control "fixture $f is missing or unreadable in the review worktree"; return 0; }
@@ -59,6 +59,12 @@ live_probe() {
   done
   probe denied "reads a file outside the checkout" 'cat "$1" >/dev/null' "$LIVE_OUTSIDE"
   probe denied "reads a file under /tmp" 'cat "$1" >/dev/null' "$LIVE_TMPFILE"
+  probe denied "reads a file under /var/tmp" 'cat "$1" >/dev/null' "$LIVE_VARTMPFILE"
+  probe denied "writes a new file under /var/tmp" 'echo x >"$1"' "$LIVE_VARTMPFILE.probe"
+  if [ -e "$LIVE_VARTMPFILE.probe" ]; then
+    rm -f "$LIVE_VARTMPFILE.probe"
+    printf 'probe|denied|allowed|the /var/tmp write left a file behind|%s.probe exists afterward\n' "$LIVE_VARTMPFILE" >>"$res"
+  fi
   probe denied "writes a new file into the worktree" 'echo x >live-write-probe'
   if [ -e live-write-probe ]; then
     rm -f live-write-probe
@@ -71,8 +77,8 @@ live_probe() {
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
 root=$(mktemp -d)
-listener="" live_tmp=""
-cleanup() { [ -z "$listener" ] || kill "$listener" 2>/dev/null; rm -rf "$root" "$live_tmp"; }
+listener="" live_tmp="" live_vartmp=""
+cleanup() { [ -z "$listener" ] || kill "$listener" 2>/dev/null; rm -rf "$root" "$live_tmp" "$live_vartmp" "$live_vartmp.probe"; }
 trap cleanup EXIT
 export STUB="$root/stub"
 mkdir -p "$STUB" "$root/bin"
@@ -169,6 +175,7 @@ reset; rc=$(cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1; ech
 gitdir=$(git -C "$root/work" rev-parse --path-format=absolute --git-common-dir)
 check "limits Codex's shell to core environment variables and no user git config" '[ "$rc" = 0 ] && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args" && grep -qx "shell_environment_policy.set={GIT_CONFIG_GLOBAL=\"/dev/null\"}" "$STUB/args"'
 check "the profile reads the main checkout's git directory, which a worktree's .git points to" '[ "$rc" = 0 ] && case "$gitdir" in */work/.git) true ;; *) false ;; esac && grep -qF "\"$gitdir\"=\"read\"" "$STUB/args" && ! grep -q -- "--sandbox" "$STUB/args"'
+check "denies /var/tmp and turns the apps feature off for reviews too" 'grep -qF "\"/var/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/var/tmp\"=\"deny\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args"'
 check "denies credential files inside the checkout for reviews too" 'grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
 check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ]'
 
@@ -213,7 +220,7 @@ live_run() {
   [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
   # Controls that need no worktree.
   case "$(cd -P "$root" && pwd -P)" in
-    /tmp/* | /private/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
+    /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
   esac
   outside="$(cd -P "$(dirname "$mentat")/.." && pwd -P)/tests/run"
   case "$outside" in
@@ -223,6 +230,10 @@ live_run() {
   live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /tmp"; return 0; }
   echo fake >"$live_tmp" || { live_fail "could not write $live_tmp"; return 0; }
   [ -r "$live_tmp" ] || { live_fail "$live_tmp is not readable"; return 0; }
+  live_vartmp=$(mktemp /var/tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /var/tmp"; return 0; }
+  echo fake >"$live_vartmp" || { live_fail "could not write $live_vartmp"; return 0; }
+  [ -r "$live_vartmp" ] || { live_fail "$live_vartmp is not readable"; return 0; }
+  { : >"$live_vartmp.probe" && rm -f "$live_vartmp.probe"; } 2>/dev/null || { live_fail "could not write a new file next to $live_vartmp"; return 0; }
   command -v perl >/dev/null 2>&1 || { live_fail "perl is not installed, so there is no local listener"; return 0; }
   perl -MIO::Socket::INET -e '$| = 1; my $s = IO::Socket::INET->new(Listen => 5, LocalAddr => "127.0.0.1", LocalPort => 0, ReuseAddr => 1) or exit 1; print $s->sockport, "\n"; while (my $c = $s->accept) { close $c }' >"$root/port" 2>/dev/null &
   listener=$!
@@ -252,7 +263,7 @@ nested/.netrc
     while IFS= read -r f; do mkdir -p "$(dirname "$f")" && echo fake >"$f"; done <<<"$LIVE_FIXTURES" &&
     git add -A && git commit -qm fixtures && git push -q "$root/origin.git" HEAD:refs/pull/9/head) || { live_fail "could not build the pull request head"; return 0; }
   self=$(cd "$(dirname "$0")" && pwd) || { live_fail "could not find this script's directory"; return 0; }
-  export LIVE_FIXTURES LIVE_CODEX="$real_codex" LIVE_PORT="$port" LIVE_TMPFILE="$live_tmp" LIVE_OUTSIDE="$outside" LIVE_BASE="$BASE" LIVE_SELF="$self/${0##*/}"
+  export LIVE_FIXTURES LIVE_CODEX="$real_codex" LIVE_PORT="$port" LIVE_TMPFILE="$live_tmp" LIVE_VARTMPFILE="$live_vartmp" LIVE_OUTSIDE="$outside" LIVE_BASE="$BASE" LIVE_SELF="$self/${0##*/}"
   LIVE_HEAD=$(git -C "$root/seed" rev-parse HEAD) && export LIVE_HEAD
 
   reset; echo "$LIVE_HEAD" >"$STUB/head"; : >"$STUB/live"
