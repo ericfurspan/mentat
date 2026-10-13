@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 The maintainer wants to know what would have made the session go better. This runs once: do it, then normal work resumes. Default to the current session. If the maintainer typed text after the command, focus the retro on that, or on the session it names.
 
-1. Finish the step in flight first. Never interrupt a running builder, review or test run. Then change nothing during the retro: no edits, no commits, no GitHub writes. Reading is fine.
+1. Finish the step in flight first. Never interrupt a running builder, review or test run. Then change nothing (no edits, no commits, no GitHub writes) until the maintainer has answered the last candidate. Reading is fine.
 2. Read the primary sources: what happened in the session (the maintainer's messages, commands and their results, builder reports, review findings), `rules.md`, the output style, the skills and the builder agent, the repository's AGENTS.md files, and its test command and hooks. For another session, read its log on this machine.
 3. Look for candidates in these places. Each has a "use when"; skip a place that does not apply.
    - Mentat's own workflow: a rule, skill, output style or builder instruction that made the session slower or wrong. Use when the session went the wrong way and Mentat told it to.
@@ -21,4 +21,4 @@ The maintainer wants to know what would have made the session go better. This ru
    - The recommendation: what to change, and where it would go (the file, the check or the hook).
    - Its evidence from the session in one short line: a short quote, a command and its result, or a link. Quotes never include credentials or tokens.
    Leave out a candidate with no evidence. If nothing is worth changing, say so.
-5. Each candidate gets its own file-or-skip prompt. Collect the answers, then file the agreed ones as issues at the end. Nothing is filed without the maintainer's agreement.
+5. Each candidate gets its own file-or-skip prompt. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones as issues. Nothing is filed without the maintainer's agreement.
