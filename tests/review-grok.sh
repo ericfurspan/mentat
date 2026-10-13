@@ -72,8 +72,10 @@ case "$1 $2" in
   "api --paginate")
     case "$3" in
       */check-runs) cat "$STUB/check_runs.json" ;;
+      */comments) [ -f "$STUB/comments_fail" ] && exit 1; cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]' ;;
       *) exit 99 ;;
     esac ;;
+  "api user") [ -f "$STUB/user_fails" ] && exit 1; echo agent-bot ;;
   "pr comment")
     [ -f "$STUB/comment_fails" ] && exit 1
     n=$(($(cat "$STUB/comment_count" 2>/dev/null || echo 0) + 1))
@@ -243,6 +245,17 @@ check "a cache folder inside a temporary folder is refused before any start reco
 reset; mkdir "$root/nogrok"; for t in gh git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done
 rc=$(cd "$root/work tree" && PATH="$root/nogrok:/usr/bin:/bin" "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
 check "a missing grok is not reviewed" '[ "$rc" = 1 ] && grep -q "grok is not installed" "$STUB/out"'
+
+# Grok runs once per pull request, and only this account's own start comment counts.
+start_comment() { jq -n --arg u "$1" --arg b "Grok review started on $H" '[{user: {login: $u}, body: $b}]'; }
+reset; start_comment someone-else >"$STUB/issue_comments.json"; rc=$(run)
+check "a start comment from another account does not stop the review" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ]'
+reset; start_comment agent-bot >"$STUB/issue_comments.json"; rc=$(run)
+check "the signed-in account own start comment stops it: not reviewed, no new comment, Grok does not run" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; touch "$STUB/user_fails"; rc=$(run)
+check "an account that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q "could not read which GitHub account" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; touch "$STUB/comments_fail"; rc=$(run)
+check "comments that cannot be read are not reviewed" '[ "$rc" = 1 ] && grep -q "could not read the comments" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 
 for args in "--grok" "--grok abc" "--grok 7 8" "--grok --local 7" "--grok --local" "--local --grok 7" "--grok 7 --local"; do
   # shellcheck disable=SC2086 # the words are the arguments
