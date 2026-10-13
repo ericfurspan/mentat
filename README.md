@@ -1,4 +1,11 @@
-# Mentat
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mentat-mark-dark.svg">
+    <img src="docs/images/mentat-mark.svg" alt="Mentat" width="44" height="44">
+  </picture>
+</p>
+
+<h1 align="center">Mentat</h1>
 
 Mentat is a Claude Code plugin for shipping AI-written code changes through a fixed workflow: Claude Code plans and builds each change on its own branch, a second AI model reviews every pull request, and you merge.
 
@@ -23,7 +30,7 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 | `hooks/` | The SessionStart hook, and hooks that ask before a merge and before a push to the default branch. |
 | `bin/mentat` | The `mentat` command: `review`, `review --local`, `ci`, `challenge` and `check`. |
 | `tests/run` | The test suite. It runs locally on macOS. |
-| `docs/` | How it works, and setup. |
+| `docs/` | How it works, setup, and the logo images. |
 
 ## Commands
 
