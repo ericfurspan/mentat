@@ -36,7 +36,13 @@ cat >"$root/bin/codex" <<'STUBEOF'
 [ "$1" = --version ] && [ ! -f "$STUB/no_version" ] && echo "codex-cli 9.9.9"
 exit 0
 STUBEOF
-chmod +x "$root/bin/gh" "$root/bin/codex"
+# grok: prints a version unless $STUB/no_grok_version exists.
+cat >"$root/bin/grok" <<'STUBEOF'
+#!/usr/bin/env bash
+[ "$1" = --version ] && [ ! -f "$STUB/no_grok_version" ] && echo "grok 9.9.9 (stub) [stable]"
+exit 0
+STUBEOF
+chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok"
 export PATH="$root/bin:$PATH"
 
 reset() { rm -f "$STUB"/*; }
@@ -51,6 +57,14 @@ check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out
 check "prints the installed codex version" 'grep -qx "OK: codex is installed (codex-cli 9.9.9)" "$STUB/out"'
 reset; touch "$STUB/no_version"; rc=$(run)
 check "a codex with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: codex is installed (version unknown)" "$STUB/out"'
+
+check "prints the installed grok version" 'grep -qx "OK: grok is installed (grok 9.9.9 (stub) \[stable\])" "$STUB/out"'
+reset; touch "$STUB/no_grok_version"; rc=$(run)
+check "a grok with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: grok is installed (version unknown)" "$STUB/out"'
+# Grok is optional: without it, nothing is printed about it and there is no warning.
+mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/nogrok/"
+reset; rc=$(cd "$root/cwd" && PATH="$root/nogrok:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "a missing grok prints nothing and warns of nothing" '[ "$rc" = 0 ] && ! grep -qi grok "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'

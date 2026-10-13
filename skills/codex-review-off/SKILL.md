@@ -10,7 +10,7 @@ When started, say in one line that Codex is off for this session. If a `mentat r
 
 ## Pull requests
 
-1. Do not call `mentat:review` or run `mentat review` or `mentat review --local`.
+1. Do not call `mentat:review` or run `mentat review`, `mentat review --local` or `mentat review --grok`.
 2. Once the test command passes on the head, push and update the description (Skill tool, `mentat:pr`). Its Evidence says the maintainer turned Codex off for this session and the Claude review is still to come; do not claim a review yet. Step 4 updates it.
 3. Run `mentat ci <N>`, which waits for CI on the head (up to 30 minutes; with no CI, about a minute) and reviews nothing itself. 0: go on. 3: the head moved; run it again. 4: failing checks: fix them, run the test command, push, and run it again; CI still running at the timeout: tell the maintainer. 1: tell the maintainer.
 4. Review with Claude. Call the Skill tool with `code-review` and the args `medium <N>`. Always pass the level: a bare call reuses the last level typed. The level that runs can differ from the one passed, so take the level from the skill's own output. Never pass `--fix`, which would edit files in the main session, or `--comment`.

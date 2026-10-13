@@ -13,7 +13,7 @@ Mentat is a Claude Code plugin for shipping AI-written code changes through a fi
 
 1. A change starts from a request in chat or a GitHub issue. Claude Code reads the code and records what it will build, what it will leave alone, and how the result will be checked. When the approach is uncertain, it writes a plan and has the reviewer challenge it first.
 2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a pull request with the evidence and the merge risk.
-3. `mentat review` waits for CI, then has the reviewer check that exact commit. The reviewer today is OpenAI's Codex, through its GitHub app or CLI. Claude Code fixes findings with a realistic trigger, answers the rest with a reason, and repeats until a round comes back clean, up to five rounds.
+3. `mentat review` waits for CI, then has the reviewer check that exact commit. The reviewer today is OpenAI's Codex, through its GitHub app or CLI; where Grok is installed, it reviews the first head too. Claude Code fixes findings with a realistic trigger, answers the rest with a reason, and repeats until a round comes back clean, up to five rounds.
 4. Claude Code posts a final check on the pull request and reports that it is ready.
 5. You merge. A hook asks for confirmation before any merge or auto-merge command.
 
@@ -28,7 +28,7 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 | `agents/builder.md` | The builder subagent: one change on the current branch, then the test command, then a report. |
 | `output-styles/mentat.md` | The reply style: result first, short, one decision at a time. |
 | `hooks/` | The SessionStart hook, and hooks that ask before a merge and before a push to the default branch. |
-| `bin/mentat` | The `mentat` command: `review`, `review --local`, `ci`, `challenge` and `check`. |
+| `bin/mentat` | The `mentat` command: `review`, `review --local`, `review --grok`, `ci`, `challenge` and `check`. |
 | `tests/run` | The test suite. It runs locally on macOS. |
 | `docs/` | How it works, setup, and the logo images. |
 
