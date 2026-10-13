@@ -97,6 +97,7 @@ STUBEOF
 { printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/grok" <<'STUBEOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
 args=("$@")
+prev=""
 printf '%s\n' "$@" >"$STUB/args"
 env | sort >"$STUB/env"
 pwd -P >"$STUB/cwd"
@@ -120,6 +121,7 @@ if [ -f "$STUB/live" ]; then
   cp "$GROK_HOME/sessions/sandbox-events.jsonl" "$STUB/sandbox-events.jsonl" 2>/dev/null
   exit "$rc"
 fi
+for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
 [ -f "$STUB/hang" ] && exec sleep 30
 cat "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
@@ -158,13 +160,18 @@ check "runs in the export, with the prompt from a file and the JSON output" '[ "
 check "exports the head's files, with no .git, matching the commit" '[ ! -f "$STUB/has_git" ] && ! grep -q "\.git/" "$STUB/export_files" && [ "$(sed "s#^\./##" "$STUB/export_files" | sort)" = "$(git -C "$root/seed" ls-tree -r --name-only "$H" | sort)" ] && [ "$(cat "$STUB/export_copy/README")" = change ]'
 check "the export ignores export-ignore and export-subst, and nothing from the working tree" '[ -f "$STUB/export_copy/ignored.txt" ] && grep -qF "\$Format:%H\$" "$STUB/export_copy/subst.txt" && [ ! -e "$STUB/export_copy/untracked.txt" ] && [ "$(cat "$STUB/export_copy/a dir/a file.txt")" = spaced ] && [ -L "$STUB/export_copy/link" ]'
 check "Grok gets read-only tools and no shell, agents, plan, memory, web or leader" 'for f in "--tools" "read_file,grep,list_dir" "--disallowed-tools" "Agent,run_terminal_command,run_terminal_cmd" "--no-subagents" "--no-plan" "--no-leader" "--no-memory" "--no-auto-update" "--disable-web-search" "--permission-mode" "dontAsk" "--max-turns" "60"; do grep -qxF -- "$f" "$STUB/args" || { echo "missing $f"; false; break; }; done'
+EXPORT_RUN=$(cat "$STUB/cwd")
+check "no deny rule covers the export or the prompt, which the tools must read (a deny beats an allow)" 'for r in "$EXPORT_RUN" "$(dirname "$EXPORT_RUN")/in/prompt"; do while IFS= read -r a; do case "$a" in Read\(*\)|Grep\(*\)) p=${a#*(}; p=${p%)}; case "$p" in */\*\*) q=${p%/\*\*}; case "$r/" in "$q"/*) echo "$a covers $r"; false; break 2 ;; esac ;; *) [ "$p" != "$r" ] || { echo "$a covers $r"; false; break 2; } ;; esac ;; esac; done <"$STUB/args"; done'
+check "the folders above the export are denied as paths, so they cannot be listed" 'p=$EXPORT_RUN; while [ "$p" != / ]; do p=$(dirname "$p"); for t in Read Grep; do grep -qxF -- "$t($p)" "$STUB/args" || { echo "missing $t($p)"; false; break 2; }; done; done'
 check "never passes --trust, --yolo or an always-approve mode" '! grep -qxE -- "--trust|--yolo|--always-approve|--allow|--sandbox-off|bypassPermissions" "$STUB/args"'
 HOME_RUN=$(sed -n 's/^GROK_HOME=//p' "$STUB/env")
-check "denies MCP tools, and reading or searching both Grok homes, as a folder and as everything under it" 'grep -qxF -- "MCPTool" "$STUB/args" && for h in "$HOME_RUN" "$GH_REAL"; do for t in Read Grep; do for p in "$h" "$h/**"; do grep -qxF -- "$t($p)" "$STUB/args" || { echo "missing $t($p)"; false; break 3; }; done; done; done && [ "$(grep -cx -- "--deny" "$STUB/args")" = 9 ]'
+SYSTEM_ROOTS="/private /Library /etc /var /opt /Volumes /Applications /System /usr /bin /sbin /dev /tmp $(cd -P "$HOME" && pwd -P)/Library $(cd -P "$root/tmp" && pwd -P)"
+check "denies MCP tools, and reading or searching both Grok homes and the system folders, each as a folder and as everything under it" 'grep -qxF -- "MCPTool" "$STUB/args" && for h in "$HOME_RUN" "$GH_REAL" $SYSTEM_ROOTS; do for t in Read Grep; do for p in "$h" "$h/**"; do grep -qxF -- "$t($p)" "$STUB/args" || { echo "missing $t($p)"; false; break 3; }; done; done; done'
 check "runs under the Grok sandbox with the profile Mentat wrote" '[ "$(grep -x -A1 -- "--sandbox" "$STUB/args" | tail -n 1)" = mentat-review ] && grep -qx "\[profiles.mentat-review\]" "$STUB/sandbox.toml" && grep -qx "extends = \"strict\"" "$STUB/sandbox.toml"'
 check "the profile denies the temporary folders, ~/Library, both Grok homes and the credential files" 'for f in /tmp /private/tmp /var/tmp /private/var/tmp /var/folders /private/var/folders "$(cd -P "$HOME" && pwd -P)/Library" "$GH_REAL" "$(cd -P "$root/tmp" && pwd -P)"; do grep -qF "\"$f\"" "$STUB/sandbox.toml" || { echo "missing $f"; false; break; }; done && for g in "**/.env" "**/.env.*" "**/*.pem" "**/*.key" "**/*.p12" "**/*.pfx" "**/id_rsa*" "**/id_ecdsa*" "**/id_ed25519*" "**/.netrc" "**/.npmrc" "**/.pypirc"; do grep -qF "\"$g\"" "$STUB/sandbox.toml" || { echo "missing $g"; false; break; }; done'
 check "the profile lets Grok read the prompt folder, which holds only the prompt, and write only its vendor folder" 'grep -qE "^read_only = \[\".*/in\"\]\$" "$STUB/sandbox.toml" && [ "$(cat "$STUB/prompt_dir")" = prompt ] && grep -qxF "read_write = [\"$HOME_RUN/vendor\"]" "$STUB/sandbox.toml"'
-check "its home holds only the sign-in, the Mentat config, the profile and an empty vendor folder" '[ "$(tr "\n" " " <"$STUB/home_files")" = "auth.json config.toml sandbox.toml vendor " ] && [ ! -s "$STUB/vendor_files" ] && [ "$(cat "$STUB/auth_copy")" = "$(cat "$GH_USER/auth.json")" ] && [ "$(cat "$STUB/auth_mode")" = 600 ] && [ "$HOME_RUN" != "$GH_REAL" ] && grep -qx "codebase_indexing = false" "$STUB/config.toml"'
+check "its home holds only the sign-in, the Mentat config, the profile and an empty vendor folder" '[ "$(tr "\n" " " <"$STUB/home_files")" = "auth.json config.toml sandbox.toml sessions vendor " ] && [ ! -s "$STUB/vendor_files" ] && [ "$(cat "$STUB/auth_copy")" = "$(cat "$GH_USER/auth.json")" ] && [ "$(cat "$STUB/auth_mode")" = 600 ] && [ "$HOME_RUN" != "$GH_REAL" ] && grep -qx "codebase_indexing = false" "$STUB/config.toml"'
+check "Grok writes a debug file in its sessions folder, which is where a run that never finishes leaves its record" '[ "$(grep -x -A1 -- "--debug-file" "$STUB/args" | tail -n 1)" = "$HOME_RUN/sessions/debug.log" ]'
 check "its home has a name a pull request cannot guess, so a symlink such as ../home reaches nothing" '! grep -qx home "$STUB/run_entries" && grep -qx "$(basename "$HOME_RUN")" "$STUB/run_entries"'
 check "nothing from the user config, MCP credentials or hooks reaches its home" '! grep -rq "fake-per-model-key\|fake-mcp" "$STUB/config.toml" "$STUB/sandbox.toml" "$STUB/prompt" "$STUB/args" "$STUB/env"'
 check "Grok gets a rebuilt environment: no API key, no other variables, real HOME, compatibility off" '! grep -q "^XAI_API_KEY=" "$STUB/env" && ! grep -q "MENTAT_CANARY\|GROK_FOLDER_TRUST" "$STUB/env" && grep -qx "HOME=$HOME" "$STUB/env" && grep -q "^PATH=" "$STUB/env" && grep -q "^LANG=" "$STUB/env" && for v in GROK_MEMORY=0 GROK_TELEMETRY_ENABLED=0 GROK_TELEMETRY_TRACE_UPLOAD=0 GROK_EXTERNAL_OTEL=0 GROK_DISABLE_AUTOUPDATER=1 GROK_CLAUDE_AGENTS_ENABLED=false GROK_CLAUDE_HOOKS_ENABLED=false GROK_CLAUDE_MCPS_ENABLED=false GROK_CLAUDE_RULES_ENABLED=false GROK_CLAUDE_SKILLS_ENABLED=false GROK_CURSOR_AGENTS_ENABLED=false GROK_CURSOR_HOOKS_ENABLED=false GROK_CURSOR_MCPS_ENABLED=false GROK_CURSOR_RULES_ENABLED=false GROK_CURSOR_SKILLS_ENABLED=false; do grep -qx "$v" "$STUB/env" || { echo "missing $v"; false; break; }; done'
@@ -217,8 +224,11 @@ reset; { cat "$STUB/out_json"; cat "$STUB/out_json"; } >"$STUB/out_json.2"; mv "
 not_finished "two JSON objects" "complete review"
 reset; : >"$STUB/out_json"; rc=$(run)
 not_finished "no output" "complete review"
-reset; touch "$STUB/hang"; rc=$(cd "$root/work tree" && MENTAT_REVIEW_TIMEOUT_SECONDS=2 "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
-not_finished "a timeout" "did not finish within 2 seconds"
+reset; touch "$STUB/hang"; rc=$(cd "$root/work tree" && MENTAT_GROK_TIMEOUT_SECONDS=2 "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
+not_finished "a timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "did not finish within 2 seconds"
+check "a timeout still leaves the debug record in the private log" 'p=$(sed -n "s/.*can read it at //p" "$STUB/out"); [ -n "$p" ] && grep -q DEBUG-LOG-TEXT "$p" && ! grep -q DEBUG-LOG-TEXT "$STUB/out" "$STUB"/comment.*'
+reset; rc=$(cd "$root/work tree" && MENTAT_REVIEW_TIMEOUT_SECONDS=0 "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
+check "the Codex review timeout does not limit Grok" '[ "$rc" = 0 ]'
 reset; touch "$STUB/result_fails"; rc=$(run)
 not_finished "a failed post of the review" "could not post the review"
 

@@ -81,7 +81,7 @@ run_codex() {
     -c 'approval_policy="never"' -c "web_search=\"$search\"" -o "$out" - <"$prompt") >"$log" 2>&1 &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$secs" -ge "$REVIEW_TIMEOUT_SECONDS" ]; then
+    if [ "$secs" -ge "$GROK_TIMEOUT_SECONDS" ]; then
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
@@ -353,11 +353,14 @@ review_local() {
 # the user's Grok home but auth.json is copied: no config, MCP servers, hooks or
 # keys.
 GROK_PROFILE="mentat-review"
+# Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
+# arrives only at the end.
+GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
 review_grok() {
   local pr="${1:-}" repo info head base title body top mb fetched now issues tool grok_bin
-  local run="" started=no real_grok home_real tmpdir denied d entries cache ghome
+  local run="" started=no real_grok home_real tmpdir denied d entries cache ghome roots
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok <pull request number>" 64 ;; esac
   for tool in git gh jq grok; do
     command -v "$tool" >/dev/null 2>&1 || not_reviewed "$tool is not installed"
@@ -399,13 +402,18 @@ review_grok() {
   home_real=$(realdir "$HOME") || home_real=$HOME
   denied=(/tmp /private/tmp /var/tmp /private/var/tmp /var/folders /private/var/folders "$home_real/Library" "$real_grok")
   if [ -n "${TMPDIR:-}" ] && tmpdir=$(realdir "$TMPDIR"); then denied+=("$tmpdir"); fi
-  for d in "${denied[@]}"; do
+  # `strict` also lets Grok read the system folders. Its tools have no use for them,
+  # and they are denied to the tools below. A deny always beats an allow, so none of
+  # these may contain the run folder, which holds the export the tools must read.
+  roots=(/private /Library /etc /var /opt /Volumes /Applications /System /usr /bin /sbin /dev /tmp "$home_real/Library" "$real_grok")
+  if [ -n "${tmpdir:-}" ]; then roots+=("$tmpdir"); fi
+  for d in "${denied[@]}" "${roots[@]}"; do
     case "$run/" in "$d"/*) not_reviewed "$cache is inside $d, which the Grok review denies; set XDG_CACHE_HOME to a folder outside it" ;; esac
   done
   # Grok's home has a name the pull request cannot know: a symlink in the export
   # such as `../home` would otherwise reach the sign-in around the permission rules.
   ghome=$(mktemp -d "$run/home.XXXXXX") || not_reviewed "could not create Grok's home"
-  mkdir "$run/export" "$run/in" "$run/tmp" "$ghome/vendor" || not_reviewed "could not create the review folders"
+  mkdir "$run/export" "$run/in" "$run/tmp" "$ghome/vendor" "$ghome/sessions" || not_reviewed "could not create the review folders"
 
   # A plain export of the head: no .git, and nothing from the working tree.
   GIT_INDEX_FILE="$run/index" git -C "$top" -c core.sparseCheckout=false read-tree "$head" || not_reviewed "could not read the tree of $head"
@@ -444,15 +452,28 @@ review_grok() {
 
   # Reading this pull request's own files is the job. Grok's home holds the sign-in
   # and the kernel must let Grok read it, so its tools are kept out of it by
-  # permission rules: each home is denied as a path (a search of the folder itself)
-  # and as everything under it. The user's own Grok home is also denied by the
-  # kernel. Rules follow symlinks to their target.
+  # permission rules. Each rule names a folder as a path (a search or listing of the
+  # folder itself) and as everything under it, for both Grok homes and the system
+  # folders above. Rules follow symlinks to their target, and a deny beats an allow,
+  # so the export and the prompt are what the tools can still reach; the kernel
+  # profile keeps the rest of the user's folders out of reach. The debug file is the
+  # record of a run that never finishes (the JSON arrives only at the end): it goes
+  # in the sessions folder, which Grok may write and its tools may not read.
   local args=(--cwd "$run/export" --prompt-file "$run/in/prompt" --output-format json
     --tools "read_file,grep,list_dir" --disallowed-tools "Agent,run_terminal_command,run_terminal_cmd"
-    --deny MCPTool --deny "Read($ghome)" --deny "Read($ghome/**)" --deny "Grep($ghome)" --deny "Grep($ghome/**)"
-    --deny "Read($real_grok)" --deny "Read($real_grok/**)" --deny "Grep($real_grok)" --deny "Grep($real_grok/**)"
+    --deny MCPTool --debug-file "$ghome/sessions/debug.log"
     --no-subagents --no-plan --no-leader --no-memory --no-auto-update --disable-web-search
     --permission-mode dontAsk --max-turns 60 --sandbox "$GROK_PROFILE")
+  for d in "$ghome" "${roots[@]}"; do
+    args+=(--deny "Read($d)" --deny "Read($d/**)" --deny "Grep($d)" --deny "Grep($d/**)")
+  done
+  # The folders above the export are denied as paths only (a listing of the folder
+  # itself, which shows the folders below it), never as trees: the export is below them.
+  d="$run/export"
+  while [ "$d" != / ]; do
+    d=$(dirname "$d")
+    args+=(--deny "Read($d)" --deny "Grep($d)")
+  done
   local out="$run/out.json" err="$run/err.log" result_file="$run/review.md" pid secs=0 rc
 
   # After the start comment, any failure says so on the pull request. The log is
@@ -461,7 +482,7 @@ review_grok() {
   fail() {
     local kept=""
     if [ -e "$err" ]; then
-      if kept=$(mktemp "${TMPDIR:-/tmp}/mentat-grok-log.XXXXXX") && cat "$err" "$out" >"$kept" 2>/dev/null; then :; else kept=""; fi
+      if kept=$(mktemp "${TMPDIR:-/tmp}/mentat-grok-log.XXXXXX") && { cat "$err" "$out"; cat "$ghome/sessions/debug.log" 2>/dev/null; true; } >"$kept" 2>/dev/null; then :; else kept=""; fi
     fi
     if [ "$started" = yes ]; then
       gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
@@ -481,11 +502,11 @@ review_grok() {
     "$grok_bin" "${args[@]}") >"$out" 2>"$err" </dev/null &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$secs" -ge "$REVIEW_TIMEOUT_SECONDS" ]; then
+    if [ "$secs" -ge "$GROK_TIMEOUT_SECONDS" ]; then
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
-      fail "Grok did not finish within $REVIEW_TIMEOUT_SECONDS seconds"
+      fail "Grok did not finish within $GROK_TIMEOUT_SECONDS seconds"
     fi
     sleep 1
     secs=$((secs + 1))
