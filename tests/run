@@ -129,10 +129,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh"
+  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh"
   fi
 else
   fail "shellcheck not installed, shell scripts not checked"
