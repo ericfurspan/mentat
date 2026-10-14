@@ -7,7 +7,7 @@
 
 <h1 align="center">Mentat</h1>
 
-Mentat is a Claude Code plugin for a multi-agent coding workflow with the maintainer in the loop: a change is worked out in an interactive session, with Codex and Grok on call for independent second opinions, built and tested by a builder subagent on its own branch, reviewed in a loop by Codex and Grok, and merged by the maintainer.
+Mentat is a Claude Code plugin for a multi-agent coding workflow with the maintainer in the loop: a change is worked out in an interactive session, with Codex and Grok on call for independent second opinions, built and tested by a builder subagent on its own branch, reviewed by Codex and Grok, and merged by the maintainer.
 
 ## Install
 
@@ -21,7 +21,7 @@ This adds the marketplace and installs the plugin. [Setup](docs/setup.md) covers
 
 1. A change starts from a request in chat or a GitHub issue. Claude Code reads the code and gives the maintainer its view of the request; for a new feature or workflow idea, Codex and Grok also weigh it (`mentat weigh`) and their verdicts come beside its own. Once the maintainer agrees, it records what it will build, what it will leave alone, and how the result will be checked. When the approach is uncertain, it writes a plan and has the reviewer challenge it first.
 2. A builder subagent makes the change on a branch and runs the repository's test command. Claude Code opens a pull request with the evidence and the merge risk.
-3. `mentat review` waits for CI, then has the reviewer check that exact commit. The reviewer today is OpenAI's Codex, through its GitHub app or CLI; where Grok is installed, it reviews the first head too. Claude Code fixes findings with a realistic trigger, answers the rest with a reason, and repeats until a round comes back clean, up to five rounds. Local Codex reviews and `mentat weigh` run read-only in a detached git worktree; Grok runs sandboxed on a plain export with file tools only.
+3. `mentat review` waits for CI, then has the reviewer check that exact commit. The reviewer today is OpenAI's Codex, through its GitHub app or CLI; where Grok is installed, it reviews the first head too. Claude Code fixes findings with a realistic trigger, answers the rest with a reason, and repeats until a round comes back clean, up to five rounds. Local Codex runs, for reviews and for `mentat weigh`, are read-only in a detached git worktree; Grok, for both, runs sandboxed on a plain export with file tools only.
 4. Claude Code posts a final check on the pull request and reports that it is ready.
 5. The maintainer merges. A hook asks for confirmation before any merge or auto-merge command.
 
