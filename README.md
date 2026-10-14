@@ -38,7 +38,7 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 | `bin/mentat` | The `mentat` command: `review`, `review --local`, `review --grok`, `ci`, `challenge`, `weigh` and `check`. It only parses the command and loads `lib/`. |
 | `lib/` | The command's code: `shared.sh` (CI wait, pull request and issue reading, review criteria), `codex.sh`, `grok.sh`, `weigh.sh` (`mentat weigh`) and `check.sh`. |
 | `tests/run` | The test suite. It runs locally on macOS. |
-| `docs/` | How it works, setup, and the logo images. |
+| `docs/` | How it works, setup, the design decisions and their evidence (`design.md`), and the logo images. |
 
 ## Commands
 
