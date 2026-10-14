@@ -21,4 +21,4 @@ The maintainer wants to know what would have made the session go better. This ru
    - The recommendation: what to change, and where it would go (the file, the check or the hook).
    - Its evidence from the session in one short line: a short quote, a command and its result, or a link. Quotes never include credentials or tokens.
    Leave out a candidate with no evidence. If nothing is worth changing, say so.
-5. Each candidate gets its own file-or-skip prompt. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones as issues. Nothing is filed without the maintainer's agreement.
+5. Each candidate is asked file or skip in the message text, with the candidate above it and no tool call after it; the next candidate follows the answer. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones as issues. Nothing is filed without the maintainer's agreement.
