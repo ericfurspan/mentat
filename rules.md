@@ -4,7 +4,7 @@
 
 The maintainer owns this repository. Claude Code plans and builds. Codex reviews pull requests, through OpenAI's Codex GitHub app or locally; where Grok is installed, it also reviews the first head beside Codex. The maintainer decides what matters and merges.
 
-The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a workflow they name that commits to the default branch, such as a journal), the repository wins, and Claude Code says so once. That exception covers only what the repository names; it is never leave to push code changes to the default branch. "Approval" and "What agents never do" below always hold.
+The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a workflow they name that commits to the default branch, such as a journal), the repository wins, and Claude Code says so once. That exception covers only what the repository names; it never allows pushing code changes to the default branch. "Approval" and "What agents never do" below always hold.
 
 When a session first starts change work in a repository, Claude Code runs `mentat check`. A failure goes to the maintainer with its lines; warnings are shown to the maintainer, and work goes on.
 
@@ -40,11 +40,4 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - Push code changes to the default branch, force-push a shared branch, or change repository settings. Mentat's push hook asks the maintainer before a push to the default branch.
 - Bring production credentials into an agent session.
 
-## Records
-- Issues are the backlog. Where the repository uses them, the pinned issue holds the maintainer's order of agreed work, next first; Claude Code drops closed issues from it whenever it updates it. Each issue gets one label for what it is, from the repository's own (on GitHub's defaults: `bug`, `enhancement`, `documentation`, `question`).
-- Where the repository has stage labels, each open issue also carries one: `idea` (not agreed; see step 2), `ready` (the maintainer agreed to build it), `in progress` (a branch or pull request exists) or `waiting` (waiting on the maintainer). Claude Code moves issues between stages as the work moves, and to `ready` when the maintainer agrees. Claude Code's own suggestions and parked items are `idea` too. Once an issue closes, its close reason (completed, not planned or duplicate) says how it ended, and any stage label left on it no longer counts. Pull requests get no stage label.
-- Pull request titles follow Conventional Commits unless the repository says otherwise.
-- On GitHub (issues, pull requests, comments, commits) work is referred to as `#N` inside a repository and `owner/repo#N` across repositories; in chat a pull request or issue is a link.
-- Records on GitHub (issues, pull requests, comments, commits) give what the maintainer asked in Claude Code's own words, labeled as Claude Code's summary, never as a quote of the chat. An answer given through a prompt is recorded as the question and the chosen option, in Claude Code's wording.
-- They hold only what the work needs: no other private repositories or projects by name (`owner/repo#N` is for public ones), and none of the maintainer's own account, billing or subscription details, local paths, session links or personal context (reasons, plans, mood). Where the work depends on one, they say it in general terms, such as "another private repository".
-- Plain words and common industry terms. Where the repository has a `GLOSSARY.md`, its terms.
+Records (labels, titles, what records hold): loaded with this file as rules-records.md.

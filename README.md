@@ -31,7 +31,7 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 
 | Path | Contents |
 | --- | --- |
-| `rules.md` | The workflow rules, loaded into every session by a SessionStart hook. |
+| `rules.md`, `rules-records.md` | The workflow rules in two files, both loaded into every session by SessionStart hooks. |
 | `skills/` | One skill per workflow step (`plan`, `pr`, `review`), plus four commands the maintainer runs by hand. |
 | `prompts/` | The builder subagent (`builder.md`: one change on the current branch, then the test command, then a report) and the reply style (`output-style.md`: result first, short, one decision at a time). `plugin.json` points at both. |
 | `hooks/` | The SessionStart hook, and hooks that ask before a merge and before a push to the default branch. |
