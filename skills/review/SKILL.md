@@ -20,7 +20,7 @@ Each round's result is on the pull request (the review and the replies to it). A
 2. Act on the exit code:
    - 0: no findings. Go to "When the loop ends".
    - 2: findings were posted on that commit. Go to step 3.
-   - 1: not reviewed. After the app path, run `mentat review --local <N>`; after the local path, tell the maintainer. If the local reviewer ended `REVIEW RESULT: INCOMPLETE - ...`, its reason is in the posted reply: give the maintainer the reason with the reply, as a limitation, not a finding.
+   - 1: not reviewed. After the app path, run `mentat review --local <N>`; after the local path, tell the maintainer. If the local reviewer ended `REVIEW RESULT: INCOMPLETE - ...`, its reason is in the posted reply: give the maintainer the reason with the reply, as a limitation, not a finding. Any findings in that reply are still sorted as step 3 says (fixed or answered with a reason) before you tell the maintainer.
    - 3: the head moved. Run the same command again.
    - 4: CI did not pass on that head, and nothing was reviewed. Failing checks: fix them, push, and run the same command again. CI still running at the timeout: tell the maintainer.
 3. Sort each finding as `rules.md` "Findings" says, Grok's with Codex's (see "Grok"). The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
