@@ -18,6 +18,10 @@
 # function named in `fail`: not_reviewed before a review's start comment, grok_fail
 # after it. The pull-request steps (reading it, the start comment, the diff prompt,
 # the did-not-finish comment and posting) stay in review_grok's own functions.
+# Convention: these functions set the caller's variables by name and never return
+# values; that keeps the pull-request path and the weigh path on one set of steps
+# without passing a dozen arguments. A reader tracing a variable should start from
+# review_grok and weigh_grok, which declare them.
 GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
