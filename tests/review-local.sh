@@ -185,6 +185,21 @@ check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted finding
 reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
 check "a reply without a result line is not reviewed and not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'
 
+# A reply that could not read a material file or the diff ends INCOMPLETE: it is posted,
+# so the reason is on the pull request, and it is not reviewed.
+reset; printf 'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read\n' >"$STUB/reply"; rc=$(run)
+check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with the reason" '[ "$rc" = 1 ] && posted && grep -q "^## Local Codex review of $H" "$STUB/comment" && grep -qx "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" "$STUB/comment" && grep -q "not reviewed: Codex says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing" "$STUB/out"'
+for bare in 'REVIEW RESULT: INCOMPLETE' 'REVIEW RESULT: INCOMPLETE -' 'REVIEW RESULT: INCOMPLETE -   '; do
+  reset; printf 'Could not finish.\n\n%s\n' "$bare" >"$STUB/reply"; rc=$(run)
+  check "an INCOMPLETE line without a reason ('$bare') is no final result line and is not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'
+done
+reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
+check "an INCOMPLETE reply whose head moved is exit 3 and not posted" '[ "$rc" = 3 ] && ! posted'
+reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; touch "$STUB/comment_fails"; rc=$(run)
+check "an INCOMPLETE reply that cannot be posted is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post the review" "$STUB/out" && ! grep -q "Codex says the review is incomplete" "$STUB/out"'
+reset; rc=$(run)
+check "the prompt offers the three final lines and says when INCOMPLETE applies" '[ "$rc" = 0 ] && grep -qx "REVIEW RESULT: NO FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: INCOMPLETE - <what could not be read>" "$STUB/prompt" && grep -q "only when a material file or the diff could not be read" "$STUB/prompt"'
+
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
 check "a head that moves during the review is not posted (exit 3)" '[ "$rc" = 3 ] && ! posted'
 

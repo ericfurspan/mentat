@@ -100,5 +100,8 @@ review_requirements() { # $1 linked issues, $2 title, $3 description
   printf -- '--- BEGIN PULL REQUEST DATA ---\n%s\n\n%s\n--- END PULL REQUEST DATA ---\n\n' "$2" "$3"
 }
 review_result_line() {
-  printf 'End your reply with exactly one final line, one of:\nREVIEW RESULT: NO FINDINGS\nREVIEW RESULT: FINDINGS\n'
+  printf 'Use INCOMPLETE only when a material file or the diff could not be read (a path the tools are denied is the example). '
+  printf 'A vague or thin description is a finding, not INCOMPLETE, and not having run the code is a limitation to state in a complete review. '
+  printf 'In the reason, name what was missing by repository-relative path or in general words, never a machine-local path or raw tool output.\n\n'
+  printf 'End your reply with exactly one final line, one of:\nREVIEW RESULT: NO FINDINGS\nREVIEW RESULT: FINDINGS\nREVIEW RESULT: INCOMPLETE - <what could not be read>\n'
 }
