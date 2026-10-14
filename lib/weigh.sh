@@ -175,5 +175,6 @@ weigh() {
   weigh_line grok Grok "$gsecs"
   # At least one verdict is a result; neither is a failure.
   if [ -s "$res/codex.verdict" ] || [ -s "$res/grok.verdict" ]; then exit 0; fi
+  printf 'mentat: not weighed by either tool; give Claude Code'"'"'s view alone, say the weighing did not happen, and ask the maintainer to agree\n' >&2
   exit 1
 }

@@ -129,6 +129,7 @@ data() { sed -n "/^--- BEGIN IDEA DATA ---\$/,/^--- END IDEA DATA ---\$/p" "$1" 
 
 reset; rc=$(run "$idea")
 check "both deliver (exit 0): a section for each in order, and a summary of both verdict lines" '[ "$rc" = 0 ] && c=$(grep -n "^## Codex$" "$STUB/stdout" | cut -d: -f1) && g=$(grep -n "^## Grok$" "$STUB/stdout" | cut -d: -f1) && [ "$c" -lt "$g" ] && grep -q "Codex thinks it is fine." "$STUB/stdout" && grep -q "Grok has a view." "$STUB/stdout" && grep -qE "^- Codex \([0-9]+ seconds\): WEIGH VERDICT: DO IT$" "$STUB/stdout" && grep -qE "^- Grok \([0-9]+ seconds\): WEIGH VERDICT: DO IT DIFFERENTLY - fewer helpers$" "$STUB/stdout"'
+check "a delivered weighing prints no such line on stderr" '! grep -q "not weighed by either tool" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit weighed: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
 check "nothing is posted and nothing is fetched (no gh call, no git fetch)" 'no_outside'
 check "nothing is left behind: no worktree, no Grok run folder, no temporary folder" 'clean'
@@ -228,6 +229,8 @@ grok_unweighed "a missing grok" "grok is not installed"
 reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
 check "neither delivering is exit 1, with both not-weighed lines on stdout" '[ "$rc" = 1 ] && grep -q "^## Codex$" "$STUB/stdout" && grep -q "^## Grok$" "$STUB/stdout" && [ "$(grep -c "not weighed:" "$STUB/stdout")" = 4 ] && grep -q "^- Codex ([0-9]* seconds): not weighed: codex exited with status 1" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): not weighed: Grok exited with status 1" "$STUB/stdout"'
 check "neither delivering still posts and fetches nothing" 'no_outside'
+want_line="mentat: not weighed by either tool; give Claude Code's view alone, say the weighing did not happen, and ask the maintainer to agree"
+check "neither delivering prints one line on stderr telling Claude Code to give its view alone" '[ "$(grep -cxF -- "$want_line" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ]'
 
 # Cancelling: the parent killed stops both model processes and cleans up.
 reset; touch "$STUB/codex_hang" "$STUB/grok_hang"
