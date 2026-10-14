@@ -16,26 +16,16 @@ else
   fail "AGENTS.md is missing '## Code Review Rules'"
 fi
 
-# The plugin's output style is named Mentat and is the owner's to choose, not
-# forced; this repository chooses the style and does not enable the plugin itself.
+# The plugin's output style is named Mentat and is not forced.
 if grep -qx 'name: Mentat' prompts/output-style.md && ! grep -q '^force-for-plugin:' prompts/output-style.md; then
   pass "prompts/output-style.md is the Mentat style, not forced"
 else
   fail "prompts/output-style.md must set name: Mentat and must not set force-for-plugin"
 fi
-if command -v jq >/dev/null 2>&1; then
-  if [ "$(jq -r '.outputStyle' .claude/settings.json)" = mentat:Mentat ]; then
-    pass ".claude/settings.json chooses the Mentat style"
-  else
-    fail ".claude/settings.json does not choose the Mentat style (outputStyle mentat:Mentat)"
-  fi
-  if jq -e 'has("enabledPlugins") or has("extraKnownMarketplaces") | not' .claude/settings.json >/dev/null; then
-    pass ".claude/settings.json does not turn the plugin on or add a marketplace"
-  else
-    fail ".claude/settings.json must not set enabledPlugins or extraKnownMarketplaces (Mentat is on here through a user-scope install)"
-  fi
+if [ -z "$(git ls-files .claude)" ]; then
+  pass "nothing under .claude/ is version-controlled"
 else
-  fail "jq not installed, plugin setting not checked"
+  fail ".claude/ must not be version-controlled (settings are the maintainer's own)"
 fi
 
 # hooks.json runs the SessionStart hook twice, which is what loads the rules:
