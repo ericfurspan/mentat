@@ -204,7 +204,7 @@ review_local() {
   run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled
   result=$(last_line "$out")
   case "$result" in
-    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS") ;;
+    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
     *) not_reviewed "Codex's reply has no final REVIEW RESULT line" ;;
   esac
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
@@ -218,6 +218,8 @@ review_local() {
     cat "$out"
   } >"$tmp/comment" || not_reviewed "could not write the comment"
   url=$(gh pr comment "$pr" --body-file "$tmp/comment") || not_reviewed "could not post the review on #$pr"
+  # An incomplete review is posted, so its reason is on the pull request, and is not a review.
+  case "$result" in "REVIEW RESULT: INCOMPLETE - "*) not_reviewed "Codex says the review is incomplete: ${result#"REVIEW RESULT: INCOMPLETE - "}" ;; esac
   if [ "$result" = "REVIEW RESULT: NO FINDINGS" ]; then
     printf 'The local Codex review found nothing on %s: %s\n' "$head" "$url"
     exit 0

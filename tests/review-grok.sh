@@ -196,6 +196,10 @@ check "a linked issue that cannot be read is not reviewed, with no start record"
 reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/comment/2" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment.2"'
 
+# An INCOMPLETE reply is a complete reply: the review is posted as the record and is not reviewed.
+reset; reply $'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read'; rc=$(run)
+check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with no did-not-finish comment or log" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && head -n 1 "$STUB/comment.2" | grep -qx "## Local Grok review of $H" && grep -qx "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" "$STUB/comment.2" && ! grep -rq "Grok review did not finish" "$STUB/out" "$STUB"/comment.* && grep -q "not reviewed: Grok says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing\|can read it at" "$STUB/out" && [ -z "$(left_over)" ]'
+
 reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
 check "failed CI is not reviewed (exit 4): no start record, Grok does not run" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(run)
@@ -221,6 +225,12 @@ reset; printf '{"text": "Nothing.\\n\\nREVIEW RESULT: NO FIN' >"$STUB/out_json";
 not_finished "truncated output" "complete review"
 reset; reply $'Looks fine to me.'; rc=$(run)
 not_finished "a reply without a result line" "no final REVIEW RESULT line"
+reset; reply $'Could not finish.\n\nREVIEW RESULT: INCOMPLETE'; rc=$(run)
+not_finished "a bare INCOMPLETE line" "no final REVIEW RESULT line"
+reset; reply $'Could not finish.\n\nREVIEW RESULT: INCOMPLETE -'; rc=$(run)
+not_finished "an INCOMPLETE line with a dash and no reason" "no final REVIEW RESULT line"
+reset; reply $'Could not finish.\n\nREVIEW RESULT: INCOMPLETE -   '; rc=$(run)
+not_finished "an INCOMPLETE line with a dash and only spaces" "no final REVIEW RESULT line"
 reset; reply $'REVIEW RESULT: NO FINDINGS\n\nBut actually there is a problem.'; rc=$(run)
 not_finished "a result line that is not last" "no final REVIEW RESULT line"
 reset; reply "   "; rc=$(run)

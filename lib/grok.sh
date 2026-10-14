@@ -254,12 +254,15 @@ grok_reply() {
 # Checks Grok's reply, posts it on the pull request and exits with the result. The
 # review is posted for the commit Grok reviewed, even if the head has moved since:
 # the start comment stops a rerun, so a review dropped here would be lost.
+# A reply ending INCOMPLETE is a complete reply: it is posted like any other and
+# then exits 1 as "not reviewed", with no did-not-finish comment or private log
+# (grok_fail's), because the posted review is the record.
 grok_post() {
   local result model url
   grok_reply
   result=$(last_line "$result_file")
   case "$result" in
-    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS") ;;
+    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
     *) grok_fail "Grok's reply has no final REVIEW RESULT line" ;;
   esac
   model=$(jq -r 'if (.modelUsage | type) == "object" and (.modelUsage | length) > 0 then (.modelUsage | keys | join(", ")) else "unknown" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9._, -') || model=unknown
@@ -272,6 +275,7 @@ grok_post() {
     cat "$result_file"
   } >"$run/comment" || grok_fail "could not write the comment"
   url=$(gh pr comment "$pr" --body-file "$run/comment") || grok_fail "could not post the review on #$pr"
+  case "$result" in "REVIEW RESULT: INCOMPLETE - "*) not_reviewed "Grok says the review is incomplete: ${result#"REVIEW RESULT: INCOMPLETE - "}" ;; esac
   if [ "$result" = "REVIEW RESULT: NO FINDINGS" ]; then
     printf 'The local Grok review found nothing on %s: %s\n' "$head" "$url"
     exit 0
