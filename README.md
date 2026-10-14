@@ -7,6 +7,8 @@
 
 <h1 align="center">Mentat</h1>
 
+<p align="center"><a href="https://github.com/ericfurspan/mentat/actions/workflows/tests.yml"><img src="https://github.com/ericfurspan/mentat/actions/workflows/tests.yml/badge.svg" alt="tests"></a></p>
+
 Mentat is a Claude Code plugin for a multi-agent coding workflow with the maintainer in the loop: a change is worked out in an interactive session, with Codex and Grok on call for independent second opinions, built and tested by a builder subagent on its own branch, reviewed by Codex and Grok, and merged by the maintainer.
 
 ## Install

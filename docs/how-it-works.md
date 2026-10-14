@@ -56,4 +56,4 @@ The hooks catch mistakes; they are not a sandbox, and Claude Code's permission m
 
 ## Developing Mentat
 
-`tests/run` is the one test command; it runs locally on macOS, and this repository has no CI. Every change goes through the flow above, and the maintainer merges it.
+`tests/run` is the one test command; it runs locally on macOS, and on GitHub Actions (macOS) for every pull request. Every change goes through the flow above, and the maintainer merges it.
