@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The repository's one test command. Runs locally on macOS; this repository has no CI.
+# The repository's one test command. Runs locally on macOS and in CI (.github/workflows/tests.yml).
 # A tool it needs that is missing fails the run.
 set -uo pipefail
 
@@ -146,6 +146,17 @@ if command -v claude >/dev/null 2>&1; then
   fi
 else
   fail "claude not installed, the plugin manifests not validated"
+fi
+
+# The CI workflow declares permissions and pins every action to a commit (a
+# check of form, not of least privilege).
+workflow=.github/workflows/tests.yml
+if [ -f "$workflow" ] && grep -q '^permissions:' "$workflow" \
+  && ! grep -E '^[[:space:]-]*uses:' "$workflow" \
+    | grep -Evq '^[[:space:]-]*uses:[[:space:]]+[A-Za-z0-9._-]+/[A-Za-z0-9._-]+@[0-9a-f]{40}([[:space:]]+#.*)?$'; then
+  pass "$workflow declares permissions and pins every action to a commit"
+else
+  fail "$workflow must exist, declare explicit permissions, and pin every action to a 40-hex commit (uses: owner/repo@<sha>)"
 fi
 
 # Shell scripts pass shellcheck.
