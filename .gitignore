@@ -3,3 +3,6 @@
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Working files: plans, audits and trial kits (see AGENTS.md)
+work/
