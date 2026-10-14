@@ -1,0 +1,29 @@
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools
+        run: |
+          brew install shellcheck
+          npm install -g --prefix "$(brew --prefix)" @anthropic-ai/claude-code @openai/codex
+      - name: Tool versions
+        run: |
+          which codex claude shellcheck jq
+          codex --version
+          claude --version
+          shellcheck --version
+          jq --version
+          case "$(which codex)" in /opt/homebrew/*|/usr/local/*) ;; *) echo "codex must be under /opt/homebrew or /usr/local for the Codex profile (lib/codex.sh)"; exit 1 ;; esac
+      - name: Run the test suite
+        run: tests/run
