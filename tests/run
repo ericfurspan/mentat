@@ -17,18 +17,13 @@ else
 fi
 
 # The plugin's output style is named Mentat and is the owner's to choose, not
-# forced; this repository turns the plugin on and chooses it.
+# forced; this repository chooses it.
 if grep -qx 'name: Mentat' prompts/output-style.md && ! grep -q '^force-for-plugin:' prompts/output-style.md; then
   pass "prompts/output-style.md is the Mentat style, not forced"
 else
   fail "prompts/output-style.md must set name: Mentat and must not set force-for-plugin"
 fi
 if command -v jq >/dev/null 2>&1; then
-  if [ "$(jq -r '.enabledPlugins["mentat@mentat"]' .claude/settings.json)" = true ]; then
-    pass ".claude/settings.json turns the plugin on"
-  else
-    fail ".claude/settings.json does not turn on mentat@mentat"
-  fi
   if [ "$(jq -r '.outputStyle' .claude/settings.json)" = mentat:Mentat ]; then
     pass ".claude/settings.json chooses the Mentat style"
   else
