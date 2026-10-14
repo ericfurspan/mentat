@@ -238,7 +238,7 @@ reset; touch "$STUB/result_fails"; rc=$(run)
 not_finished "a failed post of the review" "could not post the review"
 
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
-check "a head that moves during the review is not posted (exit 3); only the start record exists" '[ "$rc" = 3 ] && [ "$(comments)" = 1 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && [ -z "$(left_over)" ]'
+check "a head that moves during the review does not lose it: the review is posted for the commit Grok reviewed (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && head -n 1 "$STUB/comment.2" | grep -qx "## Local Grok review of $H" && grep -q "Change reviewed:" "$STUB/comment.2" && [ -z "$(left_over)" ]'
 reset; touch "$STUB/comment_fails"; rc=$(run)
 check "a start record that cannot be posted is not reviewed and Grok does not run" '[ "$rc" = 1 ] && grep -q "could not post the start comment" "$STUB/out" && ! grok_ran'
 reset; rm "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"

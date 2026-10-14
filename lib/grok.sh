@@ -247,9 +247,11 @@ grok_reply() {
   jq -r '.text' "$out" >"$result_file" || "$fail" "could not read Grok's reply"
 }
 
-# Checks Grok's reply, posts it on the pull request and exits with the result.
+# Checks Grok's reply, posts it on the pull request and exits with the result. The
+# review is posted for the commit Grok reviewed, even if the head has moved since:
+# the start comment stops a rerun, so a review dropped here would be lost.
 grok_post() {
-  local now result model url
+  local result model url
   grok_reply
   result=$(last_line "$result_file")
   case "$result" in
@@ -258,8 +260,6 @@ grok_post() {
   esac
   model=$(jq -r 'if (.modelUsage | type) == "object" and (.modelUsage | length) > 0 then (.modelUsage | keys | join(", ")) else "unknown" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9._, -') || model=unknown
   [ -n "$model" ] || model=unknown
-  now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || grok_fail "could not read pull request #$pr"
-  [ "$now" = "$head" ] || die "the head moved from $head; run mentat review again" 3
   {
     printf '## Local Grok review of %s\n\n' "$head"
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
