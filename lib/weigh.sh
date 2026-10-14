@@ -164,7 +164,7 @@ weigh() {
 
   printf '## Weighing %s\n\n- Commit weighed: %s\n' "$idea" "$head"
   if [ "$dirty" = yes ]; then
-    printf -- '- Uncommitted changes: yes. They were not weighed; both tools saw only that commit.\n\n'
+    printf -- '- Uncommitted changes: yes. They were not weighed; both tools were given only that commit.\n\n'
   else
     printf -- '- Uncommitted changes: no\n\n'
   fi
