@@ -9,6 +9,14 @@
 
 Mentat is a Claude Code plugin for shipping AI-written code changes through a fixed workflow: Claude Code plans and builds each change on its own branch, a second AI model reviews every pull request, and you merge.
 
+## Install
+
+```bash
+claude plugin install mentat --marketplace ericfurspan/mentat
+```
+
+This adds the marketplace and installs the plugin for you. [Setup](docs/setup.md) covers scopes and updates.
+
 ## How a change moves
 
 1. A change starts from a request in chat or a GitHub issue. Claude Code reads the code and gives you its view of the request; for a new feature or workflow idea, Codex and Grok also weigh it (`mentat weigh`) and their verdicts come beside its own. Once you agree, it records what it will build, what it will leave alone, and how the result will be checked. When the approach is uncertain, it writes a plan and has the reviewer challenge it first.
