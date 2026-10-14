@@ -14,18 +14,19 @@ What a machine and a repository need for Mentat to run, and the plugin commands.
 
 ## Plugin commands
 
-Run in a terminal, in the checkout. Scope `local` is this checkout only (`.claude/settings.local.json`, ignored by git); `project` writes `.claude/settings.json`, which is committed, as this repository does; `user` is every folder.
+Run in a terminal. Mentat is installed once per machine at `user` scope, so it is on in every folder; a project that should not use it turns it off for itself.
 
 | What | Command |
 | --- | --- |
-| Add the marketplace, once per machine | `claude plugin marketplace add ericfurspan/mentat` |
-| Turn Mentat on in a checkout | `claude plugin install mentat@mentat --scope local` (or `project`, or `user`) |
-| Update | `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <scope>`, then `/reload-plugins` in a running session; the updated rules load at the next session start, resume, `/clear` or compaction |
-| Turn it off, and back on | `claude plugin disable mentat@mentat`, `claude plugin enable mentat@mentat` |
-| Remove it | `claude plugin uninstall mentat@mentat --scope <scope>`, once per scope and checkout |
-| Where it is installed | `claude plugin list` |
+| Install, once per machine | `claude plugin install mentat --marketplace ericfurspan/mentat` (adds the marketplace and installs at `user` scope). Claude Code before 2.1.292: `claude plugin marketplace add ericfurspan/mentat`, then `claude plugin install mentat@mentat` |
+| Turn it off in one project | `claude plugin disable mentat@mentat --scope local` in that checkout; it writes `{"enabledPlugins": {"mentat@mentat": false}}` to `.claude/settings.local.json`, which git ignores. Back on: `claude plugin enable mentat@mentat --scope local` |
+| Update | `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope user`, then `/reload-plugins` in a running session; the updated rules load at the next session start, resume, `/clear` or compaction |
+| Remove | `claude plugin uninstall mentat@mentat --scope user` |
+| Where it is installed and on | `claude plugin list` |
 
-Plugin auto-update is off by default for a user-added marketplace unless a settings file sets `autoUpdate: true`, as this repository's does. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set, which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)).
+`uninstall` must name the scope the install used. In Claude Code 2.1.299, a folder that never had the plugin, while another folder has it at `project` or `local` scope, gets "installed in project scope, not local" followed by "not installed in project scope": the scope check does not filter by folder, but the removal does ([anthropics/claude-code#102131](https://github.com/anthropics/claude-code/issues/102131)). The cure is `claude plugin list` and the scope it shows.
+
+Plugin auto-update is off by default for a user-added marketplace unless the marketplace's entry in a settings file sets `autoUpdate: true`. The Claude desktop app starts its bundled Claude Code with `DISABLE_AUTOUPDATER` set, which also turns plugin auto-update off ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)).
 
 On a session's first change, Claude Code runs `mentat check`, which looks only at what Mentat needs. The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on, not on the terminal's.
 
@@ -48,4 +49,4 @@ Mentat offers each when it is installed.
 
 ## What removal leaves behind
 
-`claude plugin uninstall` removes the plugin's entry from the settings file of that scope and nothing else: the marketplace stays until `claude plugin marketplace remove mentat`; `"outputStyle": "mentat:Mentat"` stays in whichever settings file set it; Codex's review settings stay as set in ChatGPT; and any `mentat-codex-log.*` file in the temporary directory (`$TMPDIR`, else `/tmp`), kept when local Codex exits with an error because it may hold credentials, stays until deleted. Mentat never deletes settings files.
+`claude plugin uninstall` removes the plugin's entry from the settings file of that scope and nothing else: the marketplace stays until `claude plugin marketplace remove mentat`; entries that `claude plugin disable` and `enable` wrote to `.claude/settings.local.json` stay; `"outputStyle": "mentat:Mentat"` stays in whichever settings file set it; Codex's review settings stay as set in ChatGPT; and any `mentat-codex-log.*` file in the temporary directory (`$TMPDIR`, else `/tmp`), kept when local Codex exits with an error because it may hold credentials, stays until deleted. Mentat never deletes settings files.
