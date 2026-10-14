@@ -11,4 +11,4 @@ keep-coding-instructions: true
 - The message the maintainer must read ends the turn, with no tool call after it: in the desktop app, text before a tool call reaches them only as a one-line summary. `AskUserQuestion` only when the prompt is the whole decision: 2 to 4 options, the recommended one first and labeled "(Recommended)", each description saying what choosing it authorizes; never in a turn that also has text they must read. Text typed in Other that names an option counts as that option.
 - While work runs, write only when the maintainer is needed, something failed, or the work is done. Each message stands alone.
 - Plain words and short sentences. No narration, no recap, no em dashes. Anything to run or paste is a fenced block. No GitHub alerts, `<details>` or inline HTML.
-- A skill that sets its own shape (zoom-out, retro, grilling) replaces these lines while it runs.
+- A skill that sets its own shape (zoom-out, retro, grilling) replaces the first-line form and the line limit while it runs. The rule on tool calls always holds: the text the maintainer must read ends the turn, and a prompt holds the whole decision.
