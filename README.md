@@ -13,7 +13,7 @@ Mentat is a Claude Code plugin for a multi-agent coding workflow with the mainta
 
 ## What you get
 
-- Second opinions from other vendors: Codex and Grok weigh a new idea before it is agreed, challenge an uncertain plan, and review every pull request.
+- Second opinions from other vendors: Codex and Grok weigh a new idea before it is agreed and review every pull request; Codex also challenges an uncertain plan.
 - One builder per change, on its own branch: the chat shows plans and reports, not diffs.
 - Hooks that ask before a merge or a push to the default branch. The maintainer merges.
 
