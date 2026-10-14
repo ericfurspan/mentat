@@ -1,6 +1,6 @@
 # Setup
 
-*For people. Agents follow `rules.md`, not this page.*
+*For people. Agents follow `rules.md` and `rules-records.md`, not this page.*
 
 What a machine and a repository need for Mentat to run, and the plugin commands. Mentat needs nothing from a repository's GitHub settings; rulesets, required approvals and CI are the repository's own and Mentat works within them.
 

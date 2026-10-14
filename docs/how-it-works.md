@@ -1,6 +1,6 @@
 # How Mentat works
 
-*For people. Agents follow `rules.md` and the skills in `skills/`, not this page.*
+*For people. Agents follow `rules.md`, `rules-records.md` and the skills in `skills/`, not this page.*
 
 ## A change, in full
 
@@ -28,7 +28,7 @@ Where a repository's AGENTS.md differs from `rules.md` on a preference (commit a
 
 ## What holds, and how
 
-- The SessionStart hook puts `rules.md` into every session's context, on startup, resume, clear, compact and fork.
+- The SessionStart hook puts `rules.md` and `rules-records.md` into every session's context, on startup, resume, clear, compact and fork.
 - The merge hook asks you in a permission prompt before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool. Claude Code's docs say a hook's "ask" still prompts in auto mode; behavior in bypass-permissions mode is not documented. It is a net for mistakes, not a security boundary: other routes to a merge exist.
 - The push hook asks you in a permission prompt before a `git push` that would change the default branch: a refspec ending there, a delete of it, `--all`, `--mirror`, or a push with no refspec while the default branch is checked out. It reads the default branch from `origin/HEAD` and falls back to `main` and `master`. It too is a net for mistakes, not a security boundary: other routes to a push exist, such as the GitHub API.
 - `rules.md` asks agents never to merge, release, deploy, publish, change secrets or run production operations; never to commit secrets; never to push code changes to the default branch or change repository settings; and to keep production credentials out of agent sessions. These are instructions. An agent that ignores them can still do what its GitHub access and your Mac allow; Mentat does not sandbox it, and Claude Code's permission modes are the local control. Rulesets and required approvals on a repository are that repository's own choice, not part of Mentat.
