@@ -48,9 +48,9 @@ Everything is bash that runs on macOS's bash 3.2. [`tests/run`](../tests/run) is
 
 `rules.md` and `rules-records.md` are each printed by their own SessionStart command, because Claude Code caps a hook's output at 10,000 characters per hook. Evidence: [#226](https://github.com/ericfurspan/mentat/issues/226) and [#231](https://github.com/ericfurspan/mentat/pull/231), whose delivery check quoted a bullet from each file out of a tool-less session.
 
-## No draft pull requests; a comment starts each review
+## No draft pull requests; a comment starts each app review
 
-Pull requests open as normal pull requests, and each Codex round starts with an `@codex review` comment whose GitHub timestamp marks the round. Draft pull requests are not available on every plan for private repositories. Evidence: [#205](https://github.com/ericfurspan/mentat/issues/205), [#206](https://github.com/ericfurspan/mentat/pull/206).
+Pull requests open as normal pull requests. A Codex GitHub app round starts with an `@codex review` comment whose GitHub timestamp marks the round's start; a local Codex review (`mentat review --local`, used directly or as the app fallback) posts no trigger comment and posts only its finished result as a comment. Draft pull requests are not available on every plan for private repositories. Evidence: [#205](https://github.com/ericfurspan/mentat/issues/205), [#206](https://github.com/ericfurspan/mentat/pull/206).
 
 ## Conventions in the code
 
