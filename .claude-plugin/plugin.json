@@ -1,6 +1,6 @@
 {
   "name": "mentat",
-  "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code plans and builds, Codex reviews, the maintainer merges.",
+  "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code plans and builds, Codex and Grok give second opinions and review, the maintainer merges.",
   "author": { "name": "ericfurspan" },
   "repository": "https://github.com/ericfurspan/mentat",
   "agents": ["./prompts/builder.md"],

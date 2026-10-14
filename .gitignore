@@ -1,8 +1,8 @@
 # Finder
 .DS_Store
 
-# Claude Code worktrees
-.claude/worktrees/
+# Claude Code settings and worktrees
+.claude/
 
 # Working files: plans, audits and trial kits (see AGENTS.md)
 work/
