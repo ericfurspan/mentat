@@ -15,7 +15,7 @@ Mentat is a Claude Code plugin for a multi-agent coding workflow with the mainta
 claude plugin install mentat --marketplace ericfurspan/mentat
 ```
 
-This adds the marketplace and installs the plugin. It needs macOS and Claude Code 2.1.292 or later (older versions: `claude plugin marketplace add ericfurspan/mentat`, then `claude plugin install mentat@mentat`), plus `git`, `jq` and `gh` signed in. For reviews it needs OpenAI's Codex GitHub app on the repository (a ChatGPT plan with Codex code review) or the Codex CLI signed in; Grok Build is optional. [Setup](docs/setup.md) covers scopes and updates.
+This adds the marketplace and installs the plugin. It needs macOS and Claude Code 2.1.292 or later (older versions: `claude plugin marketplace add ericfurspan/mentat`, then `claude plugin install mentat@mentat`), plus `git`, `jq` and `gh` signed in. For reviews it needs OpenAI's Codex GitHub app on the repository (a ChatGPT plan with Codex code review) or the Codex CLI signed in; Grok Build is optional. [Setup](docs/setup.md) has the plugin commands.
 
 ## How a change moves
 
@@ -38,7 +38,7 @@ See [How it works](docs/how-it-works.md) for the full flow and the `mentat` comm
 | `bin/mentat` | The `mentat` command: `review`, `review --local`, `review --grok`, `ci`, `challenge`, `weigh` and `check`. It only parses the command and loads `lib/`. |
 | `lib/` | The command's code: `shared.sh` (CI wait, pull request and issue reading, review criteria), `codex.sh`, `grok.sh`, `weigh.sh` (`mentat weigh`) and `check.sh`. |
 | `tests/run` | The test suite. It runs locally on macOS. |
-| `docs/` | How it works, setup, the design decisions and their evidence (`design.md`), and the logo images. |
+| `docs/` | How it works, setup, and the logo images. |
 
 ## Commands
 
