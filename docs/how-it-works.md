@@ -11,10 +11,10 @@ sequenceDiagram
     participant X as Codex
     participant G as Grok
     M->>C: asks
-    Note over X,G: a new idea: both weigh it
+    Note over X,G: for a new idea, both weigh it first
     C->>M: its view and a plan
     M->>C: agrees
-    Note over C: the builder subagent builds on a branch; the tests pass
+    Note over C: the builder subagent builds on a branch and the tests pass
     C->>X: pull request
     C->>G: pull request
     G-->>C: findings, on the first head only
