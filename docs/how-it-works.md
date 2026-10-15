@@ -35,7 +35,7 @@ The reference the other pages match.
 | Posts the final check | Claude Code | when the loop ends ready | a comment on the pull request |
 | Merges | the maintainer | every pull request | |
 
-Outside the table, `/mentat:consult <question>` (the maintainer starts it) asks Codex, Grok and Claude Code one question and answers in four lines, one per model and a consensus; it is no step in a change. Weigh judges a change to this repository's code at HEAD; consult answers any question, no repository, web on.
+Outside the table, `/mentat:consult <question>` (the maintainer starts it) asks Codex, Grok and Claude Code one question and answers in five short lines at most, the consensus first, then what each model adds; it is no step in a change. Weigh judges a change to this repository's code at HEAD; consult answers any question, no repository, web on.
 
 ## The repository comes first
 
