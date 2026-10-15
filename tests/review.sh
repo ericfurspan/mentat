@@ -112,6 +112,8 @@ reset; printf '[%s]\n' "$(trig 2026-01-01T00:05:00Z 1)" >"$STUB/issue_comments.j
 check "refuses while the app's 👀 is on a @codex review comment with no completion" '[ "$rc" = 1 ] && grep -q "still reviewing" "$STUB/out" && ! grep -q -- "-X POST" "$STUB/calls"'
 reset; jq -n --argjson t "$(trig 2026-01-01T00:05:00Z 1)" --argjson s "$(summary 1111111 Completed 2026-01-01T00:04:00Z)" '[$t] + $s' >"$STUB/issue_comments.json"; rc=$(run)
 check "refuses while the last completion is from before the @codex review comment with the 👀" '[ "$rc" = 1 ] && grep -q "still reviewing" "$STUB/out" && ! grep -q -- "-X POST" "$STUB/calls"'
+reset; jq -n --argjson t "$(trig 2026-01-01T00:05:00Z 1)" --argjson s "$(summary 1111111 "In progress" 2026-01-01T00:06:00Z)" '[$t] + $s' >"$STUB/issue_comments.json"; rc=$(run)
+check "refuses while the summary row is still in progress after the @codex review comment with the 👀" '[ "$rc" = 1 ] && grep -q "still reviewing" "$STUB/out" && ! grep -q -- "-X POST" "$STUB/calls"'
 reset; printf '[%s,%s]\n' "$(trig 2026-01-01T00:05:00Z 1)" "$(trig 2026-01-01T00:07:00Z 0)" >"$STUB/issue_comments.json"; rc=$(run)
 check "only the newest @codex review comment decides" '! grep -q "still reviewing" "$STUB/out" && grep -q -- "-X POST" "$STUB/calls"'
 reset; printf '[%s,%s]\n' '{"user":{"login":"someone"},"body":"@codex review","created_at":"2026-01-01T00:05:00Z","reactions":{"eyes":0}}' '{"user":{"login":"someone"},"body":"thanks","created_at":"2026-01-01T00:06:00Z","reactions":{"eyes":2}}' >"$STUB/issue_comments.json"; rc=$(run)

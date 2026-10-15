@@ -85,8 +85,8 @@ run_codex() {
 # for the head, at or after the time of the comment this run posted; then every
 # bot review on the head, security reviews included, is a finding. A new round starts
 # only when no 👀 is on the pull request and none on the newest trigger comment of a
-# round that has no result yet (a row at or after that comment ends it, Completed or
-# Failed). The summary is observed bot output, not a documented API: anything
+# round that has no result yet (only a Completed or Failed row at or after that comment
+# ends it; the app rewrites the row while it works). The summary is observed bot output, not a documented API: anything
 # missing, failed or unrecognized ends in "not reviewed", and the review skill
 # falls back to local review. It never starts while a run is going.
 CODEX_APP="chatgpt-codex-connector[bot]"
@@ -109,6 +109,7 @@ app_reviewing() { # $1 repo, $2 pr: prints how many 👀 mean the app is still r
   eyes=${last%% *}; asked=${last#* }; comment=0
   if [ "$eyes" != 0 ]; then
     row=$(code_review_row "$1" "$2") || row=""
+    case "${row%% *}" in Completed | Failed) ;; *) row="" ;; esac
     at=${row#* }; at=${at%% *}
     if [ -z "$row" ] || [[ "$at" < "$asked" ]]; then comment=$eyes; fi
   fi
