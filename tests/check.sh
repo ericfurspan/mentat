@@ -24,7 +24,14 @@ case "$1 $2" in
   "api -X")
     [ "$3" = GET ] || { echo "$*" >>"$STUB/writes"; exit 98; }
     case "$4" in
-      repos/owner/repo) [ -f "$STUB/unreadable" ] && exit 1; echo owner/repo ;;
+      repos/owner/repo) [ -f "$STUB/unreadable" ] && exit 1
+        case "$*" in
+          *delete_branch_on_merge*)
+            if [ -f "$STUB/keeps_branches" ]; then echo false
+            elif [ -f "$STUB/setting_unreadable" ]; then echo unknown
+            else echo true; fi ;;
+          *) echo owner/repo ;;
+        esac ;;
       *) exit 1 ;;
     esac ;;
   *) echo "$*" >>"$STUB/writes"; exit 99 ;;
@@ -70,6 +77,12 @@ reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 reset; touch "$STUB/unreadable"; rc=$(run)
 check "an unreadable repository fails" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read owner/repo" "$STUB/out"'
+reset; rc=$(run)
+check "deleted merged head branches are reported OK" '[ "$rc" = 0 ] && grep -qx "OK: merged head branches are deleted" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; touch "$STUB/keeps_branches"; rc=$(run)
+check "kept merged head branches warn, still exit 0, and write nothing" '[ "$rc" = 0 ] && grep -q "^WARN: merged head branches are kept after merge" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && [ ! -f "$STUB/writes" ]'
+reset; touch "$STUB/setting_unreadable"; rc=$(run)
+check "an unreadable branch setting warns, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: could not read whether merged head branches are deleted" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 reset; touch "$STUB/no_repo"; rc=$(run)
 check "no repository to find fails and says to run it inside a checkout" '[ "$rc" = 1 ] && grep -q "run mentat check inside a checkout" "$STUB/out"'
 

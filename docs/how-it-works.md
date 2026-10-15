@@ -65,13 +65,13 @@ The hooks catch mistakes; they are not a sandbox, and Claude Code's permission m
 | `mentat ci <PR>` | Waits for CI on the head the same way and reviews nothing. Used when Codex is off | 0 CI passed or there is none, 1 could not read, 3 head moved, 4 CI did not pass |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat weigh <idea-file>` | Codex and Grok each judge an idea as of `HEAD` (uncommitted changes are not weighed, and the output says so), in parallel: worth doing, a simpler way, the risks. Printed, never posted. Each ends with a verdict line (`DO IT`, `DO IT DIFFERENTLY - <how>` or `DON'T - <why>`) or a "not weighed" line with the reason. Time limits: `MENTAT_REVIEW_TIMEOUT_SECONDS` (Codex) and `MENTAT_GROK_TIMEOUT_SECONDS`; `MENTAT_GROK_REASONING_EFFORT` sets Grok's reasoning effort as in `review --grok`. A failed Grok run leaves a private log that is never printed | 0 at least one verdict, 1 none (stderr tells Claude Code to give its view alone and say the weighing did not happen), 64 usage |
-| `mentat check` | Checks, read-only, that `git`, `gh` and `jq` are installed, `gh` is signed in and the repository is readable. Prints the `codex` version and warns when it is missing; prints the `grok` version when installed | 0 Mentat can work, 1 it cannot |
+| `mentat check` | Checks, read-only, that `git`, `gh` and `jq` are installed, `gh` is signed in and the repository is readable. Prints the `codex` version and warns when it is missing; prints the `grok` version when installed; warns when the repository keeps head branches after merge | 0 Mentat can work, 1 it cannot |
 
 ## What it does not do
 
 - Linux, Windows, other Git hosts, organizations and team workflows.
 - Running deployments or infrastructure.
-- Changing a repository's GitHub settings. `mentat check` reads none of them.
+- Changing a repository's GitHub settings. `mentat check` reads one, whether merged head branches are deleted, and changes nothing.
 
 ## Developing Mentat
 
