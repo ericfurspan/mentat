@@ -16,9 +16,9 @@ The maintainer wants to know what would have made the session go better. This ru
    - Tool economy: expensive calls that could be cheaper, such as a huge output read whole. Use when a call cost a lot for little.
    - Instructions that change nothing: steering that would not alter what an agent does. Use when a file is large.
    - Information the agent lacked: logs, access or context that would have settled something early. Use when a crucial fact was missing.
-4. Present the candidates one at a time, worst first. This overrides the output style's 100-word limit. Each is in plain words:
+4. Present the candidates one at a time, worst first. This replaces the output style's line limit while it runs. Each is in plain words:
    - What happened, and what it means for the maintainer.
    - The recommendation: what to change, and where it would go (the file, the check or the hook).
    - Its evidence from the session in one short line: a short quote, a command and its result, or a link. Quotes never include credentials or tokens.
    Leave out a candidate with no evidence. If nothing is worth changing, say so.
-5. Each candidate gets its own file-or-skip prompt. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones as issues. Nothing is filed without the maintainer's agreement.
+5. Each candidate is asked file or skip in the message text, with the candidate above it and no tool call after it; the next candidate follows the answer. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones as issues. Nothing is filed without the maintainer's agreement.

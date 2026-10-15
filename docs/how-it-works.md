@@ -28,7 +28,7 @@ Where a repository's AGENTS.md differs from `rules.md` on a preference (commit a
 
 ## What holds, and how
 
-- The SessionStart hook puts `rules.md` and `rules-records.md` into every session's context, on startup, resume, clear, compact and fork.
+- The SessionStart hook puts `rules.md` and `rules-records.md` into every session's context, on startup, resume, clear, compact and fork, including how decisions and steps reach the maintainer.
 - The merge hook asks the maintainer before any `gh pr merge` command (including `--auto`), any call to the pull request merge API through `gh api`, and the desktop app's auto-merge tool.
 - The push hook asks the maintainer before a `git push` that would change the default branch (read from `origin/HEAD`, else `main` and `master`): a refspec ending there, a delete of it, `--all`, `--mirror`, or a push with no refspec while it is checked out.
 - `rules.md` tells agents never to merge, release, deploy, publish, change secrets, run production operations, commit secrets, push code changes to the default branch or change repository settings.
