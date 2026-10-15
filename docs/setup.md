@@ -30,7 +30,7 @@ The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on
 
 ## The reply style
 
-The plugin ships an output style, not forced. It is the voice: every reply starts with one line that names who acts: a question with the recommended answer in it, "You:" and the step only you can take, "Failed:" and what failed, or "Done:" and the result. Then at most three short lines; reviews and numbers stay on the pull request or issue. How a decision reaches you, as a prompt or as text that ends the turn, is a workflow rule in `rules.md`, so it holds whether or not the style is on. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file.
+The plugin ships an output style, not forced. It is the voice: every reply starts with one line that names who acts: a question with the recommended answer in it, "You:" and the step only you can take, "Failed:" and what failed, or, when nothing is needed, the answer or result itself. Then at most three short lines; reviews and numbers stay on the pull request or issue. How a decision reaches you, as a prompt or as text that ends the turn, is a workflow rule in `rules.md`, so it holds whether or not the style is on. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file.
 
 ## Reviews
 
