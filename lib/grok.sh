@@ -10,7 +10,8 @@
 # be applied, Grok refuses to start. The profile and the permission rules are
 # built from where things are at run time, in the per-run folder below. Nothing in
 # the user's Grok home but auth.json is copied: no config, MCP servers, hooks or
-# keys.
+# keys. A sign-in whose access token is past its expiry is refused before the copy,
+# since Grok cannot refresh it inside the run.
 #
 # `mentat weigh` runs Grok the same way on an idea, with no pull request, except that
 # it may use Grok's backend web search (the local fetch tool stays denied). The
@@ -74,9 +75,21 @@ grok_prepare() {
 
 # Grok runs on the user's own sign-in. A key in the environment is the metered API
 # and is not used. Sets the caller's real_grok, the user's Grok home.
+#
+# An expired access token cannot be refreshed inside the run (the run home is
+# read-only to Grok's own process except vendor), so Grok parks on a credential-less
+# 401 until the time limit. A missing or unfamiliar expires_at is unknown, not
+# expired, and nothing from the file but the timestamp is printed.
 grok_signin() {
+  local expiry now
   real_grok=$(realdir "${GROK_HOME:-$HOME/.grok}") && [ -f "$real_grok/auth.json" ] ||
     "$fail" "Grok is not signed in: there is no auth.json in its home (run grok login)"
+  expiry=$(jq -r '[.. | objects | .expires_at? | strings] | max // empty' "$real_grok/auth.json" 2>/dev/null) || expiry=""
+  case "$expiry" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*Z) ;; *) expiry="" ;; esac
+  now=$(date -u +%Y-%m-%dT%H:%M:%S)
+  if [ -n "$expiry" ] && [[ "${expiry:0:19}" < "$now" ]]; then
+    "$fail" "Grok's sign-in expired at ${expiry:0:19}Z; run grok login or any grok prompt outside Mentat, then retry"
+  fi
 }
 
 # The per-run folder and Grok's home inside it, checked against the folders the
