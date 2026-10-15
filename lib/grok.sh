@@ -26,6 +26,8 @@ GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
 GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
+# Empty leaves Grok's own default; otherwise passed as --reasoning-effort (the value is not checked).
+GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
 # Grok reviews a pull request once. Only this account's own start comment counts:
@@ -183,6 +185,20 @@ grok_args() {
     d=$(dirname "$d")
     args+=(--deny "Read($d)" --deny "Grep($d)")
   done
+  if [ -n "$GROK_REASONING_EFFORT" ]; then
+    args+=(--reasoning-effort "$GROK_REASONING_EFFORT")
+  fi
+}
+
+# Keeps a copy of Grok's raw log for the maintainer and sets the caller's kept to
+# its path (empty when there was nothing to keep). The log may hold a credential, so
+# callers name the path and never print the log. Reads the caller's err, out and
+# ghome; err exists only once the run folder is built.
+grok_keep_log() {
+  kept=""
+  if [ -e "$err" ]; then
+    if kept=$(mktemp "${TMPDIR:-/tmp}/mentat-grok-log.XXXXXX") && { cat "$err" "$out"; cat "$ghome/sessions/debug.log" 2>/dev/null; true; } >"$kept" 2>/dev/null; then :; else kept=""; fi
+  fi
 }
 
 # After the start comment, any failure says so on the pull request. The log is
@@ -190,10 +206,8 @@ grok_args() {
 # copy is kept for the maintainer. Reads the caller's pr, head, started, err, out
 # and ghome.
 grok_fail() {
-  local kept=""
-  if [ -e "$err" ]; then
-    if kept=$(mktemp "${TMPDIR:-/tmp}/mentat-grok-log.XXXXXX") && { cat "$err" "$out"; cat "$ghome/sessions/debug.log" 2>/dev/null; true; } >"$kept" 2>/dev/null; then :; else kept=""; fi
-  fi
+  local kept
+  grok_keep_log
   if [ "$started" = yes ]; then
     gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
   fi

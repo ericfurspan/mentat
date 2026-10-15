@@ -92,6 +92,7 @@ if [ -f "$STUB/rendezvous" ]; then
   touch "$STUB/grok_started"
   for _ in $(seq 100); do [ -f "$STUB/codex_started" ] && { echo yes >"$STUB/grok_saw_codex"; break; }; sleep 0.1; done
 fi
+for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
 [ -f "$STUB/grok_hang" ] && exec sleep 30
 cat "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
@@ -122,13 +123,14 @@ codex_ran() { [ -f "$STUB/args" ]; }
 grok_ran() { [ -f "$STUB/args_grok" ]; }
 left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 worktrees() { "$real_git" -C "$top" worktree list | wc -l | tr -d ' '; }
-# Nothing of a run is left but Codex's private logs of failed runs.
-clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name cache)" ]; }
+# Nothing of a run is left but the private logs of failed runs, Codex's and Grok's.
+clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name 'mentat-grok-log.*' -not -name cache)" ]; }
 no_outside() { [ ! -e "$CALLS/gh" ] && [ ! -e "$CALLS/fetch" ]; }
 data() { sed -n "/^--- BEGIN IDEA DATA ---\$/,/^--- END IDEA DATA ---\$/p" "$1" | sed '1d;$d' | grep -v '^$'; }
 
 reset; rc=$(run "$idea")
 check "both deliver (exit 0): a section for each in order, and a summary of both verdict lines" '[ "$rc" = 0 ] && c=$(grep -n "^## Codex$" "$STUB/stdout" | cut -d: -f1) && g=$(grep -n "^## Grok$" "$STUB/stdout" | cut -d: -f1) && [ "$c" -lt "$g" ] && grep -q "Codex thinks it is fine." "$STUB/stdout" && grep -q "Grok has a view." "$STUB/stdout" && grep -qE "^- Codex \([0-9]+ seconds\): WEIGH VERDICT: DO IT$" "$STUB/stdout" && grep -qE "^- Grok \([0-9]+ seconds\): WEIGH VERDICT: DO IT DIFFERENTLY - fewer helpers$" "$STUB/stdout"'
+check "a delivered weighing keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
 check "a delivered weighing prints no such line on stderr" '! grep -q "not weighed by either tool" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit weighed: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
 check "nothing is posted and nothing is fetched (no gh call, no git fetch)" 'no_outside'
@@ -197,6 +199,10 @@ grok_unweighed() { # $1 description, $2 expected reason fragment
 }
 reset; echo 3 >"$STUB/grok_exit"; rc=$(run "$idea")
 grok_unweighed "Grok exiting non-zero" "Grok exited with status 3"
+grok_log_kept() { # $1 text the kept log must hold
+  p=$(sed -n "s/.*can read it at //p" "$STUB/stdout" | head -n 1); [ -n "$p" ] && [ -f "$p" ] && grep -q "$1" "$p" && case "$p" in "$root"/tmp/mentat-grok-log.*) true ;; *) false ;; esac
+}
+check "it keeps a private copy of Grok's raw log for the maintainer, under the temporary folder" 'grok_log_kept SECRET-LOG-TEXT && ! grep -q "SECRET-LOG-TEXT" "$STUB/stdout" "$STUB/stderr"'
 reset; reply $'Looks fine.\n\nWEIGH VERDICT: DO IT' max_turn_requests; rc=$(run "$idea")
 grok_unweighed "a stop reason other than end_turn, with a verdict line in its text" "stop reason: max_turn_requests"
 reset; reply $'Looks fine.\n\nWEIGH VERDICT: DO IT' future_reason; rc=$(run "$idea")
@@ -215,6 +221,11 @@ reset; reply $'WEIGH VERDICT: DON'"'"'T - nope'; rc=$(run "$idea")
 check "a Grok reply that is only a verdict line counts" '[ "$rc" = 0 ] && grep -q "^- Grok ([0-9]* seconds): WEIGH VERDICT: DON.T - nope$" "$STUB/stdout"'
 reset; touch "$STUB/grok_hang"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1 run "$idea")
 grok_unweighed "a Grok timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "Grok did not finish within 1 seconds"
+check "a Grok timeout keeps its debug log for the maintainer" 'grok_log_kept DEBUG-LOG-TEXT'
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT=high run "$idea")
+check "MENTAT_GROK_REASONING_EFFORT=high passes --reasoning-effort high to Grok" '[ "$rc" = 0 ] && [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args_grok" | tail -n 1)" = high ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args_grok")" = 1 ]'
+reset; rc=$(run "$idea")
+check "without MENTAT_GROK_REASONING_EFFORT Grok gets no --reasoning-effort" '[ "$rc" = 0 ] && grok_ran && ! grep -qx -- "--reasoning-effort" "$STUB/args_grok"'
 check "a Codex timeout of 0 does not limit Grok" 'reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run "$idea"); [ "$rc" = 0 ] && grep -q "^- Grok ([0-9]* seconds): WEIGH VERDICT" "$STUB/stdout"'
 reset; rc=$(GROK_HOME="$root/no grok home" run "$idea")
 grok_unweighed "no Grok sign-in" "Grok is not signed in"
