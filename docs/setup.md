@@ -1,6 +1,6 @@
 # Setup
 
-*For people. Agents follow `rules.md` and `rules-records.md`, not this page.*
+*For people. Agents follow `rules.md`, not this page.*
 
 What a machine needs for Mentat to run, and the plugin commands.
 
@@ -43,4 +43,4 @@ The plugin ships an output style, not forced. It is the voice: every reply start
 - [`grilling`](https://skills.sh/mattpocock/skills/grilling) interviews you about a plan until you agree on it.
 - [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) challenges a plan or claim and ends with a stronger version.
 
-Mentat offers each when it is installed.
+Mentat offers `grilling` when it is installed; `the-fool` is yours to start.

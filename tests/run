@@ -28,31 +28,19 @@ else
   fail ".claude/ must not be version-controlled (settings are the maintainer's own)"
 fi
 
-# hooks.json runs the SessionStart hook twice, which is what loads the rules:
-# once for rules.md and once, with an argument, for rules-records.md. Claude
-# Code caps each hook's output at 10,000 characters, so the rules are two files.
+# hooks.json runs the SessionStart hook once, which is what loads rules.md.
 if command -v jq >/dev/null 2>&1; then
-  if jq -e '.hooks.SessionStart[0].hooks | length == 2' hooks/hooks.json >/dev/null; then
-    pass "hooks.json has exactly two SessionStart commands"
+  if jq -e '.hooks.SessionStart | length == 1 and (.[0].hooks | length == 1) and (.[0].hooks[0].command | endswith("/hooks/session-start"))' hooks/hooks.json >/dev/null; then
+    pass "hooks.json runs hooks/session-start as its one SessionStart command"
   else
-    fail "hooks.json must have exactly two SessionStart commands"
-  fi
-  if jq -e '.hooks.SessionStart[0].hooks | map(.command) | any(endswith("/hooks/session-start"))' hooks/hooks.json >/dev/null; then
-    pass "hooks.json runs hooks/session-start with no argument on SessionStart"
-  else
-    fail "hooks.json does not run hooks/session-start with no argument on SessionStart"
-  fi
-  if jq -e '.hooks.SessionStart[0].hooks | map(.command) | any(endswith("/hooks/session-start rules-records.md"))' hooks/hooks.json >/dev/null; then
-    pass "hooks.json runs hooks/session-start rules-records.md on SessionStart"
-  else
-    fail "hooks.json does not run hooks/session-start rules-records.md on SessionStart"
+    fail "hooks.json must have exactly one SessionStart command, ending in /hooks/session-start"
   fi
 else
   fail "jq not installed, SessionStart wiring not checked"
 fi
 
-# The SessionStart hook prints each rules file unchanged, within Claude Code's
-# 10,000-character limit for context a hook adds.
+# The SessionStart hook prints rules.md unchanged, within Claude Code's
+# 10,000-character limit for the output of a hook.
 if hook_out=$(hooks/session-start); then
   if [ "$hook_out" != "$(cat rules.md)" ]; then
     fail "hooks/session-start output differs from rules.md"
@@ -64,23 +52,12 @@ if hook_out=$(hooks/session-start); then
 else
   fail "hooks/session-start exited non-zero"
 fi
-if hook_out=$(hooks/session-start rules-records.md); then
-  if [ "$hook_out" != "$(cat rules-records.md)" ]; then
-    fail "hooks/session-start rules-records.md output differs from rules-records.md"
-  elif [ "${#hook_out}" -ge 10000 ]; then
-    fail "hooks/session-start rules-records.md prints ${#hook_out} characters (limit 10000)"
-  else
-    pass "hooks/session-start rules-records.md prints rules-records.md (${#hook_out} characters)"
-  fi
-else
-  fail "hooks/session-start rules-records.md exited non-zero"
-fi
 # The file is found relative to the plugin root, not the working directory.
 hook_script=$PWD/hooks/session-start
-if hook_out=$(cd /tmp && "$hook_script" rules-records.md) && [ "$hook_out" = "$(cat rules-records.md)" ]; then
-  pass "hooks/session-start rules-records.md prints the same from another directory"
+if hook_out=$(cd /tmp && "$hook_script") && [ "$hook_out" = "$(cat rules.md)" ]; then
+  pass "hooks/session-start prints the same from another directory"
 else
-  fail "hooks/session-start rules-records.md differs when run from another directory"
+  fail "hooks/session-start differs when run from another directory"
 fi
 
 # Each skill's name matches its folder, which is how Claude Code finds it.
@@ -95,9 +72,8 @@ for f in skills/*/SKILL.md; do
   fi
 done
 
-# rules.md and rules-records.md name each workflow skill as a Skill tool call:
-# every name they use has a skill, and every skill the agent can call is named
-# there. Each skill
+# rules.md names each workflow skill as a Skill tool call: every name it uses
+# has a skill, and every skill the agent can call is named there. Each skill
 # stays under 15,000 characters, a house limit toward Claude Code's budget for
 # skill text kept after compaction.
 while IFS= read -r name; do
@@ -107,13 +83,13 @@ while IFS= read -r name; do
   else
     fail "rules.md names mentat:$name, but skills/$name/SKILL.md is missing"
   fi
-done <<< "$(grep -ho 'mentat:[a-z-]*' rules.md rules-records.md | sed 's/^mentat://' | sort -u)"
+done <<< "$(grep -ho 'mentat:[a-z-]*' rules.md | sed 's/^mentat://' | sort -u)"
 for f in skills/*/SKILL.md; do
   [ -e "$f" ] || continue
   name=${f#skills/}; name=${name%/SKILL.md}
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "disable-model-invocation: true" { found = 1; exit 0 } END { exit !found }' "$f"; then
     pass "$f is started by the maintainer, not named in rules.md"
-  elif grep -q "mentat:$name\`" rules.md rules-records.md; then
+  elif grep -q "mentat:$name\`" rules.md; then
     pass "$f is named in rules.md"
   else
     fail "$f can be called by the agent but rules.md does not name mentat:$name"
