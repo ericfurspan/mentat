@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 400" width="680" height="400" role="img" aria-label="Inside Claude Code: rules and skills loaded every session, the main session, a builder subagent, and merge and push hooks that ask the maintainer. The mentat command runs Codex (OpenAI) and Grok (xAI).">
+  <style>
+    .gb { fill: #F1EFE8; stroke: #888780; stroke-width: 1; }
+    .gt { fill: #2C2C2A; }
+    .gs { fill: #5F5E5A; }
+    .tb { fill: #E1F5EE; stroke: #0F6E56; stroke-width: 1; }
+    .tt { fill: #085041; }
+    .ts { fill: #0F6E56; }
+    .ab { fill: #FAEEDA; stroke: #854F0B; stroke-width: 1; }
+    .at { fill: #633806; }
+    .as { fill: #854F0B; }
+    .l { stroke: #6b7280; stroke-width: 1.2; fill: none; }
+    .lt { fill: #6b7280; }
+    .dash { stroke: #6b7280; stroke-width: 1; fill: none; stroke-dasharray: 4 4; }
+    .mk { stroke: #6b7280; }
+    @media (prefers-color-scheme: dark) {
+      .gb { fill: #2C2C2A; stroke: #888780; }
+      .gt { fill: #F1EFE8; }
+      .gs { fill: #B4B2A9; }
+      .tb { fill: #085041; stroke: #5DCAA5; }
+      .tt { fill: #E1F5EE; }
+      .ts { fill: #9FE1CB; }
+      .ab { fill: #633806; stroke: #FAC775; }
+      .at { fill: #FAEEDA; }
+      .as { fill: #FAC775; }
+      .l { stroke: #9ca3af; }
+      .lt { fill: #9ca3af; }
+      .dash { stroke: #9ca3af; }
+      .mk { stroke: #9ca3af; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="mk" d="M 1 1 L 9 5 L 1 9" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle" dominant-baseline="central">
+    <rect class="dash" x="170" y="30" width="280" height="320" rx="16"/>
+    <text class="gt" x="310" y="52" font-size="14" font-weight="600">Claude Code with Mentat</text>
+    <rect class="gb" x="190" y="72" width="240" height="52" rx="8"/>
+    <text class="gt" x="310" y="89" font-size="14" font-weight="600">Rules and skills</text>
+    <text class="gs" x="310" y="108" font-size="12" font-weight="400">loaded every session</text>
+    <rect class="gb" x="190" y="142" width="240" height="52" rx="8"/>
+    <text class="gt" x="310" y="159" font-size="14" font-weight="600">Main session</text>
+    <text class="gs" x="310" y="178" font-size="12" font-weight="400">plans, sorts findings, reports</text>
+    <rect class="gb" x="190" y="212" width="240" height="52" rx="8"/>
+    <text class="gt" x="310" y="229" font-size="14" font-weight="600">Builder subagent</text>
+    <text class="gs" x="310" y="248" font-size="12" font-weight="400">edits on a branch, runs tests</text>
+    <rect class="gb" x="190" y="282" width="240" height="52" rx="8"/>
+    <text class="gt" x="310" y="299" font-size="14" font-weight="600">Merge and push hooks</text>
+    <text class="gs" x="310" y="318" font-size="12" font-weight="400">ask you first</text>
+    <path class="l" d="M 310 126 L 310 140" marker-end="url(#a)"/>
+    <path class="l" d="M 310 196 L 310 210" marker-end="url(#a)"/>
+    <rect class="ab" x="40" y="140" width="100" height="56" rx="8"/>
+    <text class="at" x="90" y="159" font-size="14" font-weight="600">You</text>
+    <text class="as" x="90" y="179" font-size="12" font-weight="400">agree, merge</text>
+    <path class="l" d="M 142 168 L 188 168" marker-start="url(#a)" marker-end="url(#a)"/>
+    <path class="l" d="M 188 308 L 90 308 L 90 198" marker-end="url(#a)"/>
+    <rect class="gb" x="480" y="142" width="160" height="52" rx="8"/>
+    <text class="gt" x="560" y="159" font-size="14" font-weight="600">mentat command</text>
+    <text class="gs" x="560" y="178" font-size="12" font-weight="400">weigh, challenge, review</text>
+    <path class="l" d="M 432 168 L 478 168" marker-end="url(#a)"/>
+    <rect class="tb" x="480" y="40" width="160" height="52" rx="8"/>
+    <text class="tt" x="560" y="57" font-size="14" font-weight="600">Codex</text>
+    <text class="ts" x="560" y="76" font-size="12" font-weight="400">OpenAI</text>
+    <rect class="tb" x="480" y="244" width="160" height="52" rx="8"/>
+    <text class="tt" x="560" y="261" font-size="14" font-weight="600">Grok</text>
+    <text class="ts" x="560" y="280" font-size="12" font-weight="400">xAI</text>
+    <path class="l" d="M 560 140 L 560 94" marker-end="url(#a)"/>
+    <path class="l" d="M 560 196 L 560 242" marker-end="url(#a)"/>
+    <text class="lt" x="340" y="380" font-size="12" font-weight="400">Teal: models from other vendors. Amber: you.</text>
+  </g>
+</svg>
