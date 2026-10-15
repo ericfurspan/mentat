@@ -253,6 +253,10 @@ reset; touch "$STUB/comment_fails"; rc=$(run)
 check "a start record that cannot be posted is not reviewed and Grok does not run" '[ "$rc" = 1 ] && grep -q "could not post the start comment" "$STUB/out" && ! grok_ran'
 reset; rm "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 check "no Grok sign-in is not reviewed, with no start record" '[ "$rc" = 1 ] && grep -q "Grok is not signed in" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"2020-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+check "an expired Grok sign-in is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expired at 2020-01-01T00:00:00Z" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out"'
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"2099-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+check "a Grok sign-in with its expiry in the future is reviewed" '[ "$rc" = 0 ] && grok_ran'
 reset; rc=$(cd "$root/work tree" && XDG_CACHE_HOME="$root/tmp/cache" "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
 check "a cache folder inside a temporary folder is refused before any start record" '[ "$rc" = 1 ] && grep -q "is inside .*, which the Grok review denies" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; mkdir "$root/nogrok"; for t in gh git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done
