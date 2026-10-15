@@ -51,11 +51,11 @@
     <text class="gs" x="310" y="318" font-size="12" font-weight="400">ask the maintainer first</text>
     <path class="l" d="M 310 126 L 310 140" marker-end="url(#a)"/>
     <path class="l" d="M 310 196 L 310 210" marker-end="url(#a)"/>
-    <rect class="ab" x="40" y="140" width="100" height="56" rx="8"/>
-    <text class="at" x="90" y="159" font-size="14" font-weight="600">Maintainer</text>
-    <text class="as" x="90" y="179" font-size="12" font-weight="400">approves, merges</text>
-    <path class="l" d="M 142 168 L 188 168" marker-start="url(#a)" marker-end="url(#a)"/>
-    <path class="l" d="M 188 308 L 90 308 L 90 198" marker-end="url(#a)"/>
+    <rect class="ab" x="20" y="140" width="124" height="56" rx="8"/>
+    <text class="at" x="82" y="159" font-size="14" font-weight="600">Maintainer</text>
+    <text class="as" x="82" y="179" font-size="12" font-weight="400">approves, merges</text>
+    <path class="l" d="M 146 168 L 188 168" marker-start="url(#a)" marker-end="url(#a)"/>
+    <path class="l" d="M 188 308 L 82 308 L 82 198" marker-end="url(#a)"/>
     <rect class="gb" x="480" y="142" width="160" height="52" rx="8"/>
     <text class="gt" x="560" y="159" font-size="14" font-weight="600">mentat command</text>
     <text class="gs" x="560" y="178" font-size="12" font-weight="400">weigh, challenge, review</text>
