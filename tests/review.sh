@@ -132,6 +132,8 @@ reset; echo 0 >"$STUB/trigger_eyes"; done_on 1111111; printf '[%s]\n' "$(review 
 check "no 👀 on the trigger with findings still exits 2" '[ "$rc" = 2 ] && grep -q "no 👀 from the Codex app was seen" "$STUB/out"'
 reset; touch "$STUB/eyes_fail"; done_on 1111111; rc=$(run)
 check "a failed read of the trigger's reactions is unknown, not a missing 👀" '[ "$rc" = 0 ] && ! grep -q "no 👀" "$STUB/out"'
+reset; echo 0 >"$STUB/trigger_eyes"; printf '[%s]\n' "$(reaction "$APP" eyes 2026-01-01T00:11:00Z)" >"$STUB/reactions_after_trigger"; done_on 1111111; rc=$(run)
+check "the app's 👀 on the pull request instead of the trigger prints no note" '[ "$rc" = 0 ] && ! grep -q "no 👀" "$STUB/out"'
 reset; done_on 1111111; printf '[%s]\n' "$(review "$APP" "$OLD")" >"$STUB/reviews.json"; rc=$(run)
 check "a review of another commit is not a finding on the head" '[ "$rc" = 0 ]'
 reset; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"; rc=$(run)
