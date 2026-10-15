@@ -66,10 +66,10 @@ ci() {
   printf 'CI passed on %s\n' "$head"
 }
 # The issues the pull request closes hold the original request; the description
-# is the builder's account of it. Both go to the reviewer, each labeled. Sets
-# `issues` (the caller's variable) from the closing references in $2, the pull
-# request's JSON. An issue that cannot be read leaves the review without its
-# requirements: not reviewed.
+# is the builder's account of it. Both go to the reviewing tool, local Codex or
+# Grok, each labeled. Sets `issues` (the caller's variable) from the closing
+# references in $2, the pull request's JSON. An issue that cannot be read leaves
+# the review without its requirements: not reviewed.
 read_issues() { # $1 pr, $2 pull request JSON
   local ref irepo n
   issues=""

@@ -16,6 +16,24 @@ else
   fail "AGENTS.md is missing '## Code Review Rules'"
 fi
 
+# Retired phrases stay gone, and the reviewing tool is named (Codex, Grok or Claude), never "the reviewer".
+# The scan skips tests/*.sh (they use `gh pr ready` as test input) and skills/*/CREDITS.md.
+retired=$(git ls-files -z -- . ':!tests/run' ':!tests/*.sh' ':!skills/*/CREDITS.md' | xargs -0 grep -n -i -F \
+  -e 'ready to merge' \
+  -e '100-word' \
+  -e 'closing block' \
+  -e 'draft pull request' \
+  -e 'rules-records' \
+  -e 'brief review' \
+  -e 'gh pr ready' \
+  -e 'the reviewer')
+if [ -z "$retired" ]; then
+  pass "no retired phrase in tracked prose"
+else
+  fail "retired phrase in tracked prose:"
+  printf '%s\n' "$retired"
+fi
+
 # The plugin's output style is named Mentat and is not forced.
 if grep -qx 'name: Mentat' prompts/output-style.md && ! grep -q '^force-for-plugin:' prompts/output-style.md; then
   pass "prompts/output-style.md is the Mentat style, not forced"

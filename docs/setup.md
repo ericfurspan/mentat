@@ -36,7 +36,7 @@ The plugin ships an output style, not forced. It is the voice: every reply start
 
 - Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and turn the app's automatic review off (the repository's Review code setting and Personal preferences); `mentat review` then asks for each review with an `@codex review` comment. Connect the GitHub account `gh` is signed in as to your ChatGPT account (ChatGPT Settings → Connectors → GitHub → Connect another account), or the app answers "To use Codex here, create a Codex account and connect to github". If the app does not answer within 20 minutes, Claude Code runs `mentat review --local`.
 - Without the app: put a line in the repository's AGENTS.md saying reviews are local, and Claude Code goes straight to `mentat review --local`.
-- Either way, the reviewer follows a `## Code Review Rules` section in AGENTS.md when there is one.
+- Either way, Codex (app or local) and Grok follow a `## Code Review Rules` section in AGENTS.md when there is one.
 
 ## Optional skills
 

@@ -3,7 +3,7 @@ name: pr
 description: "Writing a pull request body. Use when opening a pull request, or when its diff changes and the description needs updating."
 ---
 
-The body has two readers: the maintainer, who wants what changed, the proof and the risk; and Codex, which reviews the diff against it. Keep it short.
+The body has two readers: the maintainer, who wants what changed, the proof and the risk; and Codex and Grok, which review the diff against it. Keep it short.
 
 1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`.
 2. Use the repository's pull request template if it has one, adding any part below that it lacks; otherwise the template below. Where the repository has a `GLOSSARY.md`, use its terms.

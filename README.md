@@ -13,7 +13,7 @@ Mentat is a Claude Code plugin for a multi-agent coding workflow with the mainta
 
 ## What you get
 
-- Second opinions from other vendors: Codex and Grok weigh a new idea before it is agreed and review every pull request; Codex also challenges an uncertain plan.
+- Other vendors' models on every change: Codex and Grok weigh a new idea before it is agreed and review every pull request; Codex also challenges an uncertain plan.
 - One builder per change, on its own branch: the chat shows plans and reports, not diffs.
 - Hooks that ask before a merge or a push to the default branch. The maintainer merges.
 
@@ -48,7 +48,7 @@ The `mentat` command (`review`, `challenge`, `weigh`, `check`) runs from Claude 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed as issues.
-- `/mentat:codex-review-off`: turns the reviewer off for the session. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed.
+- `/mentat:codex-review-off`: turns Codex off for the session, and Grok's review with it. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed.
 
 ## Docs and credits
 
