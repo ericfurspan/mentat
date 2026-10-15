@@ -32,7 +32,8 @@ The reference the other pages match.
 | Weighs an idea | Codex and Grok, in parallel | a new feature or workflow change, before the maintainer agrees | `mentat weigh` |
 | Challenges a plan | Codex | an uncertain or consequential plan, after agreement and before the build | `mentat challenge`, through `skills/plan` |
 | Builds and runs the test command | the builder subagent | every change and every review fix | one branch, one checkout |
-| Pushes, opens and describes the pull request | Claude Code | every change | `skills/pr` |
+| Runs the test command again, on a clean tree | Claude Code | before every push | the repository's test command |
+| Pushes, opens and describes the pull request | Claude Code | every change | `git push`, `gh pr create`; the body from `skills/pr` |
 | Reviews each head | Codex, through the GitHub app or locally | every head, up to five rounds | `mentat review`, `mentat review --local` |
 | Reviews the first head | Grok, where installed | once per pull request, beside Codex's first round | `mentat review --grok` |
 | Sorts findings and briefs the fixes | Claude Code | every round | `skills/review`, the builder subagent |
