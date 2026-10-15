@@ -2,17 +2,11 @@
 
 *For people. Agents follow `rules.md` and the skills in `skills/`, not this page.*
 
-## A change, in full
+## What Mentat is made of
 
-```mermaid
-flowchart TD
-    A["Maintainer asks"] --> B["Claude Code plans"]
-    B --> C["Claude Code builds and opens<br/>a pull request"]
-    C --> D["Codex reviews each head,<br/>Grok the first"]
-    D -- findings --> E["Claude Code fixes or answers"]
-    E --> D
-    D -- ready --> F["Maintainer merges"]
-```
+<p align="center"><img src="images/mentat-parts.svg" alt="Inside Claude Code: rules and skills loaded every session, the main session, a builder subagent, and merge and push hooks that ask the maintainer. The mentat command runs Codex (OpenAI) and Grok (xAI)." width="680" height="400"></p>
+
+## A change, in full
 
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then gives the maintainer its view of the request. For a new feature or a change in the workflow, Codex and Grok also weigh the idea (`mentat weigh`), and their verdicts come beside its own. Once the maintainer agrees, it writes down what it will build, what it will leave alone and how the result will be checked. An uncertain or consequential plan is then written out, and Codex challenges it before the build (`mentat challenge`, [`skills/plan`](../skills/plan/SKILL.md)). When a request leaves decisions open that only the maintainer can make, it offers `/grilling`.
 2. One builder, one branch, one checkout per change. The builder is a subagent; Claude Code plans, briefs and reports, and never edits files in the main session. The repository's test command runs before the pull request opens and after every fix; a bug fix starts with a check that fails on the bug.
