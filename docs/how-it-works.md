@@ -4,7 +4,7 @@
 
 ## What Mentat is made of
 
-<p align="center"><img src="images/mentat-parts.svg" alt="Inside Claude Code: rules and skills loaded every session, the main session, a builder subagent, and merge and push hooks that ask the maintainer. The mentat command runs Codex (OpenAI) and Grok (xAI)." width="680" height="400"></p>
+<p align="center"><img src="images/mentat-parts.svg" alt="Inside Claude Code: rules and skills loaded every session, the main session, a builder subagent, and merge and push hooks that ask the maintainer first. The mentat command runs Codex (OpenAI) and Grok (xAI)." width="680" height="400"></p>
 
 ## A change, in full
 

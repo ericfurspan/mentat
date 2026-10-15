@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 320" width="680" height="320" role="img" aria-label="A change moves from idea to plan, build, pull request and merge. Codex and Grok weigh the idea, Codex challenges an uncertain plan, and both review the pull request. The maintainer asks, agrees and merges.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 320" width="680" height="320" role="img" aria-label="A change moves from idea to plan, build, pull request and merge. Codex and Grok give a second opinion on the idea, Codex critiques the plan, and both do the code review. The maintainer requests the change, approves the plan and merges.">
   <style>
     .gb { fill: #F1EFE8; stroke: #888780; stroke-width: 1; }
     .gt { fill: #2C2C2A; }
@@ -36,14 +36,14 @@
   </defs>
   <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle" dominant-baseline="central">
     <rect class="tb" x="40" y="40" width="104" height="56" rx="8"/>
-    <text class="tt" x="92" y="59" font-size="14" font-weight="600">Weighed</text>
-    <text class="ts" x="92" y="79" font-size="12" font-weight="400">Codex, Grok</text>
+    <text class="tt" x="92" y="59" font-size="14" font-weight="600">Codex, Grok</text>
+    <text class="ts" x="92" y="79" font-size="12" font-weight="400">second opinion</text>
     <rect class="tb" x="164" y="40" width="104" height="56" rx="8"/>
-    <text class="tt" x="216" y="59" font-size="14" font-weight="600">Challenged</text>
-    <text class="ts" x="216" y="79" font-size="12" font-weight="400">Codex</text>
+    <text class="tt" x="216" y="59" font-size="14" font-weight="600">Codex</text>
+    <text class="ts" x="216" y="79" font-size="12" font-weight="400">critiques plan</text>
     <rect class="tb" x="412" y="40" width="104" height="56" rx="8"/>
-    <text class="tt" x="464" y="59" font-size="14" font-weight="600">Reviewed</text>
-    <text class="ts" x="464" y="79" font-size="12" font-weight="400">Codex, Grok</text>
+    <text class="tt" x="464" y="59" font-size="14" font-weight="600">Codex, Grok</text>
+    <text class="ts" x="464" y="79" font-size="12" font-weight="400">code review</text>
     <rect class="gb" x="40" y="128" width="104" height="44" rx="8"/>
     <text class="gt" x="92" y="150" font-size="14" font-weight="600">Idea</text>
     <rect class="gb" x="164" y="128" width="104" height="44" rx="8"/>
@@ -55,14 +55,14 @@
     <rect class="gb" x="536" y="128" width="104" height="44" rx="8"/>
     <text class="gt" x="588" y="150" font-size="14" font-weight="600">Merged</text>
     <rect class="ab" x="40" y="204" width="104" height="56" rx="8"/>
-    <text class="at" x="92" y="223" font-size="14" font-weight="600">You ask</text>
-    <text class="as" x="92" y="243" font-size="12" font-weight="400">chat or issue</text>
+    <text class="at" x="92" y="223" font-size="14" font-weight="600">Maintainer</text>
+    <text class="as" x="92" y="243" font-size="12" font-weight="400">requests</text>
     <rect class="ab" x="164" y="204" width="104" height="56" rx="8"/>
-    <text class="at" x="216" y="223" font-size="14" font-weight="600">You agree</text>
-    <text class="as" x="216" y="243" font-size="12" font-weight="400">once</text>
+    <text class="at" x="216" y="223" font-size="14" font-weight="600">Maintainer</text>
+    <text class="as" x="216" y="243" font-size="12" font-weight="400">approves plan</text>
     <rect class="ab" x="536" y="204" width="104" height="56" rx="8"/>
-    <text class="at" x="588" y="223" font-size="14" font-weight="600">You merge</text>
-    <text class="as" x="588" y="243" font-size="12" font-weight="400">hook asks</text>
+    <text class="at" x="588" y="223" font-size="14" font-weight="600">Maintainer</text>
+    <text class="as" x="588" y="243" font-size="12" font-weight="400">merges</text>
     <path class="l" d="M 92 98 L 92 126" marker-end="url(#a)"/>
     <path class="l" d="M 216 98 L 216 126" marker-end="url(#a)"/>
     <path class="l" d="M 464 98 L 464 126" marker-start="url(#a)" marker-end="url(#a)"/>
@@ -73,6 +73,6 @@
     <path class="l" d="M 92 202 L 92 174" marker-end="url(#a)"/>
     <path class="l" d="M 216 202 L 216 174" marker-end="url(#a)"/>
     <path class="l" d="M 588 202 L 588 174" marker-end="url(#a)"/>
-    <text class="lt" x="340" y="296" font-size="12" font-weight="400">Gray: Claude Code's work. Teal: other vendors check. Amber: you decide.</text>
+    <text class="lt" x="340" y="296" font-size="12" font-weight="400">Gray: Claude Code's work. Teal: other vendors' models. Amber: the maintainer.</text>
   </g>
 </svg>
