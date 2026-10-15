@@ -235,6 +235,12 @@ grok_unweighed "an expired Grok sign-in" "Grok's sign-in expired at 2020-01-01T0
 check "an expired sign-in means Grok never started, its token is not printed and Codex's verdict stays" '! grok_ran && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr" && grep -q "^- Codex ([0-9]* seconds): WEIGH VERDICT" "$STUB/stdout"'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2099-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 check "a Grok sign-in with its expiry in the future runs Grok" '[ "$rc" = 0 ] && grok_ran'
+soon=$(date -u -v+600S +%Y-%m-%dT%H:%M:%S.000000Z)
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+grok_unweighed "a Grok sign-in that expires before the time limit would end" "before this run's 1800-second time limit would end"
+check "that sign-in means Grok never started, its token is not printed and Codex's verdict stays" '! grok_ran && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr" && grep -q "^- Codex ([0-9]* seconds): WEIGH VERDICT" "$STUB/stdout"'
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+check "the same sign-in with a 60-second time limit runs Grok" '[ "$rc" = 0 ] && grok_ran'
 reset; rc=$(XDG_CACHE_HOME="$root/tmp/cache" run "$idea")
 grok_unweighed "a cache folder inside a temporary folder" "is inside .*, which the Grok review denies"
 rm -rf "$root/nogrok"; mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/codex" "$root/nogrok/codex"
