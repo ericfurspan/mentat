@@ -18,8 +18,8 @@ flowchart TD
     C -- no --> B
     C -- yes --> D[Builder builds]
     D --> E[Codex reviews]
-    E --> F{Findings?}
-    F -- yes --> G[Claude Code fixes or answers]
+    E --> F{Findings to fix?}
+    F -- yes --> G[Claude Code fixes]
     G --> E
     F -- no --> H([Maintainer merges])
     classDef maintainer fill:#fde68a,stroke:#b45309,color:#1f2937
