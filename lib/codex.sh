@@ -30,10 +30,14 @@ GLOB_DEPTH=8
 # Runs Codex in directory $1 on prompt file $2 and writes its final message to $3.
 # On any failure it calls $4 with the reason, which exits. $5 is Codex's web
 # search mode: "disabled" for reviews, which judge the diff; "cached" (OpenAI's
-# index, no live fetches) for plan challenges, which check current practice.
-# Search runs on OpenAI's side, outside the permissions profile below.
+# index, no live fetches) for plan challenges, which check current practice; "live"
+# for consult, which asks any question. Search runs on OpenAI's side, outside the
+# permissions profile below. $6 is optional: "outside" adds --skip-git-repo-check,
+# for consult, which runs in an empty folder that is not a repository (Codex refuses
+# to start there otherwise). Every other caller passes nothing.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem
+  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem outside=()
+  if [ "${6:-}" = outside ]; then outside=(--skip-git-repo-check); fi
   log="${out%/*}/codex.log"
   filesystem=$(codex_filesystem "$dir")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
@@ -48,7 +52,7 @@ run_codex() {
   # features.apps=false: the apps feature (the ChatGPT account's GitHub connector) is
   # on by default and --ignore-user-config does not turn it off, so Codex could read
   # GitHub beyond the change.
-  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config ${outside[@]+"${outside[@]}"} \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
     -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \

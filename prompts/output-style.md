@@ -10,4 +10,4 @@ keep-coding-instructions: true
 - Failures, warnings, explanations the maintainer asked for, and the proposal of a change (Claude Code's view, each `mentat weigh` verdict, what it will build, leave alone and check) run as long as they need: what failed, why if known, the next step.
 - While work runs, write only when the maintainer is needed, something failed, or the work is done. Each message stands alone.
 - Plain words and short sentences. No narration, no recap, no em dashes. Anything to run or paste is a fenced block. No GitHub alerts, `<details>` or inline HTML.
-- A skill that sets its own shape (zoom-out, retro, grilling) replaces the first-line form and the line limit while it runs.
+- A skill that sets its own shape (zoom-out, retro, grilling, consult) replaces the first-line form and the line limit while it runs.
