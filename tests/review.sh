@@ -16,8 +16,10 @@ check() { if eval "$2"; then printf 'PASS: review %s\n' "$1"; else printf 'FAIL:
 
 # State lives in $STUB: head, reviews.json, reactions.json, comments.json,
 # check_runs.json (check_runs_later.json from the second read on) and status.json.
-# The trigger comment POST records the call and returns trigger_at as its
-# created_at; a file named push_on_trigger holds a head to switch to at that moment.
+# The trigger comment POST records the call and returns trigger_id (default 99)
+# and trigger_at as its id and created_at; a file named push_on_trigger holds a head
+# to switch to at that moment. Reading that comment back returns trigger_eyes (default 1)
+# as its 👀 count; a file named eyes_fail makes that read fail.
 cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
@@ -40,8 +42,9 @@ case "$1 $2" in
     [ -f "$STUB/push_on_trigger" ] && cp "$STUB/push_on_trigger" "$STUB/head"
     [ -f "$STUB/reactions_after_trigger" ] && cp "$STUB/reactions_after_trigger" "$STUB/reactions.json"
     [ -f "$STUB/summary_after_trigger" ] && cp "$STUB/summary_after_trigger" "$STUB/issue_comments.json"
-    cat "$STUB/trigger_at"
+    printf '%s %s\n' "$(cat "$STUB/trigger_id" 2>/dev/null || echo 99)" "$(cat "$STUB/trigger_at")"
     exit 0 ;;
+  "api repos/owner/repo/issues/comments/99") [ -f "$STUB/eyes_fail" ] && exit 1; cat "$STUB/trigger_eyes" 2>/dev/null || echo 1 ;;
   "api --paginate")
     case "$3" in
       */reviews) [ -f "$STUB/reviews_fail" ] && exit 1; cat "$STUB/reviews.json" ;;
@@ -121,6 +124,14 @@ check "a 👀 on a comment that is not a trigger, or none on a trigger, does not
 reset; done_on 1111111; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"
 printf '[{"user":{"login":"%s"},"commit_id":"%s","path":"README.md","line":12,"html_url":"https://example.test/c1"}]\n' "$APP" "$H" >"$STUB/comments.json"; rc=$(run)
 check "a review of the head reports findings (exit 2)" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/review" "$STUB/out" && grep -q "README.md:12 https://example.test/c1" "$STUB/out"'
+reset; done_on 1111111; rc=$(run)
+check "a 👀 seen on the trigger prints no note" '[ "$rc" = 0 ] && ! grep -q "no 👀" "$STUB/out"'
+reset; echo 0 >"$STUB/trigger_eyes"; done_on 1111111; rc=$(run)
+check "no 👀 on the trigger during the round prints the note and still exits 0" '[ "$rc" = 0 ] && grep -q "no 👀 from the Codex app was seen" "$STUB/out" && grep -q "found nothing on $H" "$STUB/out"'
+reset; echo 0 >"$STUB/trigger_eyes"; done_on 1111111; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"; rc=$(run)
+check "no 👀 on the trigger with findings still exits 2" '[ "$rc" = 2 ] && grep -q "no 👀 from the Codex app was seen" "$STUB/out"'
+reset; touch "$STUB/eyes_fail"; done_on 1111111; rc=$(run)
+check "a failed read of the trigger's reactions is unknown, not a missing 👀" '[ "$rc" = 0 ] && ! grep -q "no 👀" "$STUB/out"'
 reset; done_on 1111111; printf '[%s]\n' "$(review "$APP" "$OLD")" >"$STUB/reviews.json"; rc=$(run)
 check "a review of another commit is not a finding on the head" '[ "$rc" = 0 ]'
 reset; printf '[%s]\n' "$(review "$APP" "$H")" >"$STUB/reviews.json"; rc=$(run)

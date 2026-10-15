@@ -88,7 +88,8 @@ run_codex() {
 # round that has no result yet (only a Completed or Failed row at or after that comment
 # ends it; the app rewrites the row while it works). The summary is observed bot output, not a documented API: anything
 # missing, failed or unrecognized ends in "not reviewed", and the review skill
-# falls back to local review. It never starts while a run is going.
+# falls back to local review. It never starts while a run is going. After a round, a
+# note says when no 👀 was seen on this run's trigger comment, since the guard above depends on it.
 CODEX_APP="chatgpt-codex-connector[bot]"
 code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<status> <time to the second> <short sha>"
   # shellcheck disable=SC2016 # the backticks are the summary's literal markdown
@@ -115,8 +116,12 @@ app_reviewing() { # $1 repo, $2 pr: prints how many 👀 mean the app is still r
   fi
   echo $((pr_eyes + comment))
 }
+eyes_note() { # prints a note to stderr when no 👀 was seen on this round's trigger comment and every read of it worked
+  [ -z "$eyes_seen" ] && [ -z "$eyes_unknown" ] || return 0
+  echo "Note: no 👀 from the Codex app was seen on this round's @codex review comment, so the guard against a second trigger while the app works may not be working." >&2
+}
 review() {
-  local pr="${1:-}" repo head asked="" secs=0 found n
+  local pr="${1:-}" repo head asked="" secs=0 found n trigger_id eyes_seen="" eyes_unknown=""
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review <pull request number>" 64 ;; esac
   if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
     not_reviewed "could not read the repository with gh"
@@ -136,14 +141,18 @@ review() {
   n=$(app_reviewing "$repo" "$pr") || not_reviewed "could not read the reactions on #$pr"
   [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
   # Start the round with a comment; GitHub's own time for it marks the round's start.
-  asked=$(gh api -X POST "repos/$repo/issues/$pr/comments" -f body='@codex review' --jq .created_at) && [ -n "$asked" ] ||
+  asked=$(gh api -X POST "repos/$repo/issues/$pr/comments" -f body='@codex review' --jq '"\(.id) \(.created_at)"') &&
+    trigger_id=${asked%% *} && asked=${asked#* } && [ -n "$trigger_id" ] && [ -n "$asked" ] ||
     not_reviewed "could not ask the Codex app to review #$pr"
-  local state row status at sha
+  local state row status at sha e
   while :; do
     [ "$(head_state)" != moved ] || moved
     # Completion first, then the findings, then the head: read in that order so
     # findings posted just before completion are not missed.
     row=$(code_review_row "$repo" "$pr") || row=""
+    # The app reacts 👀 to the trigger while it works and may remove it at the end; seeing it
+    # at any poll is enough, and a failed read makes the answer unknown, never a missing reaction.
+    if e=$(gh api "repos/$repo/issues/comments/$trigger_id" --jq '.reactions.eyes // 0' 2>/dev/null) && [ -n "$e" ]; then [ "$e" = 0 ] || eyes_seen=yes; else eyes_unknown=yes; fi
     status=${row%% *}; sha=${row##* }; at=${row#* }; at=${at%% *}
     case "$head" in "$sha"*) ;; *) row="" ;; esac
     if [ -n "$row" ] && [ -n "$sha" ] && ! [[ "$at" < "$asked" ]]; then
@@ -156,9 +165,11 @@ review() {
               n=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
                 '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"') || n=""
               printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
+              eyes_note
               exit 2
             elif [ "$state" = same ]; then
               printf 'The Codex app found nothing on %s\n' "$head"
+              eyes_note
               exit 0
             fi
           fi ;;
