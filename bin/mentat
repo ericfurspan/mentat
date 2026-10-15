@@ -21,6 +21,7 @@
 #     and prints each reply with its verdict line. Nothing is posted. 0 at least one tool
 #     delivered a verdict, 1 neither did, 64 usage. Time limits: MENTAT_REVIEW_TIMEOUT_SECONDS
 #     (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok); MENTAT_GROK_REASONING_EFFORT sets Grok's effort.
+#     Grok may use its backend web search here (never in review); the local fetch tool is denied.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
 #     gh signed in, the repository readable; prints the codex and grok versions, and warns
 #     when the repository keeps head branches after merge. 0 Mentat can work (warnings

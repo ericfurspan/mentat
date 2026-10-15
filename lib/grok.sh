@@ -12,7 +12,8 @@
 # the user's Grok home but auth.json is copied: no config, MCP servers, hooks or
 # keys.
 #
-# `mentat weigh` runs Grok the same way on an idea, with no pull request. The
+# `mentat weigh` runs Grok the same way on an idea, with no pull request, except that
+# it may use Grok's backend web search (the local fetch tool stays denied). The
 # functions below that it shares (grok_signin, grok_run_folder, grok_export_head, grok_home,
 # grok_args, grok_exec, grok_reply) report a failure by calling the caller's
 # function named in `fail`: not_reviewed before a review's start comment, grok_fail
@@ -170,10 +171,15 @@ grok_args() {
   # profile keeps the rest of the user's folders out of reach. The debug file is the
   # record of a run that never finishes (the JSON arrives only at the end): it goes
   # in the sessions folder, which Grok may write and its tools may not read.
+  # Web search is a backend search on xAI's side, on only for weigh (the caller's
+  # web_search); the local fetch tool is denied in both paths and web_fetch is never
+  # in the allowlist. A review has no web at all.
+  local tools="read_file,grep,list_dir" search=(--disable-web-search)
+  if [ -n "${web_search:-}" ]; then tools="$tools,web_search" search=(); fi
   args=(--cwd "$run/export" --prompt-file "$run/in/prompt" --output-format json
-    --tools "read_file,grep,list_dir" --disallowed-tools "Agent,run_terminal_command,run_terminal_cmd"
-    --deny MCPTool --debug-file "$ghome/sessions/debug.log"
-    --no-subagents --no-plan --no-leader --no-memory --no-auto-update --disable-web-search
+    --tools "$tools" --disallowed-tools "Agent,run_terminal_command,run_terminal_cmd"
+    --deny MCPTool --deny WebFetch --debug-file "$ghome/sessions/debug.log"
+    --no-subagents --no-plan --no-leader --no-memory --no-auto-update ${search[@]+"${search[@]}"}
     --permission-mode dontAsk --max-turns 60 --sandbox "$GROK_PROFILE")
   for d in "$ghome" "${roots[@]}"; do
     args+=(--deny "Read($d)" --deny "Read($d/**)" --deny "Grep($d)" --deny "Grep($d/**)")
@@ -302,6 +308,8 @@ review_grok() {
   local pr="${1:-}" repo info head base title body top mb issues grok_bin me
   local run="" started=no real_grok home_real tmpdir denied roots cache ghome
   local entries args=() out err result_file fail=not_reviewed
+  # shellcheck disable=SC2034 # read by grok_args
+  local web_search=""
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok <pull request number>" 64 ;; esac
   grok_prepare
   grok_run_folder

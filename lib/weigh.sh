@@ -76,6 +76,8 @@ weigh_codex() {
 weigh_grok() {
   # shellcheck disable=SC2034 # the shared Grok functions read these variables
   local t grok_bin real_grok home_real tmpdir denied roots cache ghome entries args=() out err result_file run="" fail=weigh_fail
+  # shellcheck disable=SC2034 # read by grok_args
+  local web_search=1
   for t in git jq grok; do
     command -v "$t" >/dev/null 2>&1 || weigh_fail "$t is not installed"
   done
@@ -87,8 +89,8 @@ weigh_grok() {
   fail=weigh_grok_fail
   grok_export_head
   {
-    printf 'The working directory is a plain export of commit %s, without git history, and you have no shell, only file tools. ' "$head"
-    printf 'You have no web access: a claim about current practice that you cannot check from the repository is "could not verify".\n\n'
+    printf 'The working directory is a plain export of commit %s, without git history, and you have no shell, only file tools and web search. ' "$head"
+    printf 'You may search the web, but you cannot fetch pages: say which claims you checked and where; a claim you could not check is "could not verify".\n\n'
     cat "$res/body"
   } >"$run/in/prompt" || weigh_fail "could not write the prompt"
   grok_home
