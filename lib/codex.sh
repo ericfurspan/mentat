@@ -83,7 +83,10 @@ run_codex() {
 # completion time and the short commit. Its 👍 names no commit, so it certifies
 # nothing here. A round is done when the summary's Code Review row shows Completed
 # for the head, at or after the time of the comment this run posted; then every
-# bot review on the head, security reviews included, is a finding. The summary is observed bot output, not a documented API: anything
+# bot review on the head, security reviews included, is a finding. A new round starts
+# only when no 👀 is on the pull request and none on the newest trigger comment of a
+# round that has no result yet (a row at or after that comment ends it, Completed or
+# Failed). The summary is observed bot output, not a documented API: anything
 # missing, failed or unrecognized ends in "not reviewed", and the review skill
 # falls back to local review. It never starts while a run is going.
 CODEX_APP="chatgpt-codex-connector[bot]"
@@ -94,14 +97,22 @@ code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<
     grep -E '^\|[^|]*Code Review[^|]*\|' | head -n 1 |
     sed -nE 's/^\|[^|]*\|[^|]*\*\*([A-Za-z ]+)\*\*[^|]*datetime="([0-9T:-]+)(\.[0-9]+)?Z"[^|]*\|[[:space:]]*`([0-9a-f]{7,40})`[[:space:]]*\|.*/\1 \2Z \4/p'
 }
-app_reviewing() { # $1 repo, $2 pr: prints how many 👀 the app has on the pull request or on its "@codex review" comments
-  local pr_eyes comment_eyes
+app_reviewing() { # $1 repo, $2 pr: prints how many 👀 mean the app is still reviewing: on the pull request, or on the newest "@codex review" comment while its round has no result
+  local pr_eyes comment last eyes asked row at
   pr_eyes=$(gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" \
     '[.[][] | select(.user.login == $a and .content == "eyes")] | length') || return 1
-  # The comment summary has no user filter: any 👀 there counts, which fails closed.
-  comment_eyes=$(gh api --paginate "repos/$1/issues/$2/comments" | jq -rs \
-    '[.[][] | select(.body | startswith("@codex review")) | .reactions.eyes // 0] | add // 0') || return 1
-  echo $((pr_eyes + comment_eyes))
+  # The comment has no user filter: any 👀 there counts, which fails closed. The app
+  # sometimes leaves its 👀 after the round ends, so it counts only until the summary
+  # shows a result at or after the comment.
+  last=$(gh api --paginate "repos/$1/issues/$2/comments" | jq -rs \
+    '[.[][] | select(.body | startswith("@codex review"))] | last | "\(.reactions.eyes // 0) \(.created_at)"') || return 1
+  eyes=${last%% *}; asked=${last#* }; comment=0
+  if [ "$eyes" != 0 ]; then
+    row=$(code_review_row "$1" "$2") || row=""
+    at=${row#* }; at=${at%% *}
+    if [ -z "$row" ] || [[ "$at" < "$asked" ]]; then comment=$eyes; fi
+  fi
+  echo $((pr_eyes + comment))
 }
 review() {
   local pr="${1:-}" repo head asked="" secs=0 found n
