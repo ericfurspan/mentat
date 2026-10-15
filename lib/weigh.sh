@@ -47,6 +47,15 @@ weigh_deliver() { # $1 reply file
   printf '%s\n' "$verdict" >"$res/$tool.verdict" || weigh_fail "could not keep the verdict"
 }
 
+# Ends the Grok runner like weigh_fail, after keeping Grok's raw log. This runs before
+# the exit, because the EXIT trap removes the run folder. The log may hold a
+# credential: only its path is printed.
+weigh_grok_fail() {
+  local kept
+  grok_keep_log
+  weigh_fail "$1${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
+}
+
 # Codex reads a detached worktree at the recorded commit, as review --local does.
 weigh_codex() {
   local tmp
@@ -74,6 +83,8 @@ weigh_grok() {
   grok_bin=$(command -v grok)
   grok_signin
   grok_run_folder grok-weigh
+  # shellcheck disable=SC2034 # read by the shared Grok functions
+  fail=weigh_grok_fail
   grok_export_head
   {
     printf 'The working directory is a plain export of commit %s, without git history, and you have no shell, only file tools. ' "$head"
