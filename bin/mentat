@@ -22,6 +22,11 @@
 #     delivered a verdict, 1 neither did, 64 usage. Time limits: MENTAT_REVIEW_TIMEOUT_SECONDS
 #     (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok); MENTAT_GROK_REASONING_EFFORT sets Grok's effort.
 #     Grok may use its backend web search here (never in review); the local fetch tool is denied.
+#   mentat consult <question file>  Has Codex and Grok each answer any question, in parallel, each
+#     in an empty folder with no files and no repository (it works outside git), with web search
+#     on. Prints each reply with its CONSULT line. Nothing is posted. 0 at least one tool answered,
+#     1 neither did, 64 usage. Same time limits and effort variables as weigh. Grok has web search
+#     alone; its local fetch tool is denied.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
 #     gh signed in, the repository readable; prints the codex and grok versions, and warns
 #     when the repository keeps head branches after merge. 0 Mentat can work (warnings
@@ -37,7 +42,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared codex grok weigh check; do
+for lib in shared codex grok parallel weigh consult check; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -58,6 +63,7 @@ case "${1:-}" in
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   challenge) shift; challenge "$@" ;;
   weigh) shift; weigh "$@" ;;
+  consult) shift; consult "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] <pull request number> | mentat ci <pull request number> | mentat challenge <plan file> | mentat weigh <idea file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok] <pull request number> | mentat ci <pull request number> | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
 esac

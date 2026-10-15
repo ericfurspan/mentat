@@ -14,16 +14,17 @@
 # since Grok cannot refresh it inside the run.
 #
 # `mentat weigh` runs Grok the same way on an idea, with no pull request, except that
-# it may use Grok's backend web search (the local fetch tool stays denied). The
-# functions below that it shares (grok_signin, grok_run_folder, grok_export_head, grok_home,
-# grok_args, grok_exec, grok_reply) report a failure by calling the caller's
+# it may use Grok's backend web search (the local fetch tool stays denied).
+# `mentat consult` runs it on any question with web search alone: no file tools and
+# an empty export. The functions below that they share (grok_signin, grok_run_folder,
+# grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
 # function named in `fail`: not_reviewed before a review's start comment, grok_fail
 # after it. The pull-request steps (reading it, the start comment, the diff prompt,
 # the did-not-finish comment and posting) stay in review_grok's own functions.
 # Convention: these functions set the caller's variables by name and never return
 # values; that keeps the pull-request path and the weigh path on one set of steps
 # without passing a dozen arguments. A reader tracing a variable should start from
-# review_grok and weigh_grok, which declare them.
+# review_grok, weigh_grok and consult_grok, which declare them.
 GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
@@ -184,11 +185,13 @@ grok_args() {
   # profile keeps the rest of the user's folders out of reach. The debug file is the
   # record of a run that never finishes (the JSON arrives only at the end): it goes
   # in the sessions folder, which Grok may write and its tools may not read.
-  # Web search is a backend search on xAI's side, on only for weigh (the caller's
-  # web_search); the local fetch tool is denied in both paths and web_fetch is never
-  # in the allowlist. A review has no web at all.
-  local tools="read_file,grep,list_dir" search=(--disable-web-search)
-  if [ -n "${web_search:-}" ]; then tools="$tools,web_search" search=(); fi
+  # Web search is a backend search on xAI's side, on only for weigh and consult (the
+  # caller's web_search); the local fetch tool is denied in every path and web_fetch
+  # is never in the allowlist. A review has no web at all. The file tools come from
+  # the caller's grok_tools; review and weigh set nothing and get the three file
+  # tools. Consult sets grok_tools="" and web_search=1, so Grok gets web search alone.
+  local tools="${grok_tools-read_file,grep,list_dir}" search=(--disable-web-search)
+  if [ -n "${web_search:-}" ]; then tools="${tools:+$tools,}web_search" search=(); fi
   args=(--cwd "$run/export" --prompt-file "$run/in/prompt" --output-format json
     --tools "$tools" --disallowed-tools "Agent,run_terminal_command,run_terminal_cmd"
     --deny MCPTool --deny WebFetch --debug-file "$ghome/sessions/debug.log"

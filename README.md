@@ -43,11 +43,12 @@ claude plugin install mentat --marketplace ericfurspan/mentat
 
 ## Commands
 
-The `mentat` command (`review`, `challenge`, `weigh`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes.
+The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes.
 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed as issues.
+- `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in four lines, one per model and a consensus. Runs anywhere, no repository needed.
 - `/mentat:codex-review-off`: turns Codex off for the session, and Grok's review with it. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed.
 
 ## Docs and credits
