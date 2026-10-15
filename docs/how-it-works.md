@@ -8,19 +8,38 @@
 flowchart TD
     A["Maintainer asks"] --> B["Claude Code plans"]
     B --> C["Claude Code builds and opens<br/>a pull request"]
-    C --> D["The reviewer reviews"]
+    C --> D["Codex reviews each head,<br/>Grok the first"]
     D -- findings --> E["Claude Code fixes or answers"]
     E --> D
     D -- ready --> F["Maintainer merges"]
 ```
 
-1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then gives the maintainer its view of the request. For a new feature or a change in the workflow, Codex and Grok also weigh the idea (`mentat weigh`), and their verdicts come beside its own. Once the maintainer agrees, it writes down what it will build, what it will leave alone and how the result will be checked. An uncertain or consequential plan gets a challenge from the reviewer first ([`skills/plan`](../skills/plan/SKILL.md)). When a request leaves decisions open that only the maintainer can make, it offers `/grilling`.
+1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then gives the maintainer its view of the request. For a new feature or a change in the workflow, Codex and Grok also weigh the idea (`mentat weigh`), and their verdicts come beside its own. Once the maintainer agrees, it writes down what it will build, what it will leave alone and how the result will be checked. An uncertain or consequential plan is then written out, and Codex challenges it before the build (`mentat challenge`, [`skills/plan`](../skills/plan/SKILL.md)). When a request leaves decisions open that only the maintainer can make, it offers `/grilling`.
 2. One builder, one branch, one checkout per change. The builder is a subagent; Claude Code plans, briefs and reports, and never edits files in the main session. The repository's test command runs before the pull request opens and after every fix; a bug fix starts with a check that fails on the bug.
 3. Every pull request opens as a normal pull request, not a draft, with a description that gives a short summary, before-and-after evidence and the merge danger ([`skills/pr`](../skills/pr/SKILL.md)).
-4. `mentat review` waits for CI on the head, then comments `@codex review` on the pull request, which starts the Codex app's review of that commit; or `mentat review --local` reviews it with local Codex. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again. Five rounds is the limit. When the loop ends ready, Claude Code posts a final check (its own check, not a review or an approval) and reports that the pull request is ready. If the loop is blocked, not reviewed, or reaches five rounds without being ready, it reports why and stops ([`skills/review`](../skills/review/SKILL.md)).
+4. `mentat review` waits for CI on the head, then comments `@codex review` on the pull request, which starts the Codex app's review of that commit; or `mentat review --local` reviews it with local Codex. Where `grok` is installed, Grok also reviews the first head, once per pull request, beside Codex's first round (`mentat review --grok`); its findings are sorted with Codex's. Claude Code fixes findings that have a realistic trigger, answers the rest with a reason, and reviews again. Five rounds is the limit. When the loop ends ready, Claude Code posts a final check (its own check, not a review or an approval) and reports that the pull request is ready. If the loop is blocked, not reviewed, or reaches five rounds without being ready, it reports why and stops ([`skills/review`](../skills/review/SKILL.md)).
 5. The maintainer merges, the way the repository merges.
 
-With the reviewer off for a session (`/mentat:codex-review-off`), one Claude `code-review` at medium effort replaces the review loop, at most two rounds, with no plan challenges and no `mentat weigh`. Claude Code still runs the tests, waits for CI with `mentat ci`, and posts the final check marked reviewed by Claude; if `code-review` cannot run, the final check says "Not reviewed" and why.
+With Codex off for a session (`/mentat:codex-review-off`; Grok's review stops with it), one Claude `code-review` at medium effort replaces the review loop, at most two rounds, with no plan challenges and no `mentat weigh`. Claude Code still runs the tests, waits for CI with `mentat ci`, and posts the final check marked reviewed by Claude; if `code-review` cannot run, the final check says "Not reviewed" and why.
+
+## Who does what
+
+The reference the other pages match.
+
+| What | Who | When | How |
+|---|---|---|---|
+| Gives a view of a request | Claude Code | every request | chat |
+| Weighs an idea | Codex and Grok, in parallel | a new feature or workflow change, before the maintainer agrees | `mentat weigh` |
+| Challenges a plan | Codex | an uncertain or consequential plan, after agreement and before the build | `mentat challenge`, through `skills/plan` |
+| Builds and runs the test command | the builder subagent | every change and every review fix | one branch, one checkout |
+| Runs the test command again, on a clean tree | Claude Code | before every push | the repository's test command |
+| Pushes, opens and describes the pull request | Claude Code | every change | `git push`, `gh pr create`; the body from `skills/pr` |
+| Reviews each head | Codex, through the GitHub app or locally | every head, up to five rounds | `mentat review`, `mentat review --local` |
+| Reviews the first head | Grok, where installed | once per pull request, beside Codex's first round | `mentat review --grok` |
+| Sorts findings and briefs the fixes | Claude Code | every round | `skills/review`, the builder subagent |
+| Reviews when Codex is off | Claude (`code-review`) | after `/mentat:codex-review-off`, at most two rounds, once `mentat ci` passes | `skills/codex-review-off` |
+| Posts the final check | Claude Code | when the loop ends ready | a comment on the pull request |
+| Merges | the maintainer | every pull request | |
 
 ## The repository comes first
 
@@ -43,7 +62,7 @@ The hooks catch mistakes; they are not a sandbox, and Claude Code's permission m
 | `mentat review <PR>` | Waits for CI on the pull request's head (up to 30 minutes; with no CI, about a minute), comments `@codex review` to start the Codex app's review of that head, and waits up to 20 minutes for the result. Each round posts a new comment. With no result in time, Claude Code falls back to `--local` | 0 no findings, 2 findings posted (links printed), 1 not reviewed, 3 head moved, 4 CI did not pass (failing or unfinished checks printed) |
 | `mentat review --local <PR>` | Waits for CI the same way, reviews the head with local Codex in a temporary checkout, and posts the result if the head has not moved. A reply ending `REVIEW RESULT: INCOMPLETE - <reason>` is posted and counts as not reviewed (exit 1) | same |
 | `mentat review --grok <PR>` | Waits for CI the same way, reviews the head with Grok (if installed) and posts the result; an `INCOMPLETE` reply counts as not reviewed (exit 1). Posts a start comment first and refuses to run again when one from its own GitHub account is there, so Grok runs once per pull request. Grok runs in its own sandbox with file tools, no shell, on an export of the head without `.git`. Time limit: `MENTAT_GROK_TIMEOUT_SECONDS` (default 1800). `MENTAT_GROK_REASONING_EFFORT`, when set, is passed to Grok as `--reasoning-effort` (unset leaves Grok's default; `weigh` uses the same variable). A failed run leaves a private log that is never printed | same |
-| `mentat ci <PR>` | Waits for CI on the head the same way and reviews nothing. Used when the reviewer is off | 0 CI passed or there is none, 1 could not read, 3 head moved, 4 CI did not pass |
+| `mentat ci <PR>` | Waits for CI on the head the same way and reviews nothing. Used when Codex is off | 0 CI passed or there is none, 1 could not read, 3 head moved, 4 CI did not pass |
 | `mentat challenge <plan-file>` | Codex challenges a written plan against the repository and ends with a verdict | 0 delivered (read the verdict), 1 not challenged |
 | `mentat weigh <idea-file>` | Codex and Grok each judge an idea as of `HEAD` (uncommitted changes are not weighed, and the output says so), in parallel: worth doing, a simpler way, the risks. Printed, never posted. Each ends with a verdict line (`DO IT`, `DO IT DIFFERENTLY - <how>` or `DON'T - <why>`) or a "not weighed" line with the reason. Time limits: `MENTAT_REVIEW_TIMEOUT_SECONDS` (Codex) and `MENTAT_GROK_TIMEOUT_SECONDS`; `MENTAT_GROK_REASONING_EFFORT` sets Grok's reasoning effort as in `review --grok`. A failed Grok run leaves a private log that is never printed | 0 at least one verdict, 1 none (stderr tells Claude Code to give its view alone and say the weighing did not happen), 64 usage |
 | `mentat check` | Checks, read-only, that `git`, `gh` and `jq` are installed, `gh` is signed in and the repository is readable. Prints the `codex` version and warns when it is missing; prints the `grok` version when installed | 0 Mentat can work, 1 it cannot |
