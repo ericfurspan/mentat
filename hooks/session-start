@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# SessionStart hook: prints one of Mentat's workflow rules files, which Claude
-# Code adds to the session's context: the file named by the first argument
-# (default rules.md), relative to the plugin root, never the working directory.
-# hooks.json runs it twice, for rules.md and rules-records.md, because Claude
-# Code caps each hook's output at 10,000 characters. Runs on startup, resume,
-# clear and compact. Finds the file relative to this script so it also runs
+# SessionStart hook: prints rules.md, Mentat's workflow rules, which Claude Code
+# adds to every session's context on startup, resume, clear and compact. Claude
+# Code caps a hook's output at 10,000 characters, which tests/run checks. Finds
+# rules.md relative to this script, never the working directory, so it also runs
 # outside a plugin.
 set -euo pipefail
-cat "$(dirname "$0")/../${1:-rules.md}"
+cat "$(dirname "$0")/../rules.md"
