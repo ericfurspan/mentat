@@ -12,10 +12,7 @@
 Mentat is a Claude Code plugin for a multi-agent coding workflow with the maintainer in the loop. Claude Code plans and builds, Codex and Grok weigh a new idea and review the pull request, and the maintainer merges.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mentat-loop-dark.svg">
-    <img src="docs/images/mentat-loop.svg" alt="The maintainer asks and merges; Claude Code builds and Codex reviews, in a loop" width="640" height="340">
-  </picture>
+  <img src="docs/images/mentat-loop.svg" alt="The maintainer asks and merges; Claude Code builds, Codex and Grok review, in a loop" width="640" height="340">
 </p>
 
 ## What you get

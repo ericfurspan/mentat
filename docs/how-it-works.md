@@ -5,13 +5,25 @@
 ## A change, in full
 
 ```mermaid
-flowchart TD
-    A["Maintainer asks"] --> B["Claude Code plans"]
-    B --> C["Claude Code builds and opens<br/>a pull request"]
-    C --> D["Codex reviews each head,<br/>Grok the first"]
-    D -- findings --> E["Claude Code fixes or answers"]
-    E --> D
-    D -- ready --> F["Maintainer merges"]
+sequenceDiagram
+    actor M as Maintainer
+    participant C as Claude Code
+    participant X as Codex
+    participant G as Grok
+    M->>C: asks
+    Note over X,G: a new idea: both weigh it
+    C->>M: its view and a plan
+    M->>C: agrees
+    Note over C: the builder subagent builds on a branch; the tests pass
+    C->>X: pull request
+    C->>G: pull request
+    G-->>C: findings, on the first head only
+    loop each head, at most five rounds
+        X-->>C: findings
+        C->>X: fixes pushed
+    end
+    C->>M: final check
+    M->>M: merges
 ```
 
 1. Work starts from a chat request or an issue. Claude Code reads the repository's AGENTS.md files and the code, then gives the maintainer its view of the request. For a new feature or a change in the workflow, Codex and Grok also weigh the idea (`mentat weigh`), and their verdicts come beside its own. Once the maintainer agrees, it writes down what it will build, what it will leave alone and how the result will be checked. An uncertain or consequential plan is then written out, and Codex challenges it before the build (`mentat challenge`, [`skills/plan`](../skills/plan/SKILL.md)). When a request leaves decisions open that only the maintainer can make, it offers `/grilling`.
