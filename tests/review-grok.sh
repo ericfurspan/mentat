@@ -257,6 +257,11 @@ reset; printf '{"https://auth.x.ai::test":{"expires_at":"2020-01-01T00:00:00.000
 check "an expired Grok sign-in is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expired at 2020-01-01T00:00:00Z" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out"'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2099-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 check "a Grok sign-in with its expiry in the future is reviewed" '[ "$rc" = 0 ] && grok_ran'
+soon=$(date -u -v+600S +%Y-%m-%dT%H:%M:%S.000000Z)
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+check "a Grok sign-in that expires before the time limit would end is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expires at ${soon:0:19}Z, before this run'"'"'s 1800-second time limit and 5 minutes of setup would end" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out"'
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+check "the same sign-in with a 60-second time limit is reviewed" '[ "$rc" = 0 ] && grok_ran'
 reset; rc=$(cd "$root/work tree" && XDG_CACHE_HOME="$root/tmp/cache" "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
 check "a cache folder inside a temporary folder is refused before any start record" '[ "$rc" = 1 ] && grep -q "is inside .*, which the Grok review denies" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; mkdir "$root/nogrok"; for t in gh git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done

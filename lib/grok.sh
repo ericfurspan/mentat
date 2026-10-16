@@ -77,12 +77,16 @@ grok_prepare() {
 # Grok runs on the user's own sign-in. A key in the environment is the metered API
 # and is not used. Sets the caller's real_grok, the user's Grok home.
 #
-# An expired access token cannot be refreshed inside the run (the run home is
-# read-only to Grok's own process except vendor), so Grok parks on a credential-less
-# 401 until the time limit. A missing or unfamiliar expires_at is unknown, not
-# expired, and nothing from the file but the timestamp is printed.
+# The check refuses a sign-in that would expire during the run, counting from now to
+# the end of the time limit plus 5 minutes for the setup that comes before Grok starts
+# (the run folder, the export, the prompt and Grok's home), because Grok cannot
+# refresh it there (the run home is read-only to Grok's own process except vendor):
+# it parks on a credential-less 401 until the time limit. A missing or unfamiliar
+# expires_at is unknown, not expired, and nothing from the file but the timestamp is
+# printed. Every sign-in refusal here starts with "Grok's sign-in" or "Grok is not
+# signed in", so that the skills can tell it from other failures.
 grok_signin() {
-  local expiry now
+  local expiry now ends
   real_grok=$(realdir "${GROK_HOME:-$HOME/.grok}") && [ -f "$real_grok/auth.json" ] ||
     "$fail" "Grok is not signed in: there is no auth.json in its home (run grok login)"
   expiry=$(jq -r '[.. | objects | .expires_at? | strings] | max // empty' "$real_grok/auth.json" 2>/dev/null) || expiry=""
@@ -90,6 +94,14 @@ grok_signin() {
   now=$(date -u +%Y-%m-%dT%H:%M:%S)
   if [ -n "$expiry" ] && [[ "${expiry:0:19}" < "$now" ]]; then
     "$fail" "Grok's sign-in expired at ${expiry:0:19}Z; run grok login or any grok prompt outside Mentat, then retry"
+  fi
+  if [ -n "$expiry" ]; then
+    case "$GROK_TIMEOUT_SECONDS" in '' | *[!0-9]*) ends="" ;; *) ends=$(date -u -v+$((10#$GROK_TIMEOUT_SECONDS + 300))S +%Y-%m-%dT%H:%M:%S 2>/dev/null) ;; esac
+    [ -n "$ends" ] ||
+      "$fail" "could not work out when Grok's time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is $GROK_TIMEOUT_SECONDS)"
+    if [[ "${expiry:0:19}" < "$ends" ]]; then
+      "$fail" "Grok's sign-in expires at ${expiry:0:19}Z, before this run's ${GROK_TIMEOUT_SECONDS}-second time limit and 5 minutes of setup would end; run grok login or any grok prompt outside Mentat, then retry"
+    fi
   fi
 }
 
