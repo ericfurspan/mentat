@@ -170,6 +170,7 @@ check "a linked issue that cannot be read is not reviewed" '[ "$rc" = 1 ] && gre
 reset; rc=$(run)
 check "no linked issue: no issue block" '[ "$rc" = 0 ] && ! grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt"'
 check "asks Codex to open with the pull request's intent in one sentence" 'grep -q "Start your reply with one sentence stating the pull request.s intent" "$STUB/prompt"'
+check "asks Codex to list, after the intent sentence and before the findings, only the request's items the change does not meet or that cannot be checked" 'grep -q "When an agreed request or a linked issue is given, then list, before the findings, only the items in it (what to build, what to leave alone, how it is checked) that the change does not meet or that cannot be checked from the diff and the files, one short line each with the reason; do not list met items, and report each unmet item as a finding too. If every item is met and checkable, say so in one line. When neither is given, do not invent criteria" "$STUB/prompt"'
 check "asks Codex to flag tests that would pass whatever the code does" 'grep -q "Also flag tests that would pass whatever the code does" "$STUB/prompt"'
 check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$STUB/args"'
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
