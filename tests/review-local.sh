@@ -136,7 +136,9 @@ printf '%s\n' "$@" >"$STUB/args"
 cat >"$STUB/prompt"
 [ ! -f "$STUB/live" ] || "$LIVE_SELF" --probe
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
-while [ $# -gt 0 ]; do [ "$1" = -o ] && cp "$STUB/reply" "$2"; shift; done
+# @TREE@ and @TREEP@ in the reply become the checkout's path as created and resolved (macOS: /var and /private/var).
+pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
+while [ $# -gt 0 ]; do [ "$1" = -o ] && sed -e "s|@TREE@|$(pwd)|g" -e "s|@TREEP@|$(pwd -P)|g" "$STUB/reply" >"$2"; shift; done
 STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/codex"
 export PATH="$root/bin:$PATH"
@@ -181,6 +183,66 @@ check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | t
 
 reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment"'
+
+# Codex runs in a temporary checkout and may cite files by its absolute path, as created or
+# resolved. The posted comment holds neither, and links the file at the reviewed commit.
+REPO_URL="https://github.com/owner/repo/blob/$H"
+leaked() { grep -qF "$(cat "$STUB/tree")" "$STUB/comment" || grep -qF "$(cat "$STUB/treep")" "$STUB/comment" || grep -qF "$(dirname "$(cat "$STUB/treep")")" "$STUB/comment"; }
+reset; cat >"$STUB/reply" <<'REPLYEOF'
+Changes README.
+
+- P2 [README:1](@TREE@/README:1): wrong text
+- P2 [lib/shared.sh:93-95](@TREEP@/lib/shared.sh:93-95): a range
+- P3 [a dir/a file.txt](@TREE@/a dir/a file.txt#L4): a spaced name
+- P3 see @TREEP@/lib/x.sh:7 and `@TREE@/lib/y.sh`
+REVIEW RESULT: FINDINGS
+REPLYEOF
+rc=$(run)
+check "a finding that cites the temporary checkout is posted with repository links and no temporary path" '[ "$rc" = 2 ] && ! leaked && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment"'
+check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- P3 see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
+check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(tail -n 1 "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
+reset; printf -- '- P3 see @TREE@-other/z and /Users/other/tree/w\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "a path that only starts with the checkout's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 see $(cat "$STUB/tree")-other/z and /Users/other/tree/w" "$STUB/comment"'
+check "asks for repository-relative path:line citations, never absolute paths" 'grep -q "Cite files by repository-relative path and line (path:line), never an absolute path." "$STUB/prompt"'
+reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @TREE@/lib/z.sh\n' >"$STUB/reply"; rc=$(run)
+check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
+# Link forms: an angle-bracket target, parentheses in a file name, and a line given only in the link text.
+reset; cat >"$STUB/reply" <<'REPLYEOF'
+- P2 [a dir/a file.txt:7](<@TREE@/a dir/a file.txt:7>): angle target
+- P2 [app/(auth)/page.tsx:7](@TREE@/app/(auth)/page.tsx:7) (see also [x](@TREE@/y.sh:2)): parentheses
+- P2 [lib/shared.sh:93](@TREE@/lib/shared.sh): line in the text
+- P2 [lib/x.sh:3-5](@TREEP@/lib/x.sh): range in the text
+REVIEW RESULT: FINDINGS
+REPLYEOF
+rc=$(run)
+check "an angle-bracket link target becomes a repository link" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- P2 [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): angle target" "$STUB/comment"'
+check "a file name with parentheses is linked whole, and the text after the link is kept" 'grep -qF -- "- P2 [app/(auth)/page.tsx:7]($REPO_URL/app/%28auth%29/page.tsx#L7) (see also [x]($REPO_URL/y.sh#L2)): parentheses" "$STUB/comment"'
+check "a line given only in the link text goes into the link, a range too" 'grep -qF -- "- P2 [lib/shared.sh:93]($REPO_URL/lib/shared.sh#L93): line in the text" "$STUB/comment" && grep -qF -- "- P2 [lib/x.sh:3-5]($REPO_URL/lib/x.sh#L3-L5): range in the text" "$STUB/comment"'
+
+# Percent-encoded targets and code-formatted link text.
+reset; cat >"$STUB/reply" <<'REPLYEOF'
+- P2 [a dir/a file.txt:7](@TREE@/a%20dir/a%20file.txt:7): encoded file name
+- P2 [caf](@TREE@/caf%C3%A9.txt:2): non-ASCII, and [x](https://example.test/a%20b) is not touched
+- P2 [`lib/x.sh:7`](@TREE@/lib/x.sh): code-formatted text
+REVIEW RESULT: FINDINGS
+REPLYEOF
+rc=$(run)
+check "a link target with a percent-encoded file name is decoded and encoded once" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- P2 [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): encoded file name" "$STUB/comment" && grep -qF -- "- P2 [caf]($REPO_URL/café.txt#L2)" "$STUB/comment"'
+check "a link that does not point into the checkout is not decoded" 'grep -qF -- "[x](https://example.test/a%20b) is not touched" "$STUB/comment"'
+check "a line in code-formatted link text goes into the link" 'grep -qF -- "- P2 [\`lib/x.sh:7\`]($REPO_URL/lib/x.sh#L7): code-formatted text" "$STUB/comment"'
+spaced="$root/sp ace/tree"
+mkdir -p "$spaced"
+printf -- '- P1 [lib/a.sh:7](%s/lib/a.sh:7) and [b](<%s/b.sh>) and %s/c.sh\n' "${spaced// /%20}" "${spaced// /%20}" "$spaced" >"$STUB/enc.md"
+check "a root with spaces, written as %20 in a link target, is matched" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/enc.md" owner/repo "$H" "$spaced") && [ "$(cat "$STUB/enc.md")" = "- P1 [lib/a.sh:7]($REPO_URL/lib/a.sh#L7) and [b]($REPO_URL/b.sh) and c.sh" ]'
+
+# The roots are matched literally: a checkout whose path has spaces and characters sed and
+# regular expressions treat specially (the test's temporary directory, where mktemp ignores
+# TMPDIR on macOS, cannot be made to have them), called directly.
+odd="$root/odd & [dir] (x)+.*|\\ \$HOME/tree"
+mkdir -p "$odd"
+printf -- '- P1 [README:1](%s/README:1): wrong\n- P2 %s/lib/a b.sh:3 and %s2/keep\n' "$odd" "$odd" "$odd" >"$STUB/odd.md"
+check "a checkout path with spaces and special characters is rewritten, and only that path" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/odd.md" owner/repo "$H" "$odd") && [ "$(cat "$STUB/odd.md")" = "- P1 [README:1]($REPO_URL/README#L1): wrong
+- P2 lib/a b.sh:3 and $odd""2/keep" ]'
 
 reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
 check "a reply without a result line is not reviewed and not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'

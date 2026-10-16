@@ -308,6 +308,7 @@ grok_reply() {
 grok_post() {
   local result model url
   grok_reply
+  localize_review_paths "$result_file" "$repo" "$head" "$run/export" "$cache/mentat/${run##*/}/export" || grok_fail "could not rewrite the paths in Grok's reply"
   result=$(last_line "$result_file")
   case "$result" in
     "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
