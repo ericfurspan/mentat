@@ -82,8 +82,8 @@ read_issues() { # $1 pr, $2 pull request JSON
     issues="$issues"$'\n\n'
   done <<<"$(jq -r '.closingIssuesReferences[]? | "\(.repository.owner.login)/\(.repository.name) \(.number)"' <<<"$2")"
 }
-# The agreed request, for a repository that keeps it outside GitHub (a Linear
-# project): `mentat review --request <file>`. Reads the caller's request_file once,
+# The agreed request, for a repository with an external backlog (rules.md
+# Records): `mentat review --request <file>`. Reads the caller's request_file once,
 # before the wait for CI, and sets the caller's `request` (its text) and
 # `request_fp` (the first 12 hex characters of the SHA-256 of that text without
 # trailing newlines, or "none" with no file). A file that is missing, unreadable or
