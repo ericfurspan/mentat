@@ -237,6 +237,7 @@ reset; unread "with a whitespace-only file" "$root/blank.md" "is empty"
 reset; unread "with a missing file" "$root/no such file.md" "could not read the agreed request file"
 reset; unread "with an unreadable file" "$root/locked.md" "could not read the agreed request file"
 reset; unread "with a directory" "$root" "could not read the agreed request file"
+reset; unread "with an empty file name (an empty variable)" "" "request file name for #7 is empty"
 chmod 600 "$root/locked.md"
 # Usage: the Codex app can only be told to review, so --request without --local or --grok is refused.
 rc=$("$mentat" review --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)

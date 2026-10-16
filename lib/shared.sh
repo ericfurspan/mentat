@@ -90,7 +90,8 @@ read_issues() { # $1 pr, $2 pull request JSON
 # blank is not reviewed. The text is data for the reviewing tool, never instructions.
 read_request() { # $1 pr
   request="" request_fp=none
-  [ -n "${request_file:-}" ] || return 0
+  [ "${request_given:-no}" = yes ] || return 0
+  [ -n "$request_file" ] || not_reviewed "the agreed request file name for #$1 is empty"
   [ -f "$request_file" ] && [ -r "$request_file" ] || not_reviewed "could not read the agreed request file for #$1: $request_file"
   request=$(cat "$request_file") || not_reviewed "could not read the agreed request file for #$1: $request_file"
   printf '%s' "$request" | grep -q '[^[:space:]]' || not_reviewed "the agreed request file for #$1 is empty: $request_file"
