@@ -112,6 +112,7 @@ review_criteria() {
   printf 'Start your reply with one sentence stating the pull request'"'"'s intent, written from the agreed request or the linked issue (when there is one) and the diff, not copied from the description. '
   printf 'Flag it as a finding if you cannot state the intent in one sentence, or if your sentence and the description'"'"'s disagree. '
   printf 'When an agreed request or a linked issue is given, then list, before the findings, only the items in it (what to build, what to leave alone, how it is checked) that the change does not meet or that cannot be checked from the diff and the files, one short line each with the reason; do not list met items, and report each unmet item as a finding too. '
+  printf 'A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description'"'"'s Evidence reports who checked it and what they saw. '
   printf 'If every item is met and checkable, say so in one line. When neither is given, do not invent criteria and skip this list.\n\n'
 }
 # Rewrites the reply in $1 so that it holds no machine-local path:

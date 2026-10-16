@@ -5,7 +5,7 @@ description: "Writing a pull request body. Use when opening a pull request, or w
 
 The body has two readers: the maintainer, who wants what changed, the proof and the risk; and Codex and Grok, which review the diff against it. Keep it short.
 
-1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`. With an external backlog (`rules.md` Records) there is no issue: read the agreed request from the backlog through `mentat:backlog`, write no `Closes #`, and never name the backlog's workspace or item in the body.
+1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`. With an external backlog (`rules.md` Records) there is no issue: read the spec from the backlog through `mentat:backlog` (its `## Spec` section, or `## Agreed request` on an older item), write no `Closes #`, and never name the backlog's workspace or item in the body.
 2. Use the repository's pull request template if it has one, adding any part below that it lacks; otherwise the template below. Where the repository has a `GLOSSARY.md`, use its terms.
 3. If you cannot state the change's intent in one sentence, ask the maintainer before opening the pull request.
 4. Every claim matches the diff on the head commit. After any push that changes what the diff does, update the body.
@@ -21,6 +21,8 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 
 **Before:** <the failing check, the old output, or the old line>
 **After:** <the passing check, the new output, or the new line>
+
+<For each numbered requirement of the spec (with a GitHub issue or an older item, each requirement it states): the check that covers it and what was observed. One check may cover several. A hand check says who checked and what they saw.>
 
 <The test command and its result on the head commit. Say so when a check is missing or could not run. Put the builder's material assumptions here or under Merge danger.>
 

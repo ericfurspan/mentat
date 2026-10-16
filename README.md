@@ -29,6 +29,8 @@ Mentat is a Claude Code plugin that runs a multi-agent coding workflow on a GitH
 4. Claude Code posts a final check on the pull request and reports it ready.
 5. The maintainer merges.
 
+The agreed text has the shape of a spec, and each requirement is traced to its evidence; [spec-driven development](docs/spec-driven.md) maps the steps to that practice.
+
 [How it works](docs/how-it-works.md) has the full flow.
 
 ## Requirements
@@ -58,5 +60,6 @@ The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs f
 ## Docs and credits
 
 - [How it works](docs/how-it-works.md): the full flow, the hooks, the commands.
+- [Spec-driven development](docs/spec-driven.md): where Mentat's steps fall in that practice.
 - [Setup](docs/setup.md): what a machine needs, the plugin commands, the review setup.
 - Third-party credits and licenses: the `CREDITS.md` files under `skills/`.
