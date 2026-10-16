@@ -23,7 +23,7 @@ Mentat is a Claude Code plugin for a multi-agent coding workflow with the mainta
 
 ## How a change moves
 
-1. A request in chat or an issue. Claude Code reads the code and gives its view; for a new feature or a workflow change, Codex and Grok weigh it too (`mentat weigh`). The maintainer agrees on what gets built.
+1. A request in chat or a backlog item. Claude Code reads the code and gives its view; for a new feature or a workflow change, Codex and Grok weigh it too (`mentat weigh`). The maintainer agrees on what gets built.
 2. A builder subagent makes the change on a branch and runs the test command.
 3. Claude Code opens a pull request. `mentat review` waits for CI, then Codex reviews the head commit, and Grok the first one. Findings with a realistic trigger are fixed, the rest answered with a reason, for at most five rounds.
 4. Claude Code posts a final check on the pull request and reports it ready.
@@ -51,7 +51,7 @@ The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs f
 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
-- `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed as issues.
+- `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed in the backlog.
 - `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in five short lines at most: the consensus first, then what each model adds. Runs anywhere, no repository needed.
 - `/mentat:codex-review-off`: turns Codex off for the session, and Grok's review with it. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed.
 
