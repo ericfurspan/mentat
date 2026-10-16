@@ -266,6 +266,13 @@ check "a head the fetch does not match is exit 3, with no start record" '[ "$rc"
 reset; rc=$(race)
 check "a fetch of main by another process between this review's fetch and its read is not a moved head (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H" "$STUB/out" && [ "$(comments)" = 2 ] && [ -z "$(git -C "$root/work tree" for-each-ref refs/mentat)" ]'
 
+# The review must not write the checkout's origin/main either: another review may be using it.
+stale=$(git -C "$root/work tree" commit-tree -m stale "$(git -C "$root/work tree" rev-parse 'HEAD^{tree}')")
+git -C "$root/work tree" update-ref refs/remotes/origin/main "$stale"
+reset; rc=$(run)
+check "a review leaves the checkout's origin/main alone" '[ "$rc" = 0 ] && [ "$(git -C "$root/work tree" rev-parse refs/remotes/origin/main)" = "$stale" ]'
+git -C "$root/work tree" update-ref refs/remotes/origin/main "$BASE"
+
 # Every way a review can fail after the start record leaves a did-not-finish comment and no review.
 not_finished() { # $1 description, $2 expected reason fragment
   frag=$2

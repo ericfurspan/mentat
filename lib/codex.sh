@@ -215,12 +215,13 @@ review_local() {
   # not through git's one per-checkout record of the last fetch, nor the shared
   # origin/<base> tracking ref: the review skill runs a Codex and a Grok review at once
   # in this checkout, and with those shared the fetches of one could overwrite or lock
-  # out the other. The refs go once the merge base is known (the commits stay), and at
+  # out the other (--refmap= keeps the configured mapping from also updating origin/<base>).
+  # The refs go once the merge base is known (the commits stay), and at
   # exit if the run stops before that.
   headref="refs/mentat/review-$pr-$$/head" baseref="refs/mentat/review-$pr-$$/base"
   # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
   trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$headref") >/dev/null 2>&1; git -C $(printf %q "$top") update-ref -d $(printf %q "$baseref") >/dev/null 2>&1" EXIT
-  git -C "$top" fetch -q --no-write-fetch-head origin "+pull/$pr/head:$headref" "+refs/heads/$base:$baseref" || not_reviewed "could not fetch pull request #$pr or $base"
+  git -C "$top" fetch -q --no-write-fetch-head --refmap= origin "+pull/$pr/head:$headref" "+refs/heads/$base:$baseref" || not_reviewed "could not fetch pull request #$pr or $base"
   fetched=$(git -C "$top" rev-parse --verify "$headref") || not_reviewed "could not read the fetched head"
   [ "$fetched" = "$head" ] || die "the head moved from $head; run mentat review again" 3
   mb=$(git -C "$top" merge-base "$head" "$baseref") || not_reviewed "could not find where #$pr branches from $base"
