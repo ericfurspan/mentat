@@ -9,8 +9,8 @@ Item shape. Keep an item's description short. It holds these, in this order:
 
 - One plain sentence, not a heading: what the item is, where it stands, and whether it needs the maintainer. Update it in the same edit as any change of status or wait.
 - The wait block (step 4), only while something waits on the maintainer. It is the first heading of the description. Remove it when the wait ends.
-- The "Agreed request" section (step 6), once agreed. Its text stays byte for byte as agreed, since reviews fingerprint it. Reshaping an item never rewords, retitles or re-spaces it; only a change of scope updates it, as step 6 says.
-- The current plan, only when needed: a short plan or the next step, replaced in place.
+- The "Agreed request" section (step 6), once agreed. It runs from its heading to the next heading; its body is the request that is exported and fingerprinted. Its text stays byte for byte as agreed, since reviews fingerprint it. Reshaping an item never rewords, retitles or re-spaces it; only a change of scope updates it, as step 6 says.
+- The current plan, only when needed, under its own heading `## Current plan`: a short plan or the next step, replaced in place.
 
 Progress notes, evidence and replaced plans go in comments, not the description. Post a replaced plan as a comment before removing it from the description, so it is not lost if the post is refused.
 
@@ -26,9 +26,9 @@ Progress notes, evidence and replaced plans go in comments, not the description.
 6. When the maintainer agrees to build something, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words. Then:
    - Write an "Agreed request" section in the item: what to build, what to leave alone, and how the result is checked, as agreed. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: the `rules.md` record rules apply, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
    - Post the weigh replies kept in chat (step 8) and Claude Code's settlement on the new item.
-   - The section ends before the plan. A change of scope updates the section, in the same words.
+   - A change of scope updates the section, in the same words.
    - Mark the item agreed once the maintainer agrees, in progress when the branch exists, and done when the pull request merges. Link the pull request from the item once it exists. The pull request writes no `Closes #`.
-   - Before each `mentat review --local` or `mentat review --grok`, copy the section alone, unchanged and stopping before the plan, into a temporary file (`mktemp`), pass it with `--request <file>`, and remove the file afterwards. The posted review records the first 12 hex characters of the SHA-256 of that text; `mentat:review` compares it with the current section: `printf '%s' "$(cat <file>)" | shasum -a 256 | cut -c1-12`.
+   - Before each `mentat review --local` or `mentat review --grok`, copy the section's body unchanged (the item shape says where it ends) into a temporary file (`mktemp`), pass it with `--request <file>`, and remove the file afterwards. The posted review records the first 12 hex characters of the SHA-256 of that text; `mentat:review` compares it with the current section's body: `printf '%s' "$(cat <file>)" | shasum -a 256 | cut -c1-12`.
 7. In the item, record what the maintainer asked in Claude Code's own words: a one-line summary in the opening sentence, and any longer account in a comment, labeled as Claude Code's summary; keep the current plan in the description, and post the evidence and any replaced plan as comments. Plain words.
 8. Keep what Codex and Grok said on the item. After `mentat weigh` or `mentat challenge`, Claude Code posts each tool's reply as its own comment, then one more comment with its settlement: what it adopted, what it did not, and why.
    - The reply goes in word for word and nothing else: for `challenge`, the text after the `---` line; for `weigh`, the text under the tool's `## Codex` or `## Grok` heading, without the seconds line. Leave out the header lines (they name local files), log paths and secrets. If the reply itself holds a secret or a local path, leave that part out and say so in the settlement.
