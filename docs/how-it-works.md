@@ -23,6 +23,7 @@ The reference the other pages match.
 | What | Who | When | How |
 |---|---|---|---|
 | Gives a view of a request | Claude Code | every request | chat |
+| Decides what gets built and agrees on the plan | the maintainer | every change | chat |
 | Weighs an idea | Codex and Grok, in parallel | a new feature or workflow change, before the maintainer agrees | `mentat weigh` |
 | Challenges a plan | Codex | an uncertain or consequential plan, after agreement and before the build | `mentat challenge`, through `skills/plan` |
 | Builds and runs the test command | the builder subagent | every change and every review fix | one branch, one checkout |
