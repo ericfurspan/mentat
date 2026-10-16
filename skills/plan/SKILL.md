@@ -11,7 +11,7 @@ A separate plan is written when `rules.md` step 2 calls for this skill. The scop
 2. Before handing it off, run `mentat challenge <plan-file>`. Codex checks the plan against the repository and ends with a verdict.
    - 0: delivered. Read the verdict and the findings.
    - 1: not challenged. The handoff says so.
-3. Sort the findings as `rules.md` "Findings" says, and update the plan; with an external backlog, update the backlog item, not only the file.
+3. Sort the findings as `rules.md` "Findings" says, and update the plan; with an external backlog, update the backlog item, not only the file, and post the challenge reply and the settlement on it (`mentat:backlog`).
 4. Hand off: the maintainer sees the plan with what the challenge changed, and any objection Claude Code did not adopt, with the reason.
 
 A challenge never counts as a review.
