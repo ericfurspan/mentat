@@ -12,6 +12,12 @@
 #     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
 #     MENTAT_GROK_REASONING_EFFORT to pass --reasoning-effort to Grok (weigh too);
 #     unset leaves Grok's default.
+#     Both take `--request <file>` after the mode: `mentat review --local --request <file> <PR>`.
+#     The file holds the agreed request (what to build, what to leave alone, how it is checked)
+#     for a repository that keeps it outside GitHub. It is read once, before the wait for CI;
+#     a missing, unreadable or blank file is not reviewed. It goes to the reviewing tool as
+#     its own data block, and the posted comment records a fingerprint of it. The Codex app
+#     path (no --local or --grok) refuses --request: usage error, 64.
 #   mentat ci <PR>  Waits for CI on the pull request's head the same way, and
 #     reviews nothing. 0 CI passed (or there is none), 1 could not read, 3 the head
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
@@ -58,12 +64,18 @@ case "${1:-}" in
     # --local" would otherwise run the app path.
     mode=app
     case "${1:-}" in --local) shift; mode=local ;; --grok) shift; mode=grok ;; esac
-    [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] <pull request number>" 64
+    request_file=""
+    if [ "${1:-}" = --request ]; then
+      [ "$mode" != app ] && [ $# -ge 2 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number> (--request needs --local or --grok)" 64
+      # shellcheck disable=SC2034 # read by read_request in lib/shared.sh
+      request_file=$2; shift 2
+    fi
+    [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64
     case "$mode" in local) review_local "$@" ;; grok) review_grok "$@" ;; *) review "$@" ;; esac ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   challenge) shift; challenge "$@" ;;
   weigh) shift; weigh "$@" ;;
   consult) shift; consult "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] <pull request number> | mentat ci <pull request number> | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number> | mentat ci <pull request number> | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
 esac

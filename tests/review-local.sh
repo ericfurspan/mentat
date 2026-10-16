@@ -212,6 +212,38 @@ check "a failed post is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post 
 rc=$("$mentat" review --local abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
+# --request <file>: the agreed request, kept apart from the description. Read before CI;
+# its text reaches Codex in its own block; the posted comment records its fingerprint.
+REQ_TEXT=$'Make the README say change.\nLeave every other file alone.\nChecked by reading README.'
+REQ_FP=71fca9a263e9  # shasum -a 256 of REQ_TEXT, first 12 hex characters, computed independently
+mkdir -p "$root/req dir"
+printf '%s\n' "$REQ_TEXT" >"$root/req dir/agreed request.md"
+runq() { (cd "$root/work" && "$mentat" review --local --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
+reset; rc=$(runq "$root/req dir/agreed request.md")
+check "--request: the request reaches Codex in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
+check "--request: the criteria name the agreed request as a source and let it govern scope" 'grep -q "The agreed request (when there is one) and the issues the pull request closes state the original request" "$STUB/prompt" && grep -q "the agreed request governs scope" "$STUB/prompt" && grep -q "written from the agreed request or the linked issue" "$STUB/prompt"'
+check "--request: the posted comment records the request fingerprint (first 12 hex of its SHA-256)" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && [ "${#REQ_FP}" = 12 ]'
+reset; rc=$(run)
+check "no --request: no agreed request block, and the comment says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment"'
+reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(runq "$root/req dir/agreed request.md")
+check "--request with a linked issue: both blocks reach Codex" '[ "$rc" = 0 ] && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "--- BEGIN LINKED ISSUE DATA ---" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt"'
+printf ' \n\t\n\n' >"$root/blank.md"
+printf 'x\n' >"$root/locked.md"; chmod 000 "$root/locked.md"
+unread() { # $1 description, $2 file, $3 expected fragment of the reason
+  rc=$(runq "$2"); frag=$3
+  check "--request $1: not reviewed (exit 1) before CI, Codex does not run, nothing is posted" '[ "$rc" = 1 ] && grep -q "not reviewed: .*$frag" "$STUB/out" && [ ! -f "$STUB/prompt" ] && ! posted && ! grep -q "check-runs\|pr view" "$STUB/calls" 2>/dev/null'
+}
+reset; unread "with a whitespace-only file" "$root/blank.md" "is empty"
+reset; unread "with a missing file" "$root/no such file.md" "could not read the agreed request file"
+reset; unread "with an unreadable file" "$root/locked.md" "could not read the agreed request file"
+reset; unread "with a directory" "$root" "could not read the agreed request file"
+chmod 600 "$root/locked.md"
+# Usage: the Codex app can only be told to review, so --request without --local or --grok is refused.
+rc=$("$mentat" review --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
+check "--request on the app path is a usage error (exit 64)" '[ "$rc" = 64 ] && grep -q "needs --local or --grok" "$STUB/out"'
+rc=$("$mentat" review --local --request >"$STUB/out" 2>&1; echo $?)
+check "--request without a file and a pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
+
 # Live sandbox check. Replays the -c settings the review passed to the stub through the
 # real `codex sandbox` (no model call) and runs shell probes against the review
 # worktree. It does not prove that `codex exec --ignore-user-config --strict-config`

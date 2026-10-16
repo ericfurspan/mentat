@@ -45,7 +45,7 @@ grok_not_started() { # $1 repo, $2 pull request, $3 this account's login
 
 # Reads the pull request and everything the review needs from GitHub and git, and
 # stops with "not reviewed" when something is missing. Sets the caller's variables
-# (top, info, head, base, repo, me, title, body, issues, mb, grok_bin, real_grok).
+# (top, info, head, base, repo, me, title, body, issues, mb, grok_bin, real_grok), and reads the caller's request and request_fp.
 grok_prepare() {
   local tool fetched
   for tool in git gh jq grok; do
@@ -154,7 +154,7 @@ grok_pr_prompt() {
     printf 'Review pull request #%s. The working directory is a plain export of its head, commit %s, without git history, and you have no shell. ' "$pr" "$head"
     printf 'Review the change from %s to %s, which is the diff below; read the files around it with your file tools. Do not modify files.\n\n' "$mb" "$head"
     review_criteria " and the diff"
-    review_requirements "$issues" "$title" "$body"
+    review_requirements "$issues" "$title" "$body" "$request"
     printf -- '--- BEGIN DIFF DATA ---\n'
     cat "$run/diff"
     printf -- '\n--- END DIFF DATA ---\n\n'
@@ -318,6 +318,7 @@ grok_post() {
   {
     printf '## Local Grok review of %s\n\n' "$head"
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
+    printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
     printf -- '- Grok CLI: %s\n- Model: %s\n- Time: %s\n' "$("$grok_bin" --version 2>/dev/null | head -n 1)" "$model" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '- Run locally by the agent, with file-reading tools and no shell.\n\n---\n\n'
     cat "$result_file"
@@ -333,12 +334,13 @@ grok_post() {
 }
 
 review_grok() {
-  local pr="${1:-}" repo info head base title body top mb issues grok_bin me
+  local pr="${1:-}" repo info head base title body top mb issues grok_bin me request request_fp
   local run="" started=no real_grok home_real tmpdir denied roots cache ghome
   local entries args=() out err result_file fail=not_reviewed
   # shellcheck disable=SC2034 # read by grok_args
   local web_search=""
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok <pull request number>" 64 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--request <file>] <pull request number>" 64 ;; esac
+  read_request "$pr"
   grok_prepare
   grok_run_folder
   grok_export_head

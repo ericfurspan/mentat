@@ -192,8 +192,9 @@ review() {
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, and posts the result only if the head has not moved since.
 review_local() {
-  local pr="${1:-}" repo info head base title body top tmp mb fetched now issues
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local] <pull request number>" 64 ;; esac
+  local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local] [--request <file>] <pull request number>" 64 ;; esac
+  read_request "$pr"
   local tool
   for tool in git codex; do
     command -v "$tool" >/dev/null 2>&1 || not_reviewed "$tool is not installed"
@@ -224,7 +225,7 @@ review_local() {
     printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
     printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
     review_criteria ""
-    review_requirements "$issues" "$title" "$body"
+    review_requirements "$issues" "$title" "$body" "$request"
     review_result_line
   } >"$tmp/prompt" || not_reviewed "could not write the prompt"
 
@@ -240,6 +241,7 @@ review_local() {
   {
     printf '## Local Codex review of %s\n\n' "$head"
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
+    printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
     printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
       "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '- Run locally by the agent, not by the Codex GitHub app.\n\n---\n\n'
