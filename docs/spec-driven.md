@@ -15,7 +15,7 @@ Spec Kit's phase names are used. Kiro's requirements, design and tasks map onto 
 | Plan | [`mentat:plan`](../skills/plan/SKILL.md) when the approach is uncertain or the decision matters. Otherwise the agreed spec is the plan. |
 | Tasks | The builder's brief ([`prompts/builder.md`](../prompts/builder.md)). |
 | Implement | The builder subagent, on one branch, running the test command before the pull request. |
-| Converge | The pull request's Evidence cites each requirement by number, with the check that covers it and what was observed ([`skills/pr`](../skills/pr/SKILL.md)). Codex and Grok then review the diff against the spec, and each review records the spec's fingerprint. Last comes the final check ([`skills/review`](../skills/review/SKILL.md)). |
+| Converge | The pull request's Evidence cites each requirement by number, with the check that covers it and what was observed ([`skills/pr`](../skills/pr/SKILL.md)). Codex and Grok then review the diff against the spec, and with an external backlog each review records the spec's fingerprint. Last comes the final check ([`skills/review`](../skills/review/SKILL.md)). |
 
 ## The two backlog paths
 
@@ -31,4 +31,4 @@ Either way, the pull request's Evidence cites each requirement the agreed text s
 
 ## Keeping the spec short and current
 
-There is one spec per change, scaled to it: a bug fix is a few lines. It is fixed once agreed, changes only when the scope does, and every review fingerprints the text it judged, so a review of an older spec shows up as one.
+There is one spec per change, scaled to it: a bug fix is a few lines. It is fixed once agreed, changes only when the scope does, and with an external backlog every review fingerprints the text it judged, so a review of an older spec shows up as one. On the GitHub-issues path the reviews read the issue itself and no fingerprint is recorded.
