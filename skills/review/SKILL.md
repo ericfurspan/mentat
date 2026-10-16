@@ -17,13 +17,13 @@ Each round's result is on the pull request (the review and the replies to it). W
 ## Steps
 
 1. Run `mentat review <N>`, or `mentat review --local <N>` when the repository's AGENTS.md says reviews are local, right after pushing. With an external backlog, see "Agreed request" instead: its reviews are always local. Both first wait for CI on that head (up to 30 minutes; with no CI, about a minute). The app path comments `@codex review` on the pull request, which starts the Codex app's review of that exact head (OpenAI's page says the app flags only P0 and P1 issues, though it has posted P2s), and reads the result from the app's summary comment for that commit, counting security-review findings too; the local path reviews that head with local Codex and posts the result on the pull request. Both wait for the result.
-2. Act on the exit code:
+2. With an external backlog, every round that exits 0 or 2 gets the round's comment link and the settlement on the item (`mentat:backlog`), not the review body; a clean round's settlement says there were no findings. Exit 1, 3 and 4 post nothing. Act on the exit code:
    - 0: no findings. Go to "When the loop ends".
    - 2: findings were posted on that commit. Go to step 3.
    - 1: not reviewed. After the app path, run `mentat review --local <N>`; after the local path, tell the maintainer. If local Codex ended `REVIEW RESULT: INCOMPLETE - ...`, its reason is in the posted reply: give the maintainer the reason with the reply, as a limitation, not a finding. Any findings in that reply are still sorted as step 3 says (fixed or answered with a reason) before you tell the maintainer.
    - 3: the head moved. Run the same command again.
    - 4: CI did not pass on that head, and nothing was reviewed. Failing checks: fix them, push, and run the same command again. CI still running at the timeout: tell the maintainer.
-3. Sort each finding as `rules.md` "Findings" says, Grok's with Codex's (see "Grok"). The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds. With an external backlog, post the round's comment link and the settlement on the item (`mentat:backlog`), not the review body.
+3. Sort each finding as `rules.md` "Findings" says, Grok's with Codex's (see "Grok"). The round number does not change how a finding is sorted. A review that fails, times out or returns nothing is not a pass. There is no check-in with the maintainer between rounds.
 4. Batch the fixes into one brief for the `mentat:builder` subagent (a new dispatch, or continuing the earlier builder). When it reports, run the test command on a clean working tree (`git status --porcelain` prints nothing) on the commit being pushed, push, and update the description (Skill tool, `mentat:pr`). Then go to step 1 for the new head, unless the round limit says to stop. A result on an older head does not make the new head ready.
 
 ## Grok
