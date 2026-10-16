@@ -206,6 +206,19 @@ check "a path that only starts with the checkout's name, and other absolute path
 check "asks for repository-relative path:line citations, never absolute paths" 'grep -q "Cite files by repository-relative path and line (path:line), never an absolute path." "$STUB/prompt"'
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @TREE@/lib/z.sh\n' >"$STUB/reply"; rc=$(run)
 check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
+# Link forms: an angle-bracket target, parentheses in a file name, and a line given only in the link text.
+reset; cat >"$STUB/reply" <<'REPLYEOF'
+- P2 [a dir/a file.txt:7](<@TREE@/a dir/a file.txt:7>): angle target
+- P2 [app/(auth)/page.tsx:7](@TREE@/app/(auth)/page.tsx:7) (see also [x](@TREE@/y.sh:2)): parentheses
+- P2 [lib/shared.sh:93](@TREE@/lib/shared.sh): line in the text
+- P2 [lib/x.sh:3-5](@TREEP@/lib/x.sh): range in the text
+REVIEW RESULT: FINDINGS
+REPLYEOF
+rc=$(run)
+check "an angle-bracket link target becomes a repository link" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- P2 [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): angle target" "$STUB/comment"'
+check "a file name with parentheses is linked whole, and the text after the link is kept" 'grep -qF -- "- P2 [app/(auth)/page.tsx:7]($REPO_URL/app/%28auth%29/page.tsx#L7) (see also [x]($REPO_URL/y.sh#L2)): parentheses" "$STUB/comment"'
+check "a line given only in the link text goes into the link, a range too" 'grep -qF -- "- P2 [lib/shared.sh:93]($REPO_URL/lib/shared.sh#L93): line in the text" "$STUB/comment" && grep -qF -- "- P2 [lib/x.sh:3-5]($REPO_URL/lib/x.sh#L3-L5): range in the text" "$STUB/comment"'
+
 # The roots are matched literally: a checkout whose path has spaces and characters sed and
 # regular expressions treat specially (the test's temporary directory, where mktemp ignores
 # TMPDIR on macOS, cannot be made to have them), called directly.

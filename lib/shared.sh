@@ -117,7 +117,8 @@ review_criteria() {
 # $4..., each also in its resolved form, since /var is /private/var on macOS)
 # becomes its repository-relative path, and a markdown link to such a path becomes
 # a link to that file at commit $3 of repository $2 (owner/name) on GitHub, with
-# #L<n> or #L<n>-L<m> for a trailing :n, :n-m, #Ln or #Ln-Lm. The roots are matched
+# #L<n> or #L<n>-L<m> for a trailing :n, :n-m, #Ln or #Ln-Lm (on the target, else on
+# the link text). A target may be in <> or hold balanced parentheses. The roots are matched
 # literally, as awk strings, so spaces and other characters in them are safe.
 localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... temporary roots
   local file=$1 repo=$2 head=$3 roots="" r real
@@ -135,27 +136,52 @@ localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... tempo
       }
       return o
     }
-    # The GitHub URL for the path inside a link target t, or "" when t has no path.
-    function linkurl(t,   path, frag, a, b) {
-      path = t
-      frag = ""
+    # The line or range a path ends with (:n, :n-m, :n:col, #Ln, #Ln-Lm) as a GitHub
+    # fragment, or "". Sets SPOS to where that ending starts, or 0.
+    function suffix(t,   frag, a, b) {
+      SPOS = 0
       if (match(t, /#L[0-9]+(-L?[0-9]+)?$/)) {
+        SPOS = RSTART
         frag = substr(t, RSTART + 1)
-        path = substr(t, 1, RSTART - 1)
         sub(/-L?/, "-L", frag)
-        frag = "#" frag
-      } else if (match(t, /:[0-9]+(-[0-9]+)?(:[0-9]+)?$/)) {
-        path = substr(t, 1, RSTART - 1)
+        return "#" frag
+      }
+      if (match(t, /:[0-9]+(-[0-9]+)?(:[0-9]+)?$/)) {
+        SPOS = RSTART
         split(substr(t, RSTART + 1), a, ":")
         if (index(a[1], "-")) {
           split(a[1], b, "-")
-          frag = "#L" b[1] "-L" b[2]
-        } else {
-          frag = "#L" a[1]
+          return "#L" b[1] "-L" b[2]
         }
+        return "#L" a[1]
       }
+      return ""
+    }
+    # The GitHub URL for the path inside a link target t, or "" when t has no path.
+    # The line comes from the target, else from the link text.
+    function linkurl(t, text,   path, frag) {
+      path = t
+      frag = suffix(t)
+      if (SPOS) path = substr(t, 1, SPOS - 1)
+      else frag = suffix(text)
       if (path == "") return ""
       return "https://github.com/" ENVIRON["MENTAT_REPO"] "/blob/" ENVIRON["MENTAT_HEAD"] "/" enc(path) frag
+    }
+    # The position of the ) that closes a link target s, which may hold balanced ( ), or 0.
+    function closeparen(s,   i, c, depth) {
+      depth = 0
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (c == "(") depth++
+        else if (c == ")") { if (depth == 0) return i; depth-- }
+      }
+      return 0
+    }
+    # The text of the link whose target starts at the end of s (s ends with "](").
+    function linktext(s,   i) {
+      sub(/\]\((file:\/\/|<)?$/, "", s)
+      for (i = length(s); i >= 1; i--) if (substr(s, i, 1) == "[") return substr(s, i + 1)
+      return ""
     }
     BEGIN {
       esc[" "] = "%20"; esc["%"] = "%25"; esc["#"] = "%23"; esc["?"] = "%3F"
@@ -195,14 +221,17 @@ localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... tempo
         pre = substr(rest, 1, best - 1)
         after = substr(rest, best + bl)
         if (substr(after, 1, 1) == "/") {
-          e = index(after, ")")
-          if ((pre ~ /\]\($/ || pre ~ /\]\(file:\/\/$/) && e > 2) {
-            url = linkurl(substr(after, 2, e - 2))
-            if (url != "") {
-              sub(/file:\/\/$/, "", pre)
-              out = out pre url
-              rest = substr(after, e)
-              continue
+          ang = (pre ~ /\]\(<$/)
+          if (ang || pre ~ /\]\($/ || pre ~ /\]\(file:\/\/$/) {
+            e = ang ? index(after, ">") : closeparen(after)
+            if (e > 2) {
+              url = linkurl(substr(after, 2, e - 2), linktext(out pre))
+              if (url != "") {
+                sub(/(file:\/\/|<)$/, "", pre)
+                out = out pre url
+                rest = substr(after, ang ? e + 1 : e)
+                continue
+              }
             }
           }
           out = out pre
