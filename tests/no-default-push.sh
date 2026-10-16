@@ -163,7 +163,8 @@ out=$(printf '{"tool_name":"Bash","tool_input":{}}' | "$hook"); rc=$?
 check "no command: silent, exit 0" 'silent "$out" "$rc"'
 out=$(jq -n --arg d "$tmp/repo" '{tool_name: "Write", cwd: $d, tool_input: {command: "git push origin main"}}' | "$hook"); rc=$?
 check "another tool: silent, exit 0" 'silent "$out" "$rc"'
-out=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}' | PATH=/nonexistent /bin/bash "$hook"); rc=$?
+# Without jq the hook exits before reading stdin, so a piped writer could be killed and pipefail would report its status.
+out=$(PATH=/nonexistent /bin/bash "$hook" <<<'{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}'); rc=$?
 check "no jq: silent, exit 0" 'silent "$out" "$rc"'
 
 check "hooks.json runs it on PreToolUse for Bash, beside the merge hook" \
