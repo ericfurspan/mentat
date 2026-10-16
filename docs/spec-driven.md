@@ -11,7 +11,7 @@ Spec Kit's phase names are used. Kiro's requirements, design and tasks map onto 
 | Phase | Mentat's step |
 |---|---|
 | Constitution | [`rules.md`](../rules.md) and each repository's AGENTS.md. |
-| Specify | The `## Spec` section of the backlog item: one sentence of intent, numbered requirements that can each be checked, and what is out of scope ([`skills/backlog`](../skills/backlog/SKILL.md)). With a GitHub issue as the backlog, the agreed text on the issue plays that part. |
+| Specify | The `## Spec` section of the backlog item: one sentence of intent, numbered requirements that can each be checked, and what is out of scope ([`skills/backlog`](../skills/backlog/SKILL.md)). With a GitHub issue as the backlog, the issue carries a `## Spec` section in the same shape; older issues keep their text. |
 | Plan | [`mentat:plan`](../skills/plan/SKILL.md) when the approach is uncertain or the decision matters. Otherwise the agreed spec is the plan. |
 | Tasks | The builder's brief ([`prompts/builder.md`](../prompts/builder.md)). |
 | Implement | The builder subagent, on one branch, running the test command before the pull request. |
@@ -20,7 +20,7 @@ Spec Kit's phase names are used. Kiro's requirements, design and tasks map onto 
 ## The two backlog paths
 
 - **External backlog:** the spec is a section of the backlog item. Reviews are local, and Claude Code passes the spec to Codex and Grok as a separate input with `--request`.
-- **GitHub issues:** the issue holds the agreed text, the pull request closes it, and the reviews read it from the issue.
+- **GitHub issues:** the issue carries a `## Spec` section in the same shape (older issues keep their text), the pull request closes it, and the reviews read it from the issue.
 
 Either way, the pull request's Evidence cites each requirement the agreed text states.
 
