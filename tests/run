@@ -35,7 +35,7 @@ else
 fi
 
 # The plugin's output style is named Mentat and is not forced.
-if grep -qx 'name: Mentat' prompts/output-style.md && ! grep -q '^force-for-plugin:' prompts/output-style.md; then
+if awk 'BEGIN { rc = 1 } NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && $0 == "name: Mentat" { rc = 0 } NR > 1 && /^force-for-plugin:/ { rc = 1; exit } END { exit rc }' prompts/output-style.md; then
   pass "prompts/output-style.md is the Mentat style, not forced"
 else
   fail "prompts/output-style.md must set name: Mentat and must not set force-for-plugin"
