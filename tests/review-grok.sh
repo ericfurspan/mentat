@@ -128,7 +128,8 @@ if [ -f "$STUB/live" ]; then
 fi
 for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
 [ -f "$STUB/hang" ] && exec sleep 30
-cat "$STUB/out_json"
+# @EXPORT@ in the reply becomes the export's path, which is where Grok works.
+sed "s|@EXPORT@|$(pwd -P)|g" "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
 exit "$(cat "$STUB/exit_code")"
 STUBEOF
@@ -225,6 +226,19 @@ check "--request before the mode is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/comment/2" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment.2"'
+
+# Grok works in an export under the per-run folder and may cite files by its absolute path.
+# The posted review holds no such path, and links the file at the reviewed commit.
+REPO_URL="https://github.com/owner/repo/blob/$H"
+reset; reply $'Changes README.\n\n- P2 [README:1](@EXPORT@/README:1): wrong text\n- P2 [lib/shared.sh:93-95](@EXPORT@/lib/shared.sh:93-95): a range\n- P3 [a dir/a file.txt](@EXPORT@/a dir/a file.txt#L4): a spaced name\n- P3 see @EXPORT@/lib/x.sh:7 and `@EXPORT@/lib/y.sh`\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+RUN_DIR=$(dirname "$(cat "$STUB/cwd")")
+check "a finding that cites the export is posted with repository links and no local path" '[ "$rc" = 2 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" && ! grep -qF "$RUN_DIR" "$STUB/comment.2" && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment.2" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment.2" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment.2"'
+check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- P3 see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(tail -n 1 "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
+reset; reply $'- P3 not @EXPORT@-other/z or /Users/other/export/w\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a path that only starts with the export's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 not $(cat "$STUB/cwd")-other/z or /Users/other/export/w" "$STUB/comment.2"'
+check "asks for repository-relative path:line citations, never absolute paths" 'grep -q "Cite files by repository-relative path and line (path:line), never an absolute path." "$STUB/prompt"'
+reset; reply $'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @EXPORT@/lib/z.sh'; rc=$(run)
+check "an INCOMPLETE reason that names the export is posted and printed as a repository path" '[ "$rc" = 1 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" "$STUB/out" && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment.2" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out"'
 
 # An INCOMPLETE reply is a complete reply: the review is posted as the record and is not reviewed.
 reset; reply $'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read'; rc=$(run)

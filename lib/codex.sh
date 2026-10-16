@@ -231,6 +231,7 @@ review_local() {
 
   local out="$tmp/review.md" result url
   run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled
+  localize_review_paths "$out" "$repo" "$head" "$tmp/tree" || not_reviewed "could not rewrite the paths in Codex's reply"
   result=$(last_line "$out")
   case "$result" in
     "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
