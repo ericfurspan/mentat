@@ -9,7 +9,7 @@
 
 <p align="center"><a href="https://github.com/ericfurspan/mentat/actions/workflows/tests.yml"><img src="https://github.com/ericfurspan/mentat/actions/workflows/tests.yml/badge.svg" alt="tests"></a></p>
 
-Mentat is a Claude Code plugin for a multi-agent coding workflow with the maintainer in the loop. Claude Code plans and builds, Codex and Grok weigh a new idea and review the pull request, and the maintainer merges.
+Mentat is a Claude Code plugin that runs a multi-agent coding workflow on a GitHub repository. The repository's maintainer requests a change. Claude Code proposes a plan, with Codex and Grok weighing in on new ideas, and a builder makes the change once the maintainer agrees. Codex reviews the pull request after every fix, Grok adds a second review where it is installed, and the maintainer merges. Along the way, the maintainer can step back with `/mentat:zoom-out`, put one question to several models with `/mentat:consult`, and review a session for improvements with `/mentat:retro`.
 
 <p align="center">
   <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge. Codex and Grok give a second opinion on the request, Codex critiques the plan, and both review the code. The maintainer asks for the change, approves the plan and merges." width="680" height="320">
@@ -17,7 +17,7 @@ Mentat is a Claude Code plugin for a multi-agent coding workflow with the mainta
 
 ## What you get
 
-- Other vendors' models on every change: Codex and Grok weigh a new idea before it is agreed and review every pull request; Codex also challenges an uncertain plan.
+- Other vendors' models on every change: Codex is the main reviewer, reviewing every pull request after each fix and challenging an uncertain plan. Grok, where installed, gives a second view: it weighs new ideas beside Codex and reviews each pull request once.
 - One builder per change, on its own branch: the chat shows plans and reports, not diffs.
 - Hooks that ask before a merge or a push to the default branch. The maintainer merges.
 

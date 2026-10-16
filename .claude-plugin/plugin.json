@@ -1,6 +1,6 @@
 {
   "name": "mentat",
-  "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code plans and builds, Codex and Grok weigh ideas and review pull requests, the maintainer merges.",
+  "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: a repository's maintainer requests a change, Claude Code proposes a plan and has a builder make it once the maintainer agrees, Codex reviews pull requests with Grok as a second reviewer, and the maintainer merges.",
   "author": { "name": "ericfurspan" },
   "repository": "https://github.com/ericfurspan/mentat",
   "agents": ["./prompts/builder.md"],
