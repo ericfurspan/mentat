@@ -6,7 +6,7 @@
     {
       "name": "mentat",
       "source": "./",
-      "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code proposes plans to a repository's maintainer and has a builder make the change, Codex and Grok weigh new ideas and review pull requests, a hook asks before any merge."
+      "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: Claude Code proposes plans to a repository's maintainer and has a builder make the change once they agree, Codex and Grok weigh new ideas and review pull requests, a hook asks before any merge."
     }
   ]
 }
