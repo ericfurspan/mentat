@@ -219,6 +219,22 @@ check "an angle-bracket link target becomes a repository link" '[ "$rc" = 2 ] &&
 check "a file name with parentheses is linked whole, and the text after the link is kept" 'grep -qF -- "- P2 [app/(auth)/page.tsx:7]($REPO_URL/app/%28auth%29/page.tsx#L7) (see also [x]($REPO_URL/y.sh#L2)): parentheses" "$STUB/comment"'
 check "a line given only in the link text goes into the link, a range too" 'grep -qF -- "- P2 [lib/shared.sh:93]($REPO_URL/lib/shared.sh#L93): line in the text" "$STUB/comment" && grep -qF -- "- P2 [lib/x.sh:3-5]($REPO_URL/lib/x.sh#L3-L5): range in the text" "$STUB/comment"'
 
+# Percent-encoded targets and code-formatted link text.
+reset; cat >"$STUB/reply" <<'REPLYEOF'
+- P2 [a dir/a file.txt:7](@TREE@/a%20dir/a%20file.txt:7): encoded file name
+- P2 [caf](@TREE@/caf%C3%A9.txt:2): non-ASCII, and [x](https://example.test/a%20b) is not touched
+- P2 [`lib/x.sh:7`](@TREE@/lib/x.sh): code-formatted text
+REVIEW RESULT: FINDINGS
+REPLYEOF
+rc=$(run)
+check "a link target with a percent-encoded file name is decoded and encoded once" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- P2 [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): encoded file name" "$STUB/comment" && grep -qF -- "- P2 [caf]($REPO_URL/café.txt#L2)" "$STUB/comment"'
+check "a link that does not point into the checkout is not decoded" 'grep -qF -- "[x](https://example.test/a%20b) is not touched" "$STUB/comment"'
+check "a line in code-formatted link text goes into the link" 'grep -qF -- "- P2 [\`lib/x.sh:7\`]($REPO_URL/lib/x.sh#L7): code-formatted text" "$STUB/comment"'
+spaced="$root/sp ace/tree"
+mkdir -p "$spaced"
+printf -- '- P1 [lib/a.sh:7](%s/lib/a.sh:7) and [b](<%s/b.sh>) and %s/c.sh\n' "${spaced// /%20}" "${spaced// /%20}" "$spaced" >"$STUB/enc.md"
+check "a root with spaces, written as %20 in a link target, is matched" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/enc.md" owner/repo "$H" "$spaced") && [ "$(cat "$STUB/enc.md")" = "- P1 [lib/a.sh:7]($REPO_URL/lib/a.sh#L7) and [b]($REPO_URL/b.sh) and c.sh" ]'
+
 # The roots are matched literally: a checkout whose path has spaces and characters sed and
 # regular expressions treat specially (the test's temporary directory, where mktemp ignores
 # TMPDIR on macOS, cannot be made to have them), called directly.

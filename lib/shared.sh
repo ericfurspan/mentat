@@ -118,7 +118,8 @@ review_criteria() {
 # becomes its repository-relative path, and a markdown link to such a path becomes
 # a link to that file at commit $3 of repository $2 (owner/name) on GitHub, with
 # #L<n> or #L<n>-L<m> for a trailing :n, :n-m, #Ln or #Ln-Lm (on the target, else on
-# the link text). A target may be in <> or hold balanced parentheses. The roots are matched
+# the link text, without its backticks). A target may be in <>, hold balanced parentheses,
+# or have %XX escapes, which are decoded when it points into a root. The roots are matched
 # literally, as awk strings, so spaces and other characters in them are safe.
 localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... temporary roots
   local file=$1 repo=$2 head=$3 roots="" r real
@@ -127,7 +128,7 @@ localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... tempo
     roots+="$r"$'\n'
     if real=$(cd -P "$r" 2>/dev/null && pwd -P); then roots+="$real"$'\n'; fi
   done
-  MENTAT_ROOTS=$roots MENTAT_REPO=$repo MENTAT_HEAD=$head awk '
+  LC_ALL=C MENTAT_ROOTS=$roots MENTAT_REPO=$repo MENTAT_HEAD=$head awk '
     function enc(s,   i, c, o) {
       o = ""
       for (i = 1; i <= length(s); i++) {
@@ -163,7 +164,7 @@ localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... tempo
       path = t
       frag = suffix(t)
       if (SPOS) path = substr(t, 1, SPOS - 1)
-      else frag = suffix(text)
+      else { gsub(/`/, "", text); frag = suffix(text) }
       if (path == "") return ""
       return "https://github.com/" ENVIRON["MENTAT_REPO"] "/blob/" ENVIRON["MENTAT_HEAD"] "/" enc(path) frag
     }
@@ -183,10 +184,48 @@ localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... tempo
       for (i = length(s); i >= 1; i--) if (substr(s, i, 1) == "[") return substr(s, i + 1)
       return ""
     }
+    # s with its %XX escapes decoded (bytes: awk runs under LC_ALL=C).
+    function dec(s,   o, p) {
+      o = ""
+      while ((p = match(s, /%[0-9A-Fa-f][0-9A-Fa-f]/)) > 0) {
+        o = o substr(s, 1, RSTART - 1) chr[toupper(substr(s, RSTART + 1, 2))]
+        s = substr(s, RSTART + 3)
+      }
+      return o s
+    }
+    # d starts with a root followed by a slash.
+    function hasroot(d,   i) {
+      for (i = 1; i <= nr; i++) if (substr(d, 1, length(roots[i]) + 1) == roots[i] "/") return 1
+      return 0
+    }
+    # line with the %XX escapes of each link target decoded when it points into a
+    # root, so that a root written with %20 is matched, and the path is encoded once.
+    function predecode(line,   out, rest, p, after, pf, e, tgt, d) {
+      out = ""
+      rest = line
+      while ((p = index(rest, "](")) > 0) {
+        out = out substr(rest, 1, p + 1)
+        after = substr(rest, p + 2)
+        pf = ""
+        if (substr(after, 1, 1) == "<") { pf = "<"; after = substr(after, 2); e = index(after, ">") }
+        else {
+          if (substr(after, 1, 7) == "file://") { pf = "file://"; after = substr(after, 8) }
+          e = closeparen(after)
+        }
+        if (e == 0) { rest = after; out = out pf; break }
+        tgt = substr(after, 1, e - 1)
+        d = dec(tgt)
+        if (hasroot(d)) tgt = d
+        out = out pf tgt
+        rest = substr(after, e)
+      }
+      return out rest
+    }
     BEGIN {
       esc[" "] = "%20"; esc["%"] = "%25"; esc["#"] = "%23"; esc["?"] = "%3F"
       esc["("] = "%28"; esc[")"] = "%29"; esc["["] = "%5B"; esc["]"] = "%5D"
       esc["<"] = "%3C"; esc[">"] = "%3E"
+      for (i = 1; i < 256; i++) chr[sprintf("%02X", i)] = sprintf("%c", i)
       n = split(ENVIRON["MENTAT_ROOTS"], raw, "\n")
       nr = 0
       for (i = 1; i <= n; i++) {
@@ -203,7 +242,7 @@ localize_review_paths() { # $1 reply file, $2 owner/name, $3 commit, $4... tempo
       }
     }
     {
-      rest = $0
+      rest = predecode($0)
       out = ""
       while (rest != "") {
         best = 0
