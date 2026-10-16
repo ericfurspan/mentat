@@ -7,7 +7,7 @@ What a machine needs for Mentat to run, and the plugin commands.
 ## What a machine needs
 
 - macOS, Claude Code, `git`, `jq`, and `gh` signed in.
-- For reviews, one of: OpenAI's Codex GitHub app on the repository (a ChatGPT plan with Codex code review), or the Codex CLI signed in, for local reviews. `mentat challenge` and `mentat weigh` also use the CLI, and so does `mentat consult`.
+- For reviews, one of: OpenAI's Codex GitHub app on the repository (a ChatGPT plan with Codex code review), or the Codex CLI signed in, for local reviews. A repository with an external backlog needs the CLI: its reviews are local. `mentat challenge` and `mentat weigh` also use the CLI, and so does `mentat consult`.
 - Optional: Grok Build (`grok`), signed in with `grok login`, adds a second review of each pull request's first head (`mentat review --grok`) and a second view in `mentat weigh` and `mentat consult`.
 - Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node), for local Codex.
 - A separate GitHub account for the agent, where the repository requires an approval.
@@ -35,7 +35,7 @@ The plugin ships an output style, not forced. It is the voice: every reply start
 ## Reviews
 
 - Codex GitHub app: connect the repository to Codex in ChatGPT, install the app on it, and turn the app's automatic review off (the repository's Review code setting and Personal preferences); `mentat review` then asks for each review with an `@codex review` comment. Connect the GitHub account `gh` is signed in as to your ChatGPT account (ChatGPT Settings → Connectors → GitHub → Connect another account), or the app answers "To use Codex here, create a Codex account and connect to github". If the app does not answer within 20 minutes, Claude Code runs `mentat review --local`.
-- Without the app: put a line in the repository's AGENTS.md saying reviews are local, and Claude Code goes straight to `mentat review --local`.
+- Without the app: put a line in the repository's AGENTS.md saying reviews are local, and Claude Code goes straight to `mentat review --local`. In a repository with an external backlog the app is not an alternative: its reviews are always local, with the agreed request passed to Codex and Grok as a file (`--request`), because Mentat builds that prompt itself and whether the app reads a full request in its comment is unverified.
 - Either way, Codex (app or local) and Grok follow a `## Code Review Rules` section in AGENTS.md when there is one.
 
 ## Optional skills

@@ -193,6 +193,36 @@ check "gives Grok the linked issue's request as data" '[ "$rc" = 0 ] && grep -q 
 reset; echo '[{"number":4,"repository":{"name":"repo","owner":{"login":"owner"}}}]' >"$STUB/closes"; rc=$(run)
 check "a linked issue that cannot be read is not reviewed, with no start record" '[ "$rc" = 1 ] && grep -q "could not read issue owner/repo#4" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 
+# --request <file>: the agreed request, kept apart from the description. Read before CI and
+# before the start record; its text reaches Grok in its own block; the posted review records
+# its fingerprint.
+REQ_TEXT=$'Make the README say change.\nLeave every other file alone.\nChecked by reading README.'
+REQ_FP=71fca9a263e9  # shasum -a 256 of REQ_TEXT, first 12 hex characters, computed independently
+mkdir -p "$root/req dir"
+printf '%s\n' "$REQ_TEXT" >"$root/req dir/agreed request.md"
+runq() { (cd "$root/work tree" && "$mentat" review --grok --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
+reset; rc=$(runq "$root/req dir/agreed request.md")
+check "--request: the request reaches Grok in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt" && grep -q "the agreed request governs scope" "$STUB/prompt"'
+check "--request: the posted review records the request fingerprint (first 12 hex of its SHA-256)" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment.2" && [ "${#REQ_FP}" = 12 ]'
+reset; rc=$(run)
+check "no --request: no agreed request block, and the review says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment.2"'
+reset; echo '[{"number":3,"repository":{"name":"repo","owner":{"login":"owner"}}}]' >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(runq "$root/req dir/agreed request.md")
+check "--request with a linked issue: both blocks reach Grok" '[ "$rc" = 0 ] && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "--- BEGIN LINKED ISSUE DATA ---" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt"'
+printf ' \n\t\n\n' >"$root/blank.md"
+printf 'x\n' >"$root/locked.md"; chmod 000 "$root/locked.md"
+unread() { # $1 description, $2 file, $3 expected fragment of the reason
+  rc=$(runq "$2"); frag=$3
+  check "--request $1: not reviewed (exit 1) before CI, Grok does not run, no start record, nothing is posted" '[ "$rc" = 1 ] && grep -q "not reviewed: .*$frag" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q "check-runs\|pr view\|api user" "$STUB/calls" 2>/dev/null && [ -z "$(left_over)" ]'
+}
+reset; unread "with a whitespace-only file" "$root/blank.md" "is empty"
+reset; unread "with a missing file" "$root/no such file.md" "could not read the agreed request file"
+reset; unread "with an unreadable file" "$root/locked.md" "could not read the agreed request file"
+reset; unread "with a directory" "$root" "could not read the agreed request file"
+reset; unread "with an empty file name (an empty variable)" "" "request file name for #7 is empty"
+chmod 600 "$root/locked.md"
+rc=$("$mentat" review --request "$root/req dir/agreed request.md" --grok 7 >"$STUB/out" 2>&1; echo $?)
+check "--request before the mode is a usage error (exit 64)" '[ "$rc" = 64 ]'
+
 reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/comment/2" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment.2"'
 
