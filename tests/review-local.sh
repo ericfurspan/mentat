@@ -152,6 +152,20 @@ reset() {
 run() { (cd "$root/work" && "$mentat" review --local "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
 
+# A git that, right after any fetch of pull/7/head, also fetches main in the same checkout:
+# what a second review running at the same time does. Only the cases that use it (race)
+# put it on the PATH, and the git it calls is the one found here, before that.
+mkdir -p "$root/racebin"
+cat >"$root/racebin/git" <<RACEEOF
+#!/usr/bin/env bash
+"$(command -v git)" "\$@" || exit \$?
+case "\$*" in
+  *pull/7/head*) [ "\${1:-}" = -C ] && "$(command -v git)" -C "\$2" fetch -q origin main ;;
+esac
+RACEEOF
+chmod +x "$root/racebin/git"
+race() { PATH="$root/racebin:$PATH" run; }
+
 reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
 check "failed CI is not reviewed (exit 4): Codex does not run and nothing is posted" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && [ ! -f "$STUB/prompt" ] && ! posted'
 reset; rc=$(run)
@@ -269,6 +283,18 @@ check "a head that moves during the review is not posted (exit 3)" '[ "$rc" = 3 
 
 reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(run)
 check "a head GitHub reports that the fetch does not match is exit 3" '[ "$rc" = 3 ] && [ ! -f "$STUB/prompt" ]'
+
+# A second review fetching main into the same checkout while this one fetches the pull
+# request must not change what this one reads: it is not a moved head.
+reset; rc=$(race)
+check "a fetch of main by another process between this review's fetch and its read is not a moved head (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H" "$STUB/out" && posted && [ -z "$(git -C "$root/work" for-each-ref refs/mentat)" ]'
+
+# The review must not write the checkout's origin/main either: another review may be using it.
+stale=$(git -C "$root/work" commit-tree -m stale "$(git -C "$root/work" rev-parse 'HEAD^{tree}')")
+git -C "$root/work" update-ref refs/remotes/origin/main "$stale"
+reset; rc=$(run)
+check "a review leaves the checkout's origin/main alone" '[ "$rc" = 0 ] && [ "$(git -C "$root/work" rev-parse refs/remotes/origin/main)" = "$stale" ]'
+git -C "$root/work" update-ref refs/remotes/origin/main "$BASE"
 
 reset; touch "$STUB/comment_fails"; rc=$(run)
 check "a failed post is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post the review" "$STUB/out"'

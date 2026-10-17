@@ -156,6 +156,20 @@ reset() {
 run() { (cd "$root/work tree" && "$mentat" review --grok "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 comments() { find "$STUB" -name 'comment.*' | wc -l | tr -d ' '; }
 grok_ran() { [ -f "$STUB/args" ]; }
+
+# A git that, right after any fetch of pull/7/head, also fetches main in the same checkout:
+# what a second review running at the same time does. Only the cases that use it (race)
+# put it on the PATH, and the git it calls is the one found here, before that.
+mkdir -p "$root/racebin"
+cat >"$root/racebin/git" <<RACEEOF
+#!/usr/bin/env bash
+"$(command -v git)" "\$@" || exit \$?
+case "\$*" in
+  *pull/7/head*) [ "\${1:-}" = -C ] && "$(command -v git)" -C "\$2" fetch -q origin main ;;
+esac
+RACEEOF
+chmod +x "$root/racebin/git"
+race() { PATH="$root/racebin:$PATH" run; }
 left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 
 reset; rc=$(run)
@@ -250,6 +264,15 @@ reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"fa
 check "failed CI is not reviewed (exit 4): no start record, Grok does not run" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(run)
 check "a head the fetch does not match is exit 3, with no start record" '[ "$rc" = 3 ] && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; rc=$(race)
+check "a fetch of main by another process between this review's fetch and its read is not a moved head (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H" "$STUB/out" && [ "$(comments)" = 2 ] && [ -z "$(git -C "$root/work tree" for-each-ref refs/mentat)" ]'
+
+# The review must not write the checkout's origin/main either: another review may be using it.
+stale=$(git -C "$root/work tree" commit-tree -m stale "$(git -C "$root/work tree" rev-parse 'HEAD^{tree}')")
+git -C "$root/work tree" update-ref refs/remotes/origin/main "$stale"
+reset; rc=$(run)
+check "a review leaves the checkout's origin/main alone" '[ "$rc" = 0 ] && [ "$(git -C "$root/work tree" rev-parse refs/remotes/origin/main)" = "$stale" ]'
+git -C "$root/work tree" update-ref refs/remotes/origin/main "$BASE"
 
 # Every way a review can fail after the start record leaves a did-not-finish comment and no review.
 not_finished() { # $1 description, $2 expected reason fragment

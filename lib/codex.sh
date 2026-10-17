@@ -192,7 +192,7 @@ review() {
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, and posts the result only if the head has not moved since.
 review_local() {
-  local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp
+  local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp headref baseref
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local] [--request <file>] <pull request number>" 64 ;; esac
   read_request "$pr"
   local tool
@@ -211,11 +211,22 @@ review_local() {
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
   read_issues "$pr" "$info"
-  git -C "$top" fetch -q origin "pull/$pr/head" || not_reviewed "could not fetch pull request #$pr"
-  fetched=$(git -C "$top" rev-parse FETCH_HEAD) || not_reviewed "could not read the fetched head"
+  # Fetch the head and the base into refs of this run's own, named with the process id,
+  # not through git's one per-checkout record of the last fetch, nor the shared
+  # origin/<base> tracking ref: the review skill runs a Codex and a Grok review at once
+  # in this checkout, and with those shared the fetches of one could overwrite or lock
+  # out the other (--refmap= keeps the configured mapping from also updating origin/<base>).
+  # The refs go once the merge base is known (the commits stay), and at
+  # exit if the run stops before that.
+  headref="refs/mentat/review-$pr-$$/head" baseref="refs/mentat/review-$pr-$$/base"
+  # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
+  trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$headref") >/dev/null 2>&1; git -C $(printf %q "$top") update-ref -d $(printf %q "$baseref") >/dev/null 2>&1" EXIT
+  git -C "$top" fetch -q --no-write-fetch-head --refmap= origin "+pull/$pr/head:$headref" "+refs/heads/$base:$baseref" || not_reviewed "could not fetch pull request #$pr or $base"
+  fetched=$(git -C "$top" rev-parse --verify "$headref") || not_reviewed "could not read the fetched head"
   [ "$fetched" = "$head" ] || die "the head moved from $head; run mentat review again" 3
-  git -C "$top" fetch -q origin "+refs/heads/$base:refs/remotes/origin/$base" || not_reviewed "could not fetch $base"
-  mb=$(git -C "$top" merge-base "$head" "refs/remotes/origin/$base") || not_reviewed "could not find where #$pr branches from $base"
+  mb=$(git -C "$top" merge-base "$head" "$baseref") || not_reviewed "could not find where #$pr branches from $base"
+  git -C "$top" update-ref -d "$headref" || not_reviewed "could not remove the ref fetched for #$pr"
+  git -C "$top" update-ref -d "$baseref" || not_reviewed "could not remove the ref fetched for $base"
   tmp=$(mktemp -d) || not_reviewed "could not create a temporary directory"
   # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
   trap "git -C $(printf %q "$top") worktree remove --force $(printf %q "$tmp/tree") >/dev/null 2>&1; rm -rf $(printf %q "$tmp")" EXIT
