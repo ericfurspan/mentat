@@ -33,6 +33,14 @@ The agreed text has the shape of a spec, and each requirement is traced to its e
 
 [How it works](docs/how-it-works.md) has the full flow.
 
+## See it work
+
+Three merged pull requests show the flow as it ran, with the reviews and the final check in the comments:
+
+- [#291](https://github.com/ericfurspan/mentat/pull/291): a feature agreed as a spec, four Codex review rounds with the findings fixed, a Grok review, and the final check.
+- [#290](https://github.com/ericfurspan/mentat/pull/290): a bug fix with a regression test, and the race it fixes explained.
+- [#286](https://github.com/ericfurspan/mentat/pull/286): a leak fix, with nine test cases that fail without it, three Codex review rounds, and one round's findings answered with reasons rather than fixed.
+
 ## Requirements
 
 - macOS, Claude Code, `git`, `jq`, and `gh` signed in.
@@ -46,6 +54,8 @@ claude plugin install mentat --marketplace ericfurspan/mentat
 ```
 
 [Setup](docs/setup.md) has the plugin commands and the review setup.
+
+Mentat is in use on the maintainer's own repositories. It has no versioned releases: a new install is the repository as it stands, and an existing install updates with the commands in [Setup](docs/setup.md).
 
 ## Commands
 
@@ -63,3 +73,7 @@ The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs f
 - [Spec-driven development](docs/spec-driven.md): where Mentat's steps fall in that practice.
 - [Setup](docs/setup.md): what a machine needs, the plugin commands, the review setup.
 - Third-party credits and licenses: the `CREDITS.md` files under `skills/`.
+
+## How this repository is built
+
+Mentat builds itself under its own workflow. Here the builder's commits and Claude Code's pull requests are made under the GitHub account `ericfurspan-agent`, which cannot approve its own pull requests. The maintainer requests each change, agrees to its spec and merges every pull request; Codex and Grok review the code.
