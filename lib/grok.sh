@@ -10,8 +10,10 @@
 # be applied, Grok refuses to start. The profile and the permission rules are
 # built from where things are at run time, in the per-run folder below. Nothing in
 # the user's Grok home but auth.json is copied: no config, MCP servers, hooks or
-# keys. A sign-in whose access token is past its expiry is refused before the copy,
-# since Grok cannot refresh it inside the run.
+# keys. A sign-in whose access token is past its expiry, or would pass it before the
+# run ends, is first refreshed by running `grok models` once in the user's own Grok
+# home (outside the run, where Grok can write it) and is refused before the copy only
+# if that did not extend it, since Grok cannot refresh it inside the run.
 #
 # `mentat weigh` runs Grok the same way on an idea, with no pull request, except that
 # it may use Grok's backend web search (the local fetch tool stays denied).
@@ -85,35 +87,84 @@ grok_prepare() {
   grok_signin
 }
 
+# What Grok is started with besides PATH, HOME, GROK_HOME, TMPDIR and LANG: it
+# switches off what the user's other tools and the network would otherwise add. Shared
+# by the run (grok_exec) and the sign-in refresh (grok_refresh), so both see the same.
+GROK_RUN_ENV=(GROK_MEMORY=0 GROK_TELEMETRY_ENABLED=0 GROK_TELEMETRY_TRACE_UPLOAD=0 GROK_EXTERNAL_OTEL=0 GROK_DISABLE_AUTOUPDATER=1
+  GROK_CLAUDE_AGENTS_ENABLED=false GROK_CLAUDE_HOOKS_ENABLED=false GROK_CLAUDE_MCPS_ENABLED=false GROK_CLAUDE_RULES_ENABLED=false GROK_CLAUDE_SKILLS_ENABLED=false
+  GROK_CURSOR_AGENTS_ENABLED=false GROK_CURSOR_HOOKS_ENABLED=false GROK_CURSOR_MCPS_ENABLED=false GROK_CURSOR_RULES_ENABLED=false GROK_CURSOR_SKILLS_ENABLED=false)
+
 # Grok runs on the user's own sign-in. A key in the environment is the metered API
-# and is not used. Sets the caller's real_grok, the user's Grok home.
+# and is not used. Sets the caller's real_grok, the user's Grok home, and reads the
+# caller's grok_bin.
 #
 # The check refuses a sign-in that would expire during the run, counting from now to
 # the end of the time limit plus 5 minutes for the setup that comes before Grok starts
 # (the run folder, the export, the prompt and Grok's home), because Grok cannot
 # refresh it there (the run home is read-only to Grok's own process except vendor):
-# it parks on a credential-less 401 until the time limit. A missing or unfamiliar
-# expires_at is unknown, not expired, and nothing from the file but the timestamp is
-# printed. Every sign-in refusal here starts with "Grok's sign-in" or "Grok is not
-# signed in", so that the skills can tell it from other failures.
+# it parks on a credential-less 401 until the time limit. Before refusing, it lets
+# Grok refresh the sign-in where Grok can (grok_refresh), once, and looks again. A
+# missing or unfamiliar expires_at is unknown, not expired, and is not refreshed;
+# nor is a sign-in whose time limit is not a number. Nothing from the file but the
+# timestamp is printed. Every sign-in refusal here starts with "Grok's sign-in" or
+# "Grok is not signed in", so that the skills can tell it from other failures.
 grok_signin() {
   local expiry now ends
   real_grok=$(realdir "${GROK_HOME:-$HOME/.grok}") && [ -f "$real_grok/auth.json" ] ||
     "$fail" "Grok is not signed in: there is no auth.json in its home (run grok login)"
+  grok_expiry
+  if [ -n "$expiry" ] && [ -n "$ends" ] && { [[ "${expiry:0:19}" < "$now" ]] || [[ "${expiry:0:19}" < "$ends" ]]; }; then
+    grok_refresh
+    grok_expiry
+    [ -n "$expiry" ] ||
+      "$fail" "Grok's sign-in could not be read after Mentat tried to refresh it; run grok login or any grok prompt outside Mentat, then retry"
+  fi
+  [ -n "$expiry" ] || return 0
+  if [[ "${expiry:0:19}" < "$now" ]]; then
+    "$fail" "Grok's sign-in expired at ${expiry:0:19}Z; run grok login or any grok prompt outside Mentat, then retry"
+  fi
+  [ -n "$ends" ] ||
+    "$fail" "could not work out when Grok's time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is $GROK_TIMEOUT_SECONDS)"
+  if [[ "${expiry:0:19}" < "$ends" ]]; then
+    "$fail" "Grok's sign-in expires at ${expiry:0:19}Z, before this run's ${GROK_TIMEOUT_SECONDS}-second time limit and 5 minutes of setup would end; run grok login or any grok prompt outside Mentat, then retry"
+  fi
+}
+
+# Reads the sign-in's expiry and the clock into the caller's expiry (empty unless it is
+# in the recognized form), now, and ends (now plus the time limit and 5 minutes; empty
+# when the time limit is not a number).
+grok_expiry() {
   expiry=$(jq -r '[.. | objects | .expires_at? | strings] | max // empty' "$real_grok/auth.json" 2>/dev/null) || expiry=""
   case "$expiry" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*Z) ;; *) expiry="" ;; esac
   now=$(date -u +%Y-%m-%dT%H:%M:%S)
-  if [ -n "$expiry" ] && [[ "${expiry:0:19}" < "$now" ]]; then
-    "$fail" "Grok's sign-in expired at ${expiry:0:19}Z; run grok login or any grok prompt outside Mentat, then retry"
-  fi
-  if [ -n "$expiry" ]; then
-    case "$GROK_TIMEOUT_SECONDS" in '' | *[!0-9]*) ends="" ;; *) ends=$(date -u -v+$((10#$GROK_TIMEOUT_SECONDS + 300))S +%Y-%m-%dT%H:%M:%S 2>/dev/null) ;; esac
-    [ -n "$ends" ] ||
-      "$fail" "could not work out when Grok's time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is $GROK_TIMEOUT_SECONDS)"
-    if [[ "${expiry:0:19}" < "$ends" ]]; then
-      "$fail" "Grok's sign-in expires at ${expiry:0:19}Z, before this run's ${GROK_TIMEOUT_SECONDS}-second time limit and 5 minutes of setup would end; run grok login or any grok prompt outside Mentat, then retry"
+  case "$GROK_TIMEOUT_SECONDS" in '' | *[!0-9]*) ends="" ;; *) ends=$(date -u -v+$((10#$GROK_TIMEOUT_SECONDS + 300))S +%Y-%m-%dT%H:%M:%S 2>/dev/null) ;; esac
+}
+
+# Lets Grok refresh the sign-in: `grok models` lists the models and exits, with no
+# prompt and no tools, and renews the access token with the refresh token on the way.
+# It runs in the user's own Grok home, as the real Grok does outside Mentat, with the
+# rebuilt environment of the run (the run's own folder does not exist yet).
+# GROK_AUTH_EARLY_INVALIDATION_SECS, Grok's refresh buffer, is set to the time limit,
+# the 5 minutes and a minute more, so a token that is still valid but too short for
+# the run is renewed too. It has 30 seconds, and its exit status does not matter:
+# grok_signin reads the file again and decides. Reads the caller's real_grok and grok_bin.
+grok_refresh() {
+  local pid secs=0
+  (umask 077 && exec env -i PATH="$PATH" HOME="$HOME" GROK_HOME="$real_grok" TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-en_US.UTF-8}" \
+    GROK_AUTH_EARLY_INVALIDATION_SECS=$((10#$GROK_TIMEOUT_SECONDS + 360)) "${GROK_RUN_ENV[@]}" \
+    "$grok_bin" models) >/dev/null 2>&1 </dev/null &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$secs" -ge 30 ]; then
+      kill "$pid" 2>/dev/null
+      sleep 2
+      kill -9 "$pid" 2>/dev/null
+      break
     fi
-  fi
+    sleep 1
+    secs=$((secs + 1))
+  done
+  wait "$pid" 2>/dev/null || true
 }
 
 # The per-run folder and Grok's home inside it, checked against the folders the
@@ -265,10 +316,7 @@ grok_exec() {
   local pid secs=0 rc
   # The environment is rebuilt for Grok alone: nothing else of the agent's reaches it.
   (cd "$run/export" && exec env -i PATH="$PATH" HOME="$HOME" GROK_HOME="$ghome" TMPDIR="$run/tmp" LANG="${LANG:-en_US.UTF-8}" \
-    GROK_MEMORY=0 GROK_TELEMETRY_ENABLED=0 GROK_TELEMETRY_TRACE_UPLOAD=0 GROK_EXTERNAL_OTEL=0 GROK_DISABLE_AUTOUPDATER=1 \
-    GROK_CLAUDE_AGENTS_ENABLED=false GROK_CLAUDE_HOOKS_ENABLED=false GROK_CLAUDE_MCPS_ENABLED=false GROK_CLAUDE_RULES_ENABLED=false GROK_CLAUDE_SKILLS_ENABLED=false \
-    GROK_CURSOR_AGENTS_ENABLED=false GROK_CURSOR_HOOKS_ENABLED=false GROK_CURSOR_MCPS_ENABLED=false GROK_CURSOR_RULES_ENABLED=false GROK_CURSOR_SKILLS_ENABLED=false \
-    "$grok_bin" "${args[@]}") >"$out" 2>"$err" </dev/null &
+    "${GROK_RUN_ENV[@]}" "$grok_bin" "${args[@]}") >"$out" 2>"$err" </dev/null &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$secs" -ge "$GROK_TIMEOUT_SECONDS" ]; then
