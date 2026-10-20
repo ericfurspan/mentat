@@ -33,6 +33,16 @@ The agreed text has the shape of a spec, and each requirement is traced to its e
 
 [How it works](docs/how-it-works.md) has the full flow.
 
+## See it work
+
+Three merged pull requests show the flow as it ran, with the reviews and the final check in the comments:
+
+- [#291](https://github.com/ericfurspan/mentat/pull/291): a feature agreed as a spec, four Codex review rounds with the findings fixed, a Grok review, and the final check.
+- [#290](https://github.com/ericfurspan/mentat/pull/290): a bug fix with a regression test, and the race it fixes explained.
+- [#286](https://github.com/ericfurspan/mentat/pull/286): a leak fix, with nine test cases that fail without it, three Codex review rounds, and one round's findings answered with reasons rather than fixed.
+
+Mentat is built with Mentat. The pull requests above, like every other one here, were opened by the agent account `ericfurspan-agent` under this workflow and merged by the maintainer; that account cannot approve its own pull requests.
+
 ## Requirements
 
 - macOS, Claude Code, `git`, `jq`, and `gh` signed in.
