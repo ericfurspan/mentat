@@ -101,6 +101,16 @@ STUBEOF
 # (mentat starts it with an empty environment, so its own path is written in.)
 { printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/grok" <<'STUBEOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
+if [ "${1:-}" = models ]; then
+  printf '%s\n' "$@" >"$STUB/args_models"
+  env | sort >"$STUB/env_models"
+  printf '%s\n' "$GROK_HOME" >"$STUB/models_home"
+  if [ -f "$STUB/refresh_to" ]; then
+    printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token-2"}}\n' "$(cat "$STUB/refresh_to")" >"$GROK_HOME/auth.json"
+    chmod 600 "$GROK_HOME/auth.json"
+  fi
+  exit 0
+fi
 args=("$@")
 prev=""
 printf '%s\n' "$@" >"$STUB/args"
@@ -321,16 +331,32 @@ check "a head that moves during the review does not lose it: the review is poste
 reset; touch "$STUB/comment_fails"; rc=$(run)
 check "a start record that cannot be posted is not reviewed and Grok does not run" '[ "$rc" = 1 ] && grep -q "could not post the start comment" "$STUB/out" && ! grok_ran'
 reset; rm "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "no Grok sign-in is not reviewed, with no start record" '[ "$rc" = 1 ] && grep -q "Grok is not signed in" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+check "no Grok sign-in is not reviewed, with no start record" '[ "$rc" = 1 ] && grep -q "Grok is not signed in" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ ! -e "$STUB/args_models" ]'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2020-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "an expired Grok sign-in is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expired at 2020-01-01T00:00:00Z" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out"'
+check "an expired Grok sign-in is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expired at 2020-01-01T00:00:00Z" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out" && [ -f "$STUB/args_models" ]'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2099-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "a Grok sign-in with its expiry in the future is reviewed" '[ "$rc" = 0 ] && grok_ran'
+check "a Grok sign-in with its expiry in the future is reviewed" '[ "$rc" = 0 ] && grok_ran && [ ! -e "$STUB/args_models" ]'
 soon=$(date -u -v+600S +%Y-%m-%dT%H:%M:%S.000000Z)
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "a Grok sign-in that expires before the time limit would end is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expires at ${soon:0:19}Z, before this run'"'"'s 1800-second time limit and 5 minutes of setup would end" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out"'
+check "a Grok sign-in that expires before the time limit would end is not reviewed, with no start record and its token not printed" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expires at ${soon:0:19}Z, before this run'"'"'s 1800-second time limit and 5 minutes of setup would end" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q fake-token "$STUB/out" && [ -f "$STUB/args_models" ]'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "the same sign-in with a 60-second time limit is reviewed" '[ "$rc" = 0 ] && grok_ran'
+check "the same sign-in with a 60-second time limit is reviewed" '[ "$rc" = 0 ] && grok_ran && [ ! -e "$STUB/args_models" ]'
+# A sign-in that is expired, or too short for the run, is first refreshed by grok models
+# in the user's own Grok home; the stub's models branch rewrites it only when refresh_to exists.
+set_signin() { printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$1" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
+reset_signin() { printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
+refresh_used() { [ "$(cat "$STUB/args_models")" = models ] && [ "$(cat "$STUB/models_home")" = "$GH_REAL" ] && grep -qx "GROK_AUTH_EARLY_INVALIDATION_SECS=2160" "$STUB/env_models" && grep -qx "GROK_HOME=$GH_REAL" "$STUB/env_models" && grep -qx "TMPDIR=$TMPDIR" "$STUB/env_models" && grep -qx "GROK_MEMORY=0" "$STUB/env_models" && ! grep -q "XAI_API_KEY\|MENTAT_CANARY" "$STUB/env_models" && grep -q fake-token-2 "$STUB/auth_copy"; }
+
+reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run); reset_signin
+check "an expired Grok sign-in is refreshed by grok models in the user's own Grok home, and the review goes ahead with the refreshed sign-in" '[ "$rc" = 0 ] && grok_ran && refresh_used'
+reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run); reset_signin
+check "a Grok sign-in that is too short for the time limit is refreshed too, and the review goes ahead" '[ "$rc" = 0 ] && grok_ran && refresh_used'
+reset; echo 2021-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run); reset_signin
+check "a refresh that does not extend an expired sign-in is not reviewed, with the expired message and no start record" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in expired at 2021-01-01T00:00:00Z" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ -f "$STUB/args_models" ] && ! grep -q fake-token "$STUB/out"'
+reset; echo garbage >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run); reset_signin
+check "a sign-in that cannot be read after the refresh is not reviewed, names grok login, and prints nothing from the file" '[ "$rc" = 1 ] && grep -q "Grok'"'"'s sign-in could not be read after Mentat tried to refresh it" "$STUB/out" && grep -q "grok login" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && ! grep -q "fake-token\|garbage" "$STUB/out"'
+reset; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run); reset_signin
+check "a time limit that is not a number is not reviewed, without a refresh" '[ "$rc" = 1 ] && grep -q "could not work out when Grok'"'"'s time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is soon)" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ ! -e "$STUB/args_models" ]'
 reset; rc=$(cd "$root/work tree" && XDG_CACHE_HOME="$root/tmp/cache" "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
 check "a cache folder inside a temporary folder is refused before any start record" '[ "$rc" = 1 ] && grep -q "is inside .*, which the Grok review denies" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; mkdir "$root/nogrok"; for t in gh git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done

@@ -71,6 +71,16 @@ EOF
 # environment, so its own path is written in.)
 { printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/grok" <<'EOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
+if [ "${1:-}" = models ]; then
+  printf '%s\n' "$@" >"$STUB/args_models"
+  env | sort >"$STUB/env_models"
+  printf '%s\n' "$GROK_HOME" >"$STUB/models_home"
+  if [ -f "$STUB/refresh_to" ]; then
+    printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token-2"}}\n' "$(cat "$STUB/refresh_to")" >"$GROK_HOME/auth.json"
+    chmod 600 "$GROK_HOME/auth.json"
+  fi
+  exit 0
+fi
 args=("$@")
 printf '%s\n' "$@" >"$STUB/args_grok"
 env | sort >"$STUB/env"
@@ -186,14 +196,30 @@ reset; echo 3 >"$STUB/grok_exit"; rc=$(run "$question")
 check "Grok exiting non-zero is not consulted (exit 0), Codex's view stays, and its log is not printed" '[ "$rc" = 0 ] && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok exited with status 3" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT" && ! grep -q SECRET-LOG-TEXT "$STUB/stdout" "$STUB/stderr"'
 check "it keeps a private copy of Grok's raw log under the temporary folder, and names only its path" 'p=$(sed -n "s/.*can read it at //p" "$STUB/stdout" | head -n 1); [ -n "$p" ] && [ -f "$p" ] && grep -q SECRET-LOG-TEXT "$p" && case "$p" in "$root"/tmp/mentat-grok-log.*) true ;; *) false ;; esac'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2020-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run "$question"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "an expired Grok sign-in is refused at once: Grok never started, its token is not printed and Codex's view stays" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok.s sign-in expired at 2020-01-01T00:00:00Z" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT" && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr"'
+check "an expired Grok sign-in is refused at once: Grok never started, its token is not printed and Codex's view stays" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok.s sign-in expired at 2020-01-01T00:00:00Z" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT" && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr" && [ -f "$STUB/args_models" ]'
 soon=$(date -u -v+600S +%Y-%m-%dT%H:%M:%S.000000Z)
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$question"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "a Grok sign-in that expires before the time limit would end is refused at once: Grok never started, its token is not printed and Codex's view stays" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok.s sign-in expires at ${soon:0:19}Z, before this run.s 1800-second time limit and 5 minutes of setup would end" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT" && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr"'
+check "a Grok sign-in that expires before the time limit would end is refused at once: Grok never started, its token is not printed and Codex's view stays" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok.s sign-in expires at ${soon:0:19}Z, before this run.s 1800-second time limit and 5 minutes of setup would end" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT" && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr" && [ -f "$STUB/args_models" ]'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 run "$question"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "the same sign-in with a 60-second time limit runs Grok" '[ "$rc" = 0 ] && grok_ran && views | grep -q "^- Grok ([0-9]* seconds): CONSULT"'
+check "the same sign-in with a 60-second time limit runs Grok" '[ "$rc" = 0 ] && grok_ran && views | grep -q "^- Grok ([0-9]* seconds): CONSULT" && [ ! -e "$STUB/args_models" ]'
+# A sign-in that is expired, or too short for the run, is first refreshed by grok models
+# in the user's own Grok home; the stub's models branch rewrites it only when refresh_to exists.
+set_signin() { printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$1" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
+reset_signin() { printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
+refresh_used() { [ "$(cat "$STUB/args_models")" = models ] && [ "$(cat "$STUB/models_home")" = "$GH_REAL" ] && grep -qx "GROK_AUTH_EARLY_INVALIDATION_SECS=2160" "$STUB/env_models" && grep -qx "GROK_HOME=$GH_REAL" "$STUB/env_models" && grep -qx "TMPDIR=$TMPDIR" "$STUB/env_models" && grep -qx "GROK_MEMORY=0" "$STUB/env_models" && ! grep -q "XAI_API_KEY\|MENTAT_CANARY" "$STUB/env_models" && grep -q fake-token-2 "$STUB/auth_copy"; }
+
+reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$question"); reset_signin
+check "an expired Grok sign-in is refreshed by grok models in the user's own Grok home, and Grok runs with the refreshed sign-in" '[ "$rc" = 0 ] && grok_ran && refresh_used && views | grep -q "^- Grok ([0-9]* seconds): CONSULT"'
+reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$question"); reset_signin
+check "a Grok sign-in that is too short for the time limit is refreshed too, and Grok runs" '[ "$rc" = 0 ] && grok_ran && refresh_used && views | grep -q "^- Grok ([0-9]* seconds): CONSULT"'
+reset; echo 2021-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run "$question"); reset_signin
+check "a refresh that does not extend an expired sign-in is refused with the expired message, Grok never started and no token is printed" '[ "$rc" = 0 ] && ! grok_ran && [ -f "$STUB/args_models" ] && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok.s sign-in expired at 2021-01-01T00:00:00Z" && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr"'
+reset; echo garbage >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run "$question"); reset_signin
+check "a sign-in that cannot be read after the refresh is refused, names grok login, and prints nothing from the file" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok.s sign-in could not be read after Mentat tried to refresh it.*grok login" && ! grep -q "fake-token\|garbage" "$STUB/stdout" "$STUB/stderr"'
+reset; rm "$GH_USER/auth.json"; rc=$(run "$question"); reset_signin
+check "a Grok home with no auth.json is not consulted, without a refresh" '[ "$rc" = 0 ] && ! grok_ran && [ ! -e "$STUB/args_models" ] && views | grep -q "^- Grok ([0-9]* seconds): not consulted: Grok is not signed in"'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run "$question"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
-check "a time limit that is not a number means Grok is not consulted, and Codex's view stays" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: could not work out when Grok.s time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is soon)" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT"'
+check "a time limit that is not a number means Grok is not consulted, and Codex's view stays" '[ "$rc" = 0 ] && ! grok_ran && views | grep -q "^- Grok ([0-9]* seconds): not consulted: could not work out when Grok.s time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is soon)" && views | grep -q "^- Codex ([0-9]* seconds): CONSULT" && [ ! -e "$STUB/args_models" ]'
 
 # Neither delivers: exit 1, and both sections still say why.
 reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$question")
