@@ -47,6 +47,7 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 - Step 4: add the `Waiting on you` label; remove it when the wait ends.
 - Step 5: the order is a section "Order of agreed work, next first" in the project description. Update it with the connector's project save, which accepts partial edits.
 - The item is a Linear issue in that project.
+- Name the item's branch with its identifier as its own segment, lowercase, as in the branch names Linear itself suggests, after a Conventional Commits type, for example `feat/wrk-26-branch-key`, so that Linear's GitHub integration attaches the pull request to the item. Step 6's hand-added link on the item stays, for a repository without the integration.
 - Step 8: post each comment with the connector's comment tool, on the issue.
 - The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`.
 - A new project's description is this text, with the repository's name in place of `<repository>`:

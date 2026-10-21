@@ -42,6 +42,8 @@ The plugin ships an output style, not forced. It is the voice: each reply is wri
 
 Four settings are prose in the repository's AGENTS.md, with no config file: the backlog (a named external one, else GitHub issues), how pull requests are reviewed (local, or the Codex app), the test command, and a `## Code Review Rules` section. Claude Code states them in one line when change work starts in a repository. `/mentat:setup` shows them and sets the ones you pick, in one pull request; it can also move a repository's planning from GitHub issues to a Linear project, migrating the open issues.
 
+In a repository with a Linear backlog, branch names carry the item key (for example `feat/wrk-26-branch-key`), so Linear's GitHub integration links each pull request to its item. For this to be safe, set the integration's "Comments in GitHub" to post without issue descriptions, and turn it off for public repositories, since an item's description can hold a wait block with steps for the maintainer.
+
 ## Optional skills
 
 - [`grilling`](https://skills.sh/mattpocock/skills/grilling) interviews you about a plan until you agree on it.
