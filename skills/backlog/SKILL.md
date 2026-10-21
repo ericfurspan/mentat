@@ -44,7 +44,7 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 - Step 1: find the project with the Linear connector, by that name and team. If the connector's tools are not in the session, load them with ToolSearch (query `linear`); if they are still missing, Linear is not connected: step 1 applies.
 - Step 2: statuses are Backlog (idea), Todo (agreed), In Progress, and Done, Canceled or Duplicate.
 - Step 3: type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
-- Step 4: add the `Waiting on you` label; remove it when the wait ends.
+- Step 4: on a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. If the project has no lead, set the label alone and say once that the item could not be assigned.
 - Step 5: the order is a section "Order of agreed work, next first" in the project description. Update it with the connector's project save, which accepts partial edits.
 - The item is a Linear issue in that project.
 - Name the item's branch with its identifier as its own segment, lowercase, as in the branch names Linear itself suggests, after a Conventional Commits type, for example `feat/wrk-26-branch-key`, so that Linear's GitHub integration attaches the pull request to the item. Step 6's hand-added link on the item stays, for a repository without the integration.
@@ -65,5 +65,5 @@ Nothing agreed is waiting. Other ideas are in Backlog.
 * Todo: agreed
 * In Progress: a branch or pull request exists
 * Done, Canceled or Duplicate: how it ended
-* The "Waiting on you" label: the item waits on the maintainer, with the steps at the top of its description
+* The "Waiting on you" label: the item waits on the maintainer and is assigned to the project's lead while it waits, with the steps at the top of its description
 ````
