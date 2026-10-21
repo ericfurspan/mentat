@@ -48,3 +48,21 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 - Step 5: the order is a section "Order of agreed work, next first" in the project description. Update it with the connector's project save, which accepts partial edits.
 - The item is a Linear issue in that project.
 - Step 8: post each comment with the connector's comment tool, on the issue.
+- The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`.
+- A new project's description is this text, with the repository's name in place of `<repository>`:
+
+````
+Planning for the <repository> repository. Each item is the only record of a change: the idea, plan, evidence, status and its "Spec" section, written in public-safe words. GitHub holds code and pull requests only; no issue is opened for agreed work. The `mentat:backlog` skill describes how items move.
+
+## Order of agreed work, next first
+
+Nothing agreed is waiting. Other ideas are in Backlog.
+
+## How items move
+
+* Backlog: an idea, not agreed
+* Todo: agreed
+* In Progress: a branch or pull request exists
+* Done, Canceled or Duplicate: how it ended
+* The "Waiting on you" label: the item waits on the maintainer, with the steps at the top of its description
+````
