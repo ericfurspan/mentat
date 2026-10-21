@@ -38,6 +38,10 @@ The plugin ships an output style, not forced. It is the voice: each reply is wri
 - Without the app: put a line in the repository's AGENTS.md saying reviews are local, and Claude Code goes straight to `mentat review --local`. In a repository with an external backlog the app is not an alternative: its reviews are always local, with the agreed request passed to Codex and Grok as a file (`--request`), because Mentat builds that prompt itself and whether the app reads a full request in its comment is unverified.
 - Either way, Codex (app or local) and Grok follow a `## Code Review Rules` section in AGENTS.md when there is one.
 
+## Per-repository settings
+
+Four settings are prose in the repository's AGENTS.md, with no config file: the backlog (a named external one, else GitHub issues), how pull requests are reviewed (local, or the Codex app), the test command, and a `## Code Review Rules` section. Claude Code states them in one line when change work starts in a repository. `/mentat:setup` shows them and sets the ones you pick, in one pull request; it can also move a repository's planning from GitHub issues to a Linear project, migrating the open issues.
+
 ## Optional skills
 
 - [`grilling`](https://skills.sh/mattpocock/skills/grilling) interviews you about a plan until you agree on it.
