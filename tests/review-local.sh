@@ -151,6 +151,14 @@ reset() {
 }
 run() { (cd "$root/work" && "$mentat" review --local "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
+# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+heading() { [ "$(head -n 1 "$STUB/comment")" = "## Local Codex review of $H: $1, spec fingerprint ${2:-none}" ]; }
+folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment"; }
+fold_shape() { # $1 the final REVIEW RESULT line
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 3 "$STUB/comment")" = "</details>
+
+$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(tail -n 1 "$STUB/comment")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment" | tail -n 1)" = "$1" ]
+}
 
 # A git that, right after any fetch of pull/7/head, also fetches main in the same checkout:
 # what a second review running at the same time does. Only the cases that use it (race)
@@ -170,6 +178,8 @@ reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"fa
 check "failed CI is not reviewed (exit 4): Codex does not run and nothing is posted" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && [ ! -f "$STUB/prompt" ] && ! posted'
 reset; rc=$(run)
 check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
+check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
+check "the bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
@@ -199,6 +209,9 @@ check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | t
 
 reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment"'
+check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- P1 README:1 wrong text"'
+reset; printf 'REVIEW RESULT: NO FINDINGS\n\n- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "the heading's result comes from the reply's final line only" '[ "$rc" = 2 ] && heading findings none && fold_shape "REVIEW RESULT: FINDINGS"'
 
 # Codex runs in a temporary checkout and may cite files by its absolute path, as created or
 # resolved. The posted comment holds neither, and links the file at the reviewed commit.
@@ -217,11 +230,18 @@ rc=$(run)
 check "a finding that cites the temporary checkout is posted with repository links and no temporary path" '[ "$rc" = 2 ] && ! leaked && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment"'
 check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- P3 see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
 check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(tail -n 1 "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
+
+- P2 [README:1]($REPO_URL/README#L1): wrong text
+- P2 [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
+- P3 [a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name
+- P3 see lib/x.sh:7 and \`lib/y.sh\`
+REVIEW RESULT: FINDINGS" ]'
 reset; printf -- '- P3 see @TREE@-other/z and /Users/other/tree/w\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a path that only starts with the checkout's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 see $(cat "$STUB/tree")-other/z and /Users/other/tree/w" "$STUB/comment"'
 check "asks for repository-relative path:line citations, never absolute paths" 'grep -q "Cite files by repository-relative path and line (path:line), never an absolute path." "$STUB/prompt"'
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @TREE@/lib/z.sh\n' >"$STUB/reply"; rc=$(run)
-check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
+check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
 # Link forms: an angle-bracket target, parentheses in a file name, and a line given only in the link text.
 reset; cat >"$STUB/reply" <<'REPLYEOF'
 - P2 [a dir/a file.txt:7](<@TREE@/a dir/a file.txt:7>): angle target
@@ -266,7 +286,7 @@ check "a reply without a result line is not reviewed and not posted" '[ "$rc" = 
 # A reply that could not read a material file or the diff ends INCOMPLETE: it is posted,
 # so the reason is on the pull request, and it is not reviewed.
 reset; printf 'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read\n' >"$STUB/reply"; rc=$(run)
-check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with the reason" '[ "$rc" = 1 ] && posted && grep -q "^## Local Codex review of $H" "$STUB/comment" && grep -qx "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" "$STUB/comment" && grep -q "not reviewed: Codex says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing" "$STUB/out"'
+check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with the reason" '[ "$rc" = 1 ] && posted && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" && folded | grep -qx "I could not read the linked issue." && grep -q "not reviewed: Codex says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing" "$STUB/out"'
 for bare in 'REVIEW RESULT: INCOMPLETE' 'REVIEW RESULT: INCOMPLETE -' 'REVIEW RESULT: INCOMPLETE -   '; do
   reset; printf 'Could not finish.\n\n%s\n' "$bare" >"$STUB/reply"; rc=$(run)
   check "an INCOMPLETE line without a reason ('$bare') is no final result line and is not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'
@@ -304,7 +324,7 @@ check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 # With no mode flag, mentat review is the local Codex review, the same as --local.
 reset; rc=$(cd "$root/work" && "$mentat" review 7 >"$STUB/out" 2>&1; echo $?)
-check "no mode flag runs the local review and posts it (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
+check "no mode flag runs the local review and posts it (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && heading "no findings" none && fold_shape "REVIEW RESULT: NO FINDINGS"'
 
 # --request <file>: the agreed request, kept apart from the description. Read before CI;
 # its text reaches Codex in its own block; the posted comment records its fingerprint.
@@ -316,9 +336,9 @@ runq() { (cd "$root/work" && "$mentat" review --local --request "$1" "${2:-7}" >
 reset; rc=$(runq "$root/req dir/agreed request.md")
 check "--request: the request reaches Codex in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
 check "--request: the criteria name the agreed request as a source and let it govern scope" 'grep -q "The agreed request (when there is one) and the issues the pull request closes state the original request" "$STUB/prompt" && grep -q "the agreed request governs scope" "$STUB/prompt" && grep -q "written from the agreed request or the linked issue" "$STUB/prompt"'
-check "--request: the posted comment records the request fingerprint (first 12 hex of its SHA-256)" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && [ "${#REQ_FP}" = 12 ]'
+check "--request: the posted comment records the request fingerprint (first 12 hex of its SHA-256), in the heading and in the fold" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && [ "${#REQ_FP}" = 12 ] && heading "no findings" "$REQ_FP" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
 reset; rc=$(run)
-check "no --request: no agreed request block, and the comment says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment"'
+check "no --request: no agreed request block, and the comment says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment" && heading "no findings" none && folded | grep -qx -- "- Agreed request fingerprint: none"'
 reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(runq "$root/req dir/agreed request.md")
 check "--request with a linked issue: both blocks reach Codex" '[ "$rc" = 0 ] && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "--- BEGIN LINKED ISSUE DATA ---" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt"'
 printf ' \n\t\n\n' >"$root/blank.md"

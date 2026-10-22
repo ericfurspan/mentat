@@ -11,6 +11,15 @@ not_reviewed() { die "not reviewed: $1" 1; }
 not_challenged() { die "not challenged: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
+# The word a posted review's heading gives for its checked REVIEW RESULT line $1.
+result_word() {
+  case "$1" in
+    "REVIEW RESULT: NO FINDINGS") printf 'no findings' ;;
+    "REVIEW RESULT: FINDINGS") printf 'findings' ;;
+    "REVIEW RESULT: INCOMPLETE - "*) printf 'incomplete' ;;
+  esac
+}
+
 # CI on commit $2 of repository $1: check runs, read by commit so a
 # push cannot swap them. Returns when every check passed (success, neutral or
 # skipped). Exits 4, printing the checks that did not pass, when one failed or CI
