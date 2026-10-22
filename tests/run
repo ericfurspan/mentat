@@ -52,6 +52,20 @@ for f in skills/review/SKILL.md skills/codex-review-off/SKILL.md; do
   hold_check "$f" 'push nothing yet' '"Hold #N: <reason>" and end the turn'
 done
 
+# A fast track skips the Codex and Grok reviews only after a check of the complete final diff, says so in
+# the status line, and is kept in the spec so a resumed or compacted session still has it.
+fast_track_check() {
+  local what=$1 s=$2
+  if grep -q -F -- "$s" skills/review/SKILL.md; then
+    pass "skills/review/SKILL.md gives the fast track's $what"
+  else
+    fail "skills/review/SKILL.md must give the fast track's $what (missing: $s)"
+  fi
+}
+fast_track_check "check of the complete final diff" 'check the complete final diff'
+fast_track_check "status line" 'Not reviewed: fast track agreed by the maintainer'
+fast_track_check "record in the spec" 'write it and its reason as one line in the spec'
+
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
   fail "a script under lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"
