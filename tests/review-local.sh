@@ -302,6 +302,10 @@ check "a failed post is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post 
 rc=$("$mentat" review --local abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
+# With no mode flag, mentat review is the local Codex review, the same as --local.
+reset; rc=$(cd "$root/work" && "$mentat" review 7 >"$STUB/out" 2>&1; echo $?)
+check "no mode flag runs the local review and posts it (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
+
 # --request <file>: the agreed request, kept apart from the description. Read before CI;
 # its text reaches Codex in its own block; the posted comment records its fingerprint.
 REQ_TEXT=$'Make the README say change.\nLeave every other file alone.\nChecked by reading README.'
@@ -329,9 +333,9 @@ reset; unread "with an unreadable file" "$root/locked.md" "could not read the ag
 reset; unread "with a directory" "$root" "could not read the agreed request file"
 reset; unread "with an empty file name (an empty variable)" "" "request file name for #7 is empty"
 chmod 600 "$root/locked.md"
-# Usage: the Codex app can only be told to review, so --request without --local or --grok is refused.
-rc=$("$mentat" review --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
-check "--request on the app path is a usage error (exit 64)" '[ "$rc" = 64 ] && grep -q "needs --local or --grok" "$STUB/out"'
+# With no mode flag, --request runs the same local review as --local --request.
+reset; rc=$(cd "$root/work" && "$mentat" review --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
+check "--request with no mode flag reviews locally and records the fingerprint" '[ "$rc" = 0 ] && grep -q "found nothing on $H" "$STUB/out" && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment"'
 rc=$("$mentat" review --local --request >"$STUB/out" 2>&1; echo $?)
 check "--request without a file and a pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 

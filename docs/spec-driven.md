@@ -19,7 +19,7 @@ Spec Kit's phase names are used. Kiro's requirements, design and tasks map onto 
 
 ## The two backlog paths
 
-- **External backlog:** the spec is a section of the backlog item. Reviews are local, and Claude Code passes the spec to Codex and Grok as a separate input with `--request`.
+- **External backlog:** the spec is a section of the backlog item. Claude Code passes it to Codex and Grok as a file, a separate input, with `--request`.
 - **GitHub issues:** the issue carries a `## Spec` section in the same shape (older issues keep their text), the pull request closes it, and the reviews read it from the issue.
 
 Either way, the pull request's Evidence cites each requirement the agreed text states.
