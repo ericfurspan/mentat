@@ -35,12 +35,21 @@ else
 fi
 
 # After "You: merge #N.", nothing reaches #N's branch until the maintainer answers a hold.
-for f in rules.md skills/review/SKILL.md skills/codex-review-off/SKILL.md; do
-  if grep -q -F 'Hold #N: <reason>' "$f"; then
-    pass "$f gives the hold after \"You: merge #N.\""
-  else
-    fail "$f must give the hold after \"You: merge #N.\" (\"Hold #N: <reason>\")"
-  fi
+# Each file must keep the words that carry the obligation, not just the reply's template.
+hold_check() {
+  local file=$1 s
+  shift
+  for s in "$@"; do
+    if ! grep -q -F -- "$s" "$file"; then
+      fail "$file must give the hold after \"You: merge #N.\" (missing: $s)"
+      return
+    fi
+  done
+  pass "$file gives the hold after \"You: merge #N.\""
+}
+hold_check rules.md "pushes nothing to #N's branch until the maintainer answers a reply opening \"Hold #N: <reason>\""
+for f in skills/review/SKILL.md skills/codex-review-off/SKILL.md; do
+  hold_check "$f" 'push nothing yet' '"Hold #N: <reason>" and end the turn'
 done
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
