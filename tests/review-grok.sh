@@ -166,6 +166,15 @@ reset() {
 run() { (cd "$root/work tree" && "$mentat" review --grok "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 comments() { find "$STUB" -name 'comment.*' | wc -l | tr -d ' '; }
 grok_ran() { [ -f "$STUB/args" ]; }
+# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+heading() { [ "$(head -n 1 "$STUB/comment.2")" = "## Local Grok review of $H: $1, spec fingerprint ${2:-none}" ]; }
+folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment.2"; }
+fold_shape() { # $1 the final REVIEW RESULT line
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment.2")" = blank ] && [ "$(tail -n 3 "$STUB/comment.2")" = "</details>
+
+$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment.2")" = 1 ] && [ "$(tail -n 1 "$STUB/comment.2")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment.2" | tail -n 1)" = "$1" ]
+}
+reply_in_fold() { folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d"; }
 
 # A git that, right after any fetch of pull/7/head, also fetches main in the same checkout:
 # what a second review running at the same time does. Only the cases that use it (race)
@@ -184,6 +193,8 @@ left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 
 reset; rc=$(run)
 check "no findings exits 0 and posts the start record, then the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment/2" "$STUB/out" && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "^## Local Grok review of $H" "$STUB/comment.2"'
+check "the review opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment.2")" = "" ] && [ "$(sed -n 3p "$STUB/comment.2")" = "<details><summary>Full review</summary>" ]'
+check "the six bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" && folded | grep -qx -- "- Run locally by the agent, with file-reading tools and no shell." && [ "$(reply_in_fold)" = "$(jq -r .text "$STUB/out_json")" ]'
 check "the posted review is Grok's text, with its version and model" 'grep -q "Nothing to flag." "$STUB/comment.2" && grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" "$STUB/comment.2" && grep -qx -- "- Model: grok-stub" "$STUB/comment.2" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment.2"'
 check "the per-run folder is gone afterward" '[ -z "$(left_over)" ]'
 check "runs in the export, with the prompt from a file and the JSON output" '[ "$(sed -n "/^--cwd\$/{n;p;}" "$STUB/args")" = "$(cat "$STUB/cwd")" ] && grep -qx -- "--prompt-file" "$STUB/args" && [ "$(grep -x -A1 -- "--output-format" "$STUB/args" | tail -n 1)" = json ]'
@@ -230,9 +241,9 @@ printf '%s\n' "$REQ_TEXT" >"$root/req dir/agreed request.md"
 runq() { (cd "$root/work tree" && "$mentat" review --grok --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
 reset; rc=$(runq "$root/req dir/agreed request.md")
 check "--request: the request reaches Grok in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt" && grep -q "the agreed request governs scope" "$STUB/prompt"'
-check "--request: the posted review records the request fingerprint (first 12 hex of its SHA-256)" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment.2" && [ "${#REQ_FP}" = 12 ]'
+check "--request: the posted review records the request fingerprint (first 12 hex of its SHA-256)" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment.2" && [ "${#REQ_FP}" = 12 ] && heading "no findings" "$REQ_FP" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
 reset; rc=$(run)
-check "no --request: no agreed request block, and the review says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment.2"'
+check "no --request: no agreed request block, and the review says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment.2" && heading "no findings" none && folded | grep -qx -- "- Agreed request fingerprint: none"'
 reset; echo '[{"number":3,"repository":{"name":"repo","owner":{"login":"owner"}}}]' >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(runq "$root/req dir/agreed request.md")
 check "--request with a linked issue: both blocks reach Grok" '[ "$rc" = 0 ] && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "--- BEGIN LINKED ISSUE DATA ---" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt"'
 printf ' \n\t\n\n' >"$root/blank.md"
@@ -252,6 +263,7 @@ check "--request before the mode is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/comment/2" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment.2"'
+check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- P1 README:1 wrong text"'
 
 # Grok works in an export under the per-run folder and may cite files by its absolute path.
 # The posted review holds no such path, and links the file at the reviewed commit.
@@ -260,15 +272,23 @@ reset; reply $'Changes README.\n\n- P2 [README:1](@EXPORT@/README:1): wrong text
 RUN_DIR=$(dirname "$(cat "$STUB/cwd")")
 check "a finding that cites the export is posted with repository links and no local path" '[ "$rc" = 2 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" && ! grep -qF "$RUN_DIR" "$STUB/comment.2" && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment.2" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment.2" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment.2"'
 check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- P3 see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(tail -n 1 "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(reply_in_fold)" = "Changes README.
+
+- P2 [README:1]($REPO_URL/README#L1): wrong text
+- P2 [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
+- P3 [a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name
+- P3 see lib/x.sh:7 and \`lib/y.sh\`
+
+REVIEW RESULT: FINDINGS" ]'
 reset; reply $'- P3 not @EXPORT@-other/z or /Users/other/export/w\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a path that only starts with the export's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 not $(cat "$STUB/cwd")-other/z or /Users/other/export/w" "$STUB/comment.2"'
 check "asks for repository-relative path:line citations, never absolute paths" 'grep -q "Cite files by repository-relative path and line (path:line), never an absolute path." "$STUB/prompt"'
 reset; reply $'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @EXPORT@/lib/z.sh'; rc=$(run)
-check "an INCOMPLETE reason that names the export is posted and printed as a repository path" '[ "$rc" = 1 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" "$STUB/out" && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment.2" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out"'
+check "an INCOMPLETE reason that names the export is posted and printed as a repository path" '[ "$rc" = 1 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" "$STUB/out" && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment.2" && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out"'
 
 # An INCOMPLETE reply is a complete reply: the review is posted as the record and is not reviewed.
 reset; reply $'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read'; rc=$(run)
-check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with no did-not-finish comment or log" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && head -n 1 "$STUB/comment.2" | grep -qx "## Local Grok review of $H" && grep -qx "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" "$STUB/comment.2" && ! grep -rq "Grok review did not finish" "$STUB/out" "$STUB"/comment.* && grep -q "not reviewed: Grok says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing\|can read it at" "$STUB/out" && [ -z "$(left_over)" ]'
+check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with no did-not-finish comment or log" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" && folded | grep -qx "I could not read the linked issue." && ! grep -rq "Grok review did not finish" "$STUB/out" "$STUB"/comment.* && grep -q "not reviewed: Grok says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing\|can read it at" "$STUB/out" && [ -z "$(left_over)" ]'
 
 reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
 check "failed CI is not reviewed (exit 4): no start record, Grok does not run" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
@@ -327,7 +347,7 @@ reset; touch "$STUB/result_fails"; rc=$(run)
 not_finished "a failed post of the review" "could not post the review"
 
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
-check "a head that moves during the review does not lose it: the review is posted for the commit Grok reviewed (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && head -n 1 "$STUB/comment.2" | grep -qx "## Local Grok review of $H" && grep -q "Change reviewed:" "$STUB/comment.2" && [ -z "$(left_over)" ]'
+check "a head that moves during the review does not lose it: the review is posted for the commit Grok reviewed (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && heading "no findings" none && fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -q "Change reviewed:" && [ -z "$(left_over)" ]'
 reset; touch "$STUB/comment_fails"; rc=$(run)
 check "a start record that cannot be posted is not reviewed and Grok does not run" '[ "$rc" = 1 ] && grep -q "could not post the start comment" "$STUB/out" && ! grok_ran'
 reset; rm "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"

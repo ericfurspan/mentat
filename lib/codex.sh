@@ -143,13 +143,15 @@ review_local() {
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run mentat review again" 3
   {
-    printf '## Local Codex review of %s\n\n' "$head"
+    printf '## Local Codex review of %s: %s, spec fingerprint %s\n\n' "$head" "$(result_word "$result")" "$request_fp"
+    printf '<details><summary>Full review</summary>\n\n'
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
     printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
       "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '\n---\n\n'
     cat "$out"
+    printf '\n</details>\n\n%s\n' "$result"
   } >"$tmp/comment" || not_reviewed "could not write the comment"
   url=$(gh pr comment "$pr" --body-file "$tmp/comment") || not_reviewed "could not post the review on #$pr"
   # An incomplete review is posted, so its reason is on the pull request, and is not a review.

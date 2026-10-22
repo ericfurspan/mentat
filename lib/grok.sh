@@ -376,12 +376,14 @@ grok_post() {
   model=$(jq -r 'if (.modelUsage | type) == "object" and (.modelUsage | length) > 0 then (.modelUsage | keys | join(", ")) else "unknown" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9._, -') || model=unknown
   [ -n "$model" ] || model=unknown
   {
-    printf '## Local Grok review of %s\n\n' "$head"
+    printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' "$head" "$(result_word "$result")" "$request_fp"
+    printf '<details><summary>Full review</summary>\n\n'
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
     printf -- '- Grok CLI: %s\n- Model: %s\n- Time: %s\n' "$("$grok_bin" --version 2>/dev/null | head -n 1)" "$model" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '- Run locally by the agent, with file-reading tools and no shell.\n\n---\n\n'
     cat "$result_file"
+    printf '\n</details>\n\n%s\n' "$result"
   } >"$run/comment" || grok_fail "could not write the comment"
   url=$(gh pr comment "$pr" --body-file "$run/comment") || grok_fail "could not post the review on #$pr"
   case "$result" in "REVIEW RESULT: INCOMPLETE - "*) not_reviewed "Grok says the review is incomplete: ${result#"REVIEW RESULT: INCOMPLETE - "}" ;; esac
