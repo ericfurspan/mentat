@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 # mentat: Mentat's command line. Usage errors exit 64.
-#   mentat review <PR>  Waits for CI on the pull request's head, then comments
-#     `@codex review`, which starts the Codex GitHub app's review of that head,
-#     and waits for the result. 0 no findings, 2 findings posted (printed), 1 not
-#     reviewed (app busy, error or no result in time), 3 the head moved, 4 CI did
-#     not pass on the head (failing checks printed; nothing reviewed).
-#   mentat review --local <PR>  Waits for CI the same way, then reviews the pull
-#     request's head with local Codex and posts the result. Same exit codes.
+#   mentat review <PR>  Waits for CI on the pull request's head, then reviews that head
+#     with local Codex and posts the result. 0 no findings, 2 findings posted (link
+#     printed), 1 not reviewed (error, incomplete review or no result in time), 3 the head
+#     moved, 4 CI did not pass on the head (failing checks printed; nothing reviewed).
+#     `mentat review --local <PR>` is the same.
 #   mentat review --grok <PR>  Waits for CI the same way, then reviews the pull
 #     request's head with Grok, if installed, and posts the result. Same exit codes.
 #     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
 #     MENTAT_GROK_REASONING_EFFORT to pass --reasoning-effort to Grok (weigh too);
 #     unset leaves Grok's default.
-#     Both take `--request <file>` after the mode: `mentat review --local --request <file> <PR>`.
+#     Both take `--request <file>` after the mode, if any: `mentat review --request <file> <PR>`.
 #     The file holds the agreed request (what to build, what to leave alone, how it is checked)
 #     for a repository that keeps it outside GitHub. It is read once, before the wait for CI;
 #     a missing, unreadable or blank file is not reviewed. It goes to the reviewing tool as
-#     its own data block, and the posted comment records a fingerprint of it. The Codex app
-#     path (no --local or --grok) refuses --request: usage error, 64.
+#     its own data block, and the posted comment records a fingerprint of it.
 #   mentat ci <PR>  Waits for CI on the pull request's head the same way, and
 #     reviews nothing. 0 CI passed (or there is none), 1 could not read, 3 the head
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
@@ -61,17 +58,17 @@ case "${1:-}" in
   review)
     shift
     # Exactly one pull request number, after --local or --grok if given: "review 7
-    # --local" would otherwise run the app path.
-    mode=app
-    case "${1:-}" in --local) shift; mode=local ;; --grok) shift; mode=grok ;; esac
+    # --grok" would otherwise run local Codex.
+    mode=local
+    case "${1:-}" in --local) shift ;; --grok) shift; mode=grok ;; esac
     request_file="" request_given=no
     if [ "${1:-}" = --request ]; then
-      [ "$mode" != app ] && [ $# -ge 2 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number> (--request needs --local or --grok)" 64
+      [ $# -ge 2 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64
       # shellcheck disable=SC2034 # read by read_request in lib/shared.sh
       request_file=$2 request_given=yes; shift 2
     fi
     [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64
-    case "$mode" in local) review_local "$@" ;; grok) review_grok "$@" ;; *) review "$@" ;; esac ;;
+    case "$mode" in grok) review_grok "$@" ;; *) review_local "$@" ;; esac ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   challenge) shift; challenge "$@" ;;
   weigh) shift; weigh "$@" ;;

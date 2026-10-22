@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# The Codex side of mentat: the Codex sandbox profile, run_codex, the Codex GitHub
-# app review, review --local and challenge. Sourced by bin/mentat.
+# The Codex side of mentat: the Codex sandbox profile, run_codex, the local review
+# and challenge. Sourced by bin/mentat.
 
 # mentat challenge runs Codex's own default model, so no model name lives here and a
 # new release needs no change. Effort is pinned.
@@ -80,120 +80,12 @@ run_codex() {
   [ -s "$out" ] || "$fail" "Codex returned no final message"
 }
 
-# The Codex GitHub app reviews a pull request when a comment on it says
-# `@codex review`. It reacts 👀 while working, posts findings as a review tied to
-# the commit it read, and keeps one summary comment (marked
-# codex-pull-request-review-summary) with a row per review kind: status,
-# completion time and the short commit. Its 👍 names no commit, so it certifies
-# nothing here. A round is done when the summary's Code Review row shows Completed
-# for the head, at or after the time of the comment this run posted; then every
-# bot review on the head, security reviews included, is a finding. A new round starts
-# only when no 👀 is on the pull request and none on the newest trigger comment of a
-# round that has no result yet (only a Completed or Failed row at or after that comment
-# ends it; the app rewrites the row while it works). The summary is observed bot output, not a documented API: anything
-# missing, failed or unrecognized ends in "not reviewed", and the review skill
-# falls back to local review. It never starts while a run is going. After a round, a
-# note says when no 👀 was seen on this run's trigger comment or on the pull request, since the guard above depends on it.
-CODEX_APP="chatgpt-codex-connector[bot]"
-code_review_row() { # $1 repo, $2 pr: prints the summary's Code Review row as "<status> <time to the second> <short sha>"
-  # shellcheck disable=SC2016 # the backticks are the summary's literal markdown
-  gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg a "$CODEX_APP" \
-    '[.[][] | select(.user.login == $a and (.body | contains("<!-- codex-pull-request-review-summary -->")))] | last | .body // empty' |
-    grep -E '^\|[^|]*Code Review[^|]*\|' | head -n 1 |
-    sed -nE 's/^\|[^|]*\|[^|]*\*\*([A-Za-z ]+)\*\*[^|]*datetime="([0-9T:-]+)(\.[0-9]+)?Z"[^|]*\|[[:space:]]*`([0-9a-f]{7,40})`[[:space:]]*\|.*/\1 \2Z \4/p'
-}
-app_reviewing() { # $1 repo, $2 pr: prints how many 👀 mean the app is still reviewing: on the pull request, or on the newest "@codex review" comment while its round has no result
-  local pr_eyes comment last eyes asked row at
-  pr_eyes=$(gh api --paginate "repos/$1/issues/$2/reactions" | jq -rs --arg a "$CODEX_APP" \
-    '[.[][] | select(.user.login == $a and .content == "eyes")] | length') || return 1
-  # The comment has no user filter: any 👀 there counts, which fails closed. The app
-  # sometimes leaves its 👀 after the round ends, so it counts only until the summary
-  # shows a result at or after the comment.
-  last=$(gh api --paginate "repos/$1/issues/$2/comments" | jq -rs \
-    '[.[][] | select(.body | startswith("@codex review"))] | last | "\(.reactions.eyes // 0) \(.created_at)"') || return 1
-  eyes=${last%% *}; asked=${last#* }; comment=0
-  if [ "$eyes" != 0 ]; then
-    row=$(code_review_row "$1" "$2") || row=""
-    case "${row%% *}" in Completed | Failed) ;; *) row="" ;; esac
-    at=${row#* }; at=${at%% *}
-    if [ -z "$row" ] || [[ "$at" < "$asked" ]]; then comment=$eyes; fi
-  fi
-  echo $((pr_eyes + comment))
-}
-eyes_note() { # prints a note to stderr when no 👀 was seen on this round's trigger comment or on the pull request and every read of them worked
-  [ -z "$eyes_seen" ] && [ -z "$eyes_unknown" ] || return 0
-  echo "Note: no 👀 from the Codex app was seen on this round's @codex review comment or on the pull request, so the guard against a second trigger while the app works may not be working." >&2
-}
-review() {
-  local pr="${1:-}" repo head asked="" secs=0 found n trigger_id eyes_seen="" eyes_unknown=""
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review <pull request number>" 64 ;; esac
-  if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
-    not_reviewed "could not read the repository with gh"
-  fi
-  head_now() { gh pr view "$pr" --json headRefOid --jq .headRefOid; }
-  # same, moved, or unknown when GitHub could not be read: a failed read is a
-  # missed poll, never a moved head and never proof that the head held.
-  head_state() {
-    local h
-    if ! h=$(head_now) || [ -z "$h" ]; then echo unknown; elif [ "$h" = "$head" ]; then echo same; else echo moved; fi
-  }
-  moved() { die "the head moved from $head; run mentat review again" 3; }
-  if ! head=$(head_now) || [ -z "$head" ]; then not_reviewed "could not read pull request #$pr"; fi
-  wait_for_ci "$repo" "$head"
-  # A push during the wait would get the app's review without passing CI.
-  [ "$(head_state)" != moved ] || moved
-  n=$(app_reviewing "$repo" "$pr") || not_reviewed "could not read the reactions on #$pr"
-  [ "$n" = 0 ] || not_reviewed "the Codex app is still reviewing #$pr; run this again when it finishes"
-  # Start the round with a comment; GitHub's own time for it marks the round's start.
-  asked=$(gh api -X POST "repos/$repo/issues/$pr/comments" -f body='@codex review' --jq '"\(.id) \(.created_at)"') &&
-    trigger_id=${asked%% *} && asked=${asked#* } && [ -n "$trigger_id" ] && [ -n "$asked" ] ||
-    not_reviewed "could not ask the Codex app to review #$pr"
-  local state row status at sha e p
-  while :; do
-    [ "$(head_state)" != moved ] || moved
-    # Completion first, then the findings, then the head: read in that order so
-    # findings posted just before completion are not missed.
-    row=$(code_review_row "$repo" "$pr") || row=""
-    # The app reacts 👀 on the trigger comment or on the pull request while it works and may remove it
-    # at the end; seeing either at any poll is enough, and a failed read of either makes the answer unknown.
-    if e=$(gh api "repos/$repo/issues/comments/$trigger_id" --jq '.reactions.eyes // 0' 2>/dev/null) && [ -n "$e" ]; then [ "$e" = 0 ] || eyes_seen=yes; else eyes_unknown=yes; fi
-    if p=$(gh api --paginate "repos/$repo/issues/$pr/reactions" | jq -rs --arg a "$CODEX_APP" '[.[][] | select(.user.login == $a and .content == "eyes")] | length' 2>/dev/null) && [ -n "$p" ]; then [ "$p" = 0 ] || eyes_seen=yes; else eyes_unknown=yes; fi
-    status=${row%% *}; sha=${row##* }; at=${row#* }; at=${at%% *}
-    case "$head" in "$sha"*) ;; *) row="" ;; esac
-    if [ -n "$row" ] && [ -n "$sha" ] && ! [[ "$at" < "$asked" ]]; then
-      case "$status" in
-        Completed)
-          if found=$(gh api --paginate "repos/$repo/pulls/$pr/reviews" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
-            '[.[][] | select(.user.login == $a and .commit_id == $h) | .html_url] | join(" ")'); then
-            state=$(head_state); [ "$state" != moved ] || moved
-            if [ "$state" = same ] && [ -n "$found" ]; then
-              n=$(gh api --paginate "repos/$repo/pulls/$pr/comments" | jq -rs --arg a "$CODEX_APP" --arg h "$head" \
-                '.[][] | select(.user.login == $a and .commit_id == $h) | "- \(.path):\(.line // .original_line) \(.html_url)"') || n=""
-              printf 'The Codex app posted findings on %s: %s\n%s\n' "$head" "$found" "$n"
-              eyes_note
-              exit 2
-            elif [ "$state" = same ]; then
-              printf 'The Codex app found nothing on %s\n' "$head"
-              eyes_note
-              exit 0
-            fi
-          fi ;;
-        Failed) not_reviewed "the Codex app's code review of $head failed; run mentat review --local $pr instead" ;;
-      esac
-    fi
-    [ "$secs" -lt "$REVIEW_TIMEOUT_SECONDS" ] ||
-      not_reviewed "no result from the Codex app on $head within $REVIEW_TIMEOUT_SECONDS seconds; run mentat review --local $pr instead. If the app does not answer '@codex review' comments here, it is not installed or not connected to this repository"
-    sleep "$REVIEW_INTERVAL_SECONDS"
-    secs=$((secs + REVIEW_INTERVAL_SECONDS))
-  done
-}
-
 # A local review reads the pull request's head as GitHub has it, never this
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, and posts the result only if the head has not moved since.
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp headref baseref
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local] [--request <file>] <pull request number>" 64 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64 ;; esac
   read_request "$pr"
   local tool
   for tool in git codex; do
@@ -256,7 +148,7 @@ review_local() {
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
     printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
       "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf -- '- Run locally by the agent, not by the Codex GitHub app.\n\n---\n\n'
+    printf -- '\n---\n\n'
     cat "$out"
   } >"$tmp/comment" || not_reviewed "could not write the comment"
   url=$(gh pr comment "$pr" --body-file "$tmp/comment") || not_reviewed "could not post the review on #$pr"

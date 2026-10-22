@@ -26,7 +26,7 @@ check() {
   if command -v codex >/dev/null 2>&1; then
     v=$(codex --version 2>/dev/null | head -n 1)
     c_ok "codex is installed (${v:-version unknown})"
-  else c_warn "codex is not installed: mentat challenge and mentat review --local need it"; fi
+  else c_problem "codex is not installed: mentat review, mentat challenge and mentat weigh need it; mentat ci and mentat review --grok still run without it"; fi
   # Grok is optional: no warning when it is missing.
   if command -v grok >/dev/null 2>&1; then
     v=$(grok --version 2>/dev/null | head -n 1)

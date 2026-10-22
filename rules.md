@@ -2,11 +2,11 @@
 
 *Read by agents. For people: `README.md` and `docs/`.*
 
-The maintainer owns this repository. Claude Code plans and builds. Codex reviews pull requests, through the Codex GitHub app or locally; where Grok is installed, it also reviews the first head. The maintainer decides what matters.
+The maintainer owns this repository. Claude Code plans and builds. Codex reviews pull requests; where Grok is installed, it also reviews the first head. The maintainer decides what matters.
 
 The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a named workflow that commits to the default branch), the repository wins and Claude Code says so once; "Approval" and "What agents never do" always hold.
 
-When a session first starts change work in a repository, Claude Code runs `mentat check`: a failure goes to the maintainer with its lines; warnings are shown and work goes on. It then states the effective settings in one line: backlog (the named external one, else GitHub issues), reviews (local when AGENTS.md says so or the backlog is external, else the Codex app), the test command AGENTS.md names or "not named", and whether it has a Code Review Rules section.
+When a session first starts change work in a repository, Claude Code runs `mentat check`: a failure goes to the maintainer with its lines; warnings are shown and work goes on. It then states the effective settings in one line: backlog (the named external one, else GitHub issues), the test command AGENTS.md names or "not named", and whether it has a Code Review Rules section.
 
 ## A change
 1. Work starts from a chat request or a backlog item.

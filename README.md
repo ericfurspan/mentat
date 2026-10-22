@@ -32,7 +32,7 @@ Mentat is built with Mentat. Every pull request here is opened by the agent acco
 ## Requirements
 
 - macOS, Claude Code, `git`, `jq`, and `gh` signed in.
-- For reviews: OpenAI's Codex GitHub app on the repository, or the Codex CLI signed in.
+- For reviews: the Codex CLI signed in.
 - Optional: Grok Build (`grok`), for a second review and a second view in `mentat weigh`.
 
 ## Install
