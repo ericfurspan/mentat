@@ -5,7 +5,7 @@ description: "Reading or changing the backlog in a repository with an external b
 
 In a repository with an external backlog (`rules.md` Records), the backlog lives there, not in GitHub issues, and its item is the only record of a change: the idea, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker. Steps 1 to 8 hold for any tracker; "Tracker: Linear" below holds the tool-specific parts, and a different tracker replaces only that part.
 
-Item shape. An item's title names the work in plain words, with no leading label for its type or stage, which have their own fields; any other meaning, such as that the work is optional, stays in the words. Keep an item's description short. It holds these, in this order:
+Item shape. Keep an item's description short. It holds these, in this order:
 
 - One plain sentence, not a heading: what the item is, where it stands, and whether it needs the maintainer. Update it in the same edit as any change of status or wait.
 - The wait block (step 4), only while something waits on the maintainer. It is the first heading of the description. Remove it when the wait ends.
