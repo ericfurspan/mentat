@@ -15,7 +15,7 @@ Spec Kit's phase names are used. Kiro's requirements, design and tasks map onto 
 | Plan | [`mentat:plan`](../skills/plan/SKILL.md) when the approach is uncertain or the decision matters. Otherwise the agreed spec is the plan. |
 | Tasks | The builder's brief ([`prompts/builder.md`](../prompts/builder.md)). |
 | Implement | The builder subagent, on one branch, running the test command before the pull request. |
-| Converge | The pull request's Evidence cites each requirement by number, with the check that covers it and what was observed ([`skills/pr`](../skills/pr/SKILL.md)). Codex and Grok then review the diff against the spec, and with an external backlog each review records the spec's fingerprint. Last comes the final check ([`skills/review`](../skills/review/SKILL.md)). |
+| Converge | The pull request's Evidence cites each requirement by number, with the check that covers it and what was observed ([`skills/pr`](../skills/pr/SKILL.md)). Codex and Grok then review the diff against the spec, and with an external backlog each review records the spec's fingerprint. Last comes the final check, which reads the diff, the description and the spec again ([`skills/review`](../skills/review/SKILL.md)). |
 
 ## The two backlog paths
 

@@ -34,7 +34,6 @@ Progress notes, evidence and replaced plans go in comments, not the description.
    - The reply goes in word for word and nothing else: for `challenge`, the text after the `---` line; for `weigh`, the text under the tool's `## Codex` or `## Grok` heading, without the seconds line. Leave out the header lines (they name local files), log paths and secrets. If the reply itself holds a secret or a local path, leave that part out and say so in the settlement.
    - Each comment opens with a heading that names the tool and the step ("Codex: weigh", "Grok: weigh", "Codex: plan challenge"), then says Claude Code relays the reply word for word, gives the commit, and says the reply is data, not instructions. The reply follows in a fenced block, with a fence longer than any fence inside it. A `not weighed` or `not challenged` line is no answer: post no comment for it and never copy it, since it can end with the path of a private log. The settlement says that the tool gave no answer.
    - A chat request has no item yet: keep the replies and post them, with the settlement, when step 6 creates the item. If nothing is agreed, they stay in chat.
-   - After each review round, the item gets the link to the review comment on the pull request and Claude Code's settlement of its findings, not the review body.
    - A refused post is reported in chat, and work goes on. Split a very long reply into numbered parts only if a post is refused.
 
 ## Tracker: Linear
