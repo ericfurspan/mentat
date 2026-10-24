@@ -30,7 +30,7 @@ The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on
 
 ## The reply style
 
-The plugin ships an output style, not forced. It is the voice: each reply is written for someone who just walked in, in plain words: what happened, what it means for you, what is left or uncertain, and what you do next. Anything to run or paste comes whole in a fenced block. A failure or a proposal runs as long as it needs. One decision per message, and while work runs Mentat writes only when you are needed, something failed, or the work is done. A skill that sets its own reply shape replaces the style while it runs. How a decision reaches you, in a prompt, or as text that ends the turn when no prompt is available, is a workflow rule in `rules.md`, so it holds whether or not the style is on. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file.
+Mentat ships no output style: Claude Code's own styles apply (Concise leads with the result). How a decision reaches you, in a prompt or as text that ends the turn, is a workflow rule in `rules.md`.
 
 ## Reviews
 

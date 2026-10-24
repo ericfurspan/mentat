@@ -23,7 +23,7 @@ Progress notes, evidence and replaced plans go in comments, not the description.
    - In progress: a branch or pull request exists.
    - Ended: done, canceled or duplicate.
 3. Type is one of: bug, feature or improvement.
-4. A wait on the maintainer: mark the item as waiting, and put at the top of the description, as its first heading, one saying it waits on the maintainer (the opening sentence of the item shape stays above it), then numbered steps and anything to paste (`rules.md` describes the shape). Remove the mark when the wait ends.
+4. A wait on the maintainer: mark the item as waiting, and put at the top of the description, as its first heading, one saying it waits on the maintainer (the opening sentence of the item shape stays above it), then numbered steps and anything to paste (`rules.md` describes the shape). Remove the mark when the wait ends. A merge wait is the exception: "You: merge #N." (`mentat:review`) marks the item as waiting and its opening sentence says it waits on the merge of #N, with no wait block or steps; the mark is removed when #N merges or closes, or when work resumes on #N after a hold.
 5. The order of agreed work, next first, is kept in one place in the backlog, listing item ids. Drop finished items whenever you update it. An entry whose item waits on the maintainer points to the wait. This replaces the pinned issue.
 6. When the maintainer agrees to build something, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words. Then:
    - Write a `## Spec` section in the item, as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable; and "Out of scope:", what is left alone. Scale it to the change: a bug fix is a few lines. Each requirement is a line the pull request's Evidence cites by number, and one checked by hand says so. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: the `rules.md` record rules apply, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
@@ -45,7 +45,7 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 - Step 1: find the project with the Linear connector, by that name and team. If the connector's tools are not in the session, load them with ToolSearch (query `linear`); if they are still missing, Linear is not connected: step 1 applies.
 - Step 2: statuses are Backlog (idea), Todo (agreed), In Progress, and Done, Canceled or Duplicate.
 - Step 3: type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
-- Step 4: on a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. If the project has no lead, set the label alone and say once that the item could not be assigned.
+- Step 4: on a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. If the project has no lead, set the label alone and say once that the item could not be assigned. A merge wait after "You: merge #N." gets the same label and assignment, and the same removal.
 - Step 5: the order is a section "Order of agreed work, next first" in the project description. Update it with the connector's project save, which accepts partial edits.
 - The item is a Linear issue in that project.
 - Name the item's branch with its identifier as its own segment, lowercase, as in the branch names Linear itself suggests, after a Conventional Commits type, for example `feat/wrk-26-branch-key`, so that Linear's GitHub integration attaches the pull request to the item. Step 6's hand-added link on the item stays, for a repository without the integration.
@@ -68,7 +68,7 @@ Nothing agreed is waiting. Other ideas are in Backlog.
 * Todo: agreed
 * In Progress: a branch or pull request exists
 * Done, Canceled or Duplicate: how it ended
-* The "Waiting on you" label: the item waits on the maintainer and is assigned to the project's lead while it waits, with the steps at the top of its description
+* The "Waiting on you" label: the item waits on the maintainer and is assigned to the project's lead while it waits, with the steps at the top of its description (a merge wait names the pull request in its opening sentence instead)
 ````
 
 ## Tracker: GitHub issues
