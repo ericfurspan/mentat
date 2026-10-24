@@ -19,8 +19,8 @@ Mentat is a Claude Code plugin that runs a multi-agent coding workflow on a GitH
 
 1. A request in chat or a backlog item. Claude Code reads the code and gives its view; for a new feature or a workflow change, Codex and Grok weigh it too (`mentat weigh`). The maintainer agrees on what gets built.
 2. A builder subagent makes the change, or a batch of changes the maintainer agreed to, on its own branch and runs the test command; the chat shows plans and reports, not diffs.
-3. Claude Code opens a pull request; its description opens with a status line and a short note to the maintainer. `mentat review` waits for CI, then Codex reviews the head commit, and Grok the first one. Findings with a realistic trigger are fixed, the rest answered with a reason, for at most five rounds. A typo-level change can skip both reviews if the maintainer agrees to a fast track.
-4. Claude Code checks the diff against the description and the spec, marks the status line Ready and reports it in one line.
+3. Claude Code opens a pull request; its description opens with a status line and a short note to the maintainer. `mentat review` waits for CI, then Codex reviews the head commit, and Grok the first one. If Grok cannot run, for example because it is not signed in, Codex carries on and the note says why; nothing stops for it. Findings with a realistic trigger are fixed, the rest answered with a reason, for at most five rounds. A typo-level change can skip both reviews if the maintainer agrees to a fast track.
+4. Claude Code checks the diff against the description and the spec, marks the status line Ready and reports it as "You: merge #N." with at most one more sentence. Chat names work in plain words and puts links on a message's last line, so the pull request's link ends the report.
 5. The maintainer merges. Hooks ask before any merge or push to the default branch.
 
 The agreed text has the shape of a spec, and each requirement is traced to its evidence; [spec-driven development](docs/spec-driven.md) maps the steps to that practice.
@@ -52,7 +52,7 @@ The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs f
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed in the backlog.
 - `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
 - `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in five short lines at most: the consensus first, then what each model adds. Runs anywhere, no repository needed.
-- `/mentat:codex-review-off`: turns Codex off for the session, and Grok's review with it. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed.
+- `/mentat:claude-review`: turns Codex and Grok off for the session. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed, until you say in chat to turn Codex back on.
 
 ## Docs and credits
 
