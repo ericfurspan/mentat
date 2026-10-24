@@ -31,4 +31,4 @@ Either way, the pull request's Evidence cites each requirement the agreed text s
 
 ## Keeping the spec short and current
 
-There is one spec per change, scaled to it: a bug fix is a few lines. It is fixed once agreed, changes only when the scope does, and with an external backlog every review fingerprints the text it judged, so a review of an older spec shows up as one. On the GitHub-issues path the reviews read the issue itself and no fingerprint is recorded.
+There is one spec per pull request, scaled to it: a bug fix is a few lines, and a batch of changes the maintainer agreed to has numbered requirements covering each change. It is fixed once agreed, changes only when the scope does, and with an external backlog every review fingerprints the text it judged, so a review of an older spec shows up as one. On the GitHub-issues path the reviews read the issue itself and no fingerprint is recorded.

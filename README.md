@@ -18,7 +18,7 @@ Mentat is a Claude Code plugin that runs a multi-agent coding workflow on a GitH
 ## How a change moves
 
 1. A request in chat or a backlog item. Claude Code reads the code and gives its view; for a new feature or a workflow change, Codex and Grok weigh it too (`mentat weigh`). The maintainer agrees on what gets built.
-2. A builder subagent makes the change on its own branch and runs the test command; the chat shows plans and reports, not diffs.
+2. A builder subagent makes the change, or a batch of changes the maintainer agreed to, on its own branch and runs the test command; the chat shows plans and reports, not diffs.
 3. Claude Code opens a pull request; its description opens with a status line and a short note to the maintainer. `mentat review` waits for CI, then Codex reviews the head commit, and Grok the first one. Findings with a realistic trigger are fixed, the rest answered with a reason, for at most five rounds. A typo-level change can skip both reviews if the maintainer agrees to a fast track.
 4. Claude Code checks the diff against the description and the spec, marks the status line Ready and reports it ready.
 5. The maintainer merges. Hooks ask before any merge or push to the default branch.
