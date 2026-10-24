@@ -29,11 +29,11 @@ After "You: merge #N.", until the maintainer merges, #N's branch holds what they
 
 After the answer, if #N is still open and they want the work in it, remove the item's merge wait where there is one (`mentat:backlog` step 4), build it on #N's branch (the `mentat:builder` subagent), run the test command and push. With a Claude review round left, update the description for the new head with the state `In review` (Skill tool, `mentat:pr`) and go to step 3 for the new head, within the same two rounds, through step 5 and a new "You: merge #N.": the new head gets a Claude round of its own, even when the first round left nothing to confirm, and step 5 marks it Ready only if that review ran and completed on the new head. With none left, rewrite the status line with the state `Not reviewed: no review round left` (Skill tool, `mentat:pr`) and tell the maintainer the new head was not reviewed, with no new "You: merge #N.". In any other case with #N open, first rewrite its status line back to the state it had before the hold (Skill tool, `mentat:pr`); then the work goes on a new branch from the default branch, in its own pull request.
 
-No hold is needed for a question, when #N is merged or closed, or for work that stands apart from #N; any work then goes on a new branch from the default branch, in its own pull request.
+No hold is needed for a question, when #N is merged or closed, or for work that stands apart from #N; any work then goes on a new branch from the default branch, in its own pull request. When #N is closed without merging, remove the item's merge wait (`mentat:backlog` step 4) and leave its status as it is.
 
 Every description update here rewrites the status line in full and keeps the note's shape (`mentat:pr`). Whenever this path stops short of "You: merge #N.", first rewrite the status line with the state `Not reviewed: <why>` for step 3's tell-the-maintainer cases, or `Blocked: <the defect>` for an agreed defect still unfixed after round two, and add the reason to the note in one sentence (for a defect, that it is agreed and still unfixed). Then tell the maintainer.
 
-The maintainer merges, as always. When the maintainer says #N merged, mark the backlog item done (`mentat:backlog`), which ends its merge wait, do the repository's own post-merge steps, and report in one line.
+The maintainer merges, as always. When the maintainer says #N merged, do the steps of the item's wait block where there is one (`mentat:backlog` step 4), then mark the item done (`mentat:backlog`), which ends its merge wait, do the repository's own post-merge steps, and report in one line.
 
 ## Plans
 

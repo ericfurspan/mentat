@@ -60,10 +60,10 @@ If the pull request's author is not the repository owner, request the owner's re
 
 ## After "You: merge #N."
 
-When the maintainer says #N merged, mark the backlog item done (`mentat:backlog`), which ends its merge wait, do the repository's own post-merge steps, and report in one line.
+When the maintainer says #N merged, do the steps of the item's wait block where there is one (`mentat:backlog` step 4), then mark the item done (`mentat:backlog`), which ends its merge wait, do the repository's own post-merge steps, and report in one line.
 
 Until the maintainer merges, #N's branch holds what they were told to merge. When later work belongs in #N (a change the maintainer asks for in #N, or one Claude Code finds #N should not merge without), push nothing yet: rewrite #N's status line with the state `Blocked: <reason>` first (Skill tool, `mentat:pr`), then reply with a first line "Hold #N: <reason>" and end the turn, saying whether a review round remains for #N.
 
 After the answer, if #N is still open and they want the work in it, remove the item's merge wait where there is one (`mentat:backlog` step 4), build it on #N's branch (the builder, as step 4), run the tests and push. With a round left, update the description for the new head with the state `In review` (Skill tool, `mentat:pr`) and go to step 1 for the new head, within the same five rounds (Grok does not run again), through the final check and a new "You: merge #N.". With none left, rewrite the status line with the state `Not reviewed: no review round left` (Skill tool, `mentat:pr`) and tell the maintainer the new head was not reviewed, with no new "You: merge #N.". In any other case with #N open, first rewrite its status line back to the state it had before the hold (Skill tool, `mentat:pr`); then the work goes on a new branch from the default branch, in its own pull request.
 
-No hold is needed for a question, when #N is merged or closed, or for work that stands apart from #N; any work then goes on a new branch from the default branch, in its own pull request.
+No hold is needed for a question, when #N is merged or closed, or for work that stands apart from #N; any work then goes on a new branch from the default branch, in its own pull request. When #N is closed without merging, remove the item's merge wait (`mentat:backlog` step 4) and leave its status as it is.
