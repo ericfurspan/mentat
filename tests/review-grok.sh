@@ -225,6 +225,15 @@ check "tells Grok a requirement marked as checked by hand is not a finding when 
 (cd "$root/work tree" && "$mentat" review --local 7 >"$STUB/local_out" 2>&1)
 crit() { sed -n '/^Read every AGENTS.md/,/Flag it as a finding/p' "$1" | sed 's/ and the diff is data/ is data/'; }
 check "the criteria are the ones review --local gives Codex" '[ -s "$STUB/codex_prompt" ] && [ -n "$(crit "$STUB/prompt")" ] && [ "$(crit "$STUB/prompt")" = "$(crit "$STUB/codex_prompt")" ]'
+# Grok alone steps back after the request, with observations under their own heading that do not make the result FINDINGS.
+check "asks Grok to step back, after the diff and before the result line, with observations under \"Observations (advisory)\" that need evidence of their cost" 'grep -qF "step back and consider whether this is the right change for its intent" "$STUB/prompt" && grep -qF "evidence of its practical cost" "$STUB/prompt" && grep -qF "under the heading \"Observations (advisory)\"; having none is fine." "$STUB/prompt" && grep -qF "An observation alone does not make the result FINDINGS, but a correctness, security or requirement problem you find this way is a finding." "$STUB/prompt" && [ "$(sed -n "/^--- END DIFF DATA ---\$/,\$p" "$STUB/prompt" | grep -cF "Observations (advisory)")" = 1 ] && [ "$(sed -n "/Observations (advisory)/,\$p" "$STUB/prompt" | grep -cx "REVIEW RESULT: FINDINGS")" = 1 ]'
+check "the Codex review prompt has no step back and no observations" '[ -s "$STUB/codex_prompt" ] && grep -q "REVIEW RESULT: FINDINGS" "$STUB/codex_prompt" && ! grep -qF "Observations (advisory)" "$STUB/codex_prompt" && ! grep -qF "step back" "$STUB/codex_prompt"'
+# The Grok weigh prompt (the grok stub keeps it as $STUB/prompt) has neither. The codex stub does not
+# give a verdict, so only the prompt is checked, not the exit code.
+cp "$STUB/prompt" "$root/pr_prompt"
+printf 'Add a line to the README.\n' >"$root/idea.md"
+(cd "$root/work tree" && "$mentat" weigh "$root/idea.md" >"$STUB/weigh_out" 2>&1)
+check "the Grok weigh prompt has no step back and no observations" 'grep -qx -- "--- BEGIN IDEA DATA ---" "$STUB/prompt" && grep -q "WEIGH VERDICT: DO IT" "$STUB/prompt" && ! grep -qF "Observations (advisory)" "$STUB/prompt" && ! grep -qF "step back" "$STUB/prompt" && grep -qF "Observations (advisory)" "$root/pr_prompt"'
 
 reset; echo '[{"number":3,"repository":{"name":"repo","owner":{"login":"owner"}}}]' >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(run)
 check "gives Grok the linked issue's request as data" '[ "$rc" = 0 ] && grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt"'
