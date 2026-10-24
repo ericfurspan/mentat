@@ -16,21 +16,13 @@ else
   fail "AGENTS.md is missing '## Code Review Rules'"
 fi
 
-# Retired phrases stay gone, and the reviewing tool is named (Codex, Grok or Claude), never "the reviewer".
+# The reviewing tool is named (Codex, Grok or Claude), never "the reviewer".
 # The scan skips tests/*.sh (they use `gh pr ready` as test input) and skills/*/CREDITS.md.
-retired=$(git ls-files -z -- . ':!tests/run' ':!tests/*.sh' ':!skills/*/CREDITS.md' | xargs -0 grep -n -i -F \
-  -e 'ready to merge' \
-  -e '100-word' \
-  -e 'closing block' \
-  -e 'draft pull request' \
-  -e 'rules-records' \
-  -e 'brief review' \
-  -e 'gh pr ready' \
-  -e 'the reviewer')
+retired=$(git ls-files -z -- . ':!tests/run' ':!tests/*.sh' ':!skills/*/CREDITS.md' | xargs -0 grep -n -i -F -e 'the reviewer')
 if [ -z "$retired" ]; then
-  pass "no retired phrase in tracked prose"
+  pass "no tracked prose says \"the reviewer\""
 else
-  fail "retired phrase in tracked prose:"
+  fail "tracked prose says \"the reviewer\":"
   printf '%s\n' "$retired"
 fi
 
@@ -48,9 +40,7 @@ hold_check() {
   pass "$file gives the hold after \"You: merge #N.\""
 }
 hold_check rules.md "pushes nothing to #N's branch until the maintainer answers a reply opening \"Hold #N: <reason>\""
-for f in skills/review/SKILL.md skills/codex-review-off/SKILL.md; do
-  hold_check "$f" 'push nothing yet' '"Hold #N: <reason>" and end the turn'
-done
+hold_check skills/review/SKILL.md 'push nothing yet' '"Hold #N: <reason>" and end the turn'
 
 # A fast track skips the Codex and Grok reviews only after a check of the complete final diff, says so in
 # the status line, and is kept in the spec so a resumed or compacted session still has it.

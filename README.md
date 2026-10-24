@@ -52,7 +52,7 @@ The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs f
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed in the backlog.
 - `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
 - `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in five short lines at most: the consensus first, then what each model adds. Runs anywhere, no repository needed.
-- `/mentat:codex-review-off`: turns Codex off for the session, and Grok's review with it. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed.
+- `/mentat:claude-review`: turns Codex and Grok off for the session. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed, until you say in chat to turn Codex back on.
 
 ## Docs and credits
 

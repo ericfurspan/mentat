@@ -10,7 +10,7 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 2. Use the repository's pull request template if it has one, adding any part below that it lacks; otherwise the template below. Where the repository has a `GLOSSARY.md`, use its terms.
 3. The note's first sentence states the change's intent, the sentence Codex and Grok (or Claude, with Codex off) compare their own against. If you cannot state it in one sentence, ask the maintainer before opening the pull request.
 4. Every claim matches the diff on the head commit. After any push that changes what the diff does, update the body.
-5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:codex-review-off`), so they say where things stand now. A wait on the maintainer written on the pull request (`rules.md`, "What goes to the maintainer") goes above the status line.
+5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer written on the pull request (`rules.md`, "What goes to the maintainer") goes above the status line.
 
 ```markdown
 **<State>.** <head commit>, tests <pass or fail>, CI <passed, failed, not finished or none>.
@@ -23,6 +23,7 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 
 **Before:** <the failing check, the old output, or the old line>
 **After:** <the passing check, the new output, or the new line>
+**See it:** <how the maintainer can see the change: a command to run, a URL, or a repository-relative path; never a local machine path>
 
 <For each numbered requirement of the spec, by number (an older issue or item, agreed before the section had that name and with no numbered list, is read as each requirement it states): the check that covers it and what was observed. One check may cover several. A hand check says who checked and what they saw.>
 
