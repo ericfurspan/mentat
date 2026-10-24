@@ -37,6 +37,7 @@ The reference the other pages match.
 | Reviews when Codex is off | Claude (`code-review`) | after `/mentat:codex-review-off`, at most two rounds, once `mentat ci` passes | `skills/codex-review-off` |
 | Does the final check | Claude Code | when the loop ends ready | reads the diff, the description and the spec; rewrites the status line |
 | Merges | the maintainer | every pull request | |
+| Marks the backlog item done, does the repository's own post-merge steps and reports in one line | Claude Code | after the maintainer merges | `skills/backlog`, chat |
 
 Outside the table, `/mentat:consult <question>` (the maintainer starts it) asks Codex, Grok and Claude Code one question and answers in five short lines at most, the consensus first, then what each model adds; it is no step in a change. Weigh judges a change to this repository's code at HEAD; consult answers any question, no repository, web on.
 
