@@ -209,6 +209,17 @@ grok_export_head() {
   GIT_INDEX_FILE="$run/index" git -C "$top" checkout-index -a -q --prefix="$run/export/" || "$fail" "could not export $head"
 }
 
+# Grok's own part of a pull request review, a trial that Codex's prompt, weigh and
+# consult do not get: after the request, a step back to whether this is the right change.
+grok_step_back() {
+  printf 'After judging the change against the request, step back and consider whether this is the right change for its intent: '
+  printf 'whether there is a simpler way or a better place for it, a name or structure that no longer describes what it does, '
+  printf 'something the request missed, or something the change breaks or makes harder elsewhere. '
+  printf 'Give each observation with evidence of its practical cost, and leave out any you cannot support. '
+  printf 'Put them after the findings, under the heading "Observations (advisory)"; having none is fine. '
+  printf 'An observation alone does not make the result FINDINGS, but a correctness, security or requirement problem you find this way is a finding.\n\n'
+}
+
 # The review's diff and prompt, in the per-run folder.
 grok_pr_prompt() {
   git -C "$top" diff --no-ext-diff --no-textconv --no-color "$mb" "$head" >"$run/diff" || not_reviewed "could not diff $mb..$head"
@@ -220,6 +231,7 @@ grok_pr_prompt() {
     printf -- '--- BEGIN DIFF DATA ---\n'
     cat "$run/diff"
     printf -- '\n--- END DIFF DATA ---\n\n'
+    grok_step_back
     review_result_line
   } >"$run/in/prompt" || not_reviewed "could not write the prompt"
 }
