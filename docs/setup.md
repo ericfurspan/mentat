@@ -30,7 +30,7 @@ The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on
 
 ## The reply style
 
-The plugin ships an output style, not forced. It is the voice: each reply is written for someone who just walked in, in plain words: what happened, what it means for you, what is left or uncertain, and what you do next. Anything to run or paste comes whole in a fenced block. A failure or a proposal runs as long as it needs. One decision per message, and while work runs Mentat writes only when you are needed, something failed, or the work is done. A skill that sets its own reply shape replaces the style while it runs. How a decision reaches you, as a prompt or as text that ends the turn, is a workflow rule in `rules.md`, so it holds whether or not the style is on. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file.
+The plugin ships an output style, not forced. It is the voice: each reply is written for someone who just walked in, in plain words: what happened, what it means for you, what is left or uncertain, and what you do next. Anything to run or paste comes whole in a fenced block. A failure or a proposal runs as long as it needs. One decision per message, and while work runs Mentat writes only when you are needed, something failed, or the work is done. A skill that sets its own reply shape replaces the style while it runs. How a decision reaches you, in a prompt, or as text that ends the turn when no prompt is available, is a workflow rule in `rules.md`, so it holds whether or not the style is on. In the terminal, `/output-style` picks it; in the desktop app, `outputStyle` goes in a settings file.
 
 ## Reviews
 
@@ -49,4 +49,4 @@ In a repository with a Linear backlog, branch names carry the item key (for exam
 - [`grilling`](https://skills.sh/mattpocock/skills/grilling) interviews you about a plan until you agree on it.
 - [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) challenges a plan or claim and ends with a stronger version.
 
-Mentat offers `grilling` when it is installed; `the-fool` is yours to start.
+Both are yours to start; Mentat does not offer them.
