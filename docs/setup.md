@@ -28,10 +28,6 @@ Run in a terminal. Mentat is installed once per machine at `user` scope, so it i
 
 The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on, not on the terminal's.
 
-## The reply style
-
-Mentat ships no output style: Claude Code's own styles apply (Concise leads with the result). How a decision reaches you, in a prompt or as text that ends the turn, is a workflow rule in `rules.md`.
-
 ## Reviews
 
 - `mentat review` reviews each head with the Codex CLI on this machine; nothing is installed on the repository.
