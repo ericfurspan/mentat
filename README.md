@@ -9,7 +9,7 @@
 
 <p align="center"><a href="https://github.com/ericfurspan/mentat/actions/workflows/tests.yml"><img src="https://github.com/ericfurspan/mentat/actions/workflows/tests.yml/badge.svg" alt="tests"></a></p>
 
-Mentat is a Claude Code plugin that runs a multi-agent coding workflow on a GitHub repository. The repository's maintainer requests a change. Claude Code proposes a plan, with Codex and Grok weighing in on new ideas and Codex challenging an uncertain plan, and a builder makes the change once the maintainer agrees. Codex reviews the pull request after every fix, Grok adds a second review where it is installed, and the maintainer merges. Along the way, the maintainer can step back with `/mentat:zoom-out`, put one question to several models with `/mentat:consult`, and review a session for improvements with `/mentat:retro`.
+Mentat is a Claude Code plugin that runs a multi-agent coding workflow for one maintainer of a GitHub repository. Claude Code proposes a plan, with Codex and Grok weighing in on new ideas and Codex challenging an uncertain plan, and a builder makes the change once the maintainer agrees. Codex reviews the pull request after every fix, Grok adds a second review where it is installed, and the maintainer merges. Along the way, the maintainer can step back with `/mentat:zoom-out`, put one question to several models with `/mentat:consult`, and review a session for improvements with `/mentat:retro`.
 
 <p align="center">
   <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge. Codex and Grok give a second opinion on the request, Codex critiques the plan, and both review the code. The maintainer asks for the change, approves the plan and merges." width="680" height="320">
@@ -45,7 +45,7 @@ claude plugin install mentat --marketplace ericfurspan/mentat
 
 ## Commands
 
-The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes.
+The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes. Outside the workflow, `weigh`, `challenge` and `review` run in a git checkout, and `review` needs a GitHub pull request and posts one review (the review loop is the plugin's, not the command's); `consult` runs in any folder.
 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
