@@ -42,7 +42,6 @@ In a repository with a Linear backlog, branch names carry the item key (for exam
 
 ## Optional skills
 
-- [`grilling`](https://skills.sh/mattpocock/skills/grilling) interviews you about a plan until you agree on it.
-- [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) challenges a plan or claim and ends with a stronger version.
+- [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) challenges a plan or claim and ends with a stronger version. It is yours to start; Mentat does not offer it.
 
-Both are yours to start; Mentat does not offer them.
+To be interviewed about a plan one question at a time, use Mentat's own `/mentat:grill` (see the [README's commands](../README.md#commands)). Claude Code may offer a grill when a request has several open decisions that depend on each other, and starts one only if you agree.
