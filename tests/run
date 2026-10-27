@@ -70,6 +70,7 @@ phrase_check skills/review/SKILL.md "the open hand check's status line" 'Blocked
 phrase_check skills/review/SKILL.md "the open hand check's first step in chat" 'the chat reply opens with the first step'
 phrase_check skills/review/SKILL.md "the open hand check's no merge line" 'Then say no "You: merge #N."'
 phrase_check skills/claude-review/SKILL.md "the open hand check's stop before the merge line" 'step 6 does not run'
+phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" 'apply the hand check gate of'
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
 phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "You: merge #N."'
