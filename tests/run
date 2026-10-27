@@ -90,7 +90,7 @@ phrase_check rules.md "the grill offer at most once per request" 'at most once p
 # A decision that does not block work goes to the maintainer's named decisions doc and is still asked once per turn.
 phrase_check rules.md "the decisions doc route" 'a decision Claude Code does not need in order to keep working goes there'
 phrase_check rules.md "the decisions doc's closing prompt" "the first such decision of a turn is also asked as the turn's closing prompt"
-phrase_check rules.md "the closing prompt's exception" 'unless the turn already ends with a blocking decision or a line asking the maintainer to act'
+phrase_check rules.md "the closing prompt's exception" 'unless the turn already ends with a blocking decision, a failure report or a line asking the maintainer to act'
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
