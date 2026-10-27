@@ -49,6 +49,7 @@ The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs f
 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
+- `/mentat:grill`: interviews you about a plan, decision or idea, one clickable question at a time, each built on your last answer, and ends with a list of what was agreed. Claude Code may offer a grill; it starts one only if you agree.
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed in the backlog.
 - `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
 - `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in five short lines at most: the consensus first, then what each model adds. Runs anywhere, no repository needed.

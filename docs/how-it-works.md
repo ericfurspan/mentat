@@ -37,7 +37,7 @@ The reference the other pages match.
 | Merges | the maintainer | every pull request | |
 | Marks the backlog item done, does the repository's own post-merge steps and reports in one line | Claude Code | after the maintainer merges | `skills/backlog`, chat |
 
-Outside the table, `/mentat:consult <question>` (the maintainer starts it) asks Codex, Grok and Claude Code one question and answers in five short lines at most, the consensus first, then what each model adds; it is no step in a change. Weigh judges a change to this repository's code at HEAD; consult answers any question, no repository, web on.
+Outside the table, `/mentat:consult <question>` (the maintainer starts it) asks Codex, Grok and Claude Code one question and answers in five short lines at most, the consensus first, then what each model adds; it is no step in a change. Weigh judges a change to this repository's code at HEAD; consult answers any question, no repository, web on. `/mentat:grill` interviews the maintainer about a plan, one clickable question at a time; Claude Code may offer one when a request has several open decisions that depend on each other, and starts it only if the maintainer agrees. A confirmed grill is not agreement to build: weigh and the proposal still follow, without asking its decisions again.
 
 ## The repository comes first
 
