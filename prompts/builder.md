@@ -2,7 +2,7 @@
 # Read by agents. For people: README.md and docs/.
 name: builder
 description: Builds one change that the main session has already planned, on the current branch, then runs the repository's test command and reports. Use when the plan is written down and the remaining work is mostly editing.
-model: sonnet
+model: opus
 effort: high
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---
