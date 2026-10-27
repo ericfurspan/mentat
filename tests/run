@@ -56,6 +56,26 @@ fast_track_check "check of the complete final diff" 'check the complete final di
 fast_track_check "status line" 'Not reviewed: fast track agreed by the maintainer'
 fast_track_check "record in the spec" 'one line in the spec, written when it was agreed'
 
+# An open hand check blocks "You: merge #N." (the review and Claude-only skills), and a push after Ready
+# skips its review round only on the maintainer's yes, for a diff that changes no file a program runs.
+phrase_check() {
+  local file=$1 what=$2 s=$3
+  if grep -q -F -- "$s" "$file"; then
+    pass "$file gives $what"
+  else
+    fail "$file must give $what (missing: $s)"
+  fi
+}
+phrase_check skills/review/SKILL.md "the open hand check's status line" 'the status line is `Blocked: <the hand check>`'
+phrase_check skills/review/SKILL.md "the open hand check's first step in chat" 'the chat reply opens with the first step'
+phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "You: merge #N."'
+phrase_check skills/review/SKILL.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
+phrase_check skills/review/SKILL.md "the waived round's yes for that push" "Skip only on the maintainer's yes for that push"
+phrase_check skills/review/SKILL.md "the waived round's status line" 'Not reviewed: last push waived by the maintainer'
+phrase_check skills/review/SKILL.md "the waived round's measure from the last reviewed head" 'measured from the last head a review covered'
+phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'the status line is `Blocked: <the hand check>`'
+phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
+
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
   fail "a script under lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"
