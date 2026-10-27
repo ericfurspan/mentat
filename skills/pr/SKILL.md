@@ -15,7 +15,7 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 ```markdown
 **<State>.** <head commit>, tests <pass or fail>, CI <passed, failed, not finished or none>.
 
-<A note to the maintainer, about a hundred words at most, in plain words, with no headings, labels or bullets. First sentence: what the change is for, its intent and not a list of edits. Then only what applies: why the change is made; whether a revert undoes it, and if not, what stays and why; anything Codex, Grok or Claude flagged that stayed unfixed, and any call made without the maintainer; where in the diff to look first. A small change gets two or three sentences.>
+<A note to the maintainer, about a hundred words at most, in plain words, with no headings, labels or bullets. First sentence: what the change is for, its intent and not a list of edits. Then only what applies: why the change is made (for a bug fix, the builder's cause, or that it is unknown); whether a revert undoes it, and if not, what stays and why; anything Codex, Grok or Claude flagged that stayed unfixed, and any call made without the maintainer; where in the diff to look first. A small change gets two or three sentences.>
 
 ---
 
