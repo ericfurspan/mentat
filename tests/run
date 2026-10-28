@@ -111,6 +111,7 @@ phrase_check skills/review/SKILL.md "each call made without the maintainer, one 
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
 phrase_check skills/propose/SKILL.md "step 2's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
 phrase_check skills/propose/SKILL.md "step 2's planning with overlapping items" 'overlapping items and the plan around them'
+phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:plan\`"
 phrase_check rules.md "the re-read of a record before asking about it" 'Right before asking about a record, it re-reads that record.'
 # Step 2's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/SKILL.md)" -eq 2 ]; then
