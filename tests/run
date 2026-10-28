@@ -151,7 +151,7 @@ done
 
 # rules.md holds what applies in every session; step 2's procedure is in mentat:propose, and its standing lines stay.
 phrase_check rules.md "what it holds and where a step's procedure lives" "This file holds what applies in every session; a step's procedure lives in its skill."
-phrase_check rules.md "step 2's call of mentat:propose" "Claude Code calls the Skill tool with \`mentat:propose\` before giving a view, or after a one-line view of a small, clear request."
+phrase_check rules.md "step 2's call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request."
 phrase_check rules.md "that a DO IT is not agreement" "A \`DO IT\` is not the maintainer's agreement."
 phrase_check rules.md "that the maintainer agrees once" 'The maintainer agrees once.'
 phrase_check rules.md "that agreed work is not weighed again" 'Agreed work is not weighed again.'

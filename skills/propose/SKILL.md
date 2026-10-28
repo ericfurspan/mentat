@@ -1,9 +1,9 @@
 ---
 name: propose
-description: "Step 2 of a change: the teammate's view, any grill, the decisions, the weigh, the proposal and the maintainer's agreement, the spec, and when to call mentat:plan. Use before giving a view on any request that may change a repository, unless it is small and clear (then right after its one-line view), and after a compaction or a resumed session while this step is in progress."
+description: "Step 2 of a change: the teammate's view, any grill, the decisions, the weigh, the proposal and the maintainer's agreement, the spec, and when to call mentat:plan. Use before giving a view on any request that may change a repository (a small, clear one gets its one-line view in step 1), and after a compaction or a resumed session while this step is in progress."
 ---
 
-`rules.md` step 2 calls this skill. Its standing lines there hold throughout.
+`rules.md` step 2 calls this skill before any view; a small, clear request gets its one-line view in step 1. Its standing lines there hold throughout.
 
 1. Claude Code reads the code and, unless the request is small and clear, the open backlog's titles and opening sentences (read only), then gives a teammate's view (worth doing or not, the cost, a better way, overlapping items and the plan around them, with evidence; one line when small and clear).
 2. For a new feature or workflow change, when several open decisions depend on each other, it may first offer a grill (`mentat:grill`) to ask them, at most once per request, and starts it only if the maintainer agrees.
