@@ -104,6 +104,8 @@ phrase_check rules.md "what each option authorizes, gives and costs the maintain
 # rests on checked facts, and is split rather than bundled.
 phrase_check rules.md "a decision on one point the maintainer can judge" 'one specific point the maintainer can judge from their own work'
 phrase_check rules.md "a mechanism named only when the maintainer needs it" 'only when the maintainer needs the name to judge'
+phrase_check rules.md "the mechanism chosen from the maintainer's answer" 'chooses the mechanism from the answer'
+phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked or marked unverified" 'a fact a question rests on is checked first or marked unverified'
 phrase_check rules.md "narrow questions rather than a bundle" 'several narrow questions are asked rather than one that bundles choices'
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question says why the first is recommended, so the prompt alone suffices'
