@@ -91,6 +91,28 @@ phrase_check rules.md "the grill offer at most once per request" 'at most once p
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision Claude Code does not need in order to keep working reaches them, it follows those instructions"
 phrase_check rules.md "step 2's route for a decision that does not block" 'one it does not need in order to go on goes as "How it reaches them" says'
 
+# A decision prompt can be answered on its own, a call made without the maintainer reaches chat one line each,
+# step 2 reads the open backlog before planning, and a record is re-read right before asking about it.
+phrase_check rules.md "what each option changes for the maintainer" "each saying, in the maintainer's terms, what it authorizes and changes for them"
+phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question says why the first is recommended, so the prompt alone suffices'
+phrase_check rules.md "a consequential call in one line of the next message" "and in one line of the next message the maintainer reads"
+if grep -q -F 'not in chat' rules.md; then
+  fail "rules.md must not keep a consequential call out of chat (found: not in chat)"
+else
+  pass "rules.md does not keep a consequential call out of chat"
+fi
+phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
+phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
+phrase_check rules.md "step 2's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
+phrase_check rules.md "step 2's planning with overlapping items" 'overlapping items and the plan around them'
+phrase_check rules.md "the re-read of a record before asking about it" 'Right before asking about a record, it re-reads that record.'
+# Step 2's read neither refines hand-made items nor clears merge waits: both bullets exempt it.
+if [ "$(grep -c -F "not for \`rules.md\` step 2's read," skills/backlog/SKILL.md)" -eq 2 ]; then
+  pass "skills/backlog/SKILL.md exempts step 2's read from refining items and clearing merge waits"
+else
+  fail "skills/backlog/SKILL.md must exempt step 2's read in both the hand-made items and merge waits bullets"
+fi
+
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
   fail "a script under lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"
