@@ -18,7 +18,7 @@ Progress notes, evidence and replaced plans go in comments, not the description.
 
 1. Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the tools are not in the session, tell the maintainer the backlog is not connected in this session and stop planning work there. Never file an item or a plan on GitHub instead. The builder does not touch the backlog; this happens in the main session.
 2. Status says where an item stands:
-   - Not agreed, Claude Code's own suggestions included. An item the maintainer set aside says "parked" in its opening sentence; one that was agreed keeps its spec, says it was agreed, and leaves the order of agreed work (step 5).
+   - Not agreed, Claude Code's own suggestions included. An item the maintainer set aside says "parked" in its opening sentence; one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work (step 5).
    - Agreed.
    - In progress: a branch or pull request exists.
    - Ended: done, canceled or duplicate.

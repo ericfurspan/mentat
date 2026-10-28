@@ -116,7 +116,7 @@ fi
 # An item that is not agreed is described by what it is and where it stands, and waits on no one.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item the maintainer set aside says "parked" in its opening sentence'
-phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec, says it was agreed, and leaves the order of agreed work'
+phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
 phrase_check skills/backlog/SKILL.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
 phrase_check skills/backlog/SKILL.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item and wait" 'what the item is (such as a bug, a proposal, a follow-up or a question), where it stands, and any wait on the maintainer (step 4)'
