@@ -124,13 +124,15 @@ phrase_check rules.md "the re-read of a record before asking about it" 'Right be
 # Finished work ends with one action the maintainer can take, chosen from what Claude Code already knows.
 phrase_check rules.md "the next step's trigger, finished work" 'When the work the maintainer asked for is finished and the message asks nothing else of them'
 phrase_check rules.md "the next step's one sentence before the links" 'it ends, before its links, with one sentence naming one thing they can do next'
-phrase_check rules.md "the next step's order of choice, from what is known" 'the next agreed item that needs them (not work that runs on its own), else one backlog item or follow-up Claude Code already knows of without searching'
-phrase_check rules.md "the next step not work that runs on its own" '(not work that runs on its own)'
-phrase_check rules.md "the next step known without searching" 'already knows of without searching'
-phrase_check rules.md "the next step proposed, not started" 'proposed and not started'
+phrase_check rules.md "the next step from what is known, without searching" 'from what Claude Code already knows without searching'
+phrase_check rules.md "the next step's first choice, not work that runs on its own" 'the next agreed item that needs them (not work that runs on its own)'
+phrase_check rules.md "the next step's second choice" 'one backlog item or a follow-up noticed in this work'
+phrase_check rules.md "the next step proposed, not filed or started" 'proposed and not filed or started'
+phrase_check rules.md "the next step's last choice" 'else that there is nothing further to propose'
 phrase_check rules.md "the next step's exclusions" 'Answers, progress updates and replies a skill shapes are unchanged'
 phrase_check rules.md "the backlog bullet allowing the next step" 'apart from the next step after finished work'
 phrase_check skills/review/SKILL.md "the merged report ending with the next step" 'report in one line, then the next step.'
+phrase_check skills/backlog/SKILL.md "the cleared merge waits' line ending with the next step" 'Name the cleared items in one line of the reply, then the next step'
 # Step 2's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/SKILL.md)" -eq 2 ]; then
   pass "skills/backlog/SKILL.md exempts step 2's read from refining items and clearing merge waits"
