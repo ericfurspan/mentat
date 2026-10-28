@@ -124,6 +124,23 @@ phrase_check rules.md "a wait on the maintainer for agreed work only" 'When agre
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 phrase_check skills/backlog/SKILL.md "the waiting stage for agreed work only" 'an issue that is not agreed waits on no one'
 
+# After a weigh or a plan challenge, the maintainer sees each tool's reply and what Claude Code did with it in one block.
+phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
+phrase_check skills/backlog/SKILL.md "the replies block's Adopting line" 'Adopting: <'
+phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'Not adopting: <'
+phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "\`not weighed\` or \`not challenged\` and why"
+phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
+phrase_check skills/backlog/SKILL.md "the replies block with GitHub issues" 'only "Replies in chat" and "Tracker: GitHub issues" apply'
+phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
+phrase_check rules.md "step 2's replies block" '"Replies in chat"'
+phrase_check rules.md "the replies block in a decision prompt" "(a weigh's or challenge's replies block opens the question)"
+phrase_check skills/plan/SKILL.md "the challenge's replies block at hand-off" 'replies block'
+if grep -q -F 'in one line beside its own' rules.md; then
+  fail "rules.md must show the weigh replies as one block (found: in one line beside its own)"
+else
+  pass "rules.md does not give the weigh verdicts in one line beside its own"
+fi
+
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
   fail "a script under lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"

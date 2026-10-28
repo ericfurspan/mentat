@@ -12,6 +12,6 @@ A separate plan is written when `rules.md` step 2 calls for this skill. The scop
    - 0: delivered. Read the verdict and the findings.
    - 1: not challenged. The handoff says so.
 3. Sort the findings as `rules.md` "Findings" says, and update the plan; with an external backlog, update the backlog item, not only the file, and post the challenge reply and the settlement on it (`mentat:backlog`).
-4. Hand off: the maintainer sees the plan with what the challenge changed, and any objection Claude Code did not adopt, with the reason.
+4. Hand off: the plan, then the replies block (`mentat:backlog` "Replies in chat"): Codex's line, what the challenge changed under Adopting, and any objection not adopted under Not adopting, with the reason.
 
 A challenge never counts as a review.
