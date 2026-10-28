@@ -87,11 +87,8 @@ phrase_check skills/grill/SKILL.md "no several questions at once" 'Never put sev
 phrase_check skills/grill/SKILL.md "the Stop here option on every prompt" 'Every prompt also has a "Stop here" option'
 phrase_check rules.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
 
-# A decision that does not block work goes to the maintainer's named decisions doc and is still asked once per turn.
-phrase_check rules.md "the decisions doc route" 'a decision Claude Code does not need in order to keep working goes there'
-phrase_check rules.md "the decisions doc's closing prompt" "the first such decision of a turn is also asked as the turn's closing prompt"
-phrase_check rules.md "the closing prompt's exception" 'unless the turn already ends with a blocking decision, a failure report or a line asking the maintainer to act'
-phrase_check rules.md "the closing prompt after the closing message" "That prompt comes after the turn's closing message, however long"
+# A decision that does not block work reaches the maintainer as their own instructions say, and step 2 points there.
+phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision Claude Code does not need in order to keep working reaches them, it follows those instructions"
 phrase_check rules.md "step 2's route for a decision that does not block" 'one it does not need in order to go on goes as "How it reaches them" says'
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
