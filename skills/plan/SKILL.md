@@ -3,7 +3,7 @@ name: plan
 description: "Writing a separate plan and having Codex challenge it. Use when the approach is uncertain, the decision matters, or the maintainer asks for a challenge."
 ---
 
-A separate plan is written when `rules.md` step 2 calls for this skill. The scope statement that step requires is still written either way.
+A separate plan is written when `mentat:propose` calls for this skill. The scope statement that skill requires is still written either way.
 
 ## Steps
 

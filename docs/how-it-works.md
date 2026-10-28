@@ -10,7 +10,7 @@
 
 [Who does what](#who-does-what) lists each step, who does it and when. The file that owns a step holds its procedure:
 
-1. Plan: the request, the maintainer's agreement and the spec. [`skills/plan`](../skills/plan/SKILL.md) for a challenged plan, [`skills/backlog`](../skills/backlog/SKILL.md) for where the spec lives.
+1. Plan: the request, the maintainer's agreement and the spec. [`skills/propose`](../skills/propose/SKILL.md) for the view, the weigh and the agreement, [`skills/plan`](../skills/plan/SKILL.md) for a challenged plan, [`skills/backlog`](../skills/backlog/SKILL.md) for where the spec lives.
 2. Build: [`prompts/builder.md`](../prompts/builder.md).
 3. Pull request: [`skills/pr`](../skills/pr/SKILL.md).
 4. Review and final check: [`skills/review`](../skills/review/SKILL.md), or [`skills/claude-review`](../skills/claude-review/SKILL.md) with Codex off.
