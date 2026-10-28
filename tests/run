@@ -86,6 +86,12 @@ phrase_check skills/grill/SKILL.md "one decision per prompt" "Ask one decision p
 phrase_check skills/grill/SKILL.md "no several questions at once" 'Never put several questions in one message or one prompt'
 phrase_check skills/grill/SKILL.md "the Stop here option on every prompt" 'Every prompt also has a "Stop here" option'
 phrase_check rules.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
+# A grill's record goes in the weigh's file; with no change here, a second opinion is offered once, through the consult skill's steps.
+phrase_check rules.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
+phrase_check skills/grill/SKILL.md "the second opinion offer only when no change here follows" 'only when the agreed list will not lead to a change in this repository'
+phrase_check skills/grill/SKILL.md "the second opinion offer in its own prompt" "ask once, in its own \`AskUserQuestion\` prompt"
+phrase_check skills/grill/SKILL.md "no second opinion offer after Stop here" 'Make no offer after "Stop here".'
+phrase_check skills/grill/SKILL.md "the second opinion through the consult skill's steps" "follow its steps 1 to 4 rather than running \`mentat consult\` directly"
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and step 2 points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision Claude Code does not need in order to keep working reaches them, it follows those instructions"
