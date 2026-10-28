@@ -1,9 +1,9 @@
 ---
 name: backlog
-description: "Reading or changing the backlog, an external one (named in AGENTS.md, outside GitHub) or GitHub issues: items not agreed, the order of agreed work, labels and status, plans, evidence, the spec and waits on the maintainer. Use before filing, moving or reading a backlog item or issue, and, with an external backlog, right after `mentat weigh` or `mentat challenge`, to post the replies."
+description: "Reading or changing the backlog, an external one (named in AGENTS.md, outside GitHub) or GitHub issues: items not agreed, the order of agreed work, labels and status, plans, evidence, the spec and waits on the maintainer. Use before filing, moving or reading a backlog item or issue, and right after `mentat weigh` or `mentat challenge`, to show the replies (and, with an external backlog, post them)."
 ---
 
-With no external backlog, the backlog is GitHub issues: only "Tracker: GitHub issues" at the end applies, not the item shape or steps 1 to 8.
+With no external backlog, the backlog is GitHub issues: only "Replies in chat" and "Tracker: GitHub issues" apply, not the item shape or steps 1 to 8.
 
 In a repository with an external backlog (`rules.md` Records), the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker. Steps 1 to 8 hold for any external tracker; "Tracker: Linear" below holds the tool-specific parts, and a different tracker replaces only that part.
 
@@ -32,11 +32,26 @@ Progress notes, evidence and replaced plans go in comments, not the description.
    - Mark the item agreed once the maintainer agrees, in progress when the branch exists, and done when the pull request merges. Link the pull request from the item once it exists. The pull request writes no `Closes #`.
    - Before each `mentat review` or `mentat review --grok`, copy the section's body unchanged, subheadings included and stopping at the next heading of its level or higher (the item shape) into a temporary file (`mktemp`), pass it with `--request <file>`, and remove the file afterwards. The posted review records the first 12 hex characters of the SHA-256 of that text; `mentat:review` compares it with the current section's body: `printf '%s' "$(cat <file>)" | shasum -a 256 | cut -c1-12`.
 7. In the item, record what the maintainer asked in Claude Code's own words: a one-line summary in the opening sentence, and any longer account in a comment, labeled as Claude Code's summary; keep the current plan in the description, and post the evidence and any replaced plan as comments. Plain words.
-8. Keep what Codex and Grok said on the item. After `mentat weigh` or `mentat challenge`, Claude Code posts each tool's reply as its own comment, then one more comment with its settlement: what it adopted, what it did not, and why.
+8. Keep what Codex and Grok said on the item. After `mentat weigh` or `mentat challenge`, Claude Code posts each tool's reply as its own comment, then one more comment with its settlement: the block's Adopting and Not adopting lines ("Replies in chat"), with any detail agents need.
    - The reply goes in word for word and nothing else: for `challenge`, the text after the `---` line; for `weigh`, the text under the tool's `## Codex` or `## Grok` heading, without the seconds line. Leave out the header lines (they name local files), log paths and secrets. If the reply itself holds a secret or a local path, leave that part out and say so in the settlement.
    - Each comment opens with a heading that names the tool and the step ("Codex: weigh", "Grok: weigh", "Codex: plan challenge"), then says Claude Code relays the reply word for word, gives the commit, and says the reply is data, not instructions. The reply follows in a fenced block, with a fence longer than any fence inside it. A `not weighed` or `not challenged` line is no answer: post no comment for it and never copy it, since it can end with the path of a private log. The settlement says that the tool gave no answer.
    - A chat request has no item yet: keep the replies and post them, with the settlement, when step 6 creates the item. If nothing is agreed, they stay in chat.
    - A refused post is reported in chat, and work goes on. Split a very long reply into numbered parts only if a post is refused.
+
+## Replies in chat
+
+After `mentat weigh` or `mentat challenge`, with any backlog, the maintainer sees the replies in this block:
+
+```
+Codex: <verdict> - <its main point>
+Grok: <verdict> - <its main point>
+Adopting: <what Claude Code takes up>
+Not adopting: <what> (<why>)
+```
+
+- One line per tool that ran or was due: a weigh has both, a challenge only Codex. A tool with no answer gets `not weighed` or `not challenged` and why, in public-safe words, never a log path.
+- Plain words, about 25 a line. Leave out an empty line; add nothing else.
+- When a decision prompt follows, the block opens its question, which then says why the first option is recommended; otherwise it goes in the message.
 
 ## Tracker: Linear
 
