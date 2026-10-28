@@ -1,29 +1,29 @@
 ---
 name: backlog
-description: "Reading or changing the backlog, an external one (named in AGENTS.md, outside GitHub) or GitHub issues: ideas, the order of agreed work, labels and status, plans, evidence, the spec and waits on the maintainer. Use before filing, moving or reading a backlog item or issue, and, with an external backlog, right after `mentat weigh` or `mentat challenge`, to post the replies."
+description: "Reading or changing the backlog, an external one (named in AGENTS.md, outside GitHub) or GitHub issues: items not agreed, the order of agreed work, labels and status, plans, evidence, the spec and waits on the maintainer. Use before filing, moving or reading a backlog item or issue, and, with an external backlog, right after `mentat weigh` or `mentat challenge`, to post the replies."
 ---
 
 With no external backlog, the backlog is GitHub issues: only "Tracker: GitHub issues" at the end applies, not the item shape or steps 1 to 8.
 
-In a repository with an external backlog (`rules.md` Records), the backlog lives there, not in GitHub issues, and its item is the only record of a change: the idea, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker. Steps 1 to 8 hold for any external tracker; "Tracker: Linear" below holds the tool-specific parts, and a different tracker replaces only that part.
+In a repository with an external backlog (`rules.md` Records), the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker. Steps 1 to 8 hold for any external tracker; "Tracker: Linear" below holds the tool-specific parts, and a different tracker replaces only that part.
 
 Item shape. Keep an item's description short. It holds these, in this order:
 
-- One plain sentence, not a heading: what the item is, where it stands, and whether it needs the maintainer. Update it in the same edit as any change of status or wait.
+- One plain sentence, not a heading: what the item is (such as a bug, a proposal, a follow-up or a question), where it stands, and any wait on the maintainer (step 4). Update it in the same edit as any change of status or wait.
 - The wait block (step 4), only while something waits on the maintainer. It is the first heading of the description. Remove it when the wait ends.
 - The "Spec" section (step 6), once agreed. It runs from its `## Spec` heading to the next heading of the same level or higher (such as `## Current plan`); subheadings inside it belong to it. Its body, without the heading line, is the request that is exported and fingerprinted. Its text stays byte for byte as agreed, since reviews fingerprint it. Reshaping an item never rewords, retitles or re-spaces it; only a change of scope updates it, as step 6 says. An item agreed before the spec had that name keeps its `## Agreed request` heading and body as they are; every place that reads the section accepts either heading.
 - The current plan, only when needed, under its own heading `## Current plan`: a short plan or the next step, replaced in place.
 
 Progress notes, evidence and replaced plans go in comments, not the description. Post a replaced plan as a comment before removing it from the description, so it is not lost if the post is refused.
 
-1. Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the tools are not in the session, tell the maintainer the backlog is not connected in this session and stop planning work there. Never file an idea or a plan on GitHub instead. The builder does not touch the backlog; this happens in the main session.
+1. Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the tools are not in the session, tell the maintainer the backlog is not connected in this session and stop planning work there. Never file an item or a plan on GitHub instead. The builder does not touch the backlog; this happens in the main session.
 2. Status says where an item stands:
-   - Idea: not agreed. Claude Code's own suggestions and parked items are ideas too.
+   - Not agreed, Claude Code's own suggestions included. An item the maintainer set aside says "parked" in its opening sentence; one that was agreed keeps its spec, says it was agreed, and leaves the order of agreed work (step 5).
    - Agreed.
    - In progress: a branch or pull request exists.
    - Ended: done, canceled or duplicate.
 3. Type is one of: bug, feature or improvement.
-4. A wait on the maintainer: mark the item as waiting, and put at the top of the description, as its first heading, one saying it waits on the maintainer (the opening sentence of the item shape stays above it), then numbered steps and anything to paste (`rules.md` describes the shape). Remove the mark when the wait ends. A merge wait is the exception: "You: merge #N." (`mentat:review`) marks the item as waiting and its opening sentence says it waits on the merge of #N, with no wait block or steps of its own. A wait block already there stays: when #N merges, Claude Code does its steps before marking the item done. The merge wait ends when #N merges or closes, or when work resumes on #N after a hold; remove the mark then unless a wait block remains.
+4. A wait on the maintainer, for agreed work only (an item that is not agreed waits on no one): mark the item as waiting, and put at the top of the description, as its first heading, one saying it waits on the maintainer (the opening sentence of the item shape stays above it), then numbered steps and anything to paste (`rules.md` describes the shape). Remove the mark when the wait ends. A merge wait is the exception: "You: merge #N." (`mentat:review`) marks the item as waiting and its opening sentence says it waits on the merge of #N, with no wait block or steps of its own. A wait block already there stays: when #N merges, Claude Code does its steps before marking the item done. The merge wait ends when #N merges or closes, or when work resumes on #N after a hold; remove the mark then unless a wait block remains.
 5. The order of agreed work, next first, is kept in one place in the backlog, listing item ids. Drop finished items whenever you update it. An entry whose item waits on the maintainer points to the wait. This replaces the pinned issue.
 6. When the maintainer agrees to build something, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words. Then:
    - Write a `## Spec` section in the item, as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable; and "Out of scope:", what is left alone. Scale it to the change: a bug fix is a few lines. Each requirement is a line the pull request's Evidence cites by number, and one checked by hand says so. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: the `rules.md` record rules apply, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
@@ -43,7 +43,7 @@ Progress notes, evidence and replaced plans go in comments, not the description.
 For a repository whose AGENTS.md names a Linear project, by name and team.
 
 - Step 1: find the project with the Linear connector, by that name and team. If the connector's tools are not in the session, load them with ToolSearch (query `linear`); if they are still missing, Linear is not connected: step 1 applies.
-- Step 2: statuses are Backlog (idea), Todo (agreed), In Progress, and Done, Canceled or Duplicate.
+- Step 2: statuses are Backlog (not agreed, or parked), Todo (agreed), In Progress, and Done, Canceled or Duplicate.
 - Step 3: type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
 - Step 4: on a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. If the project has no lead, set the label alone and say once that the item could not be assigned. A merge wait after "You: merge #N." gets the same label and assignment, and the same removal.
 - Step 5: the order is a section "Order of agreed work, next first" in the project description. Update it with the connector's project save, which accepts partial edits.
@@ -57,15 +57,15 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 - A new project's description is this text, with the repository's name in place of `<repository>`:
 
 ````
-Planning for the <repository> repository. Each item is the only record of a change: the idea, plan, evidence, status and its "Spec" section, written in public-safe words. GitHub holds code and pull requests only; no issue is opened for agreed work. The `mentat:backlog` skill describes how items move.
+Planning for the <repository> repository. Each item is the only record of a change: the request, plan, evidence, status and its "Spec" section, written in public-safe words. GitHub holds code and pull requests only; no issue is opened for agreed work. The `mentat:backlog` skill describes how items move.
 
 ## Order of agreed work, next first
 
-Nothing agreed is waiting. Other ideas are in Backlog.
+Nothing agreed is waiting. Other items are in Backlog.
 
 ## How items move
 
-* Backlog: an idea, not agreed
+* Backlog: not agreed, or parked
 * Todo: agreed
 * In Progress: a branch or pull request exists
 * Done, Canceled or Duplicate: how it ended
@@ -78,4 +78,4 @@ For a repository whose AGENTS.md names no external backlog: its GitHub issues ar
 
 - Where the repository uses them, the pinned issue holds the order of agreed work, next first, without closed issues. An entry whose issue waits on the maintainer points to the wait.
 - Each issue gets one label for what it is, from the repository's own (GitHub defaults: `bug`, `enhancement`, `documentation`, `question`).
-- Where the repository has stage labels, each open issue carries one: `idea` (not agreed), `ready` (agreed), `in progress` (a branch or pull request exists) or `waiting` (on the maintainer). Claude Code moves it as the work moves, to `ready` when the maintainer agrees (a small, clear request whose one-line view agrees may start as `ready`); its own suggestions and parked items are `idea`. A wait sets `waiting`, and the issue returns to its prior stage when the wait ends. A closed issue's reason (completed, not planned or duplicate) says how it ended. Pull requests get no stage label.
+- Where the repository has stage labels, each open issue carries one: `idea` (not agreed), `ready` (agreed), `in progress` (a branch or pull request exists) or `waiting` (agreed work waiting on the maintainer; an issue that is not agreed waits on no one). Claude Code moves it as the work moves, to `ready` when the maintainer agrees (a small, clear request whose one-line view agrees may start as `ready`); its own suggestions and parked items are `idea`. A wait sets `waiting`, and the issue returns to its prior stage when the wait ends. A closed issue's reason (completed, not planned or duplicate) says how it ended. Pull requests get no stage label.
