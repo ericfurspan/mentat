@@ -121,6 +121,14 @@ phrase_check skills/propose/SKILL.md "step 2's read of the open backlog" "the op
 phrase_check skills/propose/SKILL.md "step 2's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:plan\`"
 phrase_check rules.md "the re-read of a record before asking about it" 'Right before asking about a record, it re-reads that record.'
+# Finished work ends with one action the maintainer can take, chosen from what Claude Code already knows.
+phrase_check rules.md "the next step's trigger, finished work" 'When the work the maintainer asked for is finished and the message asks nothing else of them'
+phrase_check rules.md "the next step's one sentence before the links" 'it ends, before its links, with one sentence naming one thing they can do next'
+phrase_check rules.md "the next step's order of choice, from what is known" 'the next agreed item that needs them, else one backlog item or follow-up Claude Code already knows of'
+phrase_check rules.md "the next step proposed, not started" 'proposed and not started'
+phrase_check rules.md "the next step's exclusions" 'Answers, progress updates and replies a skill shapes are unchanged'
+phrase_check rules.md "the backlog bullet allowing the next step" 'apart from the next step after finished work'
+phrase_check skills/review/SKILL.md "the merged report ending with the next step" 'report in one line, then the next step.'
 # Step 2's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/SKILL.md)" -eq 2 ]; then
   pass "skills/backlog/SKILL.md exempts step 2's read from refining items and clearing merge waits"
