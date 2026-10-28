@@ -85,20 +85,20 @@ phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waiv
 phrase_check skills/grill/SKILL.md "one decision per prompt" "Ask one decision per \`AskUserQuestion\` prompt"
 phrase_check skills/grill/SKILL.md "no several questions at once" 'Never put several questions in one message or one prompt'
 phrase_check skills/grill/SKILL.md "the Stop here option on every prompt" 'Every prompt also has a "Stop here" option'
-phrase_check rules.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
+phrase_check skills/propose/SKILL.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
 # A grill's record goes in the weigh's file; with no change here, a second opinion is offered once, through the consult skill's steps.
-phrase_check rules.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
+phrase_check skills/propose/SKILL.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
 phrase_check skills/grill/SKILL.md "the second opinion offer only when no change here follows" 'only when the agreed list will not lead to a change in this repository'
 phrase_check skills/grill/SKILL.md "the second opinion offer in its own prompt" "ask once, in its own \`AskUserQuestion\` prompt"
 phrase_check skills/grill/SKILL.md "no second opinion offer after Stop here" 'Make no offer after "Stop here".'
 phrase_check skills/grill/SKILL.md "the second opinion through the consult skill's steps" "follow its steps 1 to 4 rather than running \`mentat consult\` directly"
 
-# A decision that does not block work reaches the maintainer as their own instructions say, and step 2 points there.
+# A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision Claude Code does not need in order to keep working reaches them, it follows those instructions"
-phrase_check rules.md "step 2's route for a decision that does not block" 'one it does not need in order to go on goes as "How it reaches them" says'
+phrase_check skills/propose/SKILL.md "step 2's route for a decision that does not block" 'one it does not need in order to go on goes as "How it reaches them" says'
 
 # A decision prompt can be answered on its own, a call made without the maintainer reaches chat one line each,
-# step 2 reads the open backlog before planning, and a record is re-read right before asking about it.
+# mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
 phrase_check rules.md "what each option changes for the maintainer" "each saying, in the maintainer's terms, what it authorizes and changes for them"
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question says why the first is recommended, so the prompt alone suffices'
 phrase_check rules.md "a consequential call in one line of the next message" "and in one line of the next message the maintainer reads"
@@ -109,11 +109,11 @@ else
 fi
 phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
-phrase_check rules.md "step 2's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
-phrase_check rules.md "step 2's planning with overlapping items" 'overlapping items and the plan around them'
+phrase_check skills/propose/SKILL.md "step 2's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
+phrase_check skills/propose/SKILL.md "step 2's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check rules.md "the re-read of a record before asking about it" 'Right before asking about a record, it re-reads that record.'
-# Step 2's read neither refines hand-made items nor clears merge waits: both bullets exempt it.
-if [ "$(grep -c -F "not for \`rules.md\` step 2's read," skills/backlog/SKILL.md)" -eq 2 ]; then
+# Step 2's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
+if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/SKILL.md)" -eq 2 ]; then
   pass "skills/backlog/SKILL.md exempts step 2's read from refining items and clearing merge waits"
 else
   fail "skills/backlog/SKILL.md must exempt step 2's read in both the hand-made items and merge waits bullets"
@@ -138,14 +138,24 @@ phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with n
 phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
 phrase_check skills/backlog/SKILL.md "the replies block with GitHub issues" 'only "Replies in chat" and "Tracker: GitHub issues" apply'
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
-phrase_check rules.md "step 2's replies block" '"Replies in chat"'
+phrase_check skills/propose/SKILL.md "step 2's replies block" '"Replies in chat"'
 phrase_check rules.md "the replies block in a decision prompt" "(a weigh's or challenge's replies block opens the question)"
 phrase_check skills/plan/SKILL.md "the challenge's replies block at hand-off" 'replies block'
-if grep -q -F 'in one line beside its own' rules.md; then
-  fail "rules.md must show the weigh replies as one block (found: in one line beside its own)"
-else
-  pass "rules.md does not give the weigh verdicts in one line beside its own"
-fi
+for f in rules.md skills/propose/SKILL.md; do
+  if grep -q -F 'in one line beside its own' "$f"; then
+    fail "$f must show the weigh replies as one block (found: in one line beside its own)"
+  else
+    pass "$f does not give the weigh verdicts in one line beside its own"
+  fi
+done
+
+# rules.md holds what applies in every session; step 2's procedure is in mentat:propose, and its standing lines stay.
+phrase_check rules.md "what it holds and where a step's procedure lives" "This file holds what applies in every session; a step's procedure lives in its skill."
+phrase_check rules.md "step 2's call of mentat:propose" "Claude Code calls the Skill tool with \`mentat:propose\` before giving a view, or after a one-line view of a small, clear request."
+phrase_check rules.md "that a DO IT is not agreement" "A \`DO IT\` is not the maintainer's agreement."
+phrase_check rules.md "that the maintainer agrees once" 'The maintainer agrees once.'
+phrase_check rules.md "that agreed work is not weighed again" 'Agreed work is not weighed again.'
+phrase_check rules.md "that only the maintainer turns on a fast track" 'Only the maintainer turns on a fast track.'
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
@@ -205,26 +215,37 @@ for f in skills/*/SKILL.md; do
 done
 
 # rules.md names each workflow skill as a Skill tool call: every name it uses
-# has a skill, and every skill the agent can call is named there. Each skill
-# stays under 15,000 characters, a house limit toward Claude Code's budget for
-# skill text kept after compaction.
+# has a skill, and every skill the agent can call is named there or in a skill
+# rules.md names (a step's procedure, such as mentat:propose, names the skills
+# it calls). Each skill stays under 15,000 characters, a house limit toward
+# Claude Code's budget for skill text kept after compaction.
+named_by=rules.md
 while IFS= read -r name; do
   [ -n "$name" ] || continue
   if [ -f "skills/$name/SKILL.md" ]; then
     pass "rules.md names mentat:$name, which exists"
+    named_by="$named_by skills/$name/SKILL.md"
   else
     fail "rules.md names mentat:$name, but skills/$name/SKILL.md is missing"
   fi
 done <<< "$(grep -ho 'mentat:[a-z-]*' rules.md | sed 's/^mentat://' | sort -u)"
+# Paths in named_by have no spaces: skill names are [a-z-].
+is_named() {
+  local g
+  for g in $named_by; do
+    if grep -q "mentat:$1\`" "$g"; then return 0; fi
+  done
+  return 1
+}
 for f in skills/*/SKILL.md; do
   [ -e "$f" ] || continue
   name=${f#skills/}; name=${name%/SKILL.md}
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "disable-model-invocation: true" { found = 1; exit 0 } END { exit !found }' "$f"; then
     pass "$f is started by the maintainer, not named in rules.md"
-  elif grep -q "mentat:$name\`" rules.md; then
-    pass "$f is named in rules.md"
+  elif is_named "$name"; then
+    pass "$f is named in rules.md or a skill it names"
   else
-    fail "$f can be called by the agent but rules.md does not name mentat:$name"
+    fail "$f can be called by the agent but neither rules.md nor a skill it names names mentat:$name"
   fi
   size=$(wc -c < "$f" | tr -d ' ')
   if [ "$size" -lt 15000 ]; then
