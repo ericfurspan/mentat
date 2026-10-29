@@ -377,6 +377,15 @@ check "a continued line inside double quotes joins the path" '[ "$(reason / "$co
 check "a backslash-newline inside single quotes stays in the body" '[ -z "$(decision "$tmp/feat" "$single_body")" ]'
 check "a continued line after a single-quoted body asks before a draft pull request" \
   '[ "$(reason "$tmp/feat" "$single_then_draft")" = "$draft_reason" ]'
+# An apostrophe that leaves the quoted split inside a quote: the plain split joins the continued lines.
+comment_cont=$'# It\'s ready\ngit push \\\n  --force origin feat/x\ngh pr create \\\n  --draft'
+heredoc_cont=$'cat >notes <<EOF\nit\'s done\nEOF\ngit push \\\n  --force origin feat/x'
+cont_plain=$'git push \\\n  origin feat/x'
+check "continued lines after an apostrophe in a comment ask before a force push and a draft" \
+  '[ "$(reason "$tmp/feat" "$comment_cont")" = "$force_reason $draft_reason" ]'
+check "a continued line after an apostrophe in a heredoc asks before a force push" \
+  '[ "$(reason "$tmp/feat" "$heredoc_cont")" = "$force_reason" ]'
+check "a continued line leaves alone: git push origin feat/x" '[ -z "$(decision "$tmp/feat" "$cont_plain")" ]'
 # A long inline body stays fast: the hook reads each command before it runs.
 row="| \`hooks/no-default-push\` | it's a table row; with a & b, \$x and a \\\\ backslash | yes |"
 body=""

@@ -130,8 +130,9 @@ split_quoted() {
 }
 
 # The plain split also catches commands with an unmatched quote; the quoted
-# split catches separators inside quotes. Both are checked.
-pieces=$(printf '%s' "$cmd" | LC_ALL=C tr ';|&' '\n')
+# split catches separators inside quotes. Both are checked. The plain split
+# joins each line that ends in a backslash with the next.
+pieces=$(printf '%s' "$cmd" | LC_ALL=C awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' | LC_ALL=C tr ';|&' '\n')
 split_quoted "$cmd"
 
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
