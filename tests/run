@@ -185,6 +185,37 @@ else
   pass "no script under lib/ reads FETCH_HEAD"
 fi
 
+# mentat status reads review state from the headings the review commands write. Each heading it
+# matches must still be written as below; a change here also changes lib/status.sh and tests/status.sh.
+status_heading() {
+  local file=$1 s=$2
+  if grep -q -F -- "$s" "$file"; then
+    pass "$file writes the heading mentat status reads: $s"
+  else
+    fail "$file no longer writes the heading mentat status reads (missing: $s); update lib/status.sh and tests/status.sh with it"
+  fi
+}
+status_heading lib/codex.sh "printf '## Local Codex review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
+status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
+status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
+status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
+status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
+status_heading skills/claude-review/SKILL.md "Start it with \`Claude review round <n> on <sha>\`"
+status_heading skills/claude-review/SKILL.md "\`Agreed request fingerprint: <12 hex>\`"
+# mentat status behaves as specified (stub gh), and its test passes shellcheck.
+if command -v jq >/dev/null 2>&1; then
+  if out=$(tests/status.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/status.sh; fi
+else
+  fail "jq not installed, mentat status not tested"
+fi
+if command -v shellcheck >/dev/null 2>&1; then
+  if shellcheck tests/status.sh; then pass "shellcheck tests/status.sh"; else fail "shellcheck tests/status.sh"; fi
+else
+  fail "shellcheck not installed, tests/status.sh not checked"
+fi
+
 if [ -z "$(git ls-files .claude)" ]; then
   pass "nothing under .claude/ is version-controlled"
 else
