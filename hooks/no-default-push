@@ -136,43 +136,70 @@ split_quoted "$cmd"
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
 draft="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
 
+# skip_flags: moves $i past gh flags; -R and --repo take the next word.
+skip_flags() {
+  while [ "$i" -lt "$n" ]; do
+    case "${words[i]}" in -R | --repo) i=$((i + 2)) ;; -*) i=$((i + 1)) ;; *) break ;; esac
+  done
+}
+
 # A command can chain several: look at each piece that starts with git ... push
-# or gh pr create. A cd piece sets the directory ($here) for the pieces after it.
+# or gh pr create. A cd piece sets the directory ($here) for the pieces after it,
+# up to the ) that closes a ( subshell it is in. $prev is the directory cd - uses.
 for pass in "$pieces" "$qpieces"; do
-  here=$cwd
+  here=$cwd prev="" sub=0 ends=0
   while IFS= read -r seg; do
+    if [ "$ends" -eq 1 ] && [ "$sub" -eq 1 ]; then here=$saved prev=$saved_prev sub=0; fi
+    ends=0
     tokenize "$seg"
     n=${#words[@]}
     [ "$n" -gt 0 ] || continue
+    # A group ends with ) on the last word, or } as its own word.
+    w=${words[n - 1]}
+    while :; do case "$w" in *")") w=${w%")"}; ends=1 ;; *) break ;; esac; done
+    words[n - 1]=$w
+    case "$w" in "" | "}") unset "words[n - 1]"; n=$((n - 1)) ;; esac
 
     i=0
     while [ "$i" -lt "$n" ]; do
-      case "${words[i]}" in *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
+      # A group starts with ( or { on the first word; ( starts a subshell.
+      w=${words[i]}
+      while :; do
+        case "$w" in
+          "("*) w=${w#"("}; if [ "$sub" -eq 0 ]; then sub=1 saved=$here saved_prev=$prev; fi ;;
+          "{"*) w=${w#"{"} ;;
+          *) break ;;
+        esac
+      done
+      words[i]=$w
+      case "$w" in "" | *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
     done
     [ "$i" -lt "$n" ] || continue
     case "${words[i]}" in
       cd)
-        # A directory it cannot resolve or that does not exist, such as cd -,
-        # leaves $here as it was.
+        # A directory it cannot resolve or that does not exist leaves $here as
+        # it was. cd - with no previous directory goes back to the session's.
         to=${words[i + 1]:-}
+        [ "$to" != -- ] || to=${words[i + 2]:-}
         case "$to" in
           "") to=${HOME:-} ;;
+          -) to=${prev:-$cwd} ;;
           -*) to="" ;;
           *) resolve "$to" ;;
         esac
-        if [ -n "$to" ] && [ -d "$to" ]; then here=$to; fi
+        if [ -n "$to" ] && [ -d "$to" ]; then prev=$here here=$to; fi
         continue
         ;;
       gh | */gh)
-        # Flags may come before pr: -R and --repo take the next word.
+        # Flags may come before pr and before create.
         i=$((i + 1))
-        while [ "$i" -lt "$n" ]; do
-          case "${words[i]}" in -R | --repo) i=$((i + 2)) ;; -*) i=$((i + 1)) ;; *) break ;; esac
-        done
+        skip_flags
         [ "${words[i]:-}" = pr ] || continue
-        case "${words[i + 1]:-}" in create | new) ;; *) continue ;; esac
+        i=$((i + 1))
+        skip_flags
+        case "${words[i]:-}" in create | new) ;; *) continue ;; esac
         # Short options can be bundled, as in -df or -fd.
-        for ((j = i + 2; j < n; j++)); do
+        for ((j = i + 1; j < n; j++)); do
           case "${words[j]}" in --draft | --draft=true | -d* | -[!-]*d*) note "$draft" ;; esac
         done
         unclean "$here"
@@ -201,12 +228,16 @@ for pass in "$pieces" "$qpieces"; do
 
     pos=()
     tags=0
+    # The first positional word is the remote, unless --repo gave it.
+    first=1
     while [ "$i" -lt "$n" ]; do
       w=${words[i]}
       case "$w" in
         --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
         --tags) tags=1; i=$((i + 1)) ;;
-        --repo | -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
+        --repo) first=0; i=$((i + 2)) ;;
+        --repo=*) first=0; i=$((i + 1)) ;;
+        -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
         # Short options can be bundled, as in -uf or -fu.
         --force | --force-with-lease | --force-with-lease=* | -f* | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
         -*) i=$((i + 1)) ;;
@@ -214,16 +245,16 @@ for pass in "$pieces" "$qpieces"; do
       esac
     done
 
-    # The first word is the remote; the rest are refspecs.
+    # The words from $first on are refspecs.
     np=${#pos[@]}
-    for ((j = 1; j < np; j++)); do
+    for ((j = first; j < np; j++)); do
       case "${pos[j]}" in +*) note "$force" ;; esac
     done
-    if [ "$np" -le 1 ]; then
+    if [ "$np" -le "$first" ]; then
       if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
       continue
     fi
-    for ((j = 1; j < np; j++)); do
+    for ((j = first; j < np; j++)); do
       spec=${pos[j]#+}
       case "$spec" in *:*) dest=${spec#*:} ;; *) dest=$spec ;; esac
       dest=${dest#+}

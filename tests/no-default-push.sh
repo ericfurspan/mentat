@@ -67,6 +67,7 @@ git commit -m "x" || git push origin HEAD:main
 git add . | git push origin main
 git push origin feat/x main
 git push origin 'refs/heads/*:refs/heads/*'
+git push --repo origin
 ASK
 while IFS= read -r cmd; do
   check "on main leaves alone: $cmd" '[ -z "$(decision "$tmp/repo" "$cmd")" ]'
@@ -93,6 +94,7 @@ done <<'ASK'
 git push origin main
 git push origin HEAD:main
 git push --all
+git push --repo origin main
 ASK
 while IFS= read -r cmd; do
   check "on a feature branch leaves alone: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
@@ -103,6 +105,7 @@ git push origin HEAD
 git push -u origin feat/x
 git -C . push
 git status
+git push --repo origin feat/x
 PASS
 
 # The directory comes from git -C, resolved against the session's cwd.
@@ -166,6 +169,10 @@ git push origin +HEAD:feat/x
 git status && git push --force origin feat/x
 git fetch; git push -f
 git commit -m "x" || git push origin +feat/x
+git push --repo origin +HEAD:feat/x
+git push --repo=origin +feat/x
+(git push --force origin feat/x)
+{ git push -f; }
 ASK
 while IFS= read -r cmd; do
   check "on a feature branch leaves alone, not a force push: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
@@ -259,7 +266,13 @@ cd $tmp/feat && git push -u origin feat/x
 cd "$tmp/my feat" && gh pr create --fill
 cd .. && git -C feat push
 PASS
-check "a cd that cannot be resolved keeps the directory: cd -" '[ "$(decision "$tmp/edited" "cd - && git push")" = ask ]'
+check "a cd - with no previous directory goes back to the session cwd" '[ "$(decision "$tmp/edited" "cd - && git push")" = ask ]'
+check "a cd - goes back to the previous directory" '[ "$(decision "$tmp/repo" "cd ../feat && tests/run && cd - && git push")" = ask ]'
+check "a cd - swaps with the previous directory" '[ -z "$(decision "$tmp/repo" "cd ../feat && cd ../edited && cd - && git push")" ]'
+check "a cd -- <dir> goes to the directory" '[ "$(decision "$tmp/feat" "cd -- ../edited && git push")" = ask ]'
+check "a cd in a subshell applies inside it" '[ "$(decision "$tmp/feat" "(cd ../edited && git push)")" = ask ]'
+check "a cd in a subshell applies inside it: leaves alone" '[ -z "$(decision "$tmp/edited" "(cd ../feat && git push)")" ]'
+check "a cd in a subshell ends with it" '[ "$(decision "$tmp/edited" "(cd ../feat) && git push")" = ask ]'
 check "a cd to a missing directory keeps the directory" '[ "$(decision "$tmp/repo" "cd nowhere; git push")" = ask ]'
 check "a bare cd goes to HOME" '[ "$(HOME="$tmp/edited" decision "$tmp/feat" "cd && git push")" = ask ]'
 check "a cd ~/ goes to HOME" '[ "$(HOME="$tmp" decision "$tmp/feat" "cd ~/edited && gh pr create --fill")" = ask ]'
@@ -281,6 +294,7 @@ git -C "${HOME}/repo" push
 cd "$HOME/repo" && git push
 cd ${HOME}/repo && git push
 cd $HOME && git -C repo push
+cd ${HOME} && git -C repo push
 ASK
 check "git -C ~/<checkout on main> push names the default branch" \
   '[ "$(HOME="$tmp/home" reason "$tmp/feat" "git -C ~/main-checkout push")" = "Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
@@ -301,6 +315,7 @@ git status; gh pr create -d
 gh pr create -df
 gh pr create -fd
 gh pr create -wd
+(gh pr create --draft)
 ASK
 while IFS= read -r cmd; do
   check "on a feature branch leaves alone, not a draft pull request: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
@@ -365,15 +380,18 @@ elapsed=$((SECONDS - start))
 check "a ${#long}-character pull request body asks before a draft pull request, in ${elapsed}s (under 3s)" \
   '[ "$long_decision" = ask ] && [ "$elapsed" -lt 3 ]'
 
-# gh flags before pr, such as -R or --repo with its value, are skipped.
+# gh flags before or after pr, such as -R or --repo with its value, are skipped.
 while IFS= read -r cmd; do
   check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
 done <<'ASK'
 gh -R o/r pr create --draft
 gh --repo o/r pr create -d
+gh pr -R o/r create --draft
+gh pr --repo o/r create -d
 ASK
 check "with uncommitted changes asks before: gh --repo=o/r pr create --fill" '[ "$(decision "$tmp/edited" "gh --repo=o/r pr create --fill")" = ask ]'
 check "with uncommitted changes leaves alone: gh -R o/r pr view" '[ -z "$(decision "$tmp/edited" "gh -R o/r pr view")" ]'
+check "with uncommitted changes leaves alone: gh pr -R o/r view" '[ -z "$(decision "$tmp/edited" "gh pr -R o/r view")" ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }
