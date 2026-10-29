@@ -4,8 +4,12 @@
 # no refspec while it is checked out) gets a permission prompt, so the
 # maintainer decides; a repository whose workflow commits to the default branch
 # (a journal) still works when the maintainer approves. --tags alone is not a
-# branch change and passes. This is a net for mistakes, not a security boundary:
-# other routes exist. When it cannot read its input, it stays out of the way.
+# branch change and passes. Three more commands that skip a rule ask too: a
+# force push (--force, -f, --force-with-lease or a +refspec) on any branch, a
+# git push or gh pr create while git status --porcelain in its directory prints
+# anything, and a gh pr create with --draft or -d. This is a net for mistakes,
+# not a security boundary: other routes exist. When it cannot read its input,
+# it stays out of the way.
 set -uo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0
@@ -13,14 +17,22 @@ input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
 [ "$tool" = Bash ] || exit 0
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
-case "$cmd" in *push*) ;; *) exit 0 ;; esac
+case "$cmd" in *push* | *gh*) ;; *) exit 0 ;; esac
 cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || exit 0
 [ -n "$cwd" ] || cwd=$PWD
 
-ask() {
-  jq -n --arg n "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
-    permissionDecisionReason: ("Mentat: agents do not push to the default branch (" + $n + "). Approve only if you want this push to go to it.")}}'
-  exit 0
+# note <reason>: adds a reason for the prompt, once; the hook asks at the end.
+nl=$'\n'
+reasons=""
+note() {
+  case "$nl$reasons$nl" in *"$nl$1$nl"*) return ;; esac
+  reasons+=${reasons:+$nl}$1
+}
+on_default() { note "Mentat: agents do not push to the default branch ($1). Approve only if you want this push to go to it."; }
+# unclean <dir>: notes uncommitted changes when git status there prints anything.
+unclean() {
+  [ -z "$(git --no-optional-locks -C "$1" status --porcelain 2>/dev/null)" ] ||
+    note "Mentat: agents push and open pull requests from a clean working tree, and git status lists uncommitted changes. Approve only if you want to go ahead without committing them."
 }
 
 # load <dir>: sets $defaults (origin/HEAD, else main and master) and $current.
@@ -68,12 +80,15 @@ tokenize() {
   if [ "$has" -eq 1 ]; then words+=("$cur"); fi
 }
 
-nl=$'\n'
 pieces=${cmd//;/$nl}
 pieces=${pieces//|/$nl}
 pieces=${pieces//&/$nl}
 
-# A command can chain several: look at each piece that starts with git ... push.
+force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
+draft="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
+
+# A command can chain several: look at each piece that starts with git ... push
+# or gh pr create.
 while IFS= read -r seg; do
   tokenize "$seg"
   n=${#words[@]}
@@ -84,7 +99,19 @@ while IFS= read -r seg; do
     case "${words[i]}" in *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
   done
   [ "$i" -lt "$n" ] || continue
-  case "${words[i]}" in git | */git) ;; *) continue ;; esac
+  case "${words[i]}" in
+    gh | */gh)
+      [ "${words[i + 1]:-}" = pr ] || continue
+      case "${words[i + 2]:-}" in create | new) ;; *) continue ;; esac
+      for ((j = i + 3; j < n; j++)); do
+        case "${words[j]}" in --draft | --draft=true | -d) note "$draft" ;; esac
+      done
+      unclean "$cwd"
+      continue
+      ;;
+    git | */git) ;;
+    *) continue ;;
+  esac
   i=$((i + 1))
   dir=""
   while [ "$i" -lt "$n" ]; do
@@ -101,15 +128,18 @@ while IFS= read -r seg; do
   where=$cwd
   case "$dir" in "") ;; /*) where=$dir ;; *) where=$cwd/$dir ;; esac
   load "$where"
+  unclean "$where"
 
   pos=()
   tags=0
   while [ "$i" -lt "$n" ]; do
     w=${words[i]}
     case "$w" in
-      --all | --mirror) ask "${defaults// / or }" ;;
+      --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
       --tags) tags=1; i=$((i + 1)) ;;
       --repo | -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
+      # Short options can be bundled, as in -uf.
+      --force | --force-with-lease | --force-with-lease=* | -f | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
       -*) i=$((i + 1)) ;;
       *) pos+=("$w"); i=$((i + 1)) ;;
     esac
@@ -117,8 +147,11 @@ while IFS= read -r seg; do
 
   # The first word is the remote; the rest are refspecs.
   np=${#pos[@]}
+  for ((j = 1; j < np; j++)); do
+    case "${pos[j]}" in +*) note "$force" ;; esac
+  done
   if [ "$np" -le 1 ]; then
-    if [ "$tags" -eq 0 ] && is_default "$current"; then ask "$current"; fi
+    if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
     continue
   fi
   for ((j = 1; j < np; j++)); do
@@ -127,9 +160,13 @@ while IFS= read -r seg; do
     dest=${dest#+}
     dest=${dest#refs/heads/}
     case "$spec" in HEAD) dest=$current ;; esac
-    if is_default "$dest"; then ask "$dest"; fi
+    if is_default "$dest"; then on_default "$dest"; fi
     # A wildcard refspec can carry the default branch along.
-    case "$dest" in *\**) ask "${defaults// / or }" ;; esac
+    case "$dest" in *\**) on_default "${defaults// / or }" ;; esac
   done
 done <<<"$pieces"
+
+[ -n "$reasons" ] || exit 0
+jq -n --arg r "${reasons//$nl/ }" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
+  permissionDecisionReason: $r}}'
 exit 0

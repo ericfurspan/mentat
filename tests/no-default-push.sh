@@ -101,7 +101,6 @@ git push
 git push origin
 git push origin HEAD
 git push -u origin feat/x
-git push --force-with-lease origin feat/x
 git -C . push
 git status
 PASS
@@ -148,6 +147,117 @@ decision_json() {
 }
 check "the reason names the default branch" \
   '[ "$(reason "$tmp/repo" "git push origin main")" = "Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
+
+# A force push asks on any branch, and the reason names it.
+while IFS= read -r cmd; do
+  check "on a feature branch asks before a force push: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+git push --force origin feat/x
+git push -f origin feat/x
+git push -uf origin feat/x
+git push --force-with-lease
+git push --force-with-lease origin feat/x
+git push --force-with-lease=feat/x origin feat/x
+git push --force-with-lease=feat/x:abc123 origin feat/x
+git push origin +feat/x
+git push origin +HEAD:feat/x
+git status && git push --force origin feat/x
+git fetch; git push -f
+git commit -m "x" || git push origin +feat/x
+ASK
+while IFS= read -r cmd; do
+  check "on a feature branch leaves alone, not a force push: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
+done <<'PASS'
+git push -u origin feat/x
+git push origin feat/x:feat/y
+git push --no-force-with-lease origin feat/x
+git commit -m "push -f later"
+git push --follow-tags origin feat/x
+PASS
+force_reason="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
+check "a force push on a feature branch: the reason names a force push" \
+  '[ "$(reason "$tmp/feat" "git push --force origin feat/x")" = "$force_reason" ]'
+check "a force push to the default branch: the reason names both" \
+  '[ "$(reason "$tmp/repo" "git push -f origin main")" = "$force_reason Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
+check "two force pushes in one command: the reason names it once" \
+  '[ "$(reason "$tmp/feat" "git push -f origin feat/x && git push origin +feat/x")" = "$force_reason" ]'
+
+# A push or a pull request from a directory with uncommitted changes asks, and the reason names them.
+cp -R "$tmp/feat" "$tmp/untracked"
+touch "$tmp/untracked/new.txt"
+cp -R "$tmp/feat" "$tmp/edited"
+printf 'a\n' >"$tmp/edited/file.txt"
+g -C "$tmp/edited" add file.txt
+g -C "$tmp/edited" commit -q -m file
+printf 'b\n' >"$tmp/edited/file.txt"
+cp -R "$tmp/feat" "$tmp/staged"
+printf 'a\n' >"$tmp/staged/file.txt"
+g -C "$tmp/staged" add file.txt
+for d in untracked edited staged; do
+  while IFS= read -r cmd; do
+    check "with uncommitted changes ($d) asks before: $cmd" '[ "$(decision "$tmp/$d" "$cmd")" = ask ]'
+  done <<'ASK'
+git push
+git push -u origin feat/x
+git push origin --tags
+gh pr create --fill
+gh pr create --title "x" --body "y"
+git fetch && git push origin feat/x
+git status; gh pr create --fill
+ASK
+done
+check "with uncommitted changes, git -C <dir> push asks (relative)" '[ "$(decision "$tmp" "git -C edited push")" = ask ]'
+check "with uncommitted changes, git -C <dir> push asks (absolute)" '[ "$(decision / "git -C $tmp/edited push")" = ask ]'
+check "git -C <clean dir> push from a directory with changes leaves alone" '[ -z "$(decision "$tmp/edited" "git -C ../feat push")" ]'
+while IFS= read -r cmd; do
+  check "with uncommitted changes leaves alone: $cmd" '[ -z "$(decision "$tmp/edited" "$cmd")" ]'
+done <<'PASS'
+git status
+git commit -am "push it"
+git diff
+gh pr view
+gh pr list
+gh pr checks
+ls
+PASS
+unclean_reason="Mentat: agents push and open pull requests from a clean working tree, and git status lists uncommitted changes. Approve only if you want to go ahead without committing them."
+check "with uncommitted changes: the reason names uncommitted changes" \
+  '[ "$(reason "$tmp/edited" "git push origin feat/x")" = "$unclean_reason" ]'
+check "with uncommitted changes, gh pr create: the reason names uncommitted changes" \
+  '[ "$(reason "$tmp/untracked" "gh pr create --fill")" = "$unclean_reason" ]'
+check "with uncommitted changes, a chained push and pull request: the reason names them once" \
+  '[ "$(reason "$tmp/edited" "git push -u origin feat/x && gh pr create --fill")" = "$unclean_reason" ]'
+
+# A draft pull request asks, and the reason names it.
+while IFS= read -r cmd; do
+  check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+gh pr create --draft
+gh pr create -d --fill
+gh pr create --title "x" --draft --body "y"
+gh pr create --draft=true --fill
+gh pr new --draft
+/usr/local/bin/gh pr create -d
+GH_REPO=o/r gh pr create --draft
+git push -u origin feat/x && gh pr create --draft --fill
+git status; gh pr create -d
+ASK
+while IFS= read -r cmd; do
+  check "on a feature branch leaves alone, not a draft pull request: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
+done <<'PASS'
+gh pr create --fill
+gh pr create --title "a --draft idea" --body "use -d"
+gh pr create --draft=false --fill
+gh pr ready
+gh pr view --json isDraft
+gh issue create --title x
+git push -u origin feat/x && gh pr create --fill
+PASS
+draft_reason="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
+check "a draft pull request: the reason names a draft pull request" \
+  '[ "$(reason "$tmp/feat" "gh pr create --draft --fill")" = "$draft_reason" ]'
+check "a draft pull request with uncommitted changes: the reason names both" \
+  '[ "$(reason "$tmp/untracked" "gh pr create --draft")" = "$draft_reason $unclean_reason" ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }
