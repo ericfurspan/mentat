@@ -18,7 +18,11 @@ The body has two readers: the maintainer, who wants what changed, where to look 
 > [!IMPORTANT]
 > <A note to the maintainer, about a hundred words at most, in plain words, with no headings, labels or bullets. First sentence: what the change is for, its intent and not a list of edits. Then only what applies: why the change is made (for a bug fix, the builder's cause, or that it is unknown); whether a revert undoes it, and if not, what stays and why, such as deleted data, a release, a message sent, settings elsewhere, or an interface others use; when there is a real blast radius, what breaks, and for whom, if this is wrong; anything Codex, Grok or Claude flagged that stayed unfixed, and any call made without the maintainer. A small change gets two or three sentences.>
 >
-> Look here first: [<path>:<a>-<b>](https://github.com/<owner>/<repo>/blob/<head sha>/<path>#L<a>-L<b>), <up to two more>
+> Look here first:
+>
+> https://github.com/<owner>/<repo>/blob/<head sha>/<path>#L<a>-L<b>
+>
+> <up to two more, each on its own line with a blank `>` line between>
 
 ## Not in scope
 
@@ -40,7 +44,7 @@ The body has two readers: the maintainer, who wants what changed, where to look 
 Closes #<issue, when there is one; none with an external backlog>
 ```
 
-"Look here first" gives one to three links to the line ranges that carry the change, each a permalink on the full head commit SHA. The body has no other alert.
+"Look here first" gives one to three permalinks on the full head commit SHA, each bare and alone on its line, which GitHub shows as a code preview (a link with text shows none). Each range is the few lines that carry the change, so the preview stays short. The body has no other alert.
 
 The Checks table has one row per numbered requirement of the spec, by number (an older issue or item, agreed before the section had that name and with no numbered list, is read as each requirement it states); one check may cover several.
 
