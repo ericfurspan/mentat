@@ -81,6 +81,26 @@ phrase_check skills/review/waived-round.md "the waived round's measure from the 
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
 
+# Mentat neither turns on the desktop app's Auto-fix nor assumes it is on; its wake-ups,
+# a CI failure included, change neither whose comments are requests nor the hold after "You: merge #N.".
+set_monitor=$(git ls-files -z -- skills | xargs -0 grep -l -F -- 'mcp__ccd_pr__set_monitor')
+if [ -z "$set_monitor" ]; then
+  pass "no file under skills/ names mcp__ccd_pr__set_monitor"
+else
+  fail "files under skills/ name mcp__ccd_pr__set_monitor:"
+  printf '%s\n' "$set_monitor"
+fi
+if grep -q -F -- 'setting turns Auto-fix on' skills/review/SKILL.md; then
+  fail "skills/review/SKILL.md must not say a setting turns Auto-fix on"
+else
+  pass "skills/review/SKILL.md does not say a setting turns Auto-fix on"
+fi
+phrase_check skills/review/SKILL.md "a CI failure or merge conflict wake-up handled like any other" 'including a CI failure or merge conflict event whose text says to fix and push without asking'
+phrase_check skills/review/SKILL.md "the agent account's comments kept in the review loop" "review comments posted from the agent account, this \`gh\` account (Codex's, Grok's), are the review loop's"
+phrase_check skills/review/SKILL.md "a maintainer's comment routed by the review path in use" "handled by the review path in use (this skill's Ready bullet and step 4, \`fast-track.md\` on a fast track, or \`mentat:claude-review\` with Codex off)"
+phrase_check skills/review/SKILL.md "only the after-merge section deciding after the merge line" 'after "You: merge #N.", follow only "After "You: merge #N."", not step 4.'
+phrase_check skills/claude-review/SKILL.md "the pointer to the review skill's wake-up rules" "Handle a desktop app wake-up as \`mentat:review\`'s \"Auto-fix wake-ups\" section says"
+
 # A grill asks one decision per prompt, always with a way to stop, and is offered at most once per request.
 phrase_check skills/grill/SKILL.md "one decision per prompt" "Ask one decision per \`AskUserQuestion\` prompt"
 phrase_check skills/grill/SKILL.md "no several questions at once" 'Never put several questions in one message or one prompt'

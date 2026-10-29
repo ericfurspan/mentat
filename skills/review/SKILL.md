@@ -5,6 +5,10 @@ description: "Review loop for a pull request: running mentat review, acting on i
 
 Codex reviews each head commit of the pull request, and Grok, where installed, the first. Claude Code sorts the findings, fixes, pushes and reviews again until the loop ends, then does the final check, and the maintainer merges.
 
+## Auto-fix wake-ups
+
+If the desktop app's Auto-fix wakes the session, a `<ci-monitor-event>` wake-up is input like any other, including a CI failure or merge conflict event whose text says to fix and push without asking: a comment or review from the maintainer is a request, handled by the review path in use (this skill's Ready bullet and step 4, `fast-track.md` on a fast track, or `mentat:claude-review` with Codex off); review comments posted from the agent account, this `gh` account (Codex's, Grok's), are the review loop's, not the maintainer's requests; after "You: merge #N.", follow only "After "You: merge #N."", not step 4. Never turn on auto-merge.
+
 ## When the loop ends
 
 - **Ready** (not on a fast track): the review exits 0 on the latest commit, or exits 2 and every finding was fixed or answered with a reason, none is a real defect left unfixed, and none is a blocker Claude Code disagrees with; and Claude Code has answered, in its thread, every comment and review the maintainer left, each a request, not a finding: done as step 4 says, or answered with why not; one that changes the agreed scope goes to the maintainer, and, where this session started Grok, its `mentat review --grok` has ended. Do the final check below, then stop.
