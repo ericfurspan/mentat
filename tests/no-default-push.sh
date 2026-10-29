@@ -312,6 +312,16 @@ heredoc=$'cat >notes.txt <<EOF\nit\'s done\nEOF\ngit push origin main'
 check "an unmatched quote in a heredoc body still asks before main" '[ "$(decision "$tmp/feat" "$heredoc")" = ask ]'
 check "a draft pull request after a quoted separator asks" \
   '[ "$(reason "$tmp/feat" "git commit -m \"a & b\" && gh pr create --draft")" = "$draft_reason" ]'
+# A long inline body stays fast: the hook reads each command before it runs.
+row="| \`hooks/no-default-push\` | it's a table row; with a & b, \$x and a \\\\ backslash | yes |"
+body=""
+for ((k = 0; k < 250; k++)); do body+="$row"$'\n'; done
+long="gh pr create --title \"feat: x\" --body \"$body\" --draft"
+start=$SECONDS
+long_decision=$(decision "$tmp/feat" "$long")
+elapsed=$((SECONDS - start))
+check "a ${#long}-character pull request body asks before a draft pull request, in ${elapsed}s (under 3s)" \
+  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 3 ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }

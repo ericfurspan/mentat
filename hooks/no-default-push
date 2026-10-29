@@ -52,28 +52,35 @@ is_default() {
   return 1
 }
 
+# Both scanners below take the text up to the next character that matters in
+# one chunk and drop it by offset: in bash 3.2, ${#s} and ${s:i:1} cost the
+# length of $s, and ${s#"$x"} and ${s//x/y} more, so a per-character loop or a
+# substitution with many matches is quadratic on a long pull request body.
+tab=$'\t'
+
 # tokenize <text>: sets $words, split on blanks the way a shell does: single
 # and double quotes and backslashes keep a path with spaces in one word. An
 # unmatched quote ends at the end of the text.
 tokenize() {
-  local s=$1 c q="" cur="" has=0 i
+  local s=$1 run c q="" cur="" has=0
   words=()
-  for ((i = 0; i < ${#s}; i++)); do
-    c=${s:i:1}
+  while [ -n "$s" ]; do
+    case "$q" in
+      \") run=${s%%[\"\\]*} ;;
+      \') run=${s%%\'*} ;;
+      *) run=${s%%[\'\"\\\ "$tab"]*}; [ -z "$run" ] || has=1 ;;
+    esac
+    cur+=$run; s=${s:${#run}}
+    [ -n "$s" ] || break
+    c=${s:0:1}; s=${s:1}
     if [ -n "$q" ]; then
-      if [ "$c" = "$q" ]; then
-        q=""
-      elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
-        i=$((i + 1)); cur+=${s:i:1}
-      else
-        cur+=$c
-      fi
+      # The closing quote, or a backslash inside double quotes.
+      if [ "$c" = "$q" ]; then q=""; else cur+=${s:0:1}; s=${s:1}; fi
     else
       case "$c" in
         "'" | '"') q=$c; has=1 ;;
-        "\\") i=$((i + 1)); cur+=${s:i:1}; has=1 ;;
-        " " | $'\t') if [ "$has" -eq 1 ]; then words+=("$cur"); cur=""; has=0; fi ;;
-        *) cur+=$c; has=1 ;;
+        "\\") cur+=${s:0:1}; s=${s:1}; has=1 ;;
+        *) if [ "$has" -eq 1 ]; then words+=("$cur"); cur=""; has=0; fi ;;
       esac
     fi
   done
@@ -84,34 +91,32 @@ tokenize() {
 # newline turned into a line break and each quoted newline into a space,
 # quoting as in tokenize.
 split_quoted() {
-  local s=$1 c q="" i
+  local s=$1 run c q=""
   qpieces=""
-  for ((i = 0; i < ${#s}; i++)); do
-    c=${s:i:1}
-    if [ -n "$q" ]; then
-      if [ "$c" = "$q" ]; then
-        q=""
-      elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
-        qpieces+=$c; i=$((i + 1)); c=${s:i:1}
-      fi
-      [ "$c" = "$nl" ] && c=" "
-      qpieces+=$c
-    else
-      case "$c" in
-        "'" | '"') q=$c ;;
-        "\\") qpieces+=$c; i=$((i + 1)); c=${s:i:1} ;;
-        ";" | "|" | "&") c=$nl ;;
-      esac
-      qpieces+=$c
-    fi
+  while [ -n "$s" ]; do
+    case "$q" in
+      \") run=${s%%[\"\\"$nl"]*} ;;
+      \') run=${s%%[\'"$nl"]*} ;;
+      *) run=${s%%[\'\"\\\;\|\&]*} ;;
+    esac
+    qpieces+=$run; s=${s:${#run}}
+    [ -n "$s" ] || break
+    c=${s:0:1}; s=${s:1}
+    case "$q$c" in
+      "'" | '"') q=$c ;;
+      "''" | '""') q="" ;;
+      # A backslash, unquoted or inside double quotes, keeps the next character.
+      \\ | \"\\) c+=${s:0:1}; s=${s:1}; [ -z "$q" ] || c=${c/$nl/ } ;;
+      ?$nl) c=" " ;;
+      *) c=$nl ;;
+    esac
+    qpieces+=$c
   done
 }
 
 # The plain split also catches commands with an unmatched quote; the quoted
 # split catches separators inside quotes. Both are checked.
-pieces=${cmd//;/$nl}
-pieces=${pieces//|/$nl}
-pieces=${pieces//&/$nl}
+pieces=$(printf '%s' "$cmd" | LC_ALL=C tr ';|&' '\n')
 split_quoted "$cmd"
 
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
