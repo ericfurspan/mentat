@@ -298,6 +298,9 @@ gh pr new --draft
 GH_REPO=o/r gh pr create --draft
 git push -u origin feat/x && gh pr create --draft --fill
 git status; gh pr create -d
+gh pr create -df
+gh pr create -fd
+gh pr create -wd
 ASK
 while IFS= read -r cmd; do
   check "on a feature branch leaves alone, not a draft pull request: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
@@ -305,6 +308,8 @@ done <<'PASS'
 gh pr create --fill
 gh pr create --title "a --draft idea" --body "use -d"
 gh pr create --draft=false --fill
+gh pr create -f
+gh pr create --fill --draft=false
 gh pr ready
 gh pr view --json isDraft
 gh issue create --title x

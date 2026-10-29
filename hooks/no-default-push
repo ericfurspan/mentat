@@ -171,8 +171,9 @@ for pass in "$pieces" "$qpieces"; do
         done
         [ "${words[i]:-}" = pr ] || continue
         case "${words[i + 1]:-}" in create | new) ;; *) continue ;; esac
+        # Short options can be bundled, as in -df or -fd.
         for ((j = i + 2; j < n; j++)); do
-          case "${words[j]}" in --draft | --draft=true | -d) note "$draft" ;; esac
+          case "${words[j]}" in --draft | --draft=true | -d* | -[!-]*d*) note "$draft" ;; esac
         done
         unclean "$here"
         continue
