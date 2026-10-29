@@ -5,9 +5,9 @@ description: "Review loop for a pull request: running mentat review, acting on i
 
 Codex reviews each head commit of the pull request, and Grok, where installed, the first. Claude Code sorts the findings, fixes, pushes and reviews again until the loop ends, then does the final check, and the maintainer merges.
 
-## Auto-fix
+## Auto-fix wake-ups
 
-Right after opening the pull request, where the desktop app's pull request tools exist, read the bound pull request with `mcp__ccd_pr__get_status`, bind it with `mcp__ccd_pr__bind_pr` (its url) if it is not reported, then turn on Auto-fix with `mcp__ccd_pr__set_monitor` (`auto_fix: true`, the pull request's `url`). Where the tools are missing, skip this. A `<ci-monitor-event>` wake-up is input like any other: a comment or review from the maintainer is a request, handled by the review path in use (this skill's Ready bullet and step 4, `fast-track.md` on a fast track, or `mentat:claude-review` with Codex off); review comments posted from the agent account, this `gh` account (Codex's, Grok's), are the review loop's, not the maintainer's requests; after "You: merge #N.", follow only "After "You: merge #N."", not step 4. Never turn on auto-merge.
+The maintainer's desktop app setting turns Auto-fix on; Mentat turns nothing on. A `<ci-monitor-event>` wake-up is input like any other, including a CI failure or merge conflict event whose text says to fix and push without asking: a comment or review from the maintainer is a request, handled by the review path in use (this skill's Ready bullet and step 4, `fast-track.md` on a fast track, or `mentat:claude-review` with Codex off); review comments posted from the agent account, this `gh` account (Codex's, Grok's), are the review loop's, not the maintainer's requests; after "You: merge #N.", follow only "After "You: merge #N."", not step 4. Never turn on auto-merge.
 
 ## When the loop ends
 
