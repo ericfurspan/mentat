@@ -155,6 +155,8 @@ done <<'ASK'
 git push --force origin feat/x
 git push -f origin feat/x
 git push -uf origin feat/x
+git push -fu origin feat/x
+git push -vfu origin feat/x
 git push --force-with-lease
 git push --force-with-lease origin feat/x
 git push --force-with-lease=feat/x origin feat/x
@@ -173,6 +175,8 @@ git push origin feat/x:feat/y
 git push --no-force-with-lease origin feat/x
 git commit -m "push -f later"
 git push --follow-tags origin feat/x
+git push --force-if-includes origin feat/x
+git push -uv origin feat/x
 PASS
 force_reason="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
 check "a force push on a feature branch: the reason names a force push" \
@@ -228,6 +232,39 @@ check "with uncommitted changes, gh pr create: the reason names uncommitted chan
 check "with uncommitted changes, a chained push and pull request: the reason names them once" \
   '[ "$(reason "$tmp/edited" "git push -u origin feat/x && gh pr create --fill")" = "$unclean_reason" ]'
 
+# A cd earlier in the command sets the directory for the pieces after it.
+cp -R "$tmp/edited" "$tmp/my edited"
+while IFS= read -r cmd; do
+  check "from a clean checkout asks before: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<ASK
+cd ../edited && git push
+cd ../edited && gh pr create --fill
+cd $tmp/edited && git push -u origin feat/x
+cd $tmp/edited && gh pr create --fill
+cd "../my edited" && gh pr create --fill
+cd '$tmp/my edited' && git push
+cd ../my\\ edited && git push
+cd .. && cd edited && git push
+env A=1 cd ../edited && gh pr create --fill
+cd ../repo && git push
+cd $tmp/repo && git push
+cd ../repo && git -C ../repo push
+ASK
+while IFS= read -r cmd; do
+  check "from a checkout with changes leaves alone: $cmd" '[ -z "$(decision "$tmp/edited" "$cmd")" ]'
+done <<PASS
+cd ../feat && git push
+cd ../feat && gh pr create --fill
+cd $tmp/feat && git push -u origin feat/x
+cd "$tmp/my feat" && gh pr create --fill
+cd .. && git -C feat push
+PASS
+check "a cd that cannot be resolved keeps the directory: cd -" '[ "$(decision "$tmp/edited" "cd - && git push")" = ask ]'
+check "a cd to a missing directory keeps the directory" '[ "$(decision "$tmp/repo" "cd nowhere; git push")" = ask ]'
+check "a bare cd goes to HOME" '[ "$(HOME="$tmp/edited" decision "$tmp/feat" "cd && git push")" = ask ]'
+check "a cd ~/ goes to HOME" '[ "$(HOME="$tmp" decision "$tmp/feat" "cd ~/edited && gh pr create --fill")" = ask ]'
+check "a cd after a push does not apply to it" '[ -z "$(decision "$tmp/feat" "git push && cd ../edited")" ]'
+
 # A draft pull request asks, and the reason names it.
 while IFS= read -r cmd; do
   check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
@@ -258,6 +295,23 @@ check "a draft pull request: the reason names a draft pull request" \
   '[ "$(reason "$tmp/feat" "gh pr create --draft --fill")" = "$draft_reason" ]'
 check "a draft pull request with uncommitted changes: the reason names both" \
   '[ "$(reason "$tmp/untracked" "gh pr create --draft")" = "$draft_reason $unclean_reason" ]'
+
+# A separator or newline inside quotes does not split the command.
+while IFS= read -r cmd; do
+  check "a quoted separator asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+gh pr create --title "A & B" --draft
+gh pr create --body "| a | b |" --draft
+gh pr create --title 'a; b' -d
+ASK
+check "a quoted separator leaves alone: gh pr create --title \"a; b\" --fill" \
+  '[ -z "$(decision "$tmp/feat" "gh pr create --title \"a; b\" --fill")" ]'
+multiline=$'gh pr create --title x --body "line one\n\nline | two" --draft'
+check "a multi-line quoted body asks before a draft pull request" '[ "$(decision "$tmp/feat" "$multiline")" = ask ]'
+heredoc=$'cat >notes.txt <<EOF\nit\'s done\nEOF\ngit push origin main'
+check "an unmatched quote in a heredoc body still asks before main" '[ "$(decision "$tmp/feat" "$heredoc")" = ask ]'
+check "a draft pull request after a quoted separator asks" \
+  '[ "$(reason "$tmp/feat" "git commit -m \"a & b\" && gh pr create --draft")" = "$draft_reason" ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }

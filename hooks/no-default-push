@@ -80,91 +80,138 @@ tokenize() {
   if [ "$has" -eq 1 ]; then words+=("$cur"); fi
 }
 
+# split_quoted <text>: sets $qpieces, the text with each unquoted ;, |, & and
+# newline turned into a line break and each quoted newline into a space,
+# quoting as in tokenize.
+split_quoted() {
+  local s=$1 c q="" i
+  qpieces=""
+  for ((i = 0; i < ${#s}; i++)); do
+    c=${s:i:1}
+    if [ -n "$q" ]; then
+      if [ "$c" = "$q" ]; then
+        q=""
+      elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
+        qpieces+=$c; i=$((i + 1)); c=${s:i:1}
+      fi
+      [ "$c" = "$nl" ] && c=" "
+      qpieces+=$c
+    else
+      case "$c" in
+        "'" | '"') q=$c ;;
+        "\\") qpieces+=$c; i=$((i + 1)); c=${s:i:1} ;;
+        ";" | "|" | "&") c=$nl ;;
+      esac
+      qpieces+=$c
+    fi
+  done
+}
+
+# The plain split also catches commands with an unmatched quote; the quoted
+# split catches separators inside quotes. Both are checked.
 pieces=${cmd//;/$nl}
 pieces=${pieces//|/$nl}
 pieces=${pieces//&/$nl}
+split_quoted "$cmd"
 
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
 draft="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
 
 # A command can chain several: look at each piece that starts with git ... push
-# or gh pr create.
-while IFS= read -r seg; do
-  tokenize "$seg"
-  n=${#words[@]}
-  [ "$n" -gt 0 ] || continue
+# or gh pr create. A cd piece sets the directory ($here) for the pieces after it.
+for pass in "$pieces" "$qpieces"; do
+  here=$cwd
+  while IFS= read -r seg; do
+    tokenize "$seg"
+    n=${#words[@]}
+    [ "$n" -gt 0 ] || continue
 
-  i=0
-  while [ "$i" -lt "$n" ]; do
-    case "${words[i]}" in *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
-  done
-  [ "$i" -lt "$n" ] || continue
-  case "${words[i]}" in
-    gh | */gh)
-      [ "${words[i + 1]:-}" = pr ] || continue
-      case "${words[i + 2]:-}" in create | new) ;; *) continue ;; esac
-      for ((j = i + 3; j < n; j++)); do
-        case "${words[j]}" in --draft | --draft=true | -d) note "$draft" ;; esac
-      done
-      unclean "$cwd"
-      continue
-      ;;
-    git | */git) ;;
-    *) continue ;;
-  esac
-  i=$((i + 1))
-  dir=""
-  while [ "$i" -lt "$n" ]; do
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      case "${words[i]}" in *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
+    done
+    [ "$i" -lt "$n" ] || continue
     case "${words[i]}" in
-      -C) dir=${words[i + 1]:-}; i=$((i + 2)) ;;
-      -c | --git-dir | --work-tree | --namespace) i=$((i + 2)) ;;
-      -*) i=$((i + 1)) ;;
-      *) break ;;
+      cd)
+        # A directory it cannot resolve or that does not exist, such as cd -,
+        # leaves $here as it was.
+        to=${words[i + 1]:-}
+        case "$to" in
+          "" | \~) to=${HOME:-} ;;
+          \~/*) to=${HOME:+$HOME/${to#\~/}} ;;
+          /*) ;;
+          -* | \~*) to="" ;;
+          *) to=$here/$to ;;
+        esac
+        if [ -n "$to" ] && [ -d "$to" ]; then here=$to; fi
+        continue
+        ;;
+      gh | */gh)
+        [ "${words[i + 1]:-}" = pr ] || continue
+        case "${words[i + 2]:-}" in create | new) ;; *) continue ;; esac
+        for ((j = i + 3; j < n; j++)); do
+          case "${words[j]}" in --draft | --draft=true | -d) note "$draft" ;; esac
+        done
+        unclean "$here"
+        continue
+        ;;
+      git | */git) ;;
+      *) continue ;;
     esac
-  done
-  [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
-  i=$((i + 1))
+    i=$((i + 1))
+    dir=""
+    while [ "$i" -lt "$n" ]; do
+      case "${words[i]}" in
+        -C) dir=${words[i + 1]:-}; i=$((i + 2)) ;;
+        -c | --git-dir | --work-tree | --namespace) i=$((i + 2)) ;;
+        -*) i=$((i + 1)) ;;
+        *) break ;;
+      esac
+    done
+    [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
+    i=$((i + 1))
 
-  where=$cwd
-  case "$dir" in "") ;; /*) where=$dir ;; *) where=$cwd/$dir ;; esac
-  load "$where"
-  unclean "$where"
+    where=$here
+    case "$dir" in "") ;; /*) where=$dir ;; *) where=$here/$dir ;; esac
+    load "$where"
+    unclean "$where"
 
-  pos=()
-  tags=0
-  while [ "$i" -lt "$n" ]; do
-    w=${words[i]}
-    case "$w" in
-      --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
-      --tags) tags=1; i=$((i + 1)) ;;
-      --repo | -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
-      # Short options can be bundled, as in -uf.
-      --force | --force-with-lease | --force-with-lease=* | -f | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
-      -*) i=$((i + 1)) ;;
-      *) pos+=("$w"); i=$((i + 1)) ;;
-    esac
-  done
+    pos=()
+    tags=0
+    while [ "$i" -lt "$n" ]; do
+      w=${words[i]}
+      case "$w" in
+        --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
+        --tags) tags=1; i=$((i + 1)) ;;
+        --repo | -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
+        # Short options can be bundled, as in -uf or -fu.
+        --force | --force-with-lease | --force-with-lease=* | -f* | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
+        -*) i=$((i + 1)) ;;
+        *) pos+=("$w"); i=$((i + 1)) ;;
+      esac
+    done
 
-  # The first word is the remote; the rest are refspecs.
-  np=${#pos[@]}
-  for ((j = 1; j < np; j++)); do
-    case "${pos[j]}" in +*) note "$force" ;; esac
-  done
-  if [ "$np" -le 1 ]; then
-    if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
-    continue
-  fi
-  for ((j = 1; j < np; j++)); do
-    spec=${pos[j]#+}
-    case "$spec" in *:*) dest=${spec#*:} ;; *) dest=$spec ;; esac
-    dest=${dest#+}
-    dest=${dest#refs/heads/}
-    case "$spec" in HEAD) dest=$current ;; esac
-    if is_default "$dest"; then on_default "$dest"; fi
-    # A wildcard refspec can carry the default branch along.
-    case "$dest" in *\**) on_default "${defaults// / or }" ;; esac
-  done
-done <<<"$pieces"
+    # The first word is the remote; the rest are refspecs.
+    np=${#pos[@]}
+    for ((j = 1; j < np; j++)); do
+      case "${pos[j]}" in +*) note "$force" ;; esac
+    done
+    if [ "$np" -le 1 ]; then
+      if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
+      continue
+    fi
+    for ((j = 1; j < np; j++)); do
+      spec=${pos[j]#+}
+      case "$spec" in *:*) dest=${spec#*:} ;; *) dest=$spec ;; esac
+      dest=${dest#+}
+      dest=${dest#refs/heads/}
+      case "$spec" in HEAD) dest=$current ;; esac
+      if is_default "$dest"; then on_default "$dest"; fi
+      # A wildcard refspec can carry the default branch along.
+      case "$dest" in *\**) on_default "${defaults// / or }" ;; esac
+    done
+  done <<<"$pass"
+done
 
 [ -n "$reasons" ] || exit 0
 jq -n --arg r "${reasons//$nl/ }" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
