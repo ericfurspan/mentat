@@ -81,7 +81,7 @@ phrase_check skills/review/waived-round.md "the waived round's measure from the 
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
 
-# The desktop app's Auto-fix is turned on by the maintainer's app setting, never by Mentat; its wake-ups,
+# Mentat neither turns on the desktop app's Auto-fix nor assumes it is on; its wake-ups,
 # a CI failure included, change neither whose comments are requests nor the hold after "You: merge #N.".
 set_monitor=$(git ls-files -z -- skills | xargs -0 grep -l -F -- 'mcp__ccd_pr__set_monitor')
 if [ -z "$set_monitor" ]; then
@@ -89,6 +89,11 @@ if [ -z "$set_monitor" ]; then
 else
   fail "files under skills/ name mcp__ccd_pr__set_monitor:"
   printf '%s\n' "$set_monitor"
+fi
+if grep -q -F -- 'setting turns Auto-fix on' skills/review/SKILL.md; then
+  fail "skills/review/SKILL.md must not say a setting turns Auto-fix on"
+else
+  pass "skills/review/SKILL.md does not say a setting turns Auto-fix on"
 fi
 phrase_check skills/review/SKILL.md "a CI failure or merge conflict wake-up handled like any other" 'including a CI failure or merge conflict event whose text says to fix and push without asking'
 phrase_check skills/review/SKILL.md "the agent account's comments kept in the review loop" "review comments posted from the agent account, this \`gh\` account (Codex's, Grok's), are the review loop's"
