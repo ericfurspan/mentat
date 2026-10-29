@@ -1,12 +1,12 @@
 # Credits
 
-Adapted from the `pr` skill in [mattpocock/skills](https://github.com/mattpocock/skills) (`skills/engineering/pr/SKILL.md`): the Evidence and Merge danger sections. Its Summary section and its one-way and two-way door framing were there too; Mentat replaced them with a status line, a note to the maintainer and plain words on whether a revert undoes the change.
+Adapted from the `pr` skill in [mattpocock/skills](https://github.com/mattpocock/skills) (`skills/engineering/pr/SKILL.md`): the Evidence and Merge danger sections. Mentat later turned the Evidence section into the collapsed Checks table and dropped Merge danger, keeping its revert and blast radius in the note. Its Summary section and its one-way and two-way door framing were there too; Mentat replaced them with a status line, a note to the maintainer and plain words on whether a revert undoes the change.
 
 Matt Pocock's `pr` skill itself credits Dex Horthy's [`show-me`](https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md) skill (Humanlayer).
 
 Step 3 (ask the maintainer when the change's intent cannot be stated in one sentence) comes from Jeffallan's `code-reviewer` skill ([code-reviewer](https://jeffallan.github.io/claude-skills/skills/quality/code-reviewer/)); `skills/review/CREDITS.md` has the details.
 
-Changes for Mentat: the body opens with a status line and a note to the maintainer whose first sentence states the intent, because Codex and Grok review against the body; a Not in scope section; repository templates and glossaries come first; the menu of visuals is left out.
+Changes for Mentat: the body opens with a status line and a note to the maintainer, in an alert ending with links to the lines to read first, whose first sentence states the intent, because Codex and Grok review against the body; a Not in scope section; repository templates and glossaries come first; the menu of visuals is left out.
 
 The source is under the MIT License:
 
