@@ -18,6 +18,12 @@
 #   mentat ci <PR>  Waits for CI on the pull request's head the same way, and
 #     reviews nothing. 0 CI passed (or there is none), 1 could not read, 3 the head
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
+#   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
+#     review state from the comments the review commands posted as this gh account: the head
+#     commit, the local Codex rounds (and Claude review rounds when present), whether the head
+#     is the last reviewed commit, the Grok state (none, running, done or did not finish) and
+#     the CI state (none, running, passed or failed). With --request, also whether the last
+#     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result.
 #     0 challenge delivered (read the verdict), 1 not challenged.
 #   mentat weigh <idea file>  Has Codex and Grok each judge an idea, at HEAD and in parallel,
@@ -45,7 +51,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared codex grok parallel weigh consult check; do
+for lib in shared codex grok parallel weigh consult check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -70,9 +76,10 @@ case "${1:-}" in
     [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64
     case "$mode" in grok) review_grok "$@" ;; *) review_local "$@" ;; esac ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
+  status) shift; status "$@" ;;
   challenge) shift; challenge "$@" ;;
   weigh) shift; weigh "$@" ;;
   consult) shift; consult "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number> | mentat ci <pull request number> | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
 esac

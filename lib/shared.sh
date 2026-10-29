@@ -104,8 +104,11 @@ read_request() { # $1 pr
   [ -f "$request_file" ] && [ -r "$request_file" ] || not_reviewed "could not read the agreed request file for #$1: $request_file"
   request=$(cat "$request_file") || not_reviewed "could not read the agreed request file for #$1: $request_file"
   printf '%s' "$request" | grep -q '[^[:space:]]' || not_reviewed "the agreed request file for #$1 is empty: $request_file"
-  request_fp=$(printf '%s' "$request" | shasum -a 256 | cut -c1-12) && [ -n "$request_fp" ] || not_reviewed "could not fingerprint the agreed request for #$1"
+  request_fp=$(request_fingerprint "$request") && [ -n "$request_fp" ] || not_reviewed "could not fingerprint the agreed request for #$1"
 }
+# The fingerprint of agreed request text $1, already read with $(cat ...), which
+# drops trailing newlines: the first 12 hex characters of its SHA-256. Also read by mentat status.
+request_fingerprint() { printf '%s' "$1" | shasum -a 256 | cut -c1-12; }
 # What every local review is told besides where to look: the criteria, and then
 # the requirements and the status line. $1 is " and the diff" when the prompt
 # also carries the diff as data.

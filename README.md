@@ -45,7 +45,7 @@ claude plugin install mentat --marketplace ericfurspan/mentat
 
 ## Commands
 
-The `mentat` command (`review`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes. Outside the workflow, `weigh`, `challenge` and `review` run in a git checkout, and `review` needs a GitHub pull request and posts one review (the review loop is the plugin's, not the command's); `consult` runs in any folder.
+The `mentat` command (`review`, `status`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes. Outside the workflow, `weigh`, `challenge` and `review` run in a git checkout, and `review` needs a GitHub pull request and posts one review (the review loop is the plugin's, not the command's); `consult` runs in any folder.
 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
