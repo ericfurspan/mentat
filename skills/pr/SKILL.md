@@ -13,7 +13,7 @@ The body has two readers: the maintainer, who wants what changed, the proof and 
 5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer written on the pull request (`rules.md`, "What goes to the maintainer") goes above the status line.
 
 ```markdown
-**<State>.** <head commit>, tests <pass or fail>, CI <passed, failed, not finished or none>.
+**<State>.** <head commit>, tests <pass, fail or none>, CI <passed, failed, not finished or none>.
 
 <A note to the maintainer, about a hundred words at most, in plain words, with no headings, labels or bullets. First sentence: what the change is for, its intent and not a list of edits. Then only what applies: why the change is made (for a bug fix, the builder's cause, or that it is unknown); whether a revert undoes it, and if not, what stays and why; anything Codex, Grok or Claude flagged that stayed unfixed, and any call made without the maintainer; where in the diff to look first. A small change gets two or three sentences.>
 

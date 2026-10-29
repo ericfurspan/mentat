@@ -15,6 +15,6 @@ The maintainer wants several points of view on one question before trusting the 
    - `Grok: <what Grok adds: from its CONSULT line, with the main reason its reply gives for it, or where it differs>` or `Grok: not consulted (<reason>)`
    - `Claude: <what Claude Code's line from step 2 adds>`
    - Then one link to the saved output.
-   A model line does not repeat the consensus; when a model adds nothing beyond it, its line is `<Model>: agrees.` When neither tool delivered, the Consensus line says the consultation did not happen, and the fifth line asks how to proceed, before the link.
+   A model line does not repeat the consensus; when a model adds nothing beyond it, its line is `<Model>: agrees.` When neither tool delivered, the Consensus line says the consultation did not happen, and how to proceed is asked after the reply, as `rules.md` "How it reaches them" says.
 
 Consult is not a step in a change: it does not weigh an idea or challenge a plan, and `/mentat:claude-review` does not turn it off. A consult never counts as a review.
