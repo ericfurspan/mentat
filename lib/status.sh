@@ -10,7 +10,8 @@
 # One line per review comment by $3 on pull request $2 of repository $1, oldest
 # first: "codex <sha> <no-findings|findings|incomplete> <fingerprint>",
 # "claude <sha> <fingerprint or none>", "grok-done <sha> <result> <fingerprint>",
-# "grok-started <sha>" or "grok-unfinished <sha>".
+# "grok-started <sha>" or "grok-unfinished <sha>". A Claude round's fingerprint is its
+# last line holding only "Agreed request fingerprint: <value>", so findings that quote one do not count.
 status_comments() { # $1 repo, $2 pull request, $3 this account's login
   gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg me "$3" '
     def review($who): capture("^## Local " + $who + " review of (?<sha>[0-9a-f]{40}): (?<res>no findings|findings|incomplete), spec fingerprint (?<fp>[^ ]+)$");
@@ -24,7 +25,7 @@ status_comments() { # $1 repo, $2 pull request, $3 this account's login
     elif ($h | test("^Grok review did not finish on [0-9a-f]{40}: ")) then
       "grok-unfinished \($h | capture("^Grok review did not finish on (?<sha>[0-9a-f]{40}): ").sha)"
     elif ($h | test("^(#+ +)?Claude review round [0-9]+ on [0-9a-f]{7,40}\\b")) then
-      "claude \($h | capture("Claude review round [0-9]+ on (?<sha>[0-9a-f]{7,40})").sha) \(($b | capture("Agreed request fingerprint: `?(?<fp>[0-9a-f]{12}|none)").fp) // "none")"
+      "claude \($h | capture("Claude review round [0-9]+ on (?<sha>[0-9a-f]{7,40})").sha) \([$b | split("\n")[] | capture("^\\s*(?:[-*] )?`?Agreed request fingerprint: `?(?<fp>[0-9a-f]{12}|none)`?\\s*$").fp] | last // "none")"
     else empty end'
 }
 

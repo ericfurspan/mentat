@@ -110,6 +110,13 @@ reset; codex "$OLD" findings; comment mentat-bot "Claude review round 1 on ${H:0
 
 No findings."; rc=$(run 7 --request "$root/work dir/agreed request.md")
 check "--request: a Claude round without a fingerprint line reads as none" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, claude rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
+reset; comment mentat-bot "Claude review round 1 on ${H:0:7}
+
+The Codex comment says Agreed request fingerprint: 000000000000 for an older request.
+> - Agreed request fingerprint: 000000000000
+
+Agreed request fingerprint: $REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+check "--request: a Claude round's fingerprint is its own record line, not one quoted in its findings" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, claude rounds 1, head reviewed: yes, grok: none, ci: none, spec: matches"'
 reset; rc=$(run 7 --request "$root/work dir/agreed request.md")
 check "--request with no review yet says so" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, ci: none, spec: no review yet"'
 reset; rc=$(run 7 --request "$root/no such file.md")
