@@ -46,10 +46,10 @@ hold_check skills/review/SKILL.md 'push nothing yet' '"Hold #N: <reason>" and en
 # the status line, and is kept in the spec so a resumed or compacted session still has it.
 fast_track_check() {
   local what=$1 s=$2
-  if grep -q -F -- "$s" skills/review/SKILL.md; then
-    pass "skills/review/SKILL.md gives the fast track's $what"
+  if grep -q -F -- "$s" skills/review/fast-track.md; then
+    pass "skills/review/fast-track.md gives the fast track's $what"
   else
-    fail "skills/review/SKILL.md must give the fast track's $what (missing: $s)"
+    fail "skills/review/fast-track.md must give the fast track's $what (missing: $s)"
   fi
 }
 fast_track_check "check of the complete final diff" 'check the complete final diff'
@@ -74,10 +74,10 @@ phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" 'apply the
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
 phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "You: merge #N."'
-phrase_check skills/review/SKILL.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
-phrase_check skills/review/SKILL.md "the waived round's yes for that push" "Skip only on the maintainer's yes for that push"
-phrase_check skills/review/SKILL.md "the waived round's status line" 'Not reviewed: last push waived by the maintainer'
-phrase_check skills/review/SKILL.md "the waived round's measure from the last reviewed head" 'measured from the last head a review covered'
+phrase_check skills/review/waived-round.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
+phrase_check skills/review/waived-round.md "the waived round's yes for that push" "Skip only on the maintainer's yes for that push"
+phrase_check skills/review/waived-round.md "the waived round's status line" 'Not reviewed: last push waived by the maintainer'
+phrase_check skills/review/waived-round.md "the waived round's measure from the last reviewed head" 'measured from the last head a review covered'
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
 
@@ -132,20 +132,20 @@ phrase_check rules.md "the next step's last choice" 'else that there is nothing 
 phrase_check rules.md "the next step's exclusions" 'Answers, progress updates and replies a skill shapes are unchanged'
 phrase_check rules.md "the backlog bullet allowing the next step" 'apart from the next step after finished work'
 phrase_check skills/review/SKILL.md "the merged report ending with the next step" 'report in one line, then the next step.'
-phrase_check skills/backlog/SKILL.md "the cleared merge waits' line ending with the next step" 'Name the cleared items in one line of the reply, then the next step'
+phrase_check skills/backlog/linear.md "the cleared merge waits' line ending with the next step" 'Name the cleared items in one line of the reply, then the next step'
 # Step 2's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
-if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/SKILL.md)" -eq 2 ]; then
-  pass "skills/backlog/SKILL.md exempts step 2's read from refining items and clearing merge waits"
+if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/linear.md)" -eq 2 ]; then
+  pass "skills/backlog/linear.md exempts step 2's read from refining items and clearing merge waits"
 else
-  fail "skills/backlog/SKILL.md must exempt step 2's read in both the hand-made items and merge waits bullets"
+  fail "skills/backlog/linear.md must exempt step 2's read in both the hand-made items and merge waits bullets"
 fi
 
 # An item that is not agreed is described by what it is and where it stands, and waits on no one.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item the maintainer set aside says "parked" in its opening sentence'
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
-phrase_check skills/backlog/SKILL.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
-phrase_check skills/backlog/SKILL.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
+phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
+phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item and wait" 'what the item is (such as a bug, a proposal, a follow-up or a question), where it stands, and any wait on the maintainer (step 4)'
 phrase_check rules.md "a wait on the maintainer for agreed work only" 'When agreed work waits on a test or action'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
@@ -274,6 +274,25 @@ for f in skills/*/SKILL.md; do
   else
     fail "$f is $size characters (limit 15000)"
   fi
+done
+
+# A supporting file a skill names in backticks (lowercase `name.md`, or `../<skill>/name.md`)
+# exists, relative to that skill's folder. A bare name found at the repository root, such as rules.md, is not one.
+for f in skills/*/SKILL.md; do
+  [ -e "$f" ] || continue
+  dir=${f%/SKILL.md}
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    case $ref in
+      ../*) ;;
+      *) if [ -f "$ref" ]; then continue; fi ;;
+    esac
+    if [ -f "$dir/$ref" ]; then
+      pass "$f names $ref, which exists"
+    else
+      fail "$f names $ref, but $dir/$ref is missing"
+    fi
+  done <<< "$(grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" "$f" | tr -d '\`' | sort -u)"
 done
 
 # mentat review, review --local, review --grok, challenge, weigh, consult and check behave as
