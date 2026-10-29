@@ -257,22 +257,30 @@ cd ../repo && git push
 cd $tmp/repo && git push
 cd ../repo && git -C ../repo push
 ASK
+# A cd away from a checkout with changes still asks: the session directory is checked too.
 while IFS= read -r cmd; do
-  check "from a checkout with changes leaves alone: $cmd" '[ -z "$(decision "$tmp/edited" "$cmd")" ]'
-done <<PASS
+  check "from a checkout with changes asks before: $cmd" '[ "$(decision "$tmp/edited" "$cmd")" = ask ]'
+done <<ASK
 cd ../feat && git push
 cd ../feat && gh pr create --fill
 cd $tmp/feat && git push -u origin feat/x
 cd "$tmp/my feat" && gh pr create --fill
-cd .. && git -C feat push
-PASS
+ASK
+check "from a checkout with changes leaves alone: cd .. && git -C feat push" '[ -z "$(decision "$tmp/edited" "cd .. && git -C feat push")" ]'
 check "a cd - with no previous directory goes back to the session cwd" '[ "$(decision "$tmp/edited" "cd - && git push")" = ask ]'
 check "a cd - goes back to the previous directory" '[ "$(decision "$tmp/repo" "cd ../feat && tests/run && cd - && git push")" = ask ]'
-check "a cd - swaps with the previous directory" '[ -z "$(decision "$tmp/repo" "cd ../feat && cd ../edited && cd - && git push")" ]'
+check "a cd - swaps with the previous directory" '[ "$(decision "$tmp/repo" "cd ../feat && cd ../edited && cd - && git push")" = ask ]'
 check "a cd -- <dir> goes to the directory" '[ "$(decision "$tmp/feat" "cd -- ../edited && git push")" = ask ]'
 check "a cd in a subshell applies inside it" '[ "$(decision "$tmp/feat" "(cd ../edited && git push)")" = ask ]'
-check "a cd in a subshell applies inside it: leaves alone" '[ -z "$(decision "$tmp/edited" "(cd ../feat && git push)")" ]'
+check "a cd in a subshell from a checkout with changes still asks" '[ "$(decision "$tmp/edited" "(cd ../feat && git push)")" = ask ]'
 check "a cd in a subshell ends with it" '[ "$(decision "$tmp/edited" "(cd ../feat) && git push")" = ask ]'
+# A cd never removes a prompt: the session directory is checked too.
+check "a cd the hook misreads still checks the session directory: changes" \
+  '[ "$(reason "$tmp/edited" "(cd ../feat && true) >log && git push")" = "$unclean_reason" ]'
+check "a cd the hook misreads still checks the session directory: main" \
+  '[ "$(decision "$tmp/repo" "(cd ../feat && true) >log && git push")" = ask ]'
+check "a cd the hook misreads still checks the session directory: pull request" \
+  '[ "$(reason "$tmp/edited" "(cd ../feat && true) >log && gh pr create --fill")" = "$unclean_reason" ]'
 check "a cd to a missing directory keeps the directory" '[ "$(decision "$tmp/repo" "cd nowhere; git push")" = ask ]'
 check "a bare cd goes to HOME" '[ "$(HOME="$tmp/edited" decision "$tmp/feat" "cd && git push")" = ask ]'
 check "a cd ~/ goes to HOME" '[ "$(HOME="$tmp" decision "$tmp/feat" "cd ~/edited && gh pr create --fill")" = ask ]'

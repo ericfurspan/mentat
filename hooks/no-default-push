@@ -51,9 +51,10 @@ is_default() {
   for d in $defaults; do [ "$1" = "$d" ] && return 0; done
   return 1
 }
-# resolve <path>: sets $to, the directory a cd or git -C would use: ~, $HOME and
-# ${HOME}, alone or before /, go to HOME; an absolute path stays; anything else
-# is relative to $here. A ~user, or HOME unset, gives an empty $to.
+# resolve <path> [base]: sets $to, the directory a cd or git -C would use: ~,
+# $HOME and ${HOME}, alone or before /, go to HOME; an absolute path stays;
+# anything else is relative to base, else $here. A ~user, or HOME unset, gives
+# an empty $to.
 # shellcheck disable=SC2016 # The words are not expanded: $HOME is literal text.
 resolve() {
   case "$1" in
@@ -61,7 +62,7 @@ resolve() {
     \~/* | '$HOME/'* | '${HOME}/'*) to=${HOME:+$HOME/${1#*/}} ;;
     /*) to=$1 ;;
     \~*) to="" ;;
-    *) to=$here/$1 ;;
+    *) to=${2:-$here}/$1 ;;
   esac
 }
 
@@ -143,9 +144,58 @@ skip_flags() {
   done
 }
 
+# push_checks <dir>: notes the reasons a git push in <dir> asks, reading its
+# arguments from word $start on.
+push_checks() {
+  load "$1"
+  unclean "$1"
+
+  pos=()
+  tags=0
+  # The first positional word is the remote, unless --repo gave it.
+  first=1
+  i=$start
+  while [ "$i" -lt "$n" ]; do
+    w=${words[i]}
+    case "$w" in
+      --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
+      --tags) tags=1; i=$((i + 1)) ;;
+      --repo) first=0; i=$((i + 2)) ;;
+      --repo=*) first=0; i=$((i + 1)) ;;
+      -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
+      # Short options can be bundled, as in -uf or -fu.
+      --force | --force-with-lease | --force-with-lease=* | -f* | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
+      -*) i=$((i + 1)) ;;
+      *) pos+=("$w"); i=$((i + 1)) ;;
+    esac
+  done
+
+  # The words from $first on are refspecs.
+  np=${#pos[@]}
+  for ((j = first; j < np; j++)); do
+    case "${pos[j]}" in +*) note "$force" ;; esac
+  done
+  if [ "$np" -le "$first" ]; then
+    if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
+    return
+  fi
+  for ((j = first; j < np; j++)); do
+    spec=${pos[j]#+}
+    case "$spec" in *:*) dest=${spec#*:} ;; *) dest=$spec ;; esac
+    dest=${dest#+}
+    dest=${dest#refs/heads/}
+    case "$spec" in HEAD) dest=$current ;; esac
+    if is_default "$dest"; then on_default "$dest"; fi
+    # A wildcard refspec can carry the default branch along.
+    case "$dest" in *\**) on_default "${defaults// / or }" ;; esac
+  done
+}
+
 # A command can chain several: look at each piece that starts with git ... push
 # or gh pr create. A cd piece sets the directory ($here) for the pieces after it,
 # up to the ) that closes a ( subshell it is in. $prev is the directory cd - uses.
+# Following a cd only adds prompts: the session's directory ($cwd, joined with
+# any git -C) is checked too.
 for pass in "$pieces" "$qpieces"; do
   here=$cwd prev="" sub=0 ends=0
   while IFS= read -r seg; do
@@ -203,6 +253,7 @@ for pass in "$pieces" "$qpieces"; do
           case "${words[j]}" in --draft | --draft=true | -d* | -[!-]*d*) note "$draft" ;; esac
         done
         unclean "$here"
+        [ "$here" = "$cwd" ] || unclean "$cwd"
         continue
         ;;
       git | */git) ;;
@@ -219,51 +270,15 @@ for pass in "$pieces" "$qpieces"; do
       esac
     done
     [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
-    i=$((i + 1))
+    start=$((i + 1))
 
-    where=$here
-    if [ -n "$dir" ]; then resolve "$dir"; where=${to:-$here/$dir}; fi
-    load "$where"
-    unclean "$where"
-
-    pos=()
-    tags=0
-    # The first positional word is the remote, unless --repo gave it.
-    first=1
-    while [ "$i" -lt "$n" ]; do
-      w=${words[i]}
-      case "$w" in
-        --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
-        --tags) tags=1; i=$((i + 1)) ;;
-        --repo) first=0; i=$((i + 2)) ;;
-        --repo=*) first=0; i=$((i + 1)) ;;
-        -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
-        # Short options can be bundled, as in -uf or -fu.
-        --force | --force-with-lease | --force-with-lease=* | -f* | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
-        -*) i=$((i + 1)) ;;
-        *) pos+=("$w"); i=$((i + 1)) ;;
-      esac
-    done
-
-    # The words from $first on are refspecs.
-    np=${#pos[@]}
-    for ((j = first; j < np; j++)); do
-      case "${pos[j]}" in +*) note "$force" ;; esac
-    done
-    if [ "$np" -le "$first" ]; then
-      if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
-      continue
+    where=$here base=$cwd
+    if [ -n "$dir" ]; then
+      resolve "$dir"; where=${to:-$here/$dir}
+      resolve "$dir" "$cwd"; base=${to:-$cwd/$dir}
     fi
-    for ((j = first; j < np; j++)); do
-      spec=${pos[j]#+}
-      case "$spec" in *:*) dest=${spec#*:} ;; *) dest=$spec ;; esac
-      dest=${dest#+}
-      dest=${dest#refs/heads/}
-      case "$spec" in HEAD) dest=$current ;; esac
-      if is_default "$dest"; then on_default "$dest"; fi
-      # A wildcard refspec can carry the default branch along.
-      case "$dest" in *\**) on_default "${defaults// / or }" ;; esac
-    done
+    push_checks "$where"
+    [ "$base" = "$where" ] || push_checks "$base"
   done <<<"$pass"
 done
 
