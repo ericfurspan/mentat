@@ -15,7 +15,7 @@ The body has two readers: the maintainer, who wants what changed, where to look 
 ```markdown
 **<State>.** <head commit>, tests <pass or fail>, CI <passed, failed, not finished or none>.
 
-> [!IMPORTANT]
+> [!<TYPE>]
 > <A note to the maintainer, about a hundred words at most, in plain words, with no headings, labels or bullets. First sentence: what the change is for, its intent and not a list of edits. Then only what applies: why the change is made (for a bug fix, the builder's cause, or that it is unknown); whether a revert undoes it, and if not, what stays and why, such as deleted data, a release, a message sent, settings elsewhere, or an interface others use; when there is a real blast radius, what breaks, and for whom, if this is wrong; anything Codex, Grok or Claude flagged that stayed unfixed, and any call made without the maintainer. A small change gets two or three sentences.>
 >
 > Look here first: `<path>:<a>-<b>`, <up to two more>
@@ -41,6 +41,8 @@ Closes #<issue, when there is one; none with an external backlog>
 ```
 
 "Look here first" gives one to three repository-relative paths with the lines that carry the change, as plain code text with no link or URL, so they read the same on the GitHub site and app. The body has no other alert.
+
+The alert's type is the most serious that applies: `[!CAUTION]` when a risky or irreversible step follows the merge, such as a release, deleted data or a migration; `[!WARNING]` when a revert does not fully undo the change, or a mistake in it would break a lot; `[!IMPORTANT]` when the note holds something to read before merging, such as a call made without the maintainer, a change of scope, or something not verified; otherwise `[!NOTE]`. Never `[!TIP]`.
 
 The Checks table has one row per numbered requirement of the spec, by number (an older issue or item, agreed before the section had that name and with no numbered list, is read as each requirement it states); one check may cover several.
 
