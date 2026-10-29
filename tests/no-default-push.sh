@@ -323,6 +323,16 @@ elapsed=$((SECONDS - start))
 check "a ${#long}-character pull request body asks before a draft pull request, in ${elapsed}s (under 3s)" \
   '[ "$long_decision" = ask ] && [ "$elapsed" -lt 3 ]'
 
+# gh flags before pr, such as -R or --repo with its value, are skipped.
+while IFS= read -r cmd; do
+  check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+gh -R o/r pr create --draft
+gh --repo o/r pr create -d
+ASK
+check "with uncommitted changes asks before: gh --repo=o/r pr create --fill" '[ "$(decision "$tmp/edited" "gh --repo=o/r pr create --fill")" = ask ]'
+check "with uncommitted changes leaves alone: gh -R o/r pr view" '[ -z "$(decision "$tmp/edited" "gh -R o/r pr view")" ]'
+
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }
 check "no cwd in the input: uses the process directory" '[ "$(nocwd)" = ask ]'

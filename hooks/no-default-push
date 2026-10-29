@@ -152,9 +152,14 @@ for pass in "$pieces" "$qpieces"; do
         continue
         ;;
       gh | */gh)
-        [ "${words[i + 1]:-}" = pr ] || continue
-        case "${words[i + 2]:-}" in create | new) ;; *) continue ;; esac
-        for ((j = i + 3; j < n; j++)); do
+        # Flags may come before pr: -R and --repo take the next word.
+        i=$((i + 1))
+        while [ "$i" -lt "$n" ]; do
+          case "${words[i]}" in -R | --repo) i=$((i + 2)) ;; -*) i=$((i + 1)) ;; *) break ;; esac
+        done
+        [ "${words[i]:-}" = pr ] || continue
+        case "${words[i + 1]:-}" in create | new) ;; *) continue ;; esac
+        for ((j = i + 2; j < n; j++)); do
           case "${words[j]}" in --draft | --draft=true | -d) note "$draft" ;; esac
         done
         unclean "$here"
