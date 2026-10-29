@@ -2,7 +2,7 @@
 
 *Read by agents. For people: `README.md` and `docs/`.*
 
-This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its skills (`skills/`, one per workflow step, named from `rules.md`), its builder subagent (`prompts/builder.md`) and the `mentat` command (`bin/mentat`, which loads `lib/*.sh`: `shared.sh`, `codex.sh`, `grok.sh`, `parallel.sh`, `weigh.sh`, `consult.sh`, `check.sh`, `status.sh`). Mentat is on here through the maintainer's user-scope install, so sessions in this repository follow `rules.md`.
+This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its skills (`skills/`, one per workflow step, named from `rules.md`), its builder subagent (`prompts/builder.md`) and the `mentat` command (`bin/mentat`, which loads `lib/*.sh`: `shared.sh`, `codex.sh`, `grok.sh`, `parallel.sh`, `weigh.sh`, `consult.sh`, `check.sh`). Mentat is on here through the maintainer's user-scope install, so sessions in this repository follow `rules.md`.
 
 - The one test command is `tests/run`. It takes about 80 seconds, so run it once with its output saved to a file and read the last line ("All checks passed" or "N check(s) failed"). It runs locally on macOS, and on GitHub Actions (macOS) for every pull request.
 - The external backlog is the Linear project `Mentat`, in team `Work`.
