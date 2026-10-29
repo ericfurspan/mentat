@@ -88,7 +88,8 @@ phrase_check skills/review/SKILL.md "Auto-fix turned on with set_monitor" "then 
 phrase_check skills/review/SKILL.md "Auto-fix turned on for the pull request's url" "(\`auto_fix: true\`, the pull request's \`url\`)"
 phrase_check skills/review/SKILL.md "Auto-fix skipped without the app's tools" 'Where the tools are missing, skip this.'
 phrase_check skills/review/SKILL.md "the agent account's comments kept in the review loop" "review comments posted from the agent account, this \`gh\` account (Codex's, Grok's), are the review loop's"
-phrase_check skills/review/SKILL.md "the hold still deciding after the merge line" 'an event leads to a push only through the hold rule of "After "You: merge #N.""'
+phrase_check skills/review/SKILL.md "a maintainer's comment routed by the review path in use" "handled by the review path in use (this skill's Ready bullet and step 4, \`fast-track.md\` on a fast track, or \`mentat:claude-review\` with Codex off)"
+phrase_check skills/review/SKILL.md "only the after-merge section deciding after the merge line" 'after "You: merge #N.", follow only "After "You: merge #N."", not step 4.'
 phrase_check skills/claude-review/SKILL.md "Auto-fix after the first push" "turn on Auto-fix as \`mentat:review\`'s \"Auto-fix\" section says"
 
 # A grill asks one decision per prompt, always with a way to stop, and is offered at most once per request.

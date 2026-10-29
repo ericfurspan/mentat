@@ -7,7 +7,7 @@ Codex reviews each head commit of the pull request, and Grok, where installed, t
 
 ## Auto-fix
 
-Right after opening the pull request, where the desktop app's pull request tools exist, read the bound pull request with `mcp__ccd_pr__get_status`, bind it with `mcp__ccd_pr__bind_pr` (its url) if it is not reported, then turn on Auto-fix with `mcp__ccd_pr__set_monitor` (`auto_fix: true`, the pull request's `url`). Where the tools are missing, skip this. A `<ci-monitor-event>` wake-up is input like any other: a comment or review from the maintainer is a request, handled as the Ready bullet and step 4 say; review comments posted from the agent account, this `gh` account (Codex's, Grok's), are the review loop's, not the maintainer's requests; after "You: merge #N.", an event leads to a push only through the hold rule of "After "You: merge #N."". Never turn on auto-merge.
+Right after opening the pull request, where the desktop app's pull request tools exist, read the bound pull request with `mcp__ccd_pr__get_status`, bind it with `mcp__ccd_pr__bind_pr` (its url) if it is not reported, then turn on Auto-fix with `mcp__ccd_pr__set_monitor` (`auto_fix: true`, the pull request's `url`). Where the tools are missing, skip this. A `<ci-monitor-event>` wake-up is input like any other: a comment or review from the maintainer is a request, handled by the review path in use (this skill's Ready bullet and step 4, `fast-track.md` on a fast track, or `mentat:claude-review` with Codex off); review comments posted from the agent account, this `gh` account (Codex's, Grok's), are the review loop's, not the maintainer's requests; after "You: merge #N.", follow only "After "You: merge #N."", not step 4. Never turn on auto-merge.
 
 ## When the loop ends
 
