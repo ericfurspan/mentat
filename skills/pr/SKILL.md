@@ -15,7 +15,7 @@ The body has two readers: the maintainer, who wants what changed, where to look 
 ```markdown
 **<State>.** <head commit>, tests <pass or fail>, CI <passed, failed, not finished or none>.
 
-> [!IMPORTANT]
+> [!NOTE]
 > <A note to the maintainer, about a hundred words at most, in plain words, with no headings, labels or bullets. First sentence: what the change is for, its intent and not a list of edits. Then only what applies: why the change is made (for a bug fix, the builder's cause, or that it is unknown); whether a revert undoes it, and if not, what stays and why, such as deleted data, a release, a message sent, settings elsewhere, or an interface others use; when there is a real blast radius, what breaks, and for whom, if this is wrong; anything Codex, Grok or Claude flagged that stayed unfixed, and any call made without the maintainer. A small change gets two or three sentences.>
 >
 > Look here first: `<path>:<a>-<b>`, <up to two more>
