@@ -106,6 +106,10 @@ rc=$(run 7 --request "$root/work dir/other request.md")
 check "--request: a different spec is told apart, with both fingerprints" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review $REQ_FP, file $other)"'
 reset; codex "$H" findings; rc=$(run 7 --request "$root/work dir/agreed request.md")
 check "--request: a review without a fingerprint differs" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
+reset; codex "$OLD" findings; comment mentat-bot "Claude review round 1 on ${H:0:7}
+
+No findings."; rc=$(run 7 --request "$root/work dir/agreed request.md")
+check "--request: a Claude round without a fingerprint line reads as none" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, claude rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
 reset; rc=$(run 7 --request "$root/work dir/agreed request.md")
 check "--request with no review yet says so" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, ci: none, spec: no review yet"'
 reset; rc=$(run 7 --request "$root/no such file.md")
