@@ -84,6 +84,9 @@ reset; codex "$OLD" findings; codex "$H" incomplete; comment mentat-bot "Grok re
 comment mentat-bot "Grok review did not finish on $OLD: Grok exited with status 1"; checks completed success completed failure; rc=$(run 7)
 check "an incomplete Codex review is not a round and not a reviewed head; Grok did not finish; CI failed" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: no (last reviewed 1111111), grok: did not finish, ci: failed"'
 
+reset; codex "$H" findings; comment mentat-bot "Grok review started on $H"; grok "$H" incomplete; rc=$(run 7)
+check "a Grok review posted as incomplete did not finish" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: did not finish, ci: none"'
+
 reset; codex "$OLD" findings; codex "$H" "no findings"; comment someone-else "## Local Codex review of $OLD: findings, spec fingerprint none"
 comment someone-else "Grok review started on $H"; comment someone-else "Claude review round 3 on $OLD"; rc=$(run 7)
 check "counts only comments by the account gh is signed in as" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 2, head reviewed: yes, grok: none, ci: none"'

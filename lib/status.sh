@@ -54,12 +54,13 @@ status() {
   lines=$(status_comments "$repo" "$pr" "$me") || die "could not read the comments on #$pr"
   # An incomplete Codex review is not a round (skills/review); Grok's start comment
   # and its result or did-not-finish comment are one run, and the last one says where it stands.
+  # An incomplete Grok result is posted without a did-not-finish comment (lib/grok.sh).
   while read -r kind sha res lfp; do
     case "$kind" in
       codex) [ "$res" = incomplete ] && continue; codex=$((codex + 1)); last=$sha last_fp=$lfp ;;
       claude) claude=$((claude + 1)); last=$sha last_fp=$res ;;
       grok-started) grok=running ;;
-      grok-done) grok='done' ;;
+      grok-done) if [ "$res" = incomplete ]; then grok="did not finish"; else grok='done'; fi ;;
       grok-unfinished) grok="did not finish" ;;
     esac
   done <<<"$lines"
