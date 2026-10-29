@@ -85,6 +85,7 @@ phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waiv
 # whose comments are requests nor the hold after "You: merge #N.".
 phrase_check skills/review/SKILL.md "Auto-fix right after opening" 'Right after opening the pull request, where the desktop app'
 phrase_check skills/review/SKILL.md "Auto-fix turned on with set_monitor" "then turn on Auto-fix with \`mcp__ccd_pr__set_monitor\`"
+phrase_check skills/review/SKILL.md "Auto-fix turned on for the pull request's url" "(\`auto_fix: true\`, the pull request's \`url\`)"
 phrase_check skills/review/SKILL.md "Auto-fix skipped without the app's tools" 'Where the tools are missing, skip this.'
 phrase_check skills/review/SKILL.md "the agent account's comments kept in the review loop" "review comments posted from the agent account, this \`gh\` account (Codex's, Grok's), are the review loop's"
 phrase_check skills/review/SKILL.md "the hold still deciding after the merge line" 'an event leads to a push only through the hold rule of "After "You: merge #N.""'
