@@ -5,6 +5,10 @@ description: "Review loop for a pull request: running mentat review, acting on i
 
 Codex reviews each head commit of the pull request, and Grok, where installed, the first. Claude Code sorts the findings, fixes, pushes and reviews again until the loop ends, then does the final check, and the maintainer merges.
 
+## Auto-fix
+
+Right after opening the pull request, where the desktop app's pull request tools exist, read the bound pull request with `mcp__ccd_pr__get_status`, bind it with `mcp__ccd_pr__bind_pr` (its url) if it is not reported, then turn on Auto-fix with `mcp__ccd_pr__set_monitor` (`auto_fix: true`, the pull request's `url`). Where the tools are missing, skip this. A `<ci-monitor-event>` wake-up is input like any other: a comment or review from the maintainer is a request, handled as the Ready bullet and step 4 say; review comments posted from the agent account, this `gh` account (Codex's, Grok's), are the review loop's, not the maintainer's requests; after "You: merge #N.", an event leads to a push only through the hold rule of "After "You: merge #N."". Never turn on auto-merge.
+
 ## When the loop ends
 
 - **Ready** (not on a fast track): the review exits 0 on the latest commit, or exits 2 and every finding was fixed or answered with a reason, none is a real defect left unfixed, and none is a blocker Claude Code disagrees with; and Claude Code has answered, in its thread, every comment and review the maintainer left, each a request, not a finding: done as step 4 says, or answered with why not; one that changes the agreed scope goes to the maintainer, and, where this session started Grok, its `mentat review --grok` has ended. Do the final check below, then stop.
