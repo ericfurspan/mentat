@@ -265,6 +265,26 @@ check "a bare cd goes to HOME" '[ "$(HOME="$tmp/edited" decision "$tmp/feat" "cd
 check "a cd ~/ goes to HOME" '[ "$(HOME="$tmp" decision "$tmp/feat" "cd ~/edited && gh pr create --fill")" = ask ]'
 check "a cd after a push does not apply to it" '[ -z "$(decision "$tmp/feat" "git push && cd ../edited")" ]'
 
+# ~, $HOME and ${HOME} in git -C and cd go to HOME.
+mkdir "$tmp/home"
+cp -R "$tmp/edited" "$tmp/home/repo"
+cp -R "$tmp/feat" "$tmp/home/clean"
+cp -R "$tmp/repo" "$tmp/home/main-checkout"
+while IFS= read -r cmd; do
+  check "with HOME holding a checkout with changes asks before: $cmd" '[ "$(HOME="$tmp/home" decision "$tmp/feat" "$cmd")" = ask ]'
+  clean_cmd=${cmd//repo/clean}
+  check "with HOME holding a clean checkout leaves alone: $clean_cmd" '[ -z "$(HOME="$tmp/home" decision "$tmp/feat" "$clean_cmd")" ]'
+done <<'ASK'
+git -C ~/repo push
+git -C "$HOME/repo" push
+git -C "${HOME}/repo" push
+cd "$HOME/repo" && git push
+cd ${HOME}/repo && git push
+cd $HOME && git -C repo push
+ASK
+check "git -C ~/<checkout on main> push names the default branch" \
+  '[ "$(HOME="$tmp/home" reason "$tmp/feat" "git -C ~/main-checkout push")" = "Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
+
 # A draft pull request asks, and the reason names it.
 while IFS= read -r cmd; do
   check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
@@ -312,6 +332,23 @@ heredoc=$'cat >notes.txt <<EOF\nit\'s done\nEOF\ngit push origin main'
 check "an unmatched quote in a heredoc body still asks before main" '[ "$(decision "$tmp/feat" "$heredoc")" = ask ]'
 check "a draft pull request after a quoted separator asks" \
   '[ "$(reason "$tmp/feat" "git commit -m \"a & b\" && gh pr create --draft")" = "$draft_reason" ]'
+
+# A backslash-newline outside single quotes continues the line.
+cont_force=$'git push \\\n  --force origin feat/x'
+cont_plus=$'git push origin \\\n  +feat/x'
+cont_draft=$'gh pr create \\\n  --title x \\\n  --draft'
+cont_fill=$'gh pr create \\\n  --fill'
+cont_dq=$'git -C "'"$tmp"$'/ed\\\nited" push'
+single_body=$'gh pr create --fill --body \'a \\\n--draft\''
+single_then_draft=$'gh pr create --body \'a \\\n--fill\' \\\n  --draft'
+check "a continued line asks before a force push" '[ "$(reason "$tmp/feat" "$cont_force")" = "$force_reason" ]'
+check "a continued line asks before a +refspec" '[ "$(reason "$tmp/feat" "$cont_plus")" = "$force_reason" ]'
+check "continued lines ask before a draft pull request" '[ "$(reason "$tmp/feat" "$cont_draft")" = "$draft_reason" ]'
+check "a continued line leaves alone: gh pr create --fill" '[ -z "$(decision "$tmp/feat" "$cont_fill")" ]'
+check "a continued line inside double quotes joins the path" '[ "$(reason / "$cont_dq")" = "$unclean_reason" ]'
+check "a backslash-newline inside single quotes stays in the body" '[ -z "$(decision "$tmp/feat" "$single_body")" ]'
+check "a continued line after a single-quoted body asks before a draft pull request" \
+  '[ "$(reason "$tmp/feat" "$single_then_draft")" = "$draft_reason" ]'
 # A long inline body stays fast: the hook reads each command before it runs.
 row="| \`hooks/no-default-push\` | it's a table row; with a & b, \$x and a \\\\ backslash | yes |"
 body=""

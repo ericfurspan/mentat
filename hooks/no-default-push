@@ -51,6 +51,19 @@ is_default() {
   for d in $defaults; do [ "$1" = "$d" ] && return 0; done
   return 1
 }
+# resolve <path>: sets $to, the directory a cd or git -C would use: ~, $HOME and
+# ${HOME}, alone or before /, go to HOME; an absolute path stays; anything else
+# is relative to $here. A ~user, or HOME unset, gives an empty $to.
+# shellcheck disable=SC2016 # The words are not expanded: $HOME is literal text.
+resolve() {
+  case "$1" in
+    \~ | '$HOME' | '${HOME}') to=${HOME:-} ;;
+    \~/* | '$HOME/'* | '${HOME}/'*) to=${HOME:+$HOME/${1#*/}} ;;
+    /*) to=$1 ;;
+    \~*) to="" ;;
+    *) to=$here/$1 ;;
+  esac
+}
 
 # Both scanners below take the text up to the next character that matters in
 # one chunk and drop it by offset: in bash 3.2, ${#s} and ${s:i:1} cost the
@@ -88,8 +101,8 @@ tokenize() {
 }
 
 # split_quoted <text>: sets $qpieces, the text with each unquoted ;, |, & and
-# newline turned into a line break and each quoted newline into a space,
-# quoting as in tokenize.
+# newline turned into a line break, each quoted newline into a space and each
+# backslash-newline outside single quotes dropped, quoting as in tokenize.
 split_quoted() {
   local s=$1 run c q=""
   qpieces=""
@@ -105,8 +118,9 @@ split_quoted() {
     case "$q$c" in
       "'" | '"') q=$c ;;
       "''" | '""') q="" ;;
-      # A backslash, unquoted or inside double quotes, keeps the next character.
-      \\ | \"\\) c+=${s:0:1}; s=${s:1}; [ -z "$q" ] || c=${c/$nl/ } ;;
+      # A backslash, unquoted or inside double quotes, keeps the next character;
+      # before a newline, both go (a line continuation).
+      \\ | \"\\) c=${s:0:1}; s=${s:1}; case "$c" in "$nl") c="" ;; *) c="\\$c" ;; esac ;;
       ?$nl) c=" " ;;
       *) c=$nl ;;
     esac
@@ -142,11 +156,9 @@ for pass in "$pieces" "$qpieces"; do
         # leaves $here as it was.
         to=${words[i + 1]:-}
         case "$to" in
-          "" | \~) to=${HOME:-} ;;
-          \~/*) to=${HOME:+$HOME/${to#\~/}} ;;
-          /*) ;;
-          -* | \~*) to="" ;;
-          *) to=$here/$to ;;
+          "") to=${HOME:-} ;;
+          -*) to="" ;;
+          *) resolve "$to" ;;
         esac
         if [ -n "$to" ] && [ -d "$to" ]; then here=$to; fi
         continue
@@ -182,7 +194,7 @@ for pass in "$pieces" "$qpieces"; do
     i=$((i + 1))
 
     where=$here
-    case "$dir" in "") ;; /*) where=$dir ;; *) where=$here/$dir ;; esac
+    if [ -n "$dir" ]; then resolve "$dir"; where=${to:-$here/$dir}; fi
     load "$where"
     unclean "$where"
 
