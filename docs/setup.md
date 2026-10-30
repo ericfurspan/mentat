@@ -6,10 +6,11 @@ What a machine needs for Mentat to run, and the plugin commands.
 
 ## What a machine needs
 
-- macOS, Claude Code, `git`, `jq`, and `gh` signed in.
-- For reviews, the Codex CLI signed in. `mentat challenge` and `mentat weigh` also use the CLI, and so does `mentat consult`.
-- Optional: Grok Build (`grok`), signed in with `grok login`, adds a second review of each pull request's first head (`mentat review --grok`) and a second view in `mentat weigh` and `mentat consult`.
-- Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node), for local Codex.
+- macOS only, with Claude Code, `git`, `jq`, and `gh` signed in.
+- Required for reviews: the Codex CLI signed in. `mentat challenge` and `mentat weigh` also use the CLI, and so does `mentat consult`.
+- Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node), as part of its sandbox. Anywhere else it cannot start, so no review runs.
+- Codex's effort is fixed at high.
+- Optional: Grok Build (`grok`) adds a second review of each pull request's first head (`mentat review --grok`) and a second view in `mentat weigh` and `mentat consult`. It runs only on your own sign-in (`grok login`) and does not use an API key from the environment.
 - A separate GitHub account for the agent, where the repository requires an approval.
 
 ## Plugin commands
@@ -38,10 +39,8 @@ The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on
 
 Three settings are prose in the repository's AGENTS.md, with no config file: the backlog (a named external one, else GitHub issues), the test command, and a `## Code Review Rules` section. Claude Code states them in one line when change work starts in a repository. `/mentat:setup` shows them and sets the ones you pick, in one pull request; it can also move a repository's planning from GitHub issues to a Linear project, migrating the open issues.
 
-In a repository with a Linear backlog, branch names carry the item key (for example `feat/wrk-26-branch-key`), so Linear's GitHub integration links each pull request to its item. For this to be safe, set the integration's "Comments in GitHub" to post without issue descriptions, and turn it off for public repositories, since an item's description can hold a wait block with steps for the maintainer.
+In a repository with a Linear backlog, branch names carry the item key (for example `feat/abc-26-branch-key`), so Linear's GitHub integration links each pull request to its item. For this to be safe, set the integration's "Comments in GitHub" to post without issue descriptions, and turn it off for public repositories, since an item's description can hold a wait block with steps for the maintainer.
 
-## Optional skills
+## Plan interviews
 
-- [`the-fool`](https://skills.sh/Jeffallan/claude-skills/the-fool) challenges a plan or claim and ends with a stronger version. It is yours to start; Mentat does not offer it.
-
-To be interviewed about a plan one question at a time, use Mentat's own `/mentat:grill` (see the [README's commands](../README.md#commands)). Claude Code may offer a grill when a request has several open decisions that depend on each other, and starts one only if you agree.
+To be interviewed about a plan one question at a time, use `/mentat:grill` (see the [README's commands](../README.md#commands)). Claude Code may offer a grill when a request has several open decisions that depend on each other, and starts one only if you agree.

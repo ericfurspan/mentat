@@ -49,7 +49,7 @@ Adopting: <what Claude Code takes up>
 Not adopting: <what> (<why>)
 ```
 
-- One line per tool that ran or was due: a weigh has both, a challenge only Codex. A tool with no answer gets `not weighed` or `not challenged` and why, in public-safe words, never a log path.
+- One line per tool that ran or was due: a weigh has Codex, and a Grok line only where `grok` is installed; a challenge only Codex. A tool with no answer gets `not weighed` or `not challenged` and why, in public-safe words, never a log path.
 - Plain words, about 25 a line. Leave out an empty line; add nothing else.
 - When a decision prompt follows, the block opens its question, which then says why the first option is recommended; otherwise it goes in the message.
 

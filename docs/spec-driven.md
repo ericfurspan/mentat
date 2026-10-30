@@ -15,7 +15,7 @@ Spec Kit's phase names are used. Kiro's requirements, design and tasks map onto 
 | Plan | [`mentat:plan`](../skills/plan/SKILL.md) when the approach is uncertain or the decision matters. Otherwise the agreed spec is the plan. |
 | Tasks | The builder's brief ([`prompts/builder.md`](../prompts/builder.md)). |
 | Implement | The builder subagent, on one branch, running the test command before the pull request. |
-| Converge | The pull request's Verification cites each requirement by number, with the check that covers it and what was observed ([`skills/pr`](../skills/pr/SKILL.md)). Codex and Grok then review the diff against the spec, and with an external backlog each review records the spec's fingerprint. Last comes the final check, which reads the diff, the description and the spec again ([`skills/review`](../skills/review/SKILL.md)). |
+| Converge | The pull request's Verification cites each requirement by number, with the check that covers it and what was observed ([`skills/pr`](../skills/pr/SKILL.md)). Codex and Grok then normally review the diff against the spec, and with an external backlog each review records the spec's fingerprint. Last comes the final check, which reads the diff, the description and the spec again ([`skills/review`](../skills/review/SKILL.md)). |
 
 ## The two backlog paths
 
@@ -26,8 +26,8 @@ Either way, the pull request's Verification cites each requirement the agreed te
 
 ## What Mentat adds
 
-- Each head is reviewed against the spec by models from other vendors, which did not write the code.
-- A merge only a person makes. The agent never merges.
+- Each head is normally reviewed against the spec by models from other vendors, which did not write the code. Fast tracks, waived pushes and Claude-only mode are the exceptions.
+- A merge left to a person. The rules tell the agent not to merge, and a hook asks before the merge commands it recognizes.
 
 ## Keeping the spec short and current
 
