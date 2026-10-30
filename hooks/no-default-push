@@ -4,8 +4,12 @@
 # no refspec while it is checked out) gets a permission prompt, so the
 # maintainer decides; a repository whose workflow commits to the default branch
 # (a journal) still works when the maintainer approves. --tags alone is not a
-# branch change and passes. This is a net for mistakes, not a security boundary:
-# other routes exist. When it cannot read its input, it stays out of the way.
+# branch change and passes. Three more commands that skip a rule ask too: a
+# force push (--force, -f, --force-with-lease or a +refspec) on any branch, a
+# git push or gh pr create while git status --porcelain in its directory prints
+# anything, and a gh pr create with --draft or -d. This is a net for mistakes,
+# not a security boundary: other routes exist. When it cannot read its input,
+# it stays out of the way.
 set -uo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0
@@ -13,14 +17,22 @@ input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
 [ "$tool" = Bash ] || exit 0
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
-case "$cmd" in *push*) ;; *) exit 0 ;; esac
+case "$cmd" in *push* | *gh*) ;; *) exit 0 ;; esac
 cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || exit 0
 [ -n "$cwd" ] || cwd=$PWD
 
-ask() {
-  jq -n --arg n "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
-    permissionDecisionReason: ("Mentat: agents do not push to the default branch (" + $n + "). Approve only if you want this push to go to it.")}}'
-  exit 0
+# note <reason>: adds a reason for the prompt, once; the hook asks at the end.
+nl=$'\n'
+reasons=""
+note() {
+  case "$nl$reasons$nl" in *"$nl$1$nl"*) return ;; esac
+  reasons+=${reasons:+$nl}$1
+}
+on_default() { note "Mentat: agents do not push to the default branch ($1). Approve only if you want this push to go to it."; }
+# unclean <dir>: notes uncommitted changes when git status there prints anything.
+unclean() {
+  [ -z "$(git --no-optional-locks -C "$1" status --porcelain 2>/dev/null)" ] ||
+    note "Mentat: agents push and open pull requests from a clean working tree, and git status lists uncommitted changes. Approve only if you want to go ahead without committing them."
 }
 
 # load <dir>: sets $defaults (origin/HEAD, else main and master) and $current.
@@ -39,97 +51,239 @@ is_default() {
   for d in $defaults; do [ "$1" = "$d" ] && return 0; done
   return 1
 }
+# resolve <path> [base]: sets $to, the directory a cd or git -C would use: ~,
+# $HOME and ${HOME}, alone or before /, go to HOME; an absolute path stays;
+# anything else is relative to base, else $here. A ~user, or HOME unset, gives
+# an empty $to.
+# shellcheck disable=SC2016 # The words are not expanded: $HOME is literal text.
+resolve() {
+  case "$1" in
+    \~ | '$HOME' | '${HOME}') to=${HOME:-} ;;
+    \~/* | '$HOME/'* | '${HOME}/'*) to=${HOME:+$HOME/${1#*/}} ;;
+    /*) to=$1 ;;
+    \~*) to="" ;;
+    *) to=${2:-$here}/$1 ;;
+  esac
+}
+
+# Both scanners below take the text up to the next character that matters in
+# one chunk and drop it by offset: in bash 3.2, ${#s} and ${s:i:1} cost the
+# length of $s, and ${s#"$x"} and ${s//x/y} more, so a per-character loop or a
+# substitution with many matches is quadratic on a long pull request body.
+tab=$'\t'
 
 # tokenize <text>: sets $words, split on blanks the way a shell does: single
 # and double quotes and backslashes keep a path with spaces in one word. An
 # unmatched quote ends at the end of the text.
 tokenize() {
-  local s=$1 c q="" cur="" has=0 i
+  local s=$1 run c q="" cur="" has=0
   words=()
-  for ((i = 0; i < ${#s}; i++)); do
-    c=${s:i:1}
+  while [ -n "$s" ]; do
+    case "$q" in
+      \") run=${s%%[\"\\]*} ;;
+      \') run=${s%%\'*} ;;
+      *) run=${s%%[\'\"\\\ "$tab"]*}; [ -z "$run" ] || has=1 ;;
+    esac
+    cur+=$run; s=${s:${#run}}
+    [ -n "$s" ] || break
+    c=${s:0:1}; s=${s:1}
     if [ -n "$q" ]; then
-      if [ "$c" = "$q" ]; then
-        q=""
-      elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
-        i=$((i + 1)); cur+=${s:i:1}
-      else
-        cur+=$c
-      fi
+      # The closing quote, or a backslash inside double quotes.
+      if [ "$c" = "$q" ]; then q=""; else cur+=${s:0:1}; s=${s:1}; fi
     else
       case "$c" in
         "'" | '"') q=$c; has=1 ;;
-        "\\") i=$((i + 1)); cur+=${s:i:1}; has=1 ;;
-        " " | $'\t') if [ "$has" -eq 1 ]; then words+=("$cur"); cur=""; has=0; fi ;;
-        *) cur+=$c; has=1 ;;
+        "\\") cur+=${s:0:1}; s=${s:1}; has=1 ;;
+        *) if [ "$has" -eq 1 ]; then words+=("$cur"); cur=""; has=0; fi ;;
       esac
     fi
   done
   if [ "$has" -eq 1 ]; then words+=("$cur"); fi
 }
 
-nl=$'\n'
-pieces=${cmd//;/$nl}
-pieces=${pieces//|/$nl}
-pieces=${pieces//&/$nl}
-
-# A command can chain several: look at each piece that starts with git ... push.
-while IFS= read -r seg; do
-  tokenize "$seg"
-  n=${#words[@]}
-  [ "$n" -gt 0 ] || continue
-
-  i=0
-  while [ "$i" -lt "$n" ]; do
-    case "${words[i]}" in *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
-  done
-  [ "$i" -lt "$n" ] || continue
-  case "${words[i]}" in git | */git) ;; *) continue ;; esac
-  i=$((i + 1))
-  dir=""
-  while [ "$i" -lt "$n" ]; do
-    case "${words[i]}" in
-      -C) dir=${words[i + 1]:-}; i=$((i + 2)) ;;
-      -c | --git-dir | --work-tree | --namespace) i=$((i + 2)) ;;
-      -*) i=$((i + 1)) ;;
-      *) break ;;
+# split_quoted <text>: sets $qpieces, the text with each unquoted ;, |, & and
+# newline turned into a line break, each quoted newline into a space and each
+# backslash-newline outside single quotes dropped, quoting as in tokenize.
+split_quoted() {
+  local s=$1 run c q=""
+  qpieces=""
+  while [ -n "$s" ]; do
+    case "$q" in
+      \") run=${s%%[\"\\"$nl"]*} ;;
+      \') run=${s%%[\'"$nl"]*} ;;
+      *) run=${s%%[\'\"\\\;\|\&]*} ;;
     esac
+    qpieces+=$run; s=${s:${#run}}
+    [ -n "$s" ] || break
+    c=${s:0:1}; s=${s:1}
+    case "$q$c" in
+      "'" | '"') q=$c ;;
+      "''" | '""') q="" ;;
+      # A backslash, unquoted or inside double quotes, keeps the next character;
+      # before a newline, both go (a line continuation).
+      \\ | \"\\) c=${s:0:1}; s=${s:1}; case "$c" in "$nl") c="" ;; *) c="\\$c" ;; esac ;;
+      ?$nl) c=" " ;;
+      *) c=$nl ;;
+    esac
+    qpieces+=$c
   done
-  [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
-  i=$((i + 1))
+}
 
-  where=$cwd
-  case "$dir" in "") ;; /*) where=$dir ;; *) where=$cwd/$dir ;; esac
-  load "$where"
+# The plain split also catches commands with an unmatched quote; the quoted
+# split catches separators inside quotes. Both are checked. The plain split
+# joins each line that ends in a backslash with the next.
+pieces=$(printf '%s' "$cmd" | LC_ALL=C awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' | LC_ALL=C tr ';|&' '\n')
+split_quoted "$cmd"
+
+force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
+draft="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
+
+# skip_flags: moves $i past gh flags; -R and --repo take the next word.
+skip_flags() {
+  while [ "$i" -lt "$n" ]; do
+    case "${words[i]}" in -R | --repo) i=$((i + 2)) ;; -*) i=$((i + 1)) ;; *) break ;; esac
+  done
+}
+
+# push_checks <dir>: notes the reasons a git push in <dir> asks, reading its
+# arguments from word $start on.
+push_checks() {
+  load "$1"
+  unclean "$1"
 
   pos=()
   tags=0
+  # The first positional word is the remote, unless --repo gave it.
+  first=1
+  i=$start
   while [ "$i" -lt "$n" ]; do
     w=${words[i]}
     case "$w" in
-      --all | --mirror) ask "${defaults// / or }" ;;
+      --all | --mirror) on_default "${defaults// / or }"; i=$((i + 1)) ;;
       --tags) tags=1; i=$((i + 1)) ;;
-      --repo | -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
+      --repo) first=0; i=$((i + 2)) ;;
+      --repo=*) first=0; i=$((i + 1)) ;;
+      -o | --push-option | --receive-pack | --exec) i=$((i + 2)) ;;
+      # Short options can be bundled, as in -uf or -fu.
+      --force | --force-with-lease | --force-with-lease=* | -f* | -[!-]*f*) note "$force"; i=$((i + 1)) ;;
       -*) i=$((i + 1)) ;;
       *) pos+=("$w"); i=$((i + 1)) ;;
     esac
   done
 
-  # The first word is the remote; the rest are refspecs.
+  # The words from $first on are refspecs.
   np=${#pos[@]}
-  if [ "$np" -le 1 ]; then
-    if [ "$tags" -eq 0 ] && is_default "$current"; then ask "$current"; fi
-    continue
+  for ((j = first; j < np; j++)); do
+    case "${pos[j]}" in +*) note "$force" ;; esac
+  done
+  if [ "$np" -le "$first" ]; then
+    if [ "$tags" -eq 0 ] && is_default "$current"; then on_default "$current"; fi
+    return
   fi
-  for ((j = 1; j < np; j++)); do
+  for ((j = first; j < np; j++)); do
     spec=${pos[j]#+}
     case "$spec" in *:*) dest=${spec#*:} ;; *) dest=$spec ;; esac
     dest=${dest#+}
     dest=${dest#refs/heads/}
     case "$spec" in HEAD) dest=$current ;; esac
-    if is_default "$dest"; then ask "$dest"; fi
+    if is_default "$dest"; then on_default "$dest"; fi
     # A wildcard refspec can carry the default branch along.
-    case "$dest" in *\**) ask "${defaults// / or }" ;; esac
+    case "$dest" in *\**) on_default "${defaults// / or }" ;; esac
   done
-done <<<"$pieces"
+}
+
+# A command can chain several: look at each piece that starts with git ... push
+# or gh pr create. A cd piece sets the directory ($here) for the pieces after it,
+# up to the ) that closes a ( subshell it is in. $prev is the directory cd - uses.
+# Following a cd only adds prompts: the session's directory ($cwd, joined with
+# any git -C) is checked too.
+for pass in "$pieces" "$qpieces"; do
+  here=$cwd prev="" sub=0 ends=0
+  while IFS= read -r seg; do
+    if [ "$ends" -eq 1 ] && [ "$sub" -eq 1 ]; then here=$saved prev=$saved_prev sub=0; fi
+    ends=0
+    tokenize "$seg"
+    n=${#words[@]}
+    [ "$n" -gt 0 ] || continue
+    # A group ends with ) on the last word, or } as its own word.
+    w=${words[n - 1]}
+    while :; do case "$w" in *")") w=${w%")"}; ends=1 ;; *) break ;; esac; done
+    words[n - 1]=$w
+    case "$w" in "" | "}") unset "words[n - 1]"; n=$((n - 1)) ;; esac
+
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      # A group starts with ( or { on the first word; ( starts a subshell.
+      w=${words[i]}
+      while :; do
+        case "$w" in
+          "("*) w=${w#"("}; if [ "$sub" -eq 0 ]; then sub=1 saved=$here saved_prev=$prev; fi ;;
+          "{"*) w=${w#"{"} ;;
+          *) break ;;
+        esac
+      done
+      words[i]=$w
+      case "$w" in "" | *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
+    done
+    [ "$i" -lt "$n" ] || continue
+    case "${words[i]}" in
+      cd)
+        # A directory it cannot resolve or that does not exist leaves $here as
+        # it was. cd - with no previous directory goes back to the session's.
+        to=${words[i + 1]:-}
+        [ "$to" != -- ] || to=${words[i + 2]:-}
+        case "$to" in
+          "") to=${HOME:-} ;;
+          -) to=${prev:-$cwd} ;;
+          -*) to="" ;;
+          *) resolve "$to" ;;
+        esac
+        if [ -n "$to" ] && [ -d "$to" ]; then prev=$here here=$to; fi
+        continue
+        ;;
+      gh | */gh)
+        # Flags may come before pr and before create.
+        i=$((i + 1))
+        skip_flags
+        [ "${words[i]:-}" = pr ] || continue
+        i=$((i + 1))
+        skip_flags
+        case "${words[i]:-}" in create | new) ;; *) continue ;; esac
+        # Short options can be bundled, as in -df or -fd.
+        for ((j = i + 1; j < n; j++)); do
+          case "${words[j]}" in --draft | --draft=true | -d* | -[!-]*d*) note "$draft" ;; esac
+        done
+        unclean "$here"
+        [ "$here" = "$cwd" ] || unclean "$cwd"
+        continue
+        ;;
+      git | */git) ;;
+      *) continue ;;
+    esac
+    i=$((i + 1))
+    dir=""
+    while [ "$i" -lt "$n" ]; do
+      case "${words[i]}" in
+        -C) dir=${words[i + 1]:-}; i=$((i + 2)) ;;
+        -c | --git-dir | --work-tree | --namespace) i=$((i + 2)) ;;
+        -*) i=$((i + 1)) ;;
+        *) break ;;
+      esac
+    done
+    [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
+    start=$((i + 1))
+
+    where=$here base=$cwd
+    if [ -n "$dir" ]; then
+      resolve "$dir"; where=${to:-$here/$dir}
+      resolve "$dir" "$cwd"; base=${to:-$cwd/$dir}
+    fi
+    push_checks "$where"
+    [ "$base" = "$where" ] || push_checks "$base"
+  done <<<"$pass"
+done
+
+[ -n "$reasons" ] || exit 0
+jq -n --arg r "${reasons//$nl/ }" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
+  permissionDecisionReason: $r}}'
 exit 0

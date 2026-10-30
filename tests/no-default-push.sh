@@ -67,6 +67,7 @@ git commit -m "x" || git push origin HEAD:main
 git add . | git push origin main
 git push origin feat/x main
 git push origin 'refs/heads/*:refs/heads/*'
+git push --repo origin
 ASK
 while IFS= read -r cmd; do
   check "on main leaves alone: $cmd" '[ -z "$(decision "$tmp/repo" "$cmd")" ]'
@@ -93,6 +94,7 @@ done <<'ASK'
 git push origin main
 git push origin HEAD:main
 git push --all
+git push --repo origin main
 ASK
 while IFS= read -r cmd; do
   check "on a feature branch leaves alone: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
@@ -101,9 +103,9 @@ git push
 git push origin
 git push origin HEAD
 git push -u origin feat/x
-git push --force-with-lease origin feat/x
 git -C . push
 git status
+git push --repo origin feat/x
 PASS
 
 # The directory comes from git -C, resolved against the session's cwd.
@@ -148,6 +150,265 @@ decision_json() {
 }
 check "the reason names the default branch" \
   '[ "$(reason "$tmp/repo" "git push origin main")" = "Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
+
+# A force push asks on any branch, and the reason names it.
+while IFS= read -r cmd; do
+  check "on a feature branch asks before a force push: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+git push --force origin feat/x
+git push -f origin feat/x
+git push -uf origin feat/x
+git push -fu origin feat/x
+git push -vfu origin feat/x
+git push --force-with-lease
+git push --force-with-lease origin feat/x
+git push --force-with-lease=feat/x origin feat/x
+git push --force-with-lease=feat/x:abc123 origin feat/x
+git push origin +feat/x
+git push origin +HEAD:feat/x
+git status && git push --force origin feat/x
+git fetch; git push -f
+git commit -m "x" || git push origin +feat/x
+git push --repo origin +HEAD:feat/x
+git push --repo=origin +feat/x
+(git push --force origin feat/x)
+{ git push -f; }
+ASK
+while IFS= read -r cmd; do
+  check "on a feature branch leaves alone, not a force push: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
+done <<'PASS'
+git push -u origin feat/x
+git push origin feat/x:feat/y
+git push --no-force-with-lease origin feat/x
+git commit -m "push -f later"
+git push --follow-tags origin feat/x
+git push --force-if-includes origin feat/x
+git push -uv origin feat/x
+PASS
+force_reason="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
+check "a force push on a feature branch: the reason names a force push" \
+  '[ "$(reason "$tmp/feat" "git push --force origin feat/x")" = "$force_reason" ]'
+check "a force push to the default branch: the reason names both" \
+  '[ "$(reason "$tmp/repo" "git push -f origin main")" = "$force_reason Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
+check "two force pushes in one command: the reason names it once" \
+  '[ "$(reason "$tmp/feat" "git push -f origin feat/x && git push origin +feat/x")" = "$force_reason" ]'
+
+# A push or a pull request from a directory with uncommitted changes asks, and the reason names them.
+cp -R "$tmp/feat" "$tmp/untracked"
+touch "$tmp/untracked/new.txt"
+cp -R "$tmp/feat" "$tmp/edited"
+printf 'a\n' >"$tmp/edited/file.txt"
+g -C "$tmp/edited" add file.txt
+g -C "$tmp/edited" commit -q -m file
+printf 'b\n' >"$tmp/edited/file.txt"
+cp -R "$tmp/feat" "$tmp/staged"
+printf 'a\n' >"$tmp/staged/file.txt"
+g -C "$tmp/staged" add file.txt
+for d in untracked edited staged; do
+  while IFS= read -r cmd; do
+    check "with uncommitted changes ($d) asks before: $cmd" '[ "$(decision "$tmp/$d" "$cmd")" = ask ]'
+  done <<'ASK'
+git push
+git push -u origin feat/x
+git push origin --tags
+gh pr create --fill
+gh pr create --title "x" --body "y"
+git fetch && git push origin feat/x
+git status; gh pr create --fill
+ASK
+done
+check "with uncommitted changes, git -C <dir> push asks (relative)" '[ "$(decision "$tmp" "git -C edited push")" = ask ]'
+check "with uncommitted changes, git -C <dir> push asks (absolute)" '[ "$(decision / "git -C $tmp/edited push")" = ask ]'
+check "git -C <clean dir> push from a directory with changes leaves alone" '[ -z "$(decision "$tmp/edited" "git -C ../feat push")" ]'
+while IFS= read -r cmd; do
+  check "with uncommitted changes leaves alone: $cmd" '[ -z "$(decision "$tmp/edited" "$cmd")" ]'
+done <<'PASS'
+git status
+git commit -am "push it"
+git diff
+gh pr view
+gh pr list
+gh pr checks
+ls
+PASS
+unclean_reason="Mentat: agents push and open pull requests from a clean working tree, and git status lists uncommitted changes. Approve only if you want to go ahead without committing them."
+check "with uncommitted changes: the reason names uncommitted changes" \
+  '[ "$(reason "$tmp/edited" "git push origin feat/x")" = "$unclean_reason" ]'
+check "with uncommitted changes, gh pr create: the reason names uncommitted changes" \
+  '[ "$(reason "$tmp/untracked" "gh pr create --fill")" = "$unclean_reason" ]'
+check "with uncommitted changes, a chained push and pull request: the reason names them once" \
+  '[ "$(reason "$tmp/edited" "git push -u origin feat/x && gh pr create --fill")" = "$unclean_reason" ]'
+
+# A cd earlier in the command sets the directory for the pieces after it.
+cp -R "$tmp/edited" "$tmp/my edited"
+while IFS= read -r cmd; do
+  check "from a clean checkout asks before: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<ASK
+cd ../edited && git push
+cd ../edited && gh pr create --fill
+cd $tmp/edited && git push -u origin feat/x
+cd $tmp/edited && gh pr create --fill
+cd "../my edited" && gh pr create --fill
+cd '$tmp/my edited' && git push
+cd ../my\\ edited && git push
+cd .. && cd edited && git push
+env A=1 cd ../edited && gh pr create --fill
+cd ../repo && git push
+cd $tmp/repo && git push
+cd ../repo && git -C ../repo push
+ASK
+# A cd away from a checkout with changes still asks: the session directory is checked too.
+while IFS= read -r cmd; do
+  check "from a checkout with changes asks before: $cmd" '[ "$(decision "$tmp/edited" "$cmd")" = ask ]'
+done <<ASK
+cd ../feat && git push
+cd ../feat && gh pr create --fill
+cd $tmp/feat && git push -u origin feat/x
+cd "$tmp/my feat" && gh pr create --fill
+ASK
+check "from a checkout with changes leaves alone: cd .. && git -C feat push" '[ -z "$(decision "$tmp/edited" "cd .. && git -C feat push")" ]'
+check "a cd - with no previous directory goes back to the session cwd" '[ "$(decision "$tmp/edited" "cd - && git push")" = ask ]'
+check "a cd - goes back to the previous directory" '[ "$(decision "$tmp/repo" "cd ../feat && tests/run && cd - && git push")" = ask ]'
+check "a cd - swaps with the previous directory" '[ "$(decision "$tmp/repo" "cd ../feat && cd ../edited && cd - && git push")" = ask ]'
+check "a cd -- <dir> goes to the directory" '[ "$(decision "$tmp/feat" "cd -- ../edited && git push")" = ask ]'
+check "a cd in a subshell applies inside it" '[ "$(decision "$tmp/feat" "(cd ../edited && git push)")" = ask ]'
+check "a cd in a subshell from a checkout with changes still asks" '[ "$(decision "$tmp/edited" "(cd ../feat && git push)")" = ask ]'
+check "a cd in a subshell ends with it" '[ "$(decision "$tmp/edited" "(cd ../feat) && git push")" = ask ]'
+# A cd never removes a prompt: the session directory is checked too.
+check "a cd the hook misreads still checks the session directory: changes" \
+  '[ "$(reason "$tmp/edited" "(cd ../feat && true) >log && git push")" = "$unclean_reason" ]'
+check "a cd the hook misreads still checks the session directory: main" \
+  '[ "$(decision "$tmp/repo" "(cd ../feat && true) >log && git push")" = ask ]'
+check "a cd the hook misreads still checks the session directory: pull request" \
+  '[ "$(reason "$tmp/edited" "(cd ../feat && true) >log && gh pr create --fill")" = "$unclean_reason" ]'
+check "a cd to a missing directory keeps the directory" '[ "$(decision "$tmp/repo" "cd nowhere; git push")" = ask ]'
+check "a bare cd goes to HOME" '[ "$(HOME="$tmp/edited" decision "$tmp/feat" "cd && git push")" = ask ]'
+check "a cd ~/ goes to HOME" '[ "$(HOME="$tmp" decision "$tmp/feat" "cd ~/edited && gh pr create --fill")" = ask ]'
+check "a cd after a push does not apply to it" '[ -z "$(decision "$tmp/feat" "git push && cd ../edited")" ]'
+
+# ~, $HOME and ${HOME} in git -C and cd go to HOME.
+mkdir "$tmp/home"
+cp -R "$tmp/edited" "$tmp/home/repo"
+cp -R "$tmp/feat" "$tmp/home/clean"
+cp -R "$tmp/repo" "$tmp/home/main-checkout"
+while IFS= read -r cmd; do
+  check "with HOME holding a checkout with changes asks before: $cmd" '[ "$(HOME="$tmp/home" decision "$tmp/feat" "$cmd")" = ask ]'
+  clean_cmd=${cmd//repo/clean}
+  check "with HOME holding a clean checkout leaves alone: $clean_cmd" '[ -z "$(HOME="$tmp/home" decision "$tmp/feat" "$clean_cmd")" ]'
+done <<'ASK'
+git -C ~/repo push
+git -C "$HOME/repo" push
+git -C "${HOME}/repo" push
+cd "$HOME/repo" && git push
+cd ${HOME}/repo && git push
+cd $HOME && git -C repo push
+cd ${HOME} && git -C repo push
+ASK
+check "git -C ~/<checkout on main> push names the default branch" \
+  '[ "$(HOME="$tmp/home" reason "$tmp/feat" "git -C ~/main-checkout push")" = "Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
+
+# A draft pull request asks, and the reason names it.
+while IFS= read -r cmd; do
+  check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+gh pr create --draft
+gh pr create -d --fill
+gh pr create --title "x" --draft --body "y"
+gh pr create --draft=true --fill
+gh pr new --draft
+/usr/local/bin/gh pr create -d
+GH_REPO=o/r gh pr create --draft
+git push -u origin feat/x && gh pr create --draft --fill
+git status; gh pr create -d
+gh pr create -df
+gh pr create -fd
+gh pr create -wd
+(gh pr create --draft)
+ASK
+while IFS= read -r cmd; do
+  check "on a feature branch leaves alone, not a draft pull request: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
+done <<'PASS'
+gh pr create --fill
+gh pr create --title "a --draft idea" --body "use -d"
+gh pr create --draft=false --fill
+gh pr create -f
+gh pr create --fill --draft=false
+gh pr ready
+gh pr view --json isDraft
+gh issue create --title x
+git push -u origin feat/x && gh pr create --fill
+PASS
+draft_reason="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
+check "a draft pull request: the reason names a draft pull request" \
+  '[ "$(reason "$tmp/feat" "gh pr create --draft --fill")" = "$draft_reason" ]'
+check "a draft pull request with uncommitted changes: the reason names both" \
+  '[ "$(reason "$tmp/untracked" "gh pr create --draft")" = "$draft_reason $unclean_reason" ]'
+
+# A separator or newline inside quotes does not split the command.
+while IFS= read -r cmd; do
+  check "a quoted separator asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+gh pr create --title "A & B" --draft
+gh pr create --body "| a | b |" --draft
+gh pr create --title 'a; b' -d
+ASK
+check "a quoted separator leaves alone: gh pr create --title \"a; b\" --fill" \
+  '[ -z "$(decision "$tmp/feat" "gh pr create --title \"a; b\" --fill")" ]'
+multiline=$'gh pr create --title x --body "line one\n\nline | two" --draft'
+check "a multi-line quoted body asks before a draft pull request" '[ "$(decision "$tmp/feat" "$multiline")" = ask ]'
+heredoc=$'cat >notes.txt <<EOF\nit\'s done\nEOF\ngit push origin main'
+check "an unmatched quote in a heredoc body still asks before main" '[ "$(decision "$tmp/feat" "$heredoc")" = ask ]'
+check "a draft pull request after a quoted separator asks" \
+  '[ "$(reason "$tmp/feat" "git commit -m \"a & b\" && gh pr create --draft")" = "$draft_reason" ]'
+
+# A backslash-newline outside single quotes continues the line.
+cont_force=$'git push \\\n  --force origin feat/x'
+cont_plus=$'git push origin \\\n  +feat/x'
+cont_draft=$'gh pr create \\\n  --title x \\\n  --draft'
+cont_fill=$'gh pr create \\\n  --fill'
+cont_dq=$'git -C "'"$tmp"$'/ed\\\nited" push'
+single_body=$'gh pr create --fill --body \'a \\\n--draft\''
+single_then_draft=$'gh pr create --body \'a \\\n--fill\' \\\n  --draft'
+check "a continued line asks before a force push" '[ "$(reason "$tmp/feat" "$cont_force")" = "$force_reason" ]'
+check "a continued line asks before a +refspec" '[ "$(reason "$tmp/feat" "$cont_plus")" = "$force_reason" ]'
+check "continued lines ask before a draft pull request" '[ "$(reason "$tmp/feat" "$cont_draft")" = "$draft_reason" ]'
+check "a continued line leaves alone: gh pr create --fill" '[ -z "$(decision "$tmp/feat" "$cont_fill")" ]'
+check "a continued line inside double quotes joins the path" '[ "$(reason / "$cont_dq")" = "$unclean_reason" ]'
+check "a backslash-newline inside single quotes stays in the body" '[ -z "$(decision "$tmp/feat" "$single_body")" ]'
+check "a continued line after a single-quoted body asks before a draft pull request" \
+  '[ "$(reason "$tmp/feat" "$single_then_draft")" = "$draft_reason" ]'
+# An apostrophe that leaves the quoted split inside a quote: the plain split joins the continued lines.
+comment_cont=$'# It\'s ready\ngit push \\\n  --force origin feat/x\ngh pr create \\\n  --draft'
+heredoc_cont=$'cat >notes <<EOF\nit\'s done\nEOF\ngit push \\\n  --force origin feat/x'
+cont_plain=$'git push \\\n  origin feat/x'
+check "continued lines after an apostrophe in a comment ask before a force push and a draft" \
+  '[ "$(reason "$tmp/feat" "$comment_cont")" = "$force_reason $draft_reason" ]'
+check "a continued line after an apostrophe in a heredoc asks before a force push" \
+  '[ "$(reason "$tmp/feat" "$heredoc_cont")" = "$force_reason" ]'
+check "a continued line leaves alone: git push origin feat/x" '[ -z "$(decision "$tmp/feat" "$cont_plain")" ]'
+# A long inline body stays fast: the hook reads each command before it runs.
+row="| \`hooks/no-default-push\` | it's a table row; with a & b, \$x and a \\\\ backslash | yes |"
+body=""
+for ((k = 0; k < 250; k++)); do body+="$row"$'\n'; done
+long="gh pr create --title \"feat: x\" --body \"$body\" --draft"
+start=$SECONDS
+long_decision=$(decision "$tmp/feat" "$long")
+elapsed=$((SECONDS - start))
+check "a ${#long}-character pull request body asks before a draft pull request, in ${elapsed}s (under 3s)" \
+  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 3 ]'
+
+# gh flags before or after pr, such as -R or --repo with its value, are skipped.
+while IFS= read -r cmd; do
+  check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+done <<'ASK'
+gh -R o/r pr create --draft
+gh --repo o/r pr create -d
+gh pr -R o/r create --draft
+gh pr --repo o/r create -d
+ASK
+check "with uncommitted changes asks before: gh --repo=o/r pr create --fill" '[ "$(decision "$tmp/edited" "gh --repo=o/r pr create --fill")" = ask ]'
+check "with uncommitted changes leaves alone: gh -R o/r pr view" '[ -z "$(decision "$tmp/edited" "gh -R o/r pr view")" ]'
+check "with uncommitted changes leaves alone: gh pr -R o/r view" '[ -z "$(decision "$tmp/edited" "gh pr -R o/r view")" ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }
