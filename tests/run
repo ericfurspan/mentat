@@ -116,6 +116,7 @@ phrase_check skills/pr/SKILL.md "the alert type judged by the second sentence al
 phrase_check skills/pr/SKILL.md "the caution alert for a step after the merge" "\`[!CAUTION]\` when that sentence is a risky or irreversible step after the merge"
 phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it from the backlog item's opening sentence or the issue, never a guess"
 phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
+phrase_check skills/pr/SKILL.md "the update of an older body's Checks and missing Summary heading" "rename its \`<summary>Checks</summary>\` to \`<summary>Verification</summary>\` and add the \`## Summary\` heading"
 phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
 phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'it also says where the work came from'
 for s in 'Look here first' 'Not in scope'; do

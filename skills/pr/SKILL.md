@@ -10,7 +10,7 @@ The body has two readers: the maintainer, who reads the top first (the state, wh
 2. Use the repository's pull request template if it has one, adding any part below that it lacks; otherwise the template below. Where the repository has a `GLOSSARY.md`, use its terms.
 3. The note's first sentence states the change's intent for the maintainer, the sentence Codex and Grok (or Claude, with Codex off) compare their own against. If you cannot state it in one sentence, ask the maintainer before opening the pull request.
 4. Every claim matches the diff on the head commit. After every push, rewrite the status line for the new head commit; when the push changes what the diff does, update the rest of the body too.
-5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer written on the pull request (`rules.md`, "What goes to the maintainer") goes directly under `## Summary`, above the status line.
+5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. When updating a body written in the older shape, rename its `<summary>Checks</summary>` to `<summary>Verification</summary>` and add the `## Summary` heading above the status line. A wait on the maintainer written on the pull request (`rules.md`, "What goes to the maintainer") goes first in the body, above `## Summary`.
 
 ```markdown
 ## Summary
