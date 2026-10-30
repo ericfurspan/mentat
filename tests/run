@@ -55,6 +55,7 @@ fast_track_check() {
 fast_track_check "check of the complete final diff" 'check the complete final diff'
 fast_track_check "status line" 'Not reviewed: fast track agreed by the maintainer'
 fast_track_check "record in the spec" 'one line in the spec, written when it was agreed'
+fast_track_check "skipped reviewers, Claude included with Codex off" 'names every reviewer skipped, Codex and Grok, and Claude when Codex is off'
 
 # An open hand check blocks "You: merge #N." (the review and Claude-only skills), and a push after Ready
 # skips its review round only on the maintainer's yes, for a diff that changes no file a program runs.
@@ -111,6 +112,8 @@ else
 fi
 phrase_check skills/pr/SKILL.md "the note's two-sentence cap" 'The note in the alert has at most two sentences'
 phrase_check skills/pr/SKILL.md "the order for the note's second sentence" 'carries the single sharpest item, in this order'
+phrase_check skills/pr/SKILL.md "the alert type judged by the second sentence alone" "The alert's type is the most serious that applies to the second sentence alone"
+phrase_check skills/pr/SKILL.md "the caution alert for a step after the merge" "\`[!CAUTION]\` when that sentence is a risky or irreversible step after the merge"
 phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it from the backlog item's opening sentence or the issue, never a guess"
 phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
 phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
