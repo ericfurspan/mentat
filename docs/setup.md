@@ -8,7 +8,7 @@ What a machine needs for Mentat to run, and the plugin commands.
 
 - macOS only, with Claude Code, `git`, `jq`, and `gh` signed in.
 - Required for reviews: the Codex CLI signed in. `mentat challenge` and `mentat weigh` also use the CLI, and so does `mentat consult`.
-- Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node), as part of its sandbox. Anywhere else it cannot start, so no review runs.
+- Codex installed under `/opt/homebrew` or `/usr/local` (Homebrew, or npm with a system or Homebrew node), as part of its sandbox. Anywhere else Codex's own runs (its reviews, and its part of `mentat challenge`, `mentat weigh` and `mentat consult`) cannot start; Grok's review, `mentat ci` and Claude-only mode still run.
 - Codex's effort is fixed at high.
 - Optional: Grok Build (`grok`) adds a second review of each pull request's first head (`mentat review --grok`) and a second view in `mentat weigh` and `mentat consult`. It runs only on your own sign-in (`grok login`) and does not use an API key from the environment.
 - A separate GitHub account for the agent, where the repository requires an approval.
