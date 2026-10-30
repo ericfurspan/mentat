@@ -175,7 +175,16 @@ phrase_check rules.md "the next step's one sentence before the links" 'it ends, 
 phrase_check rules.md "the next step from what is known, without searching" 'from what Claude Code already knows without searching'
 phrase_check rules.md "the next step's first choice, not work that runs on its own" 'the next agreed item that needs them (not work that runs on its own)'
 phrase_check rules.md "the next step's second choice" 'one backlog item or a follow-up noticed in this work'
-phrase_check rules.md "the next step proposed, not filed or started" 'proposed and not filed or started'
+phrase_check rules.md "the next step's item linked on the last line" 'with why, its link on the last line'
+# An unasked follow-up is filed in the record, not left in chat; a one-line tweak needs no item.
+phrase_check rules.md "an unasked follow-up filed as a not-agreed backlog item" 'A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item'
+phrase_check rules.md "a filed follow-up's decision label" "with the record's label for decisions where it has one"
+phrase_check rules.md "a one-line tweak raised in chat without an item" 'a one-line tweak may go in chat without an item'
+if grep -q -F 'not filed' rules.md; then
+  fail "rules.md must not leave a follow-up unfiled (found: not filed)"
+else
+  pass "rules.md does not leave a follow-up unfiled"
+fi
 phrase_check rules.md "the next step's last choice" 'else that there is nothing further to propose'
 phrase_check rules.md "the next step's exclusions" 'Answers, progress updates and replies a skill shapes are unchanged'
 phrase_check rules.md "the backlog bullet allowing the next step" 'apart from the next step after finished work'
