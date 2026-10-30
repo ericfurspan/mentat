@@ -102,13 +102,13 @@ phrase_check skills/review/SKILL.md "a maintainer's comment routed by the review
 phrase_check skills/review/SKILL.md "only the after-merge section deciding after the merge line" 'after "You: merge #N.", follow only "After "You: merge #N."", not step 4.'
 phrase_check skills/claude-review/SKILL.md "the pointer to the review skill's wake-up rules" "Handle a desktop app wake-up as \`mentat:review\`'s \"Auto-fix wake-ups\" section says"
 
-# A pull request body opens with the status line, a Why line (where the work came from, else "not recorded"),
-# a note of at most two sentences in an alert, then the folded Checks; "Look here first" and "Not in scope" are gone.
-if awk '/^\*\*<State>\.\*\*/ { a = NR } /^Why: </ { b = NR } /^> \[!<TYPE>\]$/ { c = NR } /^<summary>Checks<\/summary>$/ { d = NR }
-  END { exit !(a && a < b && b < c && c < d) }' skills/pr/SKILL.md; then
-  pass "skills/pr/SKILL.md's template puts the status line, the Why line, the alert, then Checks"
+# A pull request body opens with a Summary heading, the status line, a Why line (where the work came from, else "not recorded"),
+# a note of at most two sentences in an alert, then the folded Verification; "Look here first" and "Not in scope" are gone.
+if awk '/^## Summary$/ { s = NR } /^\*\*<State>\.\*\*/ { a = NR } /^Why: </ { b = NR } /^> \[!<TYPE>\]$/ { c = NR } /^<summary>Verification<\/summary>$/ { d = NR }
+  END { exit !(s && s < a && a < b && b < c && c < d) }' skills/pr/SKILL.md; then
+  pass "skills/pr/SKILL.md's template puts the Summary heading, the status line, the Why line, the alert, then Verification"
 else
-  fail "skills/pr/SKILL.md's template must put the status line, the Why line, the alert, then Checks, in that order"
+  fail "skills/pr/SKILL.md's template must put the Summary heading, the status line, the Why line, the alert, then Verification, in that order"
 fi
 phrase_check skills/pr/SKILL.md "the note's two-sentence cap" 'The note in the alert has at most two sentences'
 phrase_check skills/pr/SKILL.md "the order for the note's second sentence" 'carries the single sharpest item, in this order'
@@ -116,6 +116,7 @@ phrase_check skills/pr/SKILL.md "the alert type judged by the second sentence al
 phrase_check skills/pr/SKILL.md "the caution alert for a step after the merge" "\`[!CAUTION]\` when that sentence is a risky or irreversible step after the merge"
 phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it from the backlog item's opening sentence or the issue, never a guess"
 phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
+phrase_check skills/pr/SKILL.md "the update of an older body's Checks and missing Summary heading" "rename its \`<summary>Checks</summary>\` to \`<summary>Verification</summary>\` and add the \`## Summary\` heading"
 phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
 phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'it also says where the work came from'
 for s in 'Look here first' 'Not in scope'; do
