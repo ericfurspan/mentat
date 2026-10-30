@@ -49,4 +49,4 @@ The maintainer wants to see or change this repository's Mentat settings. They li
    gh issue close <N> --reason "not planned" --comment "Planning for this repository moved to its backlog outside GitHub on <date>; this issue's content lives there now. Pull requests stay on GitHub."
    ```
    The comment links nothing. Then set the switch item to Done, remove its wait block and label, clear the assignee if it is still the project's lead, and drop it from the project's order. From then on a pull request body here writes no `Closes #`. The held-back issues stay as they are.
-8. End with one line to the maintainer: what was set, and what waits on them (the merge, a decision about a listed issue, or nothing).
+8. End with one line to the maintainer saying what was set. A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt (`rules.md`).

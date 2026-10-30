@@ -199,6 +199,7 @@ phrase_check rules.md "a wait on the maintainer for agreed work only, a hand tes
 phrase_check rules.md "a wait named in chat in one sentence, not the first" "Chat names it in one plain sentence, not the reply's first, before the link"
 phrase_check rules.md "a merge or decision as no such wait" 'A merge or a decision is not such a wait: it keeps "You: merge #N." (and its waiting mark) or the decision prompt.'
 phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`rules.md\`'s merge exception does not remove it."
+phrase_check skills/setup/SKILL.md "step 8's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 phrase_check skills/backlog/SKILL.md "the waiting stage for agreed work only" 'an issue that is not agreed waits on no one'
 
