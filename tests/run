@@ -55,6 +55,7 @@ fast_track_check() {
 fast_track_check "check of the complete final diff" 'check the complete final diff'
 fast_track_check "status line" 'Not reviewed: fast track agreed by the maintainer'
 fast_track_check "record in the spec" 'one line in the spec, written when it was agreed'
+fast_track_check "skipped reviewers, Claude included with Codex off" 'names every reviewer skipped, Codex and Grok, and Claude when Codex is off'
 
 # An open hand check blocks "You: merge #N." (the review and Claude-only skills), and a push after Ready
 # skips its review round only on the maintainer's yes, for a diff that changes no file a program runs.
@@ -100,6 +101,32 @@ phrase_check skills/review/SKILL.md "the agent account's comments kept in the re
 phrase_check skills/review/SKILL.md "a maintainer's comment routed by the review path in use" "handled by the review path in use (this skill's Ready bullet and step 4, \`fast-track.md\` on a fast track, or \`mentat:claude-review\` with Codex off)"
 phrase_check skills/review/SKILL.md "only the after-merge section deciding after the merge line" 'after "You: merge #N.", follow only "After "You: merge #N."", not step 4.'
 phrase_check skills/claude-review/SKILL.md "the pointer to the review skill's wake-up rules" "Handle a desktop app wake-up as \`mentat:review\`'s \"Auto-fix wake-ups\" section says"
+
+# A pull request body opens with the status line, a Why line (where the work came from, else "not recorded"),
+# a note of at most two sentences in an alert, then the folded Checks; "Look here first" and "Not in scope" are gone.
+if awk '/^\*\*<State>\.\*\*/ { a = NR } /^Why: </ { b = NR } /^> \[!<TYPE>\]$/ { c = NR } /^<summary>Checks<\/summary>$/ { d = NR }
+  END { exit !(a && a < b && b < c && c < d) }' skills/pr/SKILL.md; then
+  pass "skills/pr/SKILL.md's template puts the status line, the Why line, the alert, then Checks"
+else
+  fail "skills/pr/SKILL.md's template must put the status line, the Why line, the alert, then Checks, in that order"
+fi
+phrase_check skills/pr/SKILL.md "the note's two-sentence cap" 'The note in the alert has at most two sentences'
+phrase_check skills/pr/SKILL.md "the order for the note's second sentence" 'carries the single sharpest item, in this order'
+phrase_check skills/pr/SKILL.md "the alert type judged by the second sentence alone" "The alert's type is the most serious that applies to the second sentence alone"
+phrase_check skills/pr/SKILL.md "the caution alert for a step after the merge" "\`[!CAUTION]\` when that sentence is a risky or irreversible step after the merge"
+phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it from the backlog item's opening sentence or the issue, never a guess"
+phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
+phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
+phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'it also says where the work came from'
+for s in 'Look here first' 'Not in scope'; do
+  found=$(git ls-files -z -- . ':!tests/run' | xargs -0 grep -l -I -F -- "$s")
+  if [ -z "$found" ]; then
+    pass "no tracked file gives \"$s\""
+  else
+    fail "tracked files still give \"$s\":"
+    printf '%s\n' "$found"
+  fi
+done
 
 # A grill asks one decision per prompt, always with a way to stop, and is offered at most once per request.
 phrase_check skills/grill/SKILL.md "one decision per prompt" "Ask one decision per \`AskUserQuestion\` prompt"
