@@ -68,7 +68,7 @@ phrase_check() {
   fi
 }
 phrase_check skills/review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
-phrase_check skills/review/SKILL.md "the open hand check's first step in chat" 'the chat reply opens with the first step'
+phrase_check skills/review/SKILL.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence, not its first'
 phrase_check skills/review/SKILL.md "the open hand check's no merge line" 'Then say no "You: merge #N."'
 phrase_check skills/claude-review/SKILL.md "the open hand check's stop before the merge line" 'step 6 does not run'
 phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" 'apply the hand check gate of'
@@ -195,7 +195,11 @@ phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 
 phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
 phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item and wait" 'what the item is (such as a bug, a proposal, a follow-up or a question), where it stands, and any wait on the maintainer (step 4)'
-phrase_check rules.md "a wait on the maintainer for agreed work only" 'When agreed work waits on a test or action'
+phrase_check rules.md "a wait on the maintainer for agreed work only, a hand test or setup step" 'When agreed work waits on a hand test or setup step only the maintainer can run'
+phrase_check rules.md "a wait named in chat in one sentence, not the first" "Chat names it in one plain sentence, not the reply's first, before the link"
+phrase_check rules.md "a merge or decision as no such wait" 'A merge or a decision is not such a wait: it keeps "You: merge #N." (and its waiting mark) or the decision prompt.'
+phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`rules.md\`'s merge exception does not remove it."
+phrase_check skills/setup/SKILL.md "step 8's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 phrase_check skills/backlog/SKILL.md "the waiting stage for agreed work only" 'an issue that is not agreed waits on no one'
 
