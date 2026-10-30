@@ -268,7 +268,7 @@ cd "$tmp/my feat" && gh pr create --fill
 ASK
 check "from a checkout with changes leaves alone: cd .. && git -C feat push" '[ -z "$(decision "$tmp/edited" "cd .. && git -C feat push")" ]'
 check "a cd - with no previous directory goes back to the session cwd" '[ "$(decision "$tmp/edited" "cd - && git push")" = ask ]'
-check "a cd - goes back to the previous directory" '[ "$(decision "$tmp/repo" "cd ../feat && tests/run && cd - && git push")" = ask ]'
+check "a cd - goes back to the previous directory" '[ "$(decision "$tmp/feat" "cd ../edited && cd ../feat && tests/run && cd - && git push")" = ask ]'
 check "a cd - swaps with the previous directory" '[ "$(decision "$tmp/feat" "cd ../edited && cd ../feat && cd - && git push")" = ask ]'
 check "a cd -- <dir> goes to the directory" '[ "$(decision "$tmp/feat" "cd -- ../edited && git push")" = ask ]'
 check "a cd in a subshell applies inside it" '[ "$(decision "$tmp/feat" "(cd ../edited && git push)")" = ask ]'
