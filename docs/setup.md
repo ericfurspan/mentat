@@ -37,7 +37,7 @@ The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on
 
 ## Per-repository settings
 
-Three settings are prose in the repository's AGENTS.md, with no config file: the backlog (a named external one, else GitHub issues), the test command, and a `## Code Review Rules` section. Claude Code states them in one line when change work starts in a repository. `/mentat:setup` shows them and sets the ones you pick, in one pull request; it can also move a repository's planning from GitHub issues to a Linear project, migrating the open issues.
+Three settings are prose in the repository's AGENTS.md, with no config file: the backlog (a named external one, else GitHub issues), the test command, and a `## Code Review Rules` section. `/mentat:setup` shows them and sets the ones you pick, in one pull request; it can also move a repository's planning from GitHub issues to a Linear project, migrating the open issues.
 
 In a repository with a Linear backlog, branch names carry the item key (for example `feat/abc-26-branch-key`), so Linear's GitHub integration links each pull request to its item. For this to be safe, set the integration's "Comments in GitHub" to post without issue descriptions, and turn it off for public repositories, since an item's description can hold a wait block with steps for the maintainer.
 

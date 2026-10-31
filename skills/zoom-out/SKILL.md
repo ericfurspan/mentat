@@ -7,7 +7,7 @@ disable-model-invocation: true
 The maintainer wants the whole picture, not the task in hand. This runs once: do it, then normal work resumes. If the maintainer typed text after the command, focus the zoom-out on that.
 
 1. Finish the step in flight first. Never interrupt a running builder, review or test run. Then change nothing during the zoom-out: no edits, no commits, no GitHub writes. Reading is fine.
-2. Read the backlog. Where the repository has an external backlog, read it through `mentat:backlog`: its order of agreed work and open items. Otherwise read the repository's pinned order issue if there is one: find it with `gh issue list --state open --limit 100 --json number,title,isPinned` (the pinned one has `isPinned: true`), then `gh issue view` it, and read the other open issues too. Open pull requests are read from GitHub either way (`gh pr list --limit 100`). Then read everything the maintainer said in this session.
+2. Read the backlog. Where the repository has an external backlog, read it through `mentat:backlog`: its order of agreed work and open items. Otherwise read the repository's pinned order issue if there is one, and the other open issues too. Open pull requests are read from GitHub either way. Then read everything the maintainer said in this session.
 3. Reply once, in about 250 words. This skill sets the reply's shape while it runs. If it runs long, shorten the other parts, never the list of unanswered asks. Use these parts, in this order:
    - The goal, as the opening paragraph of `rules.md` gives it, plus anything the maintainer said this session that differs from it, in their own words.
    - What is done this session.

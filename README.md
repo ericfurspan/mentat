@@ -20,14 +20,14 @@ Mentat is one maintainer's published workflow, not a product for others. It is a
 1. A request in chat or a backlog item. Claude Code reads the code and gives its view; for a new feature or a workflow change, Codex and Grok weigh it too (`mentat weigh`). The maintainer agrees on what gets built.
 2. A builder subagent makes the change, or a batch of changes the maintainer agreed to, on its own branch and runs the test command; the chat shows plans and reports, not diffs.
 3. Claude Code opens a pull request; its description opens with a `## Summary` heading, then a status line, a `Why:` line saying where the work came from, and a note of at most two sentences: what the change does, then the one thing to read before merging, when there is one. `mentat review` waits for CI, then Codex reviews the head commit, and Grok the first one. If Grok cannot run, for example because it is not signed in, Codex carries on and the description says why; nothing stops for it. Findings with a realistic trigger are fixed, the rest answered with a reason, for at most five rounds. This outside review is the normal path, with three exceptions, each the maintainer's call: a fast track lets a typo-level change skip both reviews, a waived push skips the round for a push after Ready that changes no file a program runs, and Claude-only mode (`/mentat:claude-review`) replaces both with one Claude review.
-4. Claude Code checks the diff against the description and the spec, marks the status line Ready and reports it as "You: merge #N." with at most one more sentence; a hand check still open blocks it instead, with its steps at the top of the backlog item or pull request and one sentence in chat. Chat names work in plain words and puts links on a message's last line, so the pull request's link ends the report.
+4. Claude Code checks the diff against the description and the spec, marks the status line Ready and reports it as "You: merge #N." with at most one more sentence; a hand check still open blocks it instead, with its steps at the top of the backlog item or pull request and one sentence in chat.
 5. The maintainer merges. Hooks ask before risky git commands: a merge, a push to the default branch, a force push, or a push or pull request with uncommitted changes. They catch mistakes and are not a security boundary.
 
 The agreed text has the shape of a spec, and each requirement is traced to its evidence; [spec-driven development](docs/spec-driven.md) maps the steps to that practice.
 
 [How it works](docs/how-it-works.md) has the full flow.
 
-Mentat is built with Mentat. Pull requests here are opened by the agent account `ericfurspan-agent` under this workflow and merged by the maintainer; that account cannot approve its own pull requests. The [merged pull requests](https://github.com/ericfurspan/mentat/pulls?q=is%3Apr+is%3Amerged) show the flow as it ran.
+Mentat is built with Mentat. Pull requests here are opened by an agent account under this workflow and merged by the maintainer; that account cannot approve its own pull requests. The [merged pull requests](https://github.com/ericfurspan/mentat/pulls?q=is%3Apr+is%3Amerged) show the flow as it ran.
 
 ## Requirements
 
