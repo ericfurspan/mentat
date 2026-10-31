@@ -89,7 +89,7 @@ while [ -z "$repo" ] && [[ $rest =~ $re ]]; do
   case "$w" in *\; | *\& | *\|) api="" ;; esac
 done
 
-# The files it reads replace their names. gh api's -F names a file as field=@file.
+# The files it reads replace their names. gh api's -F or --field names a file as field=@file.
 re="(--body-file|--notes-file|--field|-F)(=|[[:space:]]+)$word"
 files=""
 while IFS= read -r flag; do
