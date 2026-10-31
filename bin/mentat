@@ -4,7 +4,8 @@
 #     with local Codex and posts the result. 0 no findings, 2 findings posted (link
 #     printed), 1 not reviewed (error, incomplete review or no result in time), 3 the head
 #     moved, 4 CI did not pass on the head (failing checks printed; nothing reviewed).
-#     `mentat review --local <PR>` is the same.
+#     `mentat review --local <PR>` is the same. A comment that holds a local path or a
+#     private name, in a public repository, is kept in a local file and not posted (exit 1).
 #   mentat review --grok <PR>  Waits for CI the same way, then reviews the pull
 #     request's head with Grok, if installed, and posts the result. Same exit codes.
 #     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
@@ -38,8 +39,8 @@
 #     alone; its local fetch tool is denied.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
 #     gh signed in, the repository readable; prints the codex and grok versions, and warns
-#     when the repository keeps head branches after merge. 0 Mentat can work (warnings
-#     printed), 1 it cannot.
+#     when the repository keeps head branches after merge or the private word list is
+#     missing or unreadable. 0 Mentat can work (warnings printed), 1 it cannot.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -51,7 +52,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared codex grok parallel weigh consult check status; do
+for lib in shared publish codex grok parallel weigh consult check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1

@@ -15,6 +15,12 @@ mkdir -p "$HOME/.cache" || { echo "FAIL: review --grok: cannot create $HOME/.cac
 cache=$(mktemp -d "$HOME/.cache/mentat-test.XXXXXX") || { echo "FAIL: review --grok: cannot create a folder under $HOME/.cache"; exit 1; }
 cleanup() { rm -rf "$root" "$cache"; }
 trap cleanup EXIT
+# A temporary home beside the run folders: the publish check reads the home path and
+# the word list from it. Only the real Grok of the live check keeps the real home.
+real_home=$HOME
+export HOME="$cache/home"
+LIST="$HOME/.config/mentat/private-words"
+mkdir -p "$(dirname "$LIST")"
 export STUB="$root/stub"
 mkdir -p "$STUB" "$root/bin" "$root/tmp"
 failures=0
@@ -64,7 +70,11 @@ case "$1 $2" in
       *--jq*) echo "$h" ;;
       *) jq -n --arg h "$h" --argjson c "$(cat "$STUB/closes" 2>/dev/null || echo '[]')" '{headRefOid: $h, baseRefName: "main", title: "Change README", body: "Requirement: README says change.", closingIssuesReferences: $c}' ;;
     esac ;;
-  "repo view") echo owner/repo ;;
+  "repo view")
+    case "$*" in
+      *isPrivate*) [ -f "$STUB/lookup_fails" ] && exit 1; if [ -f "$STUB/private" ]; then echo true; else echo false; fi ;;
+      *) echo owner/repo ;;
+    esac ;;
   "issue view")
     r=$5; f="$STUB/issue_${r/\//_}_$3"
     [ "$4" = --repo ] && [ -f "$f" ] || exit 1
@@ -99,7 +109,7 @@ STUBEOF
 # $STUB/out_json (stdout) and $STUB/exit_code. In live mode it hands over to the
 # real Grok instead, without the sign-in, and keeps the sandbox event.
 # (mentat starts it with an empty environment, so its own path is written in.)
-{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/grok" <<'STUBEOF'
+{ printf '#!/usr/bin/env bash\nSTUB=%q\nREAL_HOME=%q\n' "$STUB" "$real_home"; cat; } >"$root/bin/grok" <<'STUBEOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
 if [ "${1:-}" = models ]; then
   printf '%s\n' "$@" >"$STUB/args_models"
@@ -131,7 +141,7 @@ ls -A "$(dirname "$prompt")" >"$STUB/prompt_dir"
 cp -R . "$STUB/export_copy"
 if [ -f "$STUB/live" ]; then
   rm -f "$GROK_HOME/auth.json"
-  "$(cat "$STUB/live")" "${args[@]}" >"$STUB/live_out" 2>"$STUB/live_err" </dev/null
+  HOME=$REAL_HOME "$(cat "$STUB/live")" "${args[@]}" >"$STUB/live_out" 2>"$STUB/live_err" </dev/null
   rc=$?
   cp "$GROK_HOME/sessions/sandbox-events.jsonl" "$STUB/sandbox-events.jsonl" 2>/dev/null
   exit "$rc"
@@ -355,6 +365,35 @@ reset; rc=$(cd "$root/work tree" && MENTAT_REVIEW_TIMEOUT_SECONDS=0 "$mentat" re
 check "the Codex review timeout does not limit Grok" '[ "$rc" = 0 ]'
 reset; touch "$STUB/result_fails"; rc=$(run)
 not_finished "a failed post of the review" "could not post the review"
+
+# The publish check, on each comment, right before its post.
+held_file() { sed -n 's/.*the maintainer can read it at \([^;]*\).*/\1/p' "$STUB/out"; }
+says_held() { # $1 category, $2 the match: named the category and a file holding the match, and did not repeat it
+  grep -q "not reviewed: .*the comment holds $1, so it was not posted" "$STUB/out" && grep -qiF -- "$2" "$(held_file)" && ! grep -qiF -- "$2" "$STUB/out"
+}
+printf '# a comment\n\nStubCodename\nreview started on\ndid not finish on\n' >"$LIST"
+reset; rc=$(run)
+check "a start comment with a hit is not posted, is kept, and Grok does not run" '[ "$rc" = 1 ] && [ "$(comments)" = 0 ] && ! grok_ran && says_held "a configured private name" "review started on" && [ "$(cat "$(held_file)")" = "Grok review started on $H" ]'
+printf '# a comment\n\nStubCodename\ndid not finish on\n' >"$LIST"
+reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a failure comment with a hit is skipped, with no second try, and the review exits as not reviewed" '[ "$rc" = 1 ] && [ "$(comments)" = 1 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "not reviewed: the review was held back and not posted" "$STUB/out" && [ -z "$(left_over)" ]'
+printf '# a comment\n\nStubCodename\n' >"$LIST"
+reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a review with a word from the list is not posted, is kept whole, and the pull request says it did not finish" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && says_held "a configured private name" stubcodename && grep -q "^## Local Grok review of $H" "$(held_file)" && [ "$(cat "$STUB/comment.2")" = "Grok review did not finish on $H: the review was held back and not posted" ]'
+reset; reply "$(printf -- '- P3 at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOME")"; rc=$(run)
+check "a review with the home path is the same" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && says_held "a local path" "$HOME" && ! grep -qF "$HOME" "$STUB/comment.2"'
+reset; touch "$STUB/lookup_fails"; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a failed visibility lookup counts as public" '[ "$rc" = 1 ] && says_held "a configured private name" stubcodename && ! grep -rq stubcodename "$STUB"/comment.*'
+reset; touch "$STUB/private"; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a private repository's review is posted" '[ "$rc" = 2 ] && grep -q "about stubcodename" "$STUB/comment.2"'
+check "a hit looks up the reviewed repository" 'grep -qF "repo view owner/repo --json isPrivate" "$STUB/calls"'
+reset; rc=$(run)
+check "no hit: posts, with no visibility lookup" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && ! grep -q isPrivate "$STUB/calls"'
+rm "$LIST"
+reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a missing word list never blocks" '[ "$rc" = 2 ] && grep -q "about stubcodename" "$STUB/comment.2"'
+reset; reply "$(printf -- '- P3 at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOME")"; rc=$(run)
+check "with a missing word list the home path is still found" '[ "$rc" = 1 ] && says_held "a local path" "$HOME"'
 
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
 check "a head that moves during the review does not lose it: the review is posted for the commit Grok reviewed (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && heading "no findings" none && fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -q "Change reviewed:" && [ -z "$(left_over)" ]'

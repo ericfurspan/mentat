@@ -32,6 +32,9 @@ check() {
     v=$(grok --version 2>/dev/null | head -n 1)
     c_ok "grok is installed (${v:-version unknown})"
   fi
+  # The publish check still looks for the home path without the list.
+  if [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"
+  else c_warn "the private word list ~/.config/mentat/private-words is missing or unreadable: the publish check looks only for the home path"; fi
   # Exit status only: gh auth status can print token details.
   if gh auth status >/dev/null 2>&1; then c_ok "gh is signed in"; else c_problem "gh is not signed in (run gh auth login)"; c_finish; fi
   repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || repo=""

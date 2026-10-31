@@ -132,7 +132,7 @@ review_local() {
     review_result_line
   } >"$tmp/prompt" || not_reviewed "could not write the prompt"
 
-  local out="$tmp/review.md" result url
+  local out="$tmp/review.md" result url held
   run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled
   localize_review_paths "$out" "$repo" "$head" "$tmp/tree" || not_reviewed "could not rewrite the paths in Codex's reply"
   result=$(last_line "$out")
@@ -153,6 +153,7 @@ review_local() {
     cat "$out"
     printf '\n</details>\n\n%s\n' "$result"
   } >"$tmp/comment" || not_reviewed "could not write the comment"
+  if held=$(held_comment "$(cat "$tmp/comment")" "$repo"); then not_reviewed "$held"; fi
   url=$(gh pr comment "$pr" --body-file "$tmp/comment") || not_reviewed "could not post the review on #$pr"
   # An incomplete review is posted, so its reason is on the pull request, and is not a review.
   case "$result" in "REVIEW RESULT: INCOMPLETE - "*) not_reviewed "Codex says the review is incomplete: ${result#"REVIEW RESULT: INCOMPLETE - "}" ;; esac

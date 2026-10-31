@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# PreToolUse hook: GitHub text an agent is about to publish in a public repository
+# gets a permission prompt when it holds a local path or a private name
+# (lib/publish.sh). It looks at gh pr create, pr edit, pr comment, pr review, issue
+# create, issue edit, issue comment and gh api writes: the command text, and files
+# named by --body-file, -F, --field or --notes-file. A leading cd and the name of a
+# file it reads are not published, so they are not looked at, except a name past $( or
+# << or outside a gh command. With several gh commands, it asks if any target is public.
+# The prompt gives the category, never the match, and approving it clears a false
+# alarm. This is a net for mistakes, not a security boundary: other routes exist. When
+# it cannot read its input or its tools are missing, it stays out of the way.
+# shellcheck disable=SC2016,SC2088 # ~/ and $HOME below are literal command text.
+set -uo pipefail
+
+command -v jq >/dev/null 2>&1 || exit 0
+command -v gh >/dev/null 2>&1 || exit 0
+input=$(cat)
+tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
+[ "$tool" = Bash ] || exit 0
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
+case "$cmd" in *gh*) ;; *) exit 0 ;; esac
+
+# gh api with a write method, or with fields, which gh sends as a POST unless the walk
+# below finds a real GET.
+gh_api='(^|[^[:alnum:]_.-])gh[[:space:]]+api([[:space:]]|$)'
+api_write() {
+  grep -Eq "$gh_api" <<<"$cmd" || return 1
+  grep -Eiq '(^|[[:space:]])(-X|--method)[=[:space:]]*["'"'"']?(POST|PUT|PATCH|DELETE)' <<<"$cmd"
+}
+api_fields() {
+  grep -Eq "$gh_api" <<<"$cmd" || return 1
+  grep -Eq '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([=[:space:]]|$)' <<<"$cmd"
+}
+# Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr comment.
+flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
+forms="(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+(pr${flags}[[:space:]]+(create|edit|comment|review)|issue${flags}[[:space:]]+(create|edit|comment))([[:space:]]|\$)"
+fields_only=""
+if ! grep -Eq "$forms" <<<"$cmd" && ! api_write; then
+  api_fields || exit 0
+  fields_only=1
+fi
+
+# shellcheck source=/dev/null
+. "$(dirname "$0")/../lib/publish.sh" || exit 0
+
+cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || exit 0
+[ -z "$cwd" ] || cd "$cwd" 2>/dev/null || exit 0
+
+# A word of the command with its quotes off, and ~/ or $HOME/ at its start expanded.
+word='("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:];&|)]+)'
+plain() {
+  v=${1#[\"\']}; v=${v%[\"\']}
+  case "$v" in '~/'*) v=$HOME/${v#\~/} ;; '$HOME/'*) v=$HOME/${v#\$HOME/} ;; esac
+}
+
+text=$cmd
+re="^[[:space:]]*cd[[:space:]]+${word}[[:space:]]*(&&|;)"
+if [[ $text =~ $re ]]; then
+  text=${text#"${BASH_REMATCH[0]}"}
+  plain "${BASH_REMATCH[1]}"
+  cd "$v" 2>/dev/null || true
+fi
+
+# Reads the file a word names, if it is one. gh api's -F or --field names it as field=@file.
+files=""
+read_file() {
+  plain "$1"
+  f=${v##*=@}
+  { [ -f "$f" ] && [ -r "$f" ]; } || return 1
+  files+=$'\n'$(cat "$f")
+}
+set_repo() { plain "$1"; [ -n "$repo" ] || repo=$v; }
+set_method() { plain "$1"; case "$v" in [Gg][Ee][Tt]) is_get=1 ;; esac; }
+keep() { kept+=$held$m; held=""; }
+end_command() {
+  [ -z "$in_api" ] || [ -n "$is_get" ] || unread_api=1
+  if [ -n "$in_gh" ]; then
+    case "$targets" in *$'\n'"$repo"$'\n'*) ;; *) targets+=$repo$'\n' ;; esac
+  fi
+  prev="" in_gh="" in_api="" api="" is_get="" next="" repo=""
+}
+
+# A walk over gh's real arguments, never a body: each command's target (the first it
+# names; empty is the checkout's), a GET for each gh api command, and the files it
+# reads, which replace their names in the checked text. Words cannot be told apart past
+# $( or <<, or a << before gh; that text goes to past, with any word outside a gh command.
+repo="" targets=$'\n' unread_api="" kept="" past="" held=""
+arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
+re="^[[:space:]]*($arg|[;&|)]+)"
+api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
+rest=$text prev="" in_gh="" in_api="" api="" is_get="" next=""
+while [[ $rest =~ $re ]]; do
+  m=${BASH_REMATCH[0]} w=${BASH_REMATCH[1]}
+  rest=${rest:${#m}}
+  case "$w" in
+    $'\\\n') held+=$m; continue ;;
+    *'<<'*) rest=$m$rest; break ;;
+  esac
+  case "${m%"$w"}" in *$'\n'*) end_command ;; esac
+  case "$w" in [\;\&\|\)]*) end_command; keep; continue ;; esac
+  if [ -z "$in_gh" ] && [ "$w" != gh ]; then past+=$m; keep; continue; fi
+  case "$w" in *'$('*) rest=$m$rest; break ;; esac
+  in_gh=1
+  value=$next next=""
+  case "$value" in
+    repo) set_repo "$w"; keep; continue ;;
+    method) set_method "$w"; keep; continue ;;
+    file)
+      if read_file "$w"; then held=""; else keep; fi
+      continue
+      ;;
+  esac
+  case "$w" in
+    -R | --repo) next=repo ;;
+    --repo=* | -R=*) set_repo "${w#*=}" ;;
+    -X | --method) next=method ;;
+    -X* | --method=*) v=${w#--method=}; v=${v#-X}; set_method "${v#=}" ;;
+    --body-file | --notes-file | --field | -F) next="file"; held+=$m; continue ;;
+    --body-file=* | --notes-file=* | --field=* | -F=*) if read_file "${w#*=}"; then continue; fi ;;
+  esac
+  keep
+  if [ "$prev" = gh ] && [ "$w" = api ]; then in_api=1 api=1; fi
+  prev=$w
+  [ -n "$api" ] || continue
+  # gh api's path, up to the end of that command. A path with placeholders is the checkout's.
+  plain "$w"
+  case "$v" in
+    repos/* | /repos/*)
+      api=""
+      if [ -z "$repo" ] && [[ $v =~ $api_re ]]; then repo=${BASH_REMATCH[1]}; fi
+      ;;
+  esac
+done
+end_command
+kept+=$held$rest past+=$rest
+
+# Fields go out as a POST unless each gh api command has a real GET.
+if [ -n "$fields_only" ] && [ -z "$unread_api" ] && ! grep -Eq "$gh_api" <<<"$past"; then exit 0; fi
+
+# A real flag may sit in past: its file is read too, and nothing leaves the text.
+re="(--body-file|--notes-file|--field|-F)(=|[[:space:]]+)$word"
+while IFS= read -r flag; do
+  if [[ $flag =~ $re ]]; then read_file "${BASH_REMATCH[3]}"; fi
+done <<<"$(grep -Eo -- "(^|[[:space:]])$re" <<<"$past")"
+
+# A hit asks if any target is public. With no gh command walked, the target is the checkout.
+[ "$targets" != $'\n' ] || targets+=$'\n'
+targets=${targets#$'\n'}
+hit=""
+while IFS= read -r t; do
+  hit=$(publish_hit "$kept$files" "$t") && break
+done <<<"${targets%$'\n'}"
+[ -n "$hit" ] || exit 0
+jq -n --arg r "Mentat: this text for a public repository holds $hit. Approve only if it is meant to be public." \
+  '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
+exit 0
