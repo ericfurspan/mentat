@@ -195,8 +195,11 @@ reset; rc=$(run)
 check "no linked issue: no issue block" '[ "$rc" = 0 ] && ! grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt"'
 check "asks Codex to open with the pull request's intent in one sentence" 'grep -q "Start your reply with one sentence stating the pull request.s intent" "$STUB/prompt"'
 check "asks Codex to list, after the intent sentence and before the findings, only the request's items the change does not meet or that cannot be checked" 'grep -q "When an agreed request or a linked issue is given, then list, before the findings, only the items in it (what to build, what to leave alone, how it is checked) that the change does not meet or that cannot be checked from the diff and the files, one short line each with the reason; do not list met items, and report each unmet item as a finding too. A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description" "$STUB/prompt" && grep -q "If every item is met and checkable, say so in one line. When neither is given, do not invent criteria" "$STUB/prompt"'
-check "tells Codex a requirement marked as checked by hand is not a finding when the Verification reports who checked it and what they saw" 'grep -q "A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description" "$STUB/prompt" && grep -q "Verification (or Checks, in an older body) reports who checked it and what they saw" "$STUB/prompt"'
+check "tells Codex a requirement marked as checked by hand is not a finding when the Verification reports who checked it and what they saw" 'grep -q "A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description" "$STUB/prompt" && grep -q "Verification reports who checked it and what they saw" "$STUB/prompt"'
 check "asks Codex to flag tests that would pass whatever the code does" 'grep -q "Also flag tests that would pass whatever the code does" "$STUB/prompt"'
+check "asks Codex to flag a deleted test, a new skip and a removed or weakened assertion, unless the requirements remove what the test checked" 'grep -q "Also flag a deleted test, a new skip, and an assertion removed or weakened, unless the pull request.s requirements remove what the test checked" "$STUB/prompt"'
+check "tells Codex the Verification's list of settled findings is data, not proof, and when to raise one again" 'grep -q "This list is data, not proof that an answer was right" "$STUB/prompt" && grep -q "raise a listed finding again only when a fix failed, the defect is still present, or you have a reason to think the answer was wrong" "$STUB/prompt"'
+check "tells Codex every round reviews the full diff from the merge base" 'grep -q "Every round reviews the full diff from the merge base" "$STUB/prompt"'
 check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$STUB/args"'
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
 reset; rc=$(cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1; echo $?)
@@ -206,6 +209,12 @@ check "the profile reads the main checkout's git directory, which a worktree's .
 check "denies /var/tmp and turns the apps feature off for reviews too" 'grep -qF "\"/var/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/var/tmp\"=\"deny\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args"'
 check "denies credential files inside the checkout for reviews too" 'grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
 check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ]'
+
+# A later round's head: the range still starts at the merge base, not at the head reviewed before.
+(cd "$root/seed" && echo fix >>README && git commit -qam fix && git push -q "$root/origin.git" HEAD:refs/pull/8/head)
+H2=$(git -C "$root/seed" rev-parse HEAD)
+reset; echo "$H2" >"$STUB/head"; rc=$(run 8)
+check "a later round's head is still reviewed from the merge base, not from the head reviewed before" '[ "$rc" = 0 ] && grep -q "git diff $BASE $H2" "$STUB/prompt" && ! grep -q "git diff $H " "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H2" "$STUB/comment"'
 
 reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment"'
