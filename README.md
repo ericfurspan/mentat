@@ -32,7 +32,7 @@ Mentat is built with Mentat. Pull requests here are opened by the agent account 
 ## Requirements
 
 - macOS only, with Claude Code, `git`, `jq`, and `gh` signed in.
-- Required for reviews: the Codex CLI signed in and installed under `/opt/homebrew` or `/usr/local`, as part of its sandbox. Elsewhere Codex's own runs (its reviews, and its part of `mentat challenge`, `mentat weigh` and `mentat consult`) cannot start; Grok's review, `mentat ci` and Claude-only mode still run. Its effort is fixed at high.
+- Required for reviews: the Codex CLI signed in and installed under `/opt/homebrew` or `/usr/local`, as part of its sandbox. Elsewhere Codex's own runs (its reviews, and its part of `mentat challenge`, `mentat weigh` and `mentat consult`) cannot start; Grok's review, `mentat ci` and Claude-only mode still run. Codex's effort is fixed at high.
 - Optional: Grok Build (`grok`), for a second review and a second view in `mentat weigh`. It runs only on your own sign-in (`grok login`) and does not use an API key from the environment.
 
 ## Install
