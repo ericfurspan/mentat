@@ -24,7 +24,7 @@ The reference the other pages match.
 |---|---|---|---|
 | Gives a view of a request | Claude Code | every request | chat |
 | Requests a change, decides what gets built and agrees on the plan | the maintainer | every change | chat or an issue |
-| Weighs an idea | Codex and Grok, in parallel | a new feature or workflow change, before the maintainer agrees | `mentat weigh` |
+| Weighs an idea | Codex and Grok, in parallel | every request past a small, clear one, before the maintainer agrees | `mentat weigh` |
 | Challenges a plan | Codex | an uncertain or consequential plan, after agreement and before the build | `mentat challenge`, through `skills/plan` |
 | Builds and runs the test command | the builder subagent | every change and every review fix | one branch, one checkout |
 | Runs the test command again, on a clean tree | Claude Code | before every push | the repository's test command |

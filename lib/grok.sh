@@ -209,7 +209,7 @@ grok_export_head() {
   GIT_INDEX_FILE="$run/index" git -C "$top" checkout-index -a -q --prefix="$run/export/" || "$fail" "could not export $head"
 }
 
-# Grok's own part of a pull request review, a trial that Codex's prompt, weigh and
+# Grok's own part of a pull request review, which Codex's prompt, weigh and
 # consult do not get: after the request, a step back to whether this is the right change.
 grok_step_back() {
   printf 'After judging the change against the request, step back and consider whether this is the right change for its intent: '
