@@ -4,10 +4,11 @@
 # (lib/publish.sh). It looks at gh pr create, pr edit, pr comment, pr review, issue
 # create, issue edit, issue comment and gh api writes: the command text, and files
 # named by --body-file, -F, --field or --notes-file. A leading cd and the name of a
-# file it reads are not published, so they are not looked at. The prompt gives the
-# category, never the match, and approving it clears a false alarm. This is a net for
-# mistakes, not a security boundary: other routes exist. When it cannot read its input
-# or its tools are missing, it stays out of the way.
+# file it reads are not published, so they are not looked at, except a name past $( or
+# << or outside a gh command. With several gh commands, it asks if any target is public.
+# The prompt gives the category, never the match, and approving it clears a false
+# alarm. This is a net for mistakes, not a security boundary: other routes exist. When
+# it cannot read its input or its tools are missing, it stays out of the way.
 # shellcheck disable=SC2016,SC2088 # ~/ and $HOME below are literal command text.
 set -uo pipefail
 
@@ -73,14 +74,17 @@ set_method() { plain "$1"; case "$v" in [Gg][Ee][Tt]) is_get=1 ;; esac; }
 keep() { kept+=$held$m; held=""; }
 end_command() {
   [ -z "$in_api" ] || [ -n "$is_get" ] || unread_api=1
-  prev="" in_gh="" in_api="" api="" is_get="" next=""
+  if [ -n "$in_gh" ]; then
+    case "$targets" in *$'\n'"$repo"$'\n'*) ;; *) targets+=$repo$'\n' ;; esac
+  fi
+  prev="" in_gh="" in_api="" api="" is_get="" next="" repo=""
 }
 
-# A walk over gh's real arguments, never a body: the repository the text goes to (the
-# first named; empty is the checkout's), a GET for each gh api command, and the files it
+# A walk over gh's real arguments, never a body: each command's target (the first it
+# names; empty is the checkout's), a GET for each gh api command, and the files it
 # reads, which replace their names in the checked text. Words cannot be told apart past
 # $( or <<, or a << before gh; that text goes to past, with any word outside a gh command.
-repo="" unread_api="" kept="" past="" held=""
+repo="" targets=$'\n' unread_api="" kept="" past="" held=""
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
@@ -139,7 +143,14 @@ while IFS= read -r flag; do
   if [[ $flag =~ $re ]]; then read_file "${BASH_REMATCH[3]}"; fi
 done <<<"$(grep -Eo -- "(^|[[:space:]])$re" <<<"$past")"
 
-hit=$(publish_hit "$kept$files" "$repo") || exit 0
+# A hit asks if any target is public. With no gh command walked, the target is the checkout.
+[ "$targets" != $'\n' ] || targets+=$'\n'
+targets=${targets#$'\n'}
+hit=""
+while IFS= read -r t; do
+  hit=$(publish_hit "$kept$files" "$t") && break
+done <<<"${targets%$'\n'}"
+[ -n "$hit" ] || exit 0
 jq -n --arg r "Mentat: this text for a public repository holds $hit. Approve only if it is meant to be public." \
   '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
 exit 0

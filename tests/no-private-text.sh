@@ -221,6 +221,37 @@ c='gh api \
 check "a gh api path after a line continuation stands" 'skips "$c"'
 check "the first target stands when the walk goes on past it" 'skips "gh pr comment 5 --repo owner/private --body stubcodename --repo o/public"'
 
+# Each gh command has its own target, and a hit asks if any target is public.
+reset
+lookups() { grep -c 'repo view' "$STUB/calls"; }
+while IFS= read -r c; do
+  check "asks when any target is public: $c" '[ "$(decision "$c")" = ask ]'
+done <<'TARGETS'
+gh pr view 1 -R owner/private && gh pr comment 2 -R o/public --body stubcodename
+gh pr view 1 -R owner/private; gh pr comment 2 --repo=o/public --body stubcodename
+gh pr comment 2 -R o/public --body stubcodename && gh pr view 1 -R owner/private
+gh pr view 1 -R owner/private && gh pr comment 2 --body stubcodename
+gh pr comment 2 --body stubcodename && gh pr view 1 -R owner/private
+gh api repos/owner/private/x --jq .a && gh pr comment 2 --body stubcodename
+gh pr comment 1 -R o/public --body stubcodename && gh pr comment 2 -R o/public2 --body stubcodename
+TARGETS
+c='gh pr view 1 -R owner/private
+gh pr comment 2 -R o/public --body stubcodename'
+check "asks when a public target is on the next line" '[ "$(decision "$c")" = ask ]'
+touch "$STUB/private"
+check "a private checkout counts for a command naming no target" 'rm -f "$STUB/calls"; [ -z "$(decision "gh pr view 1 -R owner/private && gh pr comment 2 --body stubcodename")" ] && [ "$(lookups)" = 2 ]'
+reset
+check "a single private target stays silent" 'skips "gh pr comment 2 -R owner/private --body stubcodename"'
+check "the same target is looked up once" 'skips "gh pr comment 1 -R owner/private --body stubcodename && gh pr comment 2 -R owner/private --body stubcodename" && [ "$(lookups)" = 1 ]'
+touch "$STUB/private"
+check "the checkout is looked up once" 'rm -f "$STUB/calls"; [ -z "$(decision "gh pr comment 1 --body stubcodename; gh pr comment 2 --body stubcodename")" ] && [ "$(lookups)" = 1 ]'
+reset
+check "several targets with no hit look nothing up" 'rm -f "$STUB/calls"; [ -z "$(decision "gh pr comment 1 -R owner/private --body ok && gh pr comment 2 -R o/public --body ok")" ] && ! looked_up'
+touch "$STUB/lookup_fails"
+check "a failed lookup counts as public with several targets" '[ "$(decision "gh pr view 1 -R owner/private && gh pr comment 2 -R o/public --body stubcodename")" = ask ]'
+reset
+check "the reason names the category with several targets" '[ "$(reason "gh pr view 1 -R owner/private && gh pr comment 2 -R o/public --body stubcodename")" = "Mentat: this text for a public repository holds a configured private name. Approve only if it is meant to be public." ]'
+
 # A method counts as GET only from a real argument of that gh api command.
 reset
 while IFS= read -r c; do
