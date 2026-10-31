@@ -52,6 +52,7 @@ fast_track_check() {
     fail "skills/review/fast-track.md must give the fast track's $what (missing: $s)"
   fi
 }
+fast_track_check "turning on only by the maintainer" 'Claude Code never turns it on itself'
 fast_track_check "check of the complete final diff" 'check the complete final diff'
 fast_track_check "status line" 'Not reviewed: fast track agreed by the maintainer'
 fast_track_check "record in the spec" 'one line in the spec, written when it was agreed'
