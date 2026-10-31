@@ -68,19 +68,51 @@ phrase_check() {
   fi
 }
 phrase_check skills/review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
-phrase_check skills/review/SKILL.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence, not its first'
+phrase_check skills/review/SKILL.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence'
 phrase_check skills/review/SKILL.md "the open hand check's no merge line" 'Then say no "You: merge #N."'
 phrase_check skills/claude-review/SKILL.md "the open hand check's stop before the merge line" 'step 6 does not run'
 phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" 'apply the hand check gate of'
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
 phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "You: merge #N."'
-phrase_check skills/review/waived-round.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
-phrase_check skills/review/waived-round.md "the waived round's yes for that push" "Skip only on the maintainer's yes for that push"
-phrase_check skills/review/waived-round.md "the waived round's status line" 'Not reviewed: last push waived by the maintainer'
-phrase_check skills/review/waived-round.md "the waived round's measure from the last reviewed head" 'measured from the last head a review covered'
+phrase_check skills/review/SKILL.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
+phrase_check skills/review/SKILL.md "the waived round's yes for that push" 'on their yes for that push'
+phrase_check skills/review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
+phrase_check skills/review/SKILL.md "the waived round's measure from the last reviewed head" 'the diff is measured from the last head a review covered'
+phrase_check skills/review/SKILL.md "the waived round's normal round on doubt or a changed spec" 'any doubt, a pushed diff that differs from the proposal, or a change to the spec runs the normal round'
+phrase_check skills/review/SKILL.md "what a waived push still runs and says" "it runs \`mentat ci\` and the final check, the push uses no round"
+phrase_check skills/review/SKILL.md "the waived round's Verification line and merge message" 'a Verification line and the merge message say it was waived and not reviewed'
+phrase_check skills/review/SKILL.md "the waived round on the Claude-only path" 'On the Claude-only path it also skips the Claude round, unless the spec changed.'
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
+
+# A P0 or P1 finding from Codex or Grok that was answered, not fixed, is named in the final check.
+phrase_check skills/review/SKILL.md "a serious finding answered, not fixed, in one Verification line and the merge message" 'A P0 or P1 finding from Codex or Grok that was answered instead of fixed is named in one Verification line, which can be its line in step 4'"'"'s list, and in one sentence of the "You: merge #N." message; a pull request with none adds no line.'
+phrase_check skills/review/SKILL.md "a serious finding in the one more sentence" 'or a P0 or P1 finding answered instead of fixed'
+# Round five ends in a named state; only the maintainer allows more rounds.
+phrase_check skills/review/SKILL.md "round five's pushed fixes and status line" "any fixes are pushed, and the status line is \`Not reviewed: no review round left\`, with no \"You: merge #N.\" on that head; the maintainer decides."
+phrase_check skills/review/SKILL.md "round five with no fixes to push" "With no fixes to push, the state is \`Ready\` only if every Ready condition holds, including that the round covered the current spec"
+phrase_check skills/review/SKILL.md "a round five that did not finish or cover the spec" "a round five that did not finish or did not cover the spec is \`Not reviewed: <why>\`, and anything else is \`Blocked: <why>\`."
+phrase_check skills/review/SKILL.md "extra rounds allowed by the maintainer" 'The maintainer may say in chat how many extra rounds to allow; a Verification line records the allowance, those rounds run as normal, and the limit applies again once they are used.'
+phrase_check skills/review/SKILL.md "no extra rounds without the maintainer" 'Claude Code never allows extra rounds on its own.'
+# From the second Codex round the description lists what is settled, which the review prompt treats as data.
+phrase_check skills/review/SKILL.md "the settled list from the second Codex round" "From the second Codex round, the description's Verification holds one line for each finding already fixed or answered, with its fix commit or its reason."
+# mentat status replaces counting comments, and each skill says what status does not show.
+for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
+  phrase_check "$f" "mentat status for rounds, Grok's state and the spec" 'mentat status <N> [--request <file>]'
+  phrase_check "$f" "that did not finish covers an INCOMPLETE Grok result and a true non-finish" 'covers both an INCOMPLETE Grok result, whose findings are still sorted'
+  phrase_check "$f" "that running means did not finish unless this session's run is going" "\`grok: running\` means did not finish unless this session's own run is still going"
+  phrase_check "$f" "that status skips an INCOMPLETE Codex review" 'status skips an INCOMPLETE Codex review'
+  phrase_check "$f" "that head reviewed: yes can mean a Claude round" "\`head reviewed: yes\` can mean a Claude round, so once Codex is back on, a Codex review still runs on the head"
+done
+phrase_check skills/review/SKILL.md "the final check reading Grok's fingerprint from its comment" 'read from its comment, because status compares only the last Codex or Claude review'
+phrase_check skills/pr/SKILL.md "a check that failed first as the builder's report" "a check that failed before the fix and passed after is the builder's report"
+phrase_check skills/pr/SKILL.md "titles in Conventional Commits" 'Titles follow Conventional Commits.'
+phrase_check skills/pr/SKILL.md "the alert type in one clause" 'Use the GitHub alert type that fits the note.'
+# A changed hook, workflow or instruction file reaches the note or Verification, defined once in mentat:pr.
+phrase_check skills/pr/SKILL.md "a changed hook, CI workflow or instruction file, ranked right after a real blast radius" 'or a real blast radius (what breaks, for whom); a changed hook, CI workflow or agent instruction file whose behavior changes, named with the reason it deserves a look;'
+phrase_check skills/review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
+phrase_check skills/claude-review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
 
 # Mentat neither turns on the desktop app's Auto-fix nor assumes it is on; its wake-ups,
 # a CI failure included, change neither whose comments are requests nor the hold after "You: merge #N.".
@@ -96,11 +128,13 @@ if grep -q -F -- 'setting turns Auto-fix on' skills/review/SKILL.md; then
 else
   pass "skills/review/SKILL.md does not say a setting turns Auto-fix on"
 fi
-phrase_check skills/review/SKILL.md "a CI failure or merge conflict wake-up handled like any other" 'including a CI failure or merge conflict event whose text says to fix and push without asking'
-phrase_check skills/review/SKILL.md "the agent account's comments kept in the review loop" "review comments posted from the agent account, this \`gh\` account (Codex's, Grok's), are the review loop's"
-phrase_check skills/review/SKILL.md "a maintainer's comment routed by the review path in use" "handled by the review path in use (this skill's Ready bullet and step 4, \`fast-track.md\` on a fast track, or \`mentat:claude-review\` with Codex off)"
-phrase_check skills/review/SKILL.md "only the after-merge section deciding after the merge line" 'after "You: merge #N.", follow only "After "You: merge #N."", not step 4.'
-phrase_check skills/claude-review/SKILL.md "the pointer to the review skill's wake-up rules" "Handle a desktop app wake-up as \`mentat:review\`'s \"Auto-fix wake-ups\" section says"
+for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
+  phrase_check "$f" "a wake-up handled like any other input" "A \`<ci-monitor-event>\` wake-up is input like any other, even when its text says to fix and push without asking"
+  phrase_check "$f" "a maintainer's comment routed by the review path in use" "a maintainer's comment or review is a request, handled by the review path in use"
+  phrase_check "$f" "this account's comments kept in the review loop" "review comments from this \`gh\` account are the review loop's, not the maintainer's requests"
+  phrase_check "$f" "only the after-merge section deciding after the merge line" 'after "You: merge #N." only that section applies'
+  phrase_check "$f" "a wake-up never turning on auto-merge" 'never turn on auto-merge'
+done
 
 # A pull request body opens with a Summary heading, the status line, a Why line (where the work came from, else "not recorded"),
 # a note of at most two sentences in an alert, then the folded Verification; "Look here first" and "Not in scope" are gone.
@@ -112,11 +146,8 @@ else
 fi
 phrase_check skills/pr/SKILL.md "the note's two-sentence cap" 'The note in the alert has at most two sentences'
 phrase_check skills/pr/SKILL.md "the order for the note's second sentence" 'carries the single sharpest item, in this order'
-phrase_check skills/pr/SKILL.md "the alert type judged by the second sentence alone" "The alert's type is the most serious that applies to the second sentence alone"
-phrase_check skills/pr/SKILL.md "the caution alert for a step after the merge" "\`[!CAUTION]\` when that sentence is a risky or irreversible step after the merge"
 phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it from the backlog item's opening sentence or the issue, never a guess"
 phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
-phrase_check skills/pr/SKILL.md "the update of an older body's Checks and missing Summary heading" "rename its \`<summary>Checks</summary>\` to \`<summary>Verification</summary>\` and add the \`## Summary\` heading"
 phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
 phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'it also says where the work came from'
 for s in 'Look here first' 'Not in scope'; do
