@@ -16,7 +16,7 @@ Item shape. Keep an item's description short. It holds these, in this order:
 
 Progress notes, evidence and replaced plans go in comments, not the description.
 
-1. Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the tools are not in the session, tell the maintainer the backlog is not connected in this session and stop planning work there. Never file an item or a plan on GitHub instead. The builder does not touch the backlog; this happens in the main session.
+1. Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the tools are not in the session, tell the maintainer the backlog is not connected in this session and stop planning work there. While the backlog is unreachable, a change that qualifies for a fast track (`mentat:review` "Fast track") may go ahead and is recorded once it is back; everything else stays blocked. Never file an item or a plan on GitHub instead. The builder does not touch the backlog; this happens in the main session.
 2. Status says where an item stands:
    - Not agreed, Claude Code's own suggestions included. An item the maintainer set aside says "parked" in its opening sentence; one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work (step 5).
    - Agreed.
