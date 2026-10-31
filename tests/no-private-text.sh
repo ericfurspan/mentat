@@ -201,6 +201,120 @@ EOF
 check "a target before a command substitution stands" 'skips "$c"'
 touch "$STUB/private"
 check "a public target asks from a private checkout" 'asks_for o/public "gh pr comment 5 --repo o/public --body stubcodename"'
+reset
+c='cat <<EOF
+gh --repo owner/private
+EOF
+gh pr comment 5 --body stubcodename'
+check "a repository named in a heredoc before gh is not the target" 'asks_for "" "$c"'
+c='gh api -X POST graphql -f query=stubcodename
+cat repos/owner/private/x'
+check "a repos/ path on the next line is not the target" 'asks_for "" "$c"'
+check "a repository named after the end of the gh command is not the target" 'asks_for "" "gh pr comment 5 --body stubcodename && echo --repo owner/private"'
+c='gh pr comment 5 \
+  --repo owner/private \
+  --body stubcodename'
+check "a target after a line continuation stands" 'skips "$c"'
+c='gh api \
+  repos/owner/private/issues/5/comments \
+  -f body=stubcodename'
+check "a gh api path after a line continuation stands" 'skips "$c"'
+check "the first target stands when the walk goes on past it" 'skips "gh pr comment 5 --repo owner/private --body stubcodename --repo o/public"'
+
+# A method counts as GET only from a real argument of that gh api command.
+reset
+while IFS= read -r c; do
+  check "a method in a body or another command makes no read: $c" '[ "$(decision "$c")" = ask ]'
+done <<'WRITES'
+gh api repos/o/r/issues/1/comments -f body="see -X GET about stubcodename"
+gh api repos/o/r/issues/1/comments -f body="see --method GET about stubcodename"
+gh api repos/o/r/issues/1/comments -f body="see --method=GET about stubcodename"
+gh api repos/o/r/issues/1/comments -f body='see -X GET about stubcodename'
+gh api repos/o/r/issues/1/comments -f body='see --method GET about stubcodename'
+gh api repos/o/r/issues/1/comments -f body='see --method=GET about stubcodename'
+gh api -X GET repos/o/r/x && gh api -X POST repos/o/r/y -f body=stubcodename
+gh api -X GET repos/o/r/x && gh api repos/o/r/y -f body=stubcodename
+gh api repos/o/r/y -f body=stubcodename; gh api -X GET repos/o/r/x
+gh api repos/o/r/y -f body=stubcodename && echo -X GET
+gh api -X GET repos/o/r/x&&gh api repos/o/r/y -f body=stubcodename
+gh api repos/o/r/x -f q="$(x) stubcodename" -X GET
+gh api -X GET repos/o/r/x -f q="$(x)" && gh api repos/o/r/y -f body=stubcodename
+gh api repos/o/r/y -f body='don'\''t -X GET about stubcodename'
+gh api -X GET repos/o/r/x -f q=1 && gh pr comment 5 --body stubcodename
+n=$(gh api repos/o/r/y -f body=stubcodename)
+WRITES
+c='gh api repos/o/r/y -f body=stubcodename
+echo -X GET'
+check "a method on the next line makes no read" '[ "$(decision "$c")" = ask ]'
+while IFS= read -r c; do
+  check "a real GET stays a read: $c" 'rm -f "$STUB/calls"; [ -z "$(decision "$c")" ] && ! looked_up'
+done <<'READS'
+gh api -X GET repos/o/r/x -f q=stubcodename
+gh api --method GET repos/o/r/x -f q=stubcodename
+gh api --method=GET repos/o/r/x -f q=stubcodename
+gh api -X=GET repos/o/r/x -f q=stubcodename
+gh api -XGET repos/o/r/x -f q=stubcodename
+gh api -X "GET" repos/o/r/x -f q=stubcodename
+gh api --method='GET' repos/o/r/x -f q=stubcodename
+gh api -X get repos/o/r/x -f q=stubcodename
+gh api repos/o/r/x -f q=stubcodename -X GET
+gh api repos/o/r/x -f q=stubcodename -X GET; echo done
+gh api -X GET repos/o/r/x -f q="$(x) stubcodename"
+gh api -X GET repos/o/r/x -f q=stubcodename && gh api --method GET repos/o/r/y -f q=stubcodename
+READS
+c='gh api \
+  -X GET \
+  repos/o/r/x \
+  -f q=stubcodename'
+check "a real GET after a line continuation stays a read" '[ -z "$(decision "$c")" ]'
+
+# A file flag comes from a real argument, and only it and its value leave the text.
+reset
+path_hit="Mentat: this text for a public repository holds a local path. Approve only if it is meant to be public."
+cp "$root/work/word.md" "$HOME/word.md"
+for f in --body-file --notes-file -F --field; do
+  check "a home path after $f in a double-quoted body is a local path" '[ "$(reason "gh pr comment 5 --body \"see $f '"'"'$HOME/clean.md'"'"'\"")" = "$path_hit" ]'
+  check "a home path after $f in a single-quoted body is a local path" '[ "$(reason "gh pr comment 5 --body '"'"'see $f \"$HOME/clean.md\"'"'"'")" = "$path_hit" ]'
+  check "a home path after $f= in a body is a local path" '[ "$(reason "gh pr comment 5 --body \"see $f='"'"'$HOME/clean.md'"'"'\"")" = "$path_hit" ]'
+done
+nospace="$root/nospace"
+mkdir -p "$nospace"; cp "$root/work/clean.md" "$nospace/clean.md"
+for f in --body-file --notes-file -F; do
+  check "an unquoted home path after $f in a body is a local path" '[ "$(HOME=$nospace reason "gh pr comment 5 --body \"see $f $nospace/clean.md\"")" = "${path_hit}" ]'
+done
+check "a body naming the same file as the real flag is still a local path" '[ "$(reason "gh pr comment 5 --body \"see --body-file '"'"'$HOME/clean.md'"'"'\" --body-file '"'"'$HOME/clean.md'"'"'")" = "$path_hit" ]'
+check "a file flag before gh is no flag of gh" '[ "$(reason "echo --body-file \"$HOME/clean.md\"; gh pr comment 5 --body ok")" = "$path_hit" ]'
+check "a file named only in a body is not read" '[ -z "$(decision "gh pr comment 5 --body \"see --body-file word.md\"")" ]'
+c="gh pr comment 5 --body 'don'\\''t see --body-file \"$HOME/clean.md\"'"
+check "a home path after a file flag in a single-quoted body with an escaped quote is a local path" '[ "$(reason "$c")" = "$path_hit" ]'
+c="cat >f <<EOF
+gh pr comment 5 --body-file \"$HOME/clean.md\"
+EOF
+gh pr comment 5 --body-file clean.md"
+check "a home path in a heredoc before gh is a local path" '[ "$(reason "$c")" = "$path_hit" ]'
+for f in --body-file --notes-file -F; do
+  check "a real $f naming a clean file under the home folder is no hit" 'rm -f "$STUB/calls"; [ -z "$(decision "gh pr comment 5 $f \"$HOME/clean.md\"")" ] && [ -z "$(decision "gh pr comment 5 $f=\"$HOME/clean.md\"")" ] && ! looked_up'
+  check "a real $f naming a file with a hit asks" '[ "$(decision "gh pr comment 5 $f \"$HOME/word.md\"")" = ask ]'
+done
+check "a real --field naming a clean file under the home folder is no hit" '[ -z "$(decision "gh api repos/o/r/issues/7/comments --field \"body=@$HOME/clean.md\"")" ]'
+check "a real flag is read when the word ends the command" '[ "$(decision "gh pr comment 5 --body-file word.md; echo done")" = ask ] && [ "$(decision "gh pr comment 5 --body-file \"a dir/word file.md\"; echo done")" = ask ]'
+c='gh pr comment 5 \
+  --body-file \
+  word.md'
+check "a real flag is read across a line continuation" '[ "$(decision "$c")" = ask ]'
+c='gh pr comment 5 \
+  --body-file \
+  ~/clean.md'
+check "a clean file named across a line continuation is no hit" '[ -z "$(decision "$c")" ]'
+check "a real flag is read where gh is not its own word, and its name stays" '[ "$(decision "(gh pr comment 5 --body-file word.md)")" = ask ] && [ "$(reason "(gh pr comment 5 --body-file \"$HOME/clean.md\")")" = "$path_hit" ]'
+# Past the stop the words cannot be told apart: a flag is still read, nothing leaves the text.
+check "past a stop, a file with a hit asks" '[ "$(decision "gh pr create --title \"\$(x)\" --body-file word.md")" = ask ]'
+check "past a stop, a clean file under the home folder asks, its path stays in the text" '[ "$(reason "gh pr create --title \"\$(x)\" --body-file \"$HOME/clean.md\"")" = "$path_hit" ]'
+check "past a stop, a clean file with no hit in its name is no hit" '[ -z "$(decision "gh pr create --title \"\$(x)\" --body-file clean.md")" ]'
+c='gh pr comment 5 --body-file - <<EOF
+see --body-file word.md
+EOF'
+check "a file named in a heredoc is read too" '[ "$(decision "$c")" = ask ]'
 
 # What the prompt says.
 reset
