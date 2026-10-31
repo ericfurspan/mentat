@@ -307,10 +307,10 @@ ASK
 check "git -C ~/<checkout on main> push names the default branch" \
   '[ "$(HOME="$tmp/home" reason "$tmp/feat" "git -C ~/main-checkout push")" = "Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
 
-# A draft pull request asks, and the reason names it.
+# A draft pull request is a normal choice: from a clean checkout nothing asks.
 while IFS= read -r cmd; do
-  check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
-done <<'ASK'
+  check "on a feature branch leaves alone, a draft pull request: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
+done <<'PASS'
 gh pr create --draft
 gh pr create -d --fill
 gh pr create --title "x" --draft --body "y"
@@ -324,10 +324,10 @@ gh pr create -df
 gh pr create -fd
 gh pr create -wd
 (gh pr create --draft)
-ASK
-while IFS= read -r cmd; do
-  check "on a feature branch leaves alone, not a draft pull request: $cmd" '[ -z "$(decision "$tmp/feat" "$cmd")" ]'
-done <<'PASS'
+gh -R o/r pr create --draft
+gh --repo o/r pr create -d
+gh pr -R o/r create --draft
+gh pr --repo o/r create -d
 gh pr create --fill
 gh pr create --title "a --draft idea" --body "use -d"
 gh pr create --draft=false --fill
@@ -338,51 +338,58 @@ gh pr view --json isDraft
 gh issue create --title x
 git push -u origin feat/x && gh pr create --fill
 PASS
-draft_reason="Mentat: agents open pull requests as normal ones, not drafts (--draft or -d). Approve only if you want a draft pull request."
-check "a draft pull request: the reason names a draft pull request" \
-  '[ "$(reason "$tmp/feat" "gh pr create --draft --fill")" = "$draft_reason" ]'
-check "a draft pull request with uncommitted changes: the reason names both" \
-  '[ "$(reason "$tmp/untracked" "gh pr create --draft")" = "$draft_reason $unclean_reason" ]'
+# A draft still gets the other checks.
+check "a draft pull request with uncommitted changes: the reason names only those" \
+  '[ "$(reason "$tmp/untracked" "gh pr create --draft")" = "$unclean_reason" ]'
+check "a chained force push before a draft pull request: the reason names only the force push" \
+  '[ "$(reason "$tmp/feat" "git push -f origin feat/x && gh pr create --draft")" = "$force_reason" ]'
 
 # A separator or newline inside quotes does not split the command.
 while IFS= read -r cmd; do
-  check "a quoted separator asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+  check "a quoted separator asks before a force push: $cmd" '[ "$(reason "$tmp/feat" "$cmd")" = "$force_reason" ]'
 done <<'ASK'
-gh pr create --title "A & B" --draft
-gh pr create --body "| a | b |" --draft
-gh pr create --title 'a; b' -d
+git push -o "A & B" --force origin feat/x
+git push -o "| a | b |" origin +feat/x
+git push -o 'a; b' -f origin feat/x
+ASK
+while IFS= read -r cmd; do
+  check "a quoted separator with uncommitted changes asks before: $cmd" '[ "$(reason "$tmp/edited" "$cmd")" = "$unclean_reason" ]'
+done <<'ASK'
+gh --repo "o & r" pr create --fill
+gh pr -R 'a; b' create --fill
 ASK
 check "a quoted separator leaves alone: gh pr create --title \"a; b\" --fill" \
   '[ -z "$(decision "$tmp/feat" "gh pr create --title \"a; b\" --fill")" ]'
-multiline=$'gh pr create --title x --body "line one\n\nline | two" --draft'
-check "a multi-line quoted body asks before a draft pull request" '[ "$(decision "$tmp/feat" "$multiline")" = ask ]'
+multiline=$'git push -o "line one\n\nline | two" --force origin feat/x'
+check "a multi-line quoted value asks before a force push" '[ "$(reason "$tmp/feat" "$multiline")" = "$force_reason" ]'
 heredoc=$'cat >notes.txt <<EOF\nit\'s done\nEOF\ngit push origin main'
 check "an unmatched quote in a heredoc body still asks before main" '[ "$(decision "$tmp/feat" "$heredoc")" = ask ]'
-check "a draft pull request after a quoted separator asks" \
-  '[ "$(reason "$tmp/feat" "git commit -m \"a & b\" && gh pr create --draft")" = "$draft_reason" ]'
+check "a force push after a quoted separator asks" \
+  '[ "$(reason "$tmp/feat" "git commit -m \"a & b\" && git push --force origin feat/x")" = "$force_reason" ]'
 
 # A backslash-newline outside single quotes continues the line.
 cont_force=$'git push \\\n  --force origin feat/x'
 cont_plus=$'git push origin \\\n  +feat/x'
-cont_draft=$'gh pr create \\\n  --title x \\\n  --draft'
+cont_twice=$'git push \\\n  --repo origin \\\n  --force feat/x'
 cont_fill=$'gh pr create \\\n  --fill'
 cont_dq=$'git -C "'"$tmp"$'/ed\\\nited" push'
-single_body=$'gh pr create --fill --body \'a \\\n--draft\''
-single_then_draft=$'gh pr create --body \'a \\\n--fill\' \\\n  --draft'
+single_body=$'git push --push-option \'a \\\n--force\' origin feat/x'
+single_then_force=$'git push --push-option \'a \\\n--fill\' \\\n  --force origin feat/x'
 check "a continued line asks before a force push" '[ "$(reason "$tmp/feat" "$cont_force")" = "$force_reason" ]'
 check "a continued line asks before a +refspec" '[ "$(reason "$tmp/feat" "$cont_plus")" = "$force_reason" ]'
-check "continued lines ask before a draft pull request" '[ "$(reason "$tmp/feat" "$cont_draft")" = "$draft_reason" ]'
+check "two continued lines ask before a force push" '[ "$(reason "$tmp/feat" "$cont_twice")" = "$force_reason" ]'
 check "a continued line leaves alone: gh pr create --fill" '[ -z "$(decision "$tmp/feat" "$cont_fill")" ]'
+check "a continued line with uncommitted changes asks before: gh pr create --fill" '[ "$(reason "$tmp/edited" "$cont_fill")" = "$unclean_reason" ]'
 check "a continued line inside double quotes joins the path" '[ "$(reason / "$cont_dq")" = "$unclean_reason" ]'
-check "a backslash-newline inside single quotes stays in the body" '[ -z "$(decision "$tmp/feat" "$single_body")" ]'
-check "a continued line after a single-quoted body asks before a draft pull request" \
-  '[ "$(reason "$tmp/feat" "$single_then_draft")" = "$draft_reason" ]'
+check "a backslash-newline inside single quotes stays in the value" '[ -z "$(decision "$tmp/feat" "$single_body")" ]'
+check "a continued line after a single-quoted value asks before a force push" \
+  '[ "$(reason "$tmp/feat" "$single_then_force")" = "$force_reason" ]'
 # An apostrophe that leaves the quoted split inside a quote: the plain split joins the continued lines.
-comment_cont=$'# It\'s ready\ngit push \\\n  --force origin feat/x\ngh pr create \\\n  --draft'
+comment_cont=$'# It\'s ready\ngit push \\\n  --force origin feat/x\ngit push origin \\\n  main'
 heredoc_cont=$'cat >notes <<EOF\nit\'s done\nEOF\ngit push \\\n  --force origin feat/x'
 cont_plain=$'git push \\\n  origin feat/x'
-check "continued lines after an apostrophe in a comment ask before a force push and a draft" \
-  '[ "$(reason "$tmp/feat" "$comment_cont")" = "$force_reason $draft_reason" ]'
+check "continued lines after an apostrophe in a comment ask before a force push and a push to main" \
+  '[ "$(reason "$tmp/feat" "$comment_cont")" = "$force_reason Mentat: agents do not push to the default branch (main). Approve only if you want this push to go to it." ]'
 check "a continued line after an apostrophe in a heredoc asks before a force push" \
   '[ "$(reason "$tmp/feat" "$heredoc_cont")" = "$force_reason" ]'
 check "a continued line leaves alone: git push origin feat/x" '[ -z "$(decision "$tmp/feat" "$cont_plain")" ]'
@@ -390,21 +397,27 @@ check "a continued line leaves alone: git push origin feat/x" '[ -z "$(decision 
 row="| \`hooks/no-default-push\` | it's a table row; with a & b, \$x and a \\\\ backslash | yes |"
 body=""
 for ((k = 0; k < 250; k++)); do body+="$row"$'\n'; done
-long="gh pr create --title \"feat: x\" --body \"$body\" --draft"
+long="gh pr create --title \"feat: x\" --body \"$body\" --fill"
 start=$SECONDS
-long_decision=$(decision "$tmp/feat" "$long")
+long_decision=$(decision "$tmp/edited" "$long")
 elapsed=$((SECONDS - start))
-check "a ${#long}-character pull request body asks before a draft pull request, in ${elapsed}s (under 3s)" \
+check "a ${#long}-character pull request body with uncommitted changes asks, in ${elapsed}s (under 3s)" \
+  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 3 ]'
+long_push="git push -o \"$body\" --force origin feat/x"
+start=$SECONDS
+long_decision=$(decision "$tmp/feat" "$long_push")
+elapsed=$((SECONDS - start))
+check "a force push after a ${#long_push}-character quoted value asks, in ${elapsed}s (under 3s)" \
   '[ "$long_decision" = ask ] && [ "$elapsed" -lt 3 ]'
 
 # gh flags before or after pr, such as -R or --repo with its value, are skipped.
 while IFS= read -r cmd; do
-  check "on a feature branch asks before a draft pull request: $cmd" '[ "$(decision "$tmp/feat" "$cmd")" = ask ]'
+  check "with uncommitted changes asks before: $cmd" '[ "$(decision "$tmp/edited" "$cmd")" = ask ]'
 done <<'ASK'
-gh -R o/r pr create --draft
-gh --repo o/r pr create -d
-gh pr -R o/r create --draft
-gh pr --repo o/r create -d
+gh -R o/r pr create --fill
+gh --repo o/r pr create --fill
+gh pr -R o/r create --fill
+gh pr --repo o/r create --fill
 ASK
 check "with uncommitted changes asks before: gh --repo=o/r pr create --fill" '[ "$(decision "$tmp/edited" "gh --repo=o/r pr create --fill")" = ask ]'
 check "with uncommitted changes leaves alone: gh -R o/r pr view" '[ -z "$(decision "$tmp/edited" "gh -R o/r pr view")" ]'
