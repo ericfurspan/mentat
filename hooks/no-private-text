@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# PreToolUse hook: GitHub text an agent is about to publish in a public repository
+# gets a permission prompt when it holds a local path or a private name
+# (lib/publish.sh). It looks at gh pr create, pr edit, pr comment, pr review, issue
+# create, issue edit, issue comment and gh api writes: the command text, and files
+# named by --body-file, -F or --notes-file. A leading cd and the name of a file it
+# reads are not published, so they are not looked at. The prompt gives the category,
+# never the match, and approving it clears a false alarm. This is a net for mistakes,
+# not a security boundary: other routes exist. When it cannot read its input or its
+# tools are missing, it stays out of the way.
+# shellcheck disable=SC2016,SC2088 # ~/ and $HOME below are literal command text.
+set -uo pipefail
+
+command -v jq >/dev/null 2>&1 || exit 0
+command -v gh >/dev/null 2>&1 || exit 0
+input=$(cat)
+tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
+[ "$tool" = Bash ] || exit 0
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
+case "$cmd" in *gh*) ;; *) exit 0 ;; esac
+
+# gh api with a write method, or with fields and no method, which gh sends as a POST.
+api_write() {
+  grep -Eq '(^|[^[:alnum:]_.-])gh[[:space:]]+api([[:space:]]|$)' <<<"$cmd" || return 1
+  grep -Eiq '(^|[[:space:]])(-X|--method)[=[:space:]]*["'"'"']?(POST|PUT|PATCH|DELETE)' <<<"$cmd" && return 0
+  grep -Eiq '(^|[[:space:]])(-X|--method)[=[:space:]]*["'"'"']?GET' <<<"$cmd" && return 1
+  grep -Eq '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([=[:space:]]|$)' <<<"$cmd"
+}
+# Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr comment.
+flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
+forms="(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+(pr${flags}[[:space:]]+(create|edit|comment|review)|issue${flags}[[:space:]]+(create|edit|comment))([[:space:]]|\$)"
+grep -Eq "$forms" <<<"$cmd" || api_write || exit 0
+
+# shellcheck source=/dev/null
+. "$(dirname "$0")/../lib/publish.sh" || exit 0
+
+cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || exit 0
+[ -z "$cwd" ] || cd "$cwd" 2>/dev/null || exit 0
+
+# A word of the command with its quotes off, and ~/ or $HOME/ at its start expanded.
+word='("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]+)'
+plain() {
+  v=${1#[\"\']}; v=${v%[\"\']}
+  case "$v" in '~/'*) v=$HOME/${v#\~/} ;; '$HOME/'*) v=$HOME/${v#\$HOME/} ;; esac
+}
+
+text=$cmd
+re="^[[:space:]]*cd[[:space:]]+${word}[[:space:]]*(&&|;)"
+if [[ $text =~ $re ]]; then
+  text=${text#"${BASH_REMATCH[0]}"}
+  plain "${BASH_REMATCH[1]}"
+  cd "$v" 2>/dev/null || true
+fi
+
+# The repository the text goes to; empty is the checkout's. The lookup is only on a hit.
+repo=""
+re="(^|[[:space:]])(-R|--repo)(=|[[:space:]]+)$word"
+api_re='gh[[:space:]]+api[^;&|]*[[:space:]]["'"'"']?/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
+if [[ $text =~ $re ]]; then
+  plain "${BASH_REMATCH[4]}"
+  repo=$v
+elif [[ $text =~ $api_re ]]; then
+  repo=${BASH_REMATCH[1]}
+fi
+
+# The files it reads replace their names. gh api's -F names a file as field=@file.
+re="(--body-file|--notes-file|-F)(=|[[:space:]]+)$word"
+files=""
+while IFS= read -r flag; do
+  [[ $flag =~ $re ]] || continue
+  plain "${BASH_REMATCH[3]}"
+  f=${v##*=@}
+  { [ -f "$f" ] && [ -r "$f" ]; } || continue
+  text=${text//"$flag"/ }
+  files+=$'\n'$(cat "$f")
+done <<<"$(grep -Eo -- "(^|[[:space:]])$re" <<<"$text")"
+
+hit=$(publish_hit "$text$files" "$repo") || exit 0
+jq -n --arg r "Mentat: this text for a public repository holds $hit. Approve only if it is meant to be public." \
+  '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
+exit 0

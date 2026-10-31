@@ -81,7 +81,10 @@ listener="" live_tmp="" live_vartmp=""
 cleanup() { [ -z "$listener" ] || kill "$listener" 2>/dev/null; rm -rf "$root" "$live_tmp" "$live_vartmp" ${live_vartmp:+"$live_vartmp.probe"}; }
 trap cleanup EXIT
 export STUB="$root/stub"
-mkdir -p "$STUB" "$root/bin"
+# A temporary home: the publish check reads the home path and the word list from it.
+export HOME="$root/home"
+LIST="$HOME/.config/mentat/private-words"
+mkdir -p "$STUB" "$root/bin" "$(dirname "$LIST")"
 failures=0
 check() { if eval "$2"; then printf 'PASS: review --local %s\n' "$1"; else printf 'FAIL: review --local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -111,7 +114,11 @@ case "$1 $2" in
       *--jq*) echo "$h" ;;
       *) jq -n --arg h "$h" --argjson c "$(cat "$STUB/closes" 2>/dev/null || echo '[]')" '{headRefOid: $h, baseRefName: "main", title: "Change README", body: "Requirement: README says change.", closingIssuesReferences: $c}' ;;
     esac ;;
-  "repo view") echo owner/repo ;;
+  "repo view")
+    case "$*" in
+      *isPrivate*) [ -f "$STUB/lookup_fails" ] && exit 1; if [ -f "$STUB/private" ]; then echo true; else echo false; fi ;;
+      *) echo owner/repo ;;
+    esac ;;
   "issue view")
     r=$5; f="$STUB/issue_${r/\//_}_$3"
     [ "$4" = --repo ] && [ -f "$f" ] || exit 1
@@ -288,6 +295,37 @@ mkdir -p "$odd"
 printf -- '- P1 [README:1](%s/README:1): wrong\n- P2 %s/lib/a b.sh:3 and %s2/keep\n' "$odd" "$odd" "$odd" >"$STUB/odd.md"
 check "a checkout path with spaces and special characters is rewritten, and only that path" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/odd.md" owner/repo "$H" "$odd") && [ "$(cat "$STUB/odd.md")" = "- P1 [README:1]($REPO_URL/README#L1): wrong
 - P2 lib/a b.sh:3 and $odd""2/keep" ]'
+
+# The publish check, on the final comment, right before the post.
+held_file() { sed -n 's/.*the maintainer can read it at //p' "$STUB/out"; }
+held() { # $1 category, $2 the match: not posted, not reviewed, kept whole, and no message repeats it
+  [ "$rc" = 1 ] && ! posted && grep -q "not reviewed: the comment holds $1, so it was not posted" "$STUB/out" &&
+    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(tail -n 1 "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
+}
+printf '# a comment\n\nStubCodename\n' >"$LIST"
+reset; printf -- '- P3 %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
+check "a comment with the home path is not posted, exits as not reviewed, is kept, and no message repeats it" 'held "a local path" "$HOME"'
+check "a hit looks up the reviewed repository" 'grep -qF "repo view owner/repo --json isPrivate" "$STUB/calls"'
+rm -f "$(held_file)"
+reset; printf -- '- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "a comment with a word from the list, in another case, is the same" 'held "a configured private name" stubcodename'
+rm -f "$(held_file)"
+reset; printf 'Stopped at stubcodename.\n\nREVIEW RESULT: INCOMPLETE - could not read stubcodename\n' >"$STUB/reply"; rc=$(run)
+check "an INCOMPLETE reason is checked before it is posted or printed" 'held "a configured private name" stubcodename'
+rm -f "$(held_file)"
+reset; touch "$STUB/lookup_fails"; printf -- '- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "a failed visibility lookup counts as public" 'held "a configured private name" stubcodename'
+rm -f "$(held_file)"
+reset; touch "$STUB/private"; printf -- '- P3 about stubcodename at %s/x\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
+check "a private repository's comment is posted unchanged" '[ "$rc" = 2 ] && grep -qF "about stubcodename at $HOME/x" "$STUB/comment"'
+reset; rc=$(run)
+check "no hit: posts, with no visibility lookup" '[ "$rc" = 0 ] && posted && ! grep -q isPrivate "$STUB/calls"'
+rm "$LIST"
+reset; printf -- '- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "a missing word list never blocks" '[ "$rc" = 2 ] && grep -q "about stubcodename" "$STUB/comment"'
+reset; printf -- '- P3 %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
+check "with a missing word list the home path is still found" 'held "a local path" "$HOME"'
+rm -f "$(held_file)"
 
 reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
 check "a reply without a result line is not reviewed and not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'

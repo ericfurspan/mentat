@@ -52,6 +52,10 @@ STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok"
 export PATH="$root/bin:$PATH"
 
+export HOME="$root/home"
+LIST="$HOME/.config/mentat/private-words"
+mkdir -p "$(dirname "$LIST")"
+echo stubword >"$LIST"
 reset() { rm -f "$STUB"/*; }
 run() { (cd "$root/cwd" && "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
@@ -89,6 +93,13 @@ reset; touch "$STUB/setting_unreadable"; rc=$(run)
 check "an unreadable branch setting warns, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: could not read whether merged head branches are deleted" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 reset; touch "$STUB/no_repo"; rc=$(run)
 check "no repository to find fails and says to run it inside a checkout" '[ "$rc" = 1 ] && grep -q "run mentat check inside a checkout" "$STUB/out"'
+
+reset; rc=$(run)
+check "a readable private word list is OK, and its words are not printed" '[ "$rc" = 0 ] && grep -qx "OK: the private word list is readable" "$STUB/out" && ! grep -q stubword "$STUB/out"'
+reset; mv "$LIST" "$LIST.away"; rc=$(run)
+check "a missing private word list warns, still exit 0, and prints no home path" '[ "$rc" = 0 ] && grep -qx "WARN: the private word list ~/.config/mentat/private-words is missing or unreadable: the publish check looks only for the home path" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qF "$HOME" "$STUB/out"'
+reset; mv "$LIST.away" "$LIST"; chmod 000 "$LIST"; rc=$(run); chmod 600 "$LIST"
+check "an unreadable private word list warns, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 
 rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)
 check "an argument is a usage error (exit 64)" '[ "$rc" = 64 ]'

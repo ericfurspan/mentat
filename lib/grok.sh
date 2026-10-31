@@ -311,15 +311,17 @@ grok_keep_log() {
 
 # After the start comment, any failure says so on the pull request. The log is
 # Grok's raw output and may hold a credential, so it is not printed or posted; a
-# copy is kept for the maintainer. Reads the caller's pr, head, started, err, out
-# and ghome.
+# copy is kept for the maintainer. A publish check hit on this comment skips the post.
+# $2, optional, is for the local message only. Reads the caller's pr, repo, head,
+# started, err, out and ghome.
 grok_fail() {
-  local kept
+  local kept held=""
   grok_keep_log
   if [ "$started" = yes ]; then
-    gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
+    held=$(held_comment "Grok review did not finish on $head: $1" "$repo") ||
+      gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
   fi
-  not_reviewed "$1${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
+  not_reviewed "$1${2:+; $2}${held:+; $held}${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
 }
 
 # Runs Grok in the rebuilt environment under its time limit, and calls "$fail"
@@ -352,6 +354,8 @@ grok_run() {
   # check is repeated here because a start comment may have appeared during the CI
   # wait (this narrows the window; it does not serialize two sessions).
   grok_not_started "$repo" "$pr" "$me"
+  local held
+  if held=$(held_comment "Grok review started on $head" "$repo"); then not_reviewed "$held"; fi
   gh pr comment "$pr" --body "Grok review started on $head" >/dev/null || not_reviewed "could not post the start comment on #$pr"
   started=yes
   fail=grok_fail
@@ -377,7 +381,7 @@ grok_reply() {
 # then exits 1 as "not reviewed", with no did-not-finish comment or private log
 # (grok_fail's), because the posted review is the record.
 grok_post() {
-  local result model url
+  local result model url held
   grok_reply
   localize_review_paths "$result_file" "$repo" "$head" "$run/export" "$cache/mentat/${run##*/}/export" || grok_fail "could not rewrite the paths in Grok's reply"
   result=$(last_line "$result_file")
@@ -397,6 +401,8 @@ grok_post() {
     cat "$result_file"
     printf '\n</details>\n\n%s\n' "$result"
   } >"$run/comment" || grok_fail "could not write the comment"
+  # The start comment stops a rerun, so the pull request says the review did not finish.
+  if held=$(held_comment "$(cat "$run/comment")" "$repo"); then grok_fail "the review was held back and not posted" "$held"; fi
   url=$(gh pr comment "$pr" --body-file "$run/comment") || grok_fail "could not post the review on #$pr"
   case "$result" in "REVIEW RESULT: INCOMPLETE - "*) not_reviewed "Grok says the review is incomplete: ${result#"REVIEW RESULT: INCOMPLETE - "}" ;; esac
   if [ "$result" = "REVIEW RESULT: NO FINDINGS" ]; then
