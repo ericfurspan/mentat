@@ -134,30 +134,26 @@ phrase_check skills/grill/SKILL.md "one decision per prompt" "Ask one decision p
 phrase_check skills/grill/SKILL.md "no several questions at once" 'Never put several questions in one message or one prompt'
 phrase_check skills/grill/SKILL.md "the Stop here option on every prompt" 'Every prompt also has a "Stop here" option'
 phrase_check skills/propose/SKILL.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
-# A grill's record goes in the weigh's file; with no change here, a second opinion is offered once, through the consult skill's steps.
+# A grill's record goes in the weigh's file.
 phrase_check skills/propose/SKILL.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
-phrase_check skills/grill/SKILL.md "the second opinion offer only when no change here follows" 'only when the agreed list will not lead to a change in this repository'
-phrase_check skills/grill/SKILL.md "the second opinion offer in its own prompt" "ask once, in its own \`AskUserQuestion\` prompt"
-phrase_check skills/grill/SKILL.md "no second opinion offer after Stop here" 'Make no offer after "Stop here".'
-phrase_check skills/grill/SKILL.md "the second opinion through the consult skill's steps" "follow its steps 1 to 4 rather than running \`mentat consult\` directly"
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
-phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision Claude Code does not need in order to keep working reaches them, it follows those instructions"
-phrase_check skills/propose/SKILL.md "step 2's route for a decision that does not block" 'one it does not need in order to go on goes as "How it reaches them" says'
+phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
+phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
 
+# The maintainer decides outcomes, cost and risk, and Claude Code settles the rest.
+phrase_check rules.md "what the maintainer decides" 'The maintainer decides outcomes, cost and risk: what to build and in what order, a change in scope or cost, a blocking disagreement, undoing what they recently asked for.'
+phrase_check rules.md "what Claude Code settles without asking" 'Claude Code settles the rest, including approach, code, tests, wording, findings and how to split work, and does not ask about it.'
 # A decision prompt can be answered on its own, a call made without the maintainer reaches chat one line each,
 # mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
-phrase_check rules.md "what each option authorizes, gives and costs the maintainer" "each saying what it authorizes, what the maintainer gets and what it costs them"
-# A decision asks one point the maintainer can judge, names a mechanism only when needed,
-# rests on checked facts, and is split rather than bundled.
-phrase_check rules.md "a decision on one point the maintainer can judge" 'one specific point the maintainer can judge from their own work'
-phrase_check rules.md "a mechanism named only when the maintainer needs it" 'only when the maintainer needs the name to judge'
-phrase_check rules.md "the mechanism chosen from the maintainer's answer" 'chooses the mechanism from the answer'
+phrase_check rules.md "a decision as one question about outcomes, never the mechanism" 'A decision reaches them as one question about what they get, pay or risk, never about the mechanism'
+phrase_check rules.md "what each option authorizes, gets and costs" 'each option saying what it authorizes, gets and costs'
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
-phrase_check rules.md "a question's premise checked or marked unverified" 'a fact a question rests on is checked first or marked unverified'
-phrase_check rules.md "narrow questions rather than a bundle" 'several narrow questions are asked rather than one that bundles choices'
-phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question says why the first is recommended, so the prompt alone suffices'
+phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
+phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question saying why the first is recommended, so the prompt alone suffices'
 phrase_check rules.md "a consequential call in one line of the next message" "and in one line of the next message the maintainer reads"
+phrase_check rules.md "a decision that needs talking through in chat" 'A decision that needs talking through goes in chat, in plain words, one at a time.'
+phrase_check rules.md "the pointer to where a hand step is written" "A hand step only the maintainer can run is written as \`mentat:backlog\` \"Waits on the maintainer\" says."
 if grep -q -F 'not in chat' rules.md; then
   fail "rules.md must not keep a consequential call out of chat (found: not in chat)"
 else
@@ -165,36 +161,22 @@ else
 fi
 phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
-phrase_check skills/propose/SKILL.md "step 2's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
-phrase_check skills/propose/SKILL.md "step 2's planning with overlapping items" 'overlapping items and the plan around them'
+phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
+phrase_check skills/propose/SKILL.md "the propose step's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:plan\`"
-phrase_check rules.md "the re-read of a record before asking about it" 'Right before asking about a record, it re-reads that record.'
-# Finished work ends with one action the maintainer can take, chosen from what Claude Code already knows.
-phrase_check rules.md "the next step's trigger, finished work" 'When the work the maintainer asked for is finished and the message asks nothing else of them'
-phrase_check rules.md "the next step's one sentence before the links" 'it ends, before its links, with one sentence naming one thing they can do next'
-phrase_check rules.md "the next step from what is known, without searching" 'from what Claude Code already knows without searching'
-phrase_check rules.md "the next step's first choice, not work that runs on its own" 'the next agreed item that needs them (not work that runs on its own)'
-phrase_check rules.md "the next step's second choice" 'one backlog item or a follow-up noticed in this work'
-phrase_check rules.md "the next step's item linked on the last line" 'with why, its link on the last line'
-# An unasked follow-up is filed in the record, not left in chat; a one-line tweak needs no item.
+phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
+# An unasked follow-up is filed in the record, not left in chat.
 phrase_check rules.md "an unasked follow-up filed as a not-agreed backlog item" 'A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item'
-phrase_check rules.md "a filed follow-up's decision label" "with the record's label for decisions where it has one"
-phrase_check rules.md "a one-line tweak raised in chat without an item" 'a one-line tweak may go in chat without an item'
 if grep -q -F 'not filed' rules.md; then
   fail "rules.md must not leave a follow-up unfiled (found: not filed)"
 else
   pass "rules.md does not leave a follow-up unfiled"
 fi
-phrase_check rules.md "the next step's last choice" 'else that there is nothing further to propose'
-phrase_check rules.md "the next step's exclusions" 'Answers, progress updates and replies a skill shapes are unchanged'
-phrase_check rules.md "the backlog bullet allowing the next step" 'apart from the next step after finished work'
-phrase_check skills/review/SKILL.md "the merged report ending with the next step" 'report in one line, then the next step.'
-phrase_check skills/backlog/linear.md "the cleared merge waits' line ending with the next step" 'Name the cleared items in one line of the reply, then the next step'
-# Step 2's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
+# The propose step's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/linear.md)" -eq 2 ]; then
-  pass "skills/backlog/linear.md exempts step 2's read from refining items and clearing merge waits"
+  pass "skills/backlog/linear.md exempts the propose step's read from refining items and clearing merge waits"
 else
-  fail "skills/backlog/linear.md must exempt step 2's read in both the hand-made items and merge waits bullets"
+  fail "skills/backlog/linear.md must exempt the propose step's read in both the hand-made items and merge waits bullets"
 fi
 
 # An item that is not agreed is described by what it is and where it stands, and waits on no one.
@@ -204,13 +186,13 @@ phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 
 phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
 phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item and wait" 'what the item is (such as a bug, a proposal, a follow-up or a question), where it stands, and any wait on the maintainer (step 4)'
-phrase_check rules.md "a wait on the maintainer for agreed work only, a hand test or setup step" 'When agreed work waits on a hand test or setup step only the maintainer can run'
-phrase_check rules.md "a wait named in chat in one sentence, not the first" "Chat names it in one plain sentence, not the reply's first, before the link"
-phrase_check rules.md "a merge or decision as no such wait" 'A merge or a decision is not such a wait: it keeps "You: merge #N." (and its waiting mark) or the decision prompt.'
-phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`rules.md\`'s merge exception does not remove it."
+phrase_check skills/backlog/SKILL.md "a wait on the maintainer for agreed work only, a hand test or setup step" 'when agreed work waits on a hand test or setup step only the maintainer can run'
+phrase_check skills/backlog/SKILL.md "where a wait goes, with either tracker" 'the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog'
+phrase_check skills/backlog/SKILL.md "the wait's shape" 'numbered steps (how many first), anything to paste, and one copy-ready command for a step repeated N times'
+phrase_check skills/backlog/SKILL.md "step 4's pointer to the wait's shape" '("Waits on the maintainer" gives the shape)'
+phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
 phrase_check skills/setup/SKILL.md "step 8's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
-phrase_check skills/backlog/SKILL.md "the waiting stage for agreed work only" 'an issue that is not agreed waits on no one'
 
 # After a weigh or a plan challenge, the maintainer sees each tool's reply and what Claude Code did with it in one block.
 phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
@@ -218,10 +200,9 @@ phrase_check skills/backlog/SKILL.md "the replies block's Adopting line" 'Adopti
 phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'Not adopting: <'
 phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "\`not weighed\` or \`not challenged\` and why"
 phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
-phrase_check skills/backlog/SKILL.md "the replies block with GitHub issues" 'only "Replies in chat" and "Tracker: GitHub issues" apply'
+phrase_check skills/backlog/SKILL.md "the replies block and waits with GitHub issues" 'only "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply'
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
-phrase_check skills/propose/SKILL.md "step 2's replies block" '"Replies in chat"'
-phrase_check rules.md "the replies block in a decision prompt" "(a weigh's or challenge's replies block opens the question)"
+phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 phrase_check skills/plan/SKILL.md "the challenge's replies block at hand-off" 'replies block'
 for f in rules.md skills/propose/SKILL.md; do
   if grep -q -F 'in one line beside its own' "$f"; then
@@ -231,13 +212,13 @@ for f in rules.md skills/propose/SKILL.md; do
   fi
 done
 
-# rules.md holds what applies in every session; step 2's procedure is in mentat:propose, and its standing lines stay.
-phrase_check rules.md "what it holds and where a step's procedure lives" "This file holds what applies in every session; a step's procedure lives in its skill."
-phrase_check rules.md "step 2's call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request."
-phrase_check rules.md "that a DO IT is not agreement" "A \`DO IT\` is not the maintainer's agreement."
-phrase_check rules.md "that the maintainer agrees once" 'The maintainer agrees once.'
-phrase_check rules.md "that agreed work is not weighed again" 'Agreed work is not weighed again.'
-phrase_check rules.md "that only the maintainer turns on a fast track" 'Only the maintainer turns on a fast track.'
+# The propose step's procedure is in mentat:propose, with its standing lines on agreement.
+phrase_check rules.md "the call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request."
+phrase_check skills/propose/SKILL.md "that a weigh's DO IT is not agreement" "A weigh's \`DO IT\` is not the maintainer's agreement"
+phrase_check skills/propose/SKILL.md "that nothing is built before agreement" 'nothing is built before that agreement'
+phrase_check skills/propose/SKILL.md "that the maintainer agrees once" 'The maintainer agrees once.'
+phrase_check skills/propose/SKILL.md "that agreed work is not weighed again" 'Agreed work is not weighed again.'
+phrase_check skills/propose/SKILL.md "that a batch needs agreement under one spec" 'A batch needs agreement under one spec whose numbered requirements cover each change.'
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh; then
