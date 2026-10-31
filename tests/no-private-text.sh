@@ -100,8 +100,17 @@ gh pr comment 7 --body-file "a dir/word file.md"
 gh pr comment 7 --body-file 'a dir/word file.md'
 gh api repos/o/r/issues/7/comments -F body=@word.md
 gh api repos/o/r/issues/7/comments -F "body=@word.md"
+gh api repos/o/r/issues/7/comments --field body=@word.md
+gh api repos/o/r/issues/7/comments --field=body=@word.md
 cd sub && gh pr comment 7 --body-file word.md
 FILES
+while IFS= read -r cmd; do
+  check "leaves alone a command with no hit: $cmd" '[ -z "$(decision "$cmd")" ]'
+done <<'CLEAN'
+gh api repos/o/r/issues/7/comments --field body=@clean.md
+gh api repos/o/r/issues/7/comments --field=body=@clean.md
+gh api repos/o/r/issues/7/comments --field body=plain
+CLEAN
 check "follows a file at an absolute path" '[ "$(decision "gh pr comment 7 --body-file $root/work/word.md")" = ask ]'
 check "leaves alone a clean file, a name that is no file, and standard input" '[ -z "$(decision "gh pr comment 7 --body-file clean.md")" ] && [ -z "$(decision "gh pr comment 7 --body-file missing.md")" ] && [ -z "$(decision "gh pr comment 7 --body-file -")" ]'
 # The name of a file it reads and a leading cd are not published.

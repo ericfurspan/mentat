@@ -3,11 +3,11 @@
 # gets a permission prompt when it holds a local path or a private name
 # (lib/publish.sh). It looks at gh pr create, pr edit, pr comment, pr review, issue
 # create, issue edit, issue comment and gh api writes: the command text, and files
-# named by --body-file, -F or --notes-file. A leading cd and the name of a file it
-# reads are not published, so they are not looked at. The prompt gives the category,
-# never the match, and approving it clears a false alarm. This is a net for mistakes,
-# not a security boundary: other routes exist. When it cannot read its input or its
-# tools are missing, it stays out of the way.
+# named by --body-file, -F, --field or --notes-file. A leading cd and the name of a
+# file it reads are not published, so they are not looked at. The prompt gives the
+# category, never the match, and approving it clears a false alarm. This is a net for
+# mistakes, not a security boundary: other routes exist. When it cannot read its input
+# or its tools are missing, it stays out of the way.
 # shellcheck disable=SC2016,SC2088 # ~/ and $HOME below are literal command text.
 set -uo pipefail
 
@@ -90,7 +90,7 @@ while [ -z "$repo" ] && [[ $rest =~ $re ]]; do
 done
 
 # The files it reads replace their names. gh api's -F names a file as field=@file.
-re="(--body-file|--notes-file|-F)(=|[[:space:]]+)$word"
+re="(--body-file|--notes-file|--field|-F)(=|[[:space:]]+)$word"
 files=""
 while IFS= read -r flag; do
   [[ $flag =~ $re ]] || continue
