@@ -2,7 +2,7 @@
 # The Grok side of mentat: review --grok and the Grok run shared with weigh, with
 # its sandbox profile and its isolated home. Sourced by bin/mentat.
 
-# A Grok review (`mentat review --grok`) runs beside the Codex review, once per
+# A Grok review (`mentat review --grok`) runs beside the main review, once per
 # pull request. Grok gets read-only file tools and no shell, a plain export of the
 # head without git history, and the diff inside its prompt. It runs as the user's
 # Grok sign-in, in a home folder Mentat builds for it, inside Grok's own sandbox
@@ -70,7 +70,7 @@ grok_prepare() {
   read_issues "$pr" "$info"
   # Fetch the head and the base into refs of this run's own, named with the process id,
   # not through git's one per-checkout record of the last fetch, nor the shared
-  # origin/<base> tracking ref: the review skill runs a Codex and a Grok review at once
+  # origin/<base> tracking ref: the review skill runs two reviews of a pull request at once
   # in this checkout, and with those shared the fetches of one could overwrite or lock
   # out the other (--refmap= keeps the configured mapping from also updating origin/<base>).
   # The refs go once the merge base is known (the commits stay), and at
@@ -209,8 +209,8 @@ grok_export_head() {
   GIT_INDEX_FILE="$run/index" git -C "$top" checkout-index -a -q --prefix="$run/export/" || "$fail" "could not export $head"
 }
 
-# Grok's own part of a pull request review, which Codex's prompt, weigh and
-# consult do not get: after the request, a step back to whether this is the right change.
+# Grok's own part of a pull request review: after the request, a step back to whether
+# this is the right change.
 grok_step_back() {
   printf 'After judging the change against the request, step back and consider whether this is the right change for its intent: '
   printf 'whether there is a simpler way or a better place for it, a name or structure that no longer describes what it does, '
@@ -240,8 +240,8 @@ grok_home() {
   local d
   # Grok's home: the sign-in, a config, and the sandbox profile. The profile starts
   # from `strict` and denies what `strict` still lets through: the temporary
-  # folders, ~/Library, the user's own Grok home, and the credential files Codex's
-  # profile denies. The prompt folder is the one extra place it may read, and the
+  # folders, ~/Library, the user's own Grok home, and the credential files named
+  # below. The prompt folder is the one extra place it may read, and the
   # empty vendor folder in its home the one extra place it may write: Grok unpacks
   # its search program (ripgrep) there the first time it searches, and without it
   # the grep tool fails.
