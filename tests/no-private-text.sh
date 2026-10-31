@@ -20,6 +20,7 @@ cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$PWD: $*" >>"$STUB/calls"
 [ -f "$STUB/lookup_fails" ] && exit 1
+case "$*" in *owner/private*) echo true; exit ;; *o/public*) echo false; exit ;; esac
 [ -f "$STUB/private" ] && echo true || echo false
 STUBEOF
 chmod +x "$root/bin/gh"
@@ -129,6 +130,68 @@ reset; decision "cd $root/other && gh pr comment 7 --body stubcodename" >/dev/nu
 check "looks up the checkout a leading cd goes to, else the session's" 'grep -qF "$root/other: repo view --json isPrivate" "$STUB/calls"'
 reset; decision "gh pr comment 7 --body stubcodename" >/dev/null
 check "without a cd, looks up the checkout of the session" 'grep -qF "$root/work: repo view --json isPrivate" "$STUB/calls"'
+
+# The target comes from gh's arguments, never a body. The stub says owner/private is
+# private, and o/public and the checkout, unless marked private, are public.
+reset
+asks_for() { rm -f "$STUB/calls"; [ "$(decision "$2")" = ask ] && grep -qF "repo view ${1:+$1 }--json isPrivate" "$STUB/calls"; }
+skips() { rm -f "$STUB/calls"; [ -z "$(decision "$1")" ] && grep -qF "repo view owner/private --json isPrivate" "$STUB/calls"; }
+while IFS= read -r c; do
+  check "a repository named in a body is not the target: $c" 'asks_for "" "$c"'
+done <<'BODIES'
+gh pr comment 5 --body "see --repo owner/private about stubcodename"
+gh pr comment 5 --body "see --repo=owner/private about stubcodename"
+gh pr comment 5 --body 'see --repo owner/private about stubcodename'
+gh pr comment 5 --body 'see --repo=owner/private about stubcodename'
+gh pr comment 5 --body "say \"a b --repo owner/private c\" about stubcodename"
+gh pr comment 5 --body "say \"a b --repo=owner/private c\" about stubcodename"
+gh pr comment 5 --body repos/owner/private --title stubcodename
+echo --repo owner/private; gh pr comment 5 --body stubcodename
+gh api -X POST graphql -f query="see repos/owner/private about stubcodename"
+gh api -X POST graphql -f query=stubcodename && cat repos/owner/private/x
+BODIES
+check "a repository named in a body is not the target, with a home path as the hit" 'asks_for "" "gh pr comment 5 --body \"see --repo owner/private for $HOME/x\""'
+c='gh pr comment 5 --body "$(cat <<EOF
+see "the --repo owner/private flag" about stubcodename
+EOF
+)"'
+check "a repository named in a command substitution's heredoc is not the target" 'asks_for "" "$c"'
+c='gh pr comment 5 --body-file - <<EOF
+see "the --repo owner/private flag" about stubcodename
+EOF'
+check "a repository named in a heredoc is not the target" 'asks_for "" "$c"'
+while IFS= read -r c; do
+  check "a repos/ path in a field is not the target: $c" 'asks_for o/public "$c"'
+done <<'FIELDS'
+gh api repos/o/public/issues/1/comments -f body="see repos/owner/private about stubcodename"
+gh api repos/o/public/issues/1/comments -f body='see repos/owner/private about stubcodename'
+gh api repos/o/public/issues/1/comments -f body=repos/owner/private -f title=stubcodename
+gh api repos/o/public/issues/1/comments -f "body=see /repos/owner/private about stubcodename"
+FIELDS
+while IFS= read -r c; do
+  check "a private target is skipped: $c" 'skips "$c"'
+done <<'TARGETS'
+gh pr comment 5 -R owner/private --body stubcodename
+gh pr comment 5 -R=owner/private --body stubcodename
+gh pr comment 5 --repo owner/private --body stubcodename
+gh pr comment 5 --repo=owner/private --body stubcodename
+gh pr comment 5 --repo "owner/private" --body stubcodename
+gh pr comment 5 --repo 'owner/private' --body stubcodename
+gh pr comment 5 --repo="owner/private" --body stubcodename
+gh -R owner/private pr comment 5 --body stubcodename
+gh api repos/owner/private/issues/5/comments -f body=stubcodename
+gh api -X POST /repos/owner/private/issues/5/comments -f body=stubcodename
+gh api -X POST "repos/owner/private/issues/5/comments" -f body=stubcodename
+gh pr comment 5 --body "x stubcodename" --repo owner/private
+b=$(cat x); gh pr comment 5 --repo owner/private --body "$b stubcodename"
+TARGETS
+c='gh pr comment 5 --repo owner/private --body "$(cat <<EOF
+about stubcodename
+EOF
+)"'
+check "a target before a command substitution stands" 'skips "$c"'
+touch "$STUB/private"
+check "a public target asks from a private checkout" 'asks_for o/public "gh pr comment 5 --repo o/public --body stubcodename"'
 
 # What the prompt says.
 reset

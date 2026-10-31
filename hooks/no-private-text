@@ -52,16 +52,42 @@ if [[ $text =~ $re ]]; then
   cd "$v" 2>/dev/null || true
 fi
 
-# The repository the text goes to; empty is the checkout's. The lookup is only on a hit.
+# The repository the text goes to, from gh's arguments and never a body; empty is the
+# checkout's. The lookup is only on a hit. Words cannot be told apart past $( or <<.
 repo=""
-re="(^|[[:space:]])(-R|--repo)(=|[[:space:]]+)$word"
-api_re='gh[[:space:]]+api[^;&|]*[[:space:]]["'"'"']?/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
-if [[ $text =~ $re ]]; then
-  plain "${BASH_REMATCH[4]}"
-  repo=$v
-elif [[ $text =~ $api_re ]]; then
-  repo=${BASH_REMATCH[1]}
-fi
+arg='([^[:space:]"'"'"']|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
+re="^[[:space:]]*($arg)"
+api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
+rest=$text prev="" in_gh="" api="" value_next=""
+while [ -z "$repo" ] && [[ $rest =~ $re ]]; do
+  w=${BASH_REMATCH[1]}
+  rest=${rest:${#BASH_REMATCH[0]}}
+  [ -n "$in_gh" ] || [ "$w" = gh ] || continue
+  in_gh=1
+  case "$w" in *'$('* | *'<<'*) break ;; esac
+  if [ -n "$value_next" ]; then
+    plain "$w"
+    repo=$v
+    break
+  fi
+  case "$w" in
+    -R | --repo) value_next=1 ;;
+    --repo=*) plain "${w#--repo=}"; repo=$v ;;
+    -R=*) plain "${w#-R=}"; repo=$v ;;
+  esac
+  [ "$prev" != gh ] || [ "$w" != api ] || api=1
+  prev=$w
+  [ -n "$api" ] || continue
+  # gh api's path, up to the end of that command. A path with placeholders is the checkout's.
+  plain "$w"
+  case "$v" in
+    repos/* | /repos/*)
+      api=""
+      if [[ $v =~ $api_re ]]; then repo=${BASH_REMATCH[1]}; fi
+      ;;
+  esac
+  case "$w" in *\; | *\& | *\|) api="" ;; esac
+done
 
 # The files it reads replace their names. gh api's -F names a file as field=@file.
 re="(--body-file|--notes-file|-F)(=|[[:space:]]+)$word"
