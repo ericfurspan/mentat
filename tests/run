@@ -86,6 +86,8 @@ phrase_check skills/review/SKILL.md "the waived round's Verification line and me
 phrase_check skills/review/SKILL.md "the waived round on the Claude-only path" 'On the Claude-only path it also skips the Claude round, unless the spec changed.'
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
+phrase_check skills/claude-review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
+phrase_check skills/claude-review/SKILL.md "that an earlier Claude round does not make a waived push Ready" 'an earlier Claude round does not make it Ready'
 
 # A P0 or P1 finding from Codex or Grok that was answered, not fixed, is named in the final check.
 phrase_check skills/review/SKILL.md "a serious finding answered, not fixed, in one Verification line and the merge message" 'A P0 or P1 finding from Codex or Grok that was answered instead of fixed is named in one Verification line, which can be its line in step 4'"'"'s list, and in one sentence of the "You: merge #N." message; a pull request with none adds no line.'
@@ -106,6 +108,7 @@ for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
   phrase_check "$f" "that status skips an INCOMPLETE Codex review" 'status skips an INCOMPLETE Codex review'
   phrase_check "$f" "that head reviewed: yes can mean a Claude round" "\`head reviewed: yes\` can mean a Claude round, so once Codex is back on, a Codex review still runs on the head"
 done
+phrase_check skills/review/SKILL.md "the latest comment read once Codex is turned back on" 'or Codex was just turned back on'
 phrase_check skills/review/SKILL.md "the final check reading Grok's fingerprint from its comment" 'read from its comment, because status compares only the last Codex or Claude review'
 phrase_check skills/pr/SKILL.md "a check that failed first as the builder's report" "a check that failed before the fix and passed after is the builder's report"
 phrase_check skills/pr/SKILL.md "titles in Conventional Commits" 'Titles follow Conventional Commits.'
