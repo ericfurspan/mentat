@@ -56,7 +56,7 @@ fast_track_check "turning on only by the maintainer" 'Claude Code never turns it
 fast_track_check "check of the complete final diff" 'check the complete final diff'
 fast_track_check "status line" 'Not reviewed: fast track agreed by the maintainer'
 fast_track_check "record in the spec" 'one line in the spec, written when it was agreed'
-fast_track_check "skipped reviewers, Claude included with Codex off" 'names every reviewer skipped, Codex and Grok, and Claude when Codex is off'
+fast_track_check "skipped reviewers" 'names every reviewer skipped, Codex and Grok (fast track agreed by the maintainer)'
 
 # An open hand check blocks "You: merge #N." (the review and Claude-only skills), and a push after Ready
 # skips its review round only on the maintainer's yes, for a diff that changes no file a program runs.
