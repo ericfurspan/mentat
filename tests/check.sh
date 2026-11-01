@@ -32,6 +32,15 @@ case "$1 $2" in
             else echo true; fi ;;
           *) echo owner/repo ;;
         esac ;;
+      # The account's private repository names: $STUB/repos, by default one on the list,
+      # and those reached only as a collaborator, $STUB/repos_collaborator. Any other
+      # affiliation fails. A failed lookup also prints a name, which must never reach the output.
+      'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100')
+        if [ -f "$STUB/repos_fail" ]; then echo stubleakedrepo; echo stubleakedrepo >&2; exit 1; fi
+        # The list was readable a moment ago, so the comparison itself fails.
+        if [ -f "$STUB/list_unreadable_after_lookup" ]; then chmod 000 "$HOME/.config/mentat/private-words"; fi
+        if [ -f "$STUB/repos" ]; then cat "$STUB/repos"; else echo stubword; fi
+        if [ -f "$STUB/repos_collaborator" ]; then cat "$STUB/repos_collaborator"; fi ;;
       *) exit 1 ;;
     esac ;;
   *) echo "$*" >>"$STUB/writes"; exit 99 ;;
@@ -98,8 +107,61 @@ reset; rc=$(run)
 check "a readable private word list is OK, and its words are not printed" '[ "$rc" = 0 ] && grep -qx "OK: the private word list is readable" "$STUB/out" && ! grep -q stubword "$STUB/out"'
 reset; mv "$LIST" "$LIST.away"; rc=$(run)
 check "a missing private word list warns, still exit 0, and prints no home path" '[ "$rc" = 0 ] && grep -qx "WARN: the private word list ~/.config/mentat/private-words is missing or unreadable: the publish check looks only for the home path" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qF "$HOME" "$STUB/out"'
+check "a missing private word list skips the comparison" '! grep -q "user/repos" "$STUB/calls"'
 reset; mv "$LIST.away" "$LIST"; chmod 000 "$LIST"; rc=$(run); chmod 600 "$LIST"
 check "an unreadable private word list warns, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+check "an unreadable private word list skips the comparison" '! grep -q "user/repos" "$STUB/calls"'
+
+# The word list against the account's private repositories. Every case but the failed
+# lookup's has names on the stub, and none may be printed.
+ALL_MATCH="OK: the private word list has every private repository this account can reach"
+no_name() { ! grep -qi -e stubword -e stubkept -e stubmissing -e stubleakedrepo -e stubother "$STUB/out"; }
+reset; rc=$(run)
+check "none missing is OK with no warning" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ] && no_name'
+check "asks once for private repositories as owner, organization member or collaborator" '[ "$(grep -cxF "api -X GET user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100 --paginate --jq .[].name" "$STUB/calls")" = 1 ]'
+
+reset; echo stubmissing-collaborator >"$STUB/repos_collaborator"; rc=$(run)
+check "a repository reached only as a collaborator counts as missing when it is not on the list" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && no_name'
+
+reset; printf 'stubword\nstubmissing-one\nstubmissing-two\n' >"$STUB/repos"
+before=$(cd "$root" && find home cwd -type f -exec cksum {} + && find home cwd | sort); rc=$(run)
+after=$(cd "$root" && find home cwd -type f -exec cksum {} + && find home cwd | sort)
+check "some missing warns with the count, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: 2 private repository name(s) are not whole lines of the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$ALL_MATCH" "$STUB/out"'
+check "some missing prints no name" 'no_name'
+check "some missing writes nothing, there or locally" '[ ! -f "$STUB/writes" ] && [ "$before" = "$after" ]'
+
+reset; echo STUBWORD >"$STUB/repos"; rc=$(run)
+check "a differently cased repository name is on the list" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ] && no_name'
+reset; echo stubword >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo STUBWORD >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a differently cased list line covers the repository" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && no_name'
+
+reset; touch "$STUB/repos"; rc=$(run)
+check "no private repositories is OK with no warning" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+
+reset; touch "$STUB/repos_fail"; rc=$(run)
+check "a failed lookup warns it could not compare, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: could not compare the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$ALL_MATCH" "$STUB/out"'
+check "a failed lookup prints no name" 'no_name'
+
+reset; touch "$STUB/list_unreadable_after_lookup"; rc=$(run); chmod 600 "$LIST"
+check "a failing comparison warns it could not compare, prints no OK line, no name and no path, still exit 0" '[ "$rc" = 0 ] && grep -qx "OK: the private word list is readable" "$STUB/out" && grep -q "^WARN: could not compare the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$ALL_MATCH" "$STUB/out" && no_name && ! grep -qF "$HOME" "$STUB/out"'
+# Bash 3.2 writes a here-string to a temporary file, and check changes nothing locally.
+check "lib/check.sh uses no here-string" '! grep -qF "<<<" "$(dirname "$mentat")/../lib/check.sh"'
+
+reset; echo stubkept-whole >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo stubkept >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a list line that is only part of a repository name does not cover it" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
+
+reset; printf 'stubother\nstubkept\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; printf '\n#stubother\n  \n# a comment\nstubkept\n' >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "blank and # list lines cover nothing" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
+reset; echo stubother >"$STUB/repos"; cp "$LIST" "$LIST.keep"; : >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "an empty list misses every repository" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
+
+reset; touch "$STUB/signed_out"; rc=$(run)
+check "signed out, the comparison does not run" '[ "$rc" = 1 ] && ! grep -q "user/repos" "$STUB/calls"'
+
+# The command the docs give lists the missing names, by the same lookup.
+doc_command=$(grep '^gh api -X GET ' "$(dirname "$mentat")/../docs/how-it-works.md")
+reset; printf 'stubword\nSTUBWORD\nstubmissing-one\n' >"$STUB/repos"; doc_out=$(bash -c "$doc_command" 2>&1)
+check "the docs' command lists only the missing names" '[ "$doc_out" = stubmissing-one ]'
 
 rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)
 check "an argument is a usage error (exit 64)" '[ "$rc" = 64 ]'
