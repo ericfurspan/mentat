@@ -54,7 +54,7 @@ Run these in a terminal:
 
 `uninstall` names the scope the install used; `claude plugin list` shows it.
 
-The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on, not on the terminal's. `mentat review` runs entirely on this machine, with the Codex CLI.
+The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on, not on the terminal's. `mentat review` runs from this machine with the Codex CLI and needs nothing installed on the repository.
 
 Where the repository requires an approval, the agent needs a separate GitHub account.
 
@@ -66,7 +66,7 @@ The `mentat` command (`review`, `status`, `challenge`, `weigh`, `consult`, `chec
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
 - `/mentat:grill`: interviews you about a plan, decision or idea, one clickable question at a time, each built on your last answer, and ends with a list of what was agreed. Claude Code may offer a grill; it starts one only if you agree.
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed in the backlog.
-- `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
+- `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules that Codex and Grok follow) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
 - `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in five short lines at most: the consensus first, then what each model adds. Runs anywhere, no repository needed.
 - `/mentat:claude-review`: turns Codex and Grok off for the session. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed, until you say in chat to turn Codex back on.
 
