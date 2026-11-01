@@ -39,8 +39,9 @@
 #     alone; its local fetch tool is denied.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
 #     gh signed in, the repository readable; prints the codex and grok versions, and warns
-#     when the repository keeps head branches after merge or the private word list is
-#     missing or unreadable. 0 Mentat can work (warnings printed), 1 it cannot.
+#     when the repository keeps head branches after merge, the private word list is
+#     missing or unreadable, or the list misses private repository names, by count only.
+#     0 Mentat can work (warnings printed), 1 it cannot.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
