@@ -376,8 +376,12 @@ check "hooks.json runs it on PreToolUse for Bash" \
 reset
 # shellcheck source=/dev/null
 . "$root_dir/lib/publish.sh"
-long=$(printf 'stubcodename %0200000d' 0)
+# A newline right after the match lets grep -q stop early, which is what fails a pipe
+# under pipefail. On one long line grep reads to the end, and a pipe would pass.
+long=$(printf 'stubcodename\n%0100000d\n%0100000d' 0 0)
 check "a hit early in long text is found under pipefail" '[ "$(private_text "$long")" = "a configured private name" ] && [ "$(publish_hit "$long" owner/repo)" = "a configured private name" ]'
+long_path=$(printf '%s\n%0100000d\n%0100000d' "$HOME" 0 0)
+check "the home path early in long text is found under pipefail" '[ "$(private_text "$long_path")" = "a local path" ]'
 check "the home path reports its category, and a miss returns 1 and prints nothing" '[ "$(private_text "at $HOME")" = "a local path" ] && ! private_text "nothing here" >/dev/null && [ -z "$(private_text "nothing here")" ]'
 reset
 check "held_comment returns 1 with no hit and looks nothing up" '! held=$(held_comment "nothing here" owner/repo) && [ -z "$held" ] && ! looked_up'
