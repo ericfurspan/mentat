@@ -32,11 +32,13 @@ case "$1 $2" in
             else echo true; fi ;;
           *) echo owner/repo ;;
         esac ;;
-      # The account's private repository names: $STUB/repos, by default one on the list.
-      # A failed lookup also prints a name, which must never reach the output.
-      'user/repos?affiliation=owner,organization_member&visibility=private&per_page=100')
+      # The account's private repository names: $STUB/repos, by default one on the list,
+      # and those reached only as a collaborator, $STUB/repos_collaborator. Any other
+      # affiliation fails. A failed lookup also prints a name, which must never reach the output.
+      'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100')
         if [ -f "$STUB/repos_fail" ]; then echo stubleakedrepo; echo stubleakedrepo >&2; exit 1; fi
-        if [ -f "$STUB/repos" ]; then cat "$STUB/repos"; else echo stubword; fi ;;
+        if [ -f "$STUB/repos" ]; then cat "$STUB/repos"; else echo stubword; fi
+        if [ -f "$STUB/repos_collaborator" ]; then cat "$STUB/repos_collaborator"; fi ;;
       *) exit 1 ;;
     esac ;;
   *) echo "$*" >>"$STUB/writes"; exit 99 ;;
@@ -110,11 +112,14 @@ check "an unreadable private word list skips the comparison" '! grep -q "user/re
 
 # The word list against the account's private repositories. Every case but the failed
 # lookup's has names on the stub, and none may be printed.
-ALL_MATCH="OK: the private word list has every private repository of this account and its organizations"
+ALL_MATCH="OK: the private word list has every private repository this account can reach"
 no_name() { ! grep -qi -e stubword -e stubkept -e stubmissing -e stubleakedrepo -e stubother "$STUB/out"; }
 reset; rc=$(run)
 check "none missing is OK with no warning" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ] && no_name'
-check "asks once for private repositories of the account and its organizations" '[ "$(grep -cxF "api -X GET user/repos?affiliation=owner,organization_member&visibility=private&per_page=100 --paginate --jq .[].name" "$STUB/calls")" = 1 ]'
+check "asks once for private repositories as owner, organization member or collaborator" '[ "$(grep -cxF "api -X GET user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100 --paginate --jq .[].name" "$STUB/calls")" = 1 ]'
+
+reset; echo stubmissing-collaborator >"$STUB/repos_collaborator"; rc=$(run)
+check "a repository reached only as a collaborator counts as missing when it is not on the list" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && no_name'
 
 reset; printf 'stubword\nstubmissing-one\nstubmissing-two\n' >"$STUB/repos"
 before=$(cd "$root" && find home cwd -type f -exec cksum {} + && find home cwd | sort); rc=$(run)

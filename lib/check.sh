@@ -6,8 +6,8 @@
 # branches are deleted, which it warns about and never changes. The rest of the
 # repository's settings (rulesets, required approvals, merge methods) are the
 # owner's and are not read. It also reads the names of the private repositories
-# of the signed-in account and its organizations, to compare them with the private
-# word list, and prints only how many are missing.
+# the signed-in account can reach, as owner, organization member or collaborator,
+# to compare them with the private word list, and prints only how many are missing.
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
 c_problem() { printf 'PROBLEM: %s\n' "$1"; check_problems=$((check_problems + 1)); }
@@ -23,7 +23,7 @@ c_finish() {
 # name. Success with no output means no private repositories, not a failed lookup.
 c_word_list_covers_repos() {
   local names missing=0
-  if ! names=$(gh api -X GET 'user/repos?affiliation=owner,organization_member&visibility=private&per_page=100' --paginate --jq '.[].name' 2>/dev/null); then
+  if ! names=$(gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' 2>/dev/null); then
     c_warn "could not compare the private word list with your private repositories: the lookup failed"
     return
   fi
@@ -31,7 +31,7 @@ c_word_list_covers_repos() {
   if [ "$missing" -gt 0 ]; then
     c_warn "$missing private repository name(s) are not whole lines of the private word list: 'The publish check' in docs/how-it-works.md gives the command that lists them"
   else
-    c_ok "the private word list has every private repository of this account and its organizations"
+    c_ok "the private word list has every private repository this account can reach"
   fi
 }
 check() {
