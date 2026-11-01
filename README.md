@@ -23,7 +23,7 @@ Mentat is a set of multi-agent AI development lifecycle tools (skills, hooks, co
 4. Claude Code checks the diff against the description and the spec, marks the status line Ready and reports it as "You: merge #N." with at most one more sentence; a hand check still open blocks it instead, with its steps at the top of the backlog item or pull request and one sentence in chat.
 5. The maintainer merges. Hooks ask before risky git commands: a merge, a push to the default branch, a force push, or a push or pull request with uncommitted changes. Another asks before an agent publishes GitHub text with a local path or a private name in a public repository. They catch mistakes and are not a security boundary.
 
-The agreed text has the shape of a spec, and each requirement is traced to its evidence; [spec-driven development](docs/spec-driven.md) maps the steps to that practice.
+The agreed text has the shape of a spec, and each requirement is traced to its evidence.
 
 [How it works](docs/how-it-works.md) has the full flow.
 
@@ -41,23 +41,36 @@ Mentat is built with Mentat. Pull requests here are opened by an agent account u
 claude plugin install mentat --marketplace ericfurspan/mentat
 ```
 
-[Setup](docs/setup.md) has the plugin commands and the review setup.
+This adds the marketplace and installs at `user` scope, once per machine, so Mentat is on in every folder. Before Claude Code 2.1.292: `claude plugin marketplace add ericfurspan/mentat`, then `claude plugin install mentat@mentat`. To install for one repository instead, use `--scope project` or `--scope local` ([plugin scopes](https://code.claude.com/docs/en/plugins/install)).
+
+Run these in a terminal:
+
+| What | Command |
+| --- | --- |
+| Turn it off in one project | `claude plugin disable mentat@mentat --scope local` in that checkout. Back on: `claude plugin enable mentat@mentat --scope local` |
+| Update | `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope user`, then `/reload-plugins` in a running session |
+| Remove | `claude plugin uninstall mentat@mentat --scope user` |
+| Where it is installed and on | `claude plugin list` |
+
+`uninstall` names the scope the install used; `claude plugin list` shows it.
+
+The `mentat` command is on Claude Code's Bash tool's PATH while the plugin is on, not on the terminal's. `mentat review` runs from this machine with the Codex CLI and needs nothing installed on the repository.
+
+Where the repository requires an approval, the agent needs a separate GitHub account.
 
 ## Commands
 
-The `mentat` command (`review`, `status`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes. Outside the workflow, `weigh`, `challenge` and `review` run in a git checkout, and `review` needs a GitHub pull request and posts one review (the review loop is the plugin's, not the command's); `consult` runs in any folder.
+The `mentat` command (`review`, `status`, `challenge`, `weigh`, `consult`, `check`) runs from Claude Code's shell; [How it works](docs/how-it-works.md) lists each with its exit codes. Outside the workflow, `weigh`, `challenge` and `review` run in a git checkout, and `review` needs a GitHub pull request and posts one review (the review loop runs only in the plugin); `consult` runs in any folder.
 
 - `/mentat:zoom-out`: a one-time summary of the goal, progress, open questions and the next step. Changes nothing.
 - `/mentat:come-again`: restates the last reply in three short lines or fewer.
 - `/mentat:grill`: interviews you about a plan, decision or idea, one clickable question at a time, each built on your last answer, and ends with a list of what was agreed. Claude Code may offer a grill; it starts one only if you agree.
 - `/mentat:retro`: reviews a session and proposes improvements one at a time, with evidence. Agreed ones are filed in the backlog.
-- `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
+- `/mentat:setup`: shows the repository's Mentat settings (the backlog, the test command, the Code Review Rules that Codex and Grok follow) and changes the ones you pick, in AGENTS.md. It can also move planning from GitHub issues to a Linear project.
 - `/mentat:consult <question>`: consults Codex, Grok and Claude Code on any question, with the web, and answers in five short lines at most: the consensus first, then what each model adds. Runs anywhere, no repository needed.
 - `/mentat:claude-review`: turns Codex and Grok off for the session. One Claude code review replaces the review loop, and plans are not challenged or ideas weighed, until you say in chat to turn Codex back on.
 
 ## Docs and credits
 
 - [How it works](docs/how-it-works.md): the full flow, the hooks, the commands.
-- [Spec-driven development](docs/spec-driven.md): where Mentat's steps fall in that practice.
-- [Setup](docs/setup.md): what a machine needs, the plugin commands, the review setup.
 - Third-party credits and licenses: the `CREDITS.md` files under `skills/`.
