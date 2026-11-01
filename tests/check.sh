@@ -37,6 +37,8 @@ case "$1 $2" in
       # affiliation fails. A failed lookup also prints a name, which must never reach the output.
       'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100')
         if [ -f "$STUB/repos_fail" ]; then echo stubleakedrepo; echo stubleakedrepo >&2; exit 1; fi
+        # The list was readable a moment ago, so the comparison itself fails.
+        if [ -f "$STUB/list_unreadable_after_lookup" ]; then chmod 000 "$HOME/.config/mentat/private-words"; fi
         if [ -f "$STUB/repos" ]; then cat "$STUB/repos"; else echo stubword; fi
         if [ -f "$STUB/repos_collaborator" ]; then cat "$STUB/repos_collaborator"; fi ;;
       *) exit 1 ;;
@@ -139,6 +141,11 @@ check "no private repositories is OK with no warning" '[ "$rc" = 0 ] && grep -qx
 reset; touch "$STUB/repos_fail"; rc=$(run)
 check "a failed lookup warns it could not compare, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: could not compare the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$ALL_MATCH" "$STUB/out"'
 check "a failed lookup prints no name" 'no_name'
+
+reset; touch "$STUB/list_unreadable_after_lookup"; rc=$(run); chmod 600 "$LIST"
+check "a failing comparison warns it could not compare, prints no OK line, no name and no path, still exit 0" '[ "$rc" = 0 ] && grep -qx "OK: the private word list is readable" "$STUB/out" && grep -q "^WARN: could not compare the private word list" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$ALL_MATCH" "$STUB/out" && no_name && ! grep -qF "$HOME" "$STUB/out"'
+# Bash 3.2 writes a here-string to a temporary file, and check changes nothing locally.
+check "lib/check.sh uses no here-string" '! grep -qF "<<<" "$(dirname "$mentat")/../lib/check.sh"'
 
 reset; echo stubkept-whole >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo stubkept >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
 check "a list line that is only part of a repository name does not cover it" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'

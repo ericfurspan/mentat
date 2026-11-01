@@ -21,14 +21,17 @@ c_finish() {
 # Warns with a count, never a name, for each private repository that is not a whole
 # line of the word list, ignoring case. Blank lines and # lines match no repository
 # name. Success with no output means no private repositories, not a failed lookup.
+# A pipe, not a here-string: bash 3.2 writes a here-string to a temporary file. grep
+# exits 1 when none are missing and above 1 on an error.
 c_word_list_covers_repos() {
-  local names missing=0
-  if ! names=$(gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' 2>/dev/null); then
-    c_warn "could not compare the private word list with your private repositories: the lookup failed"
-    return
+  local names missing=0 rc=0
+  names=$(gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' 2>/dev/null) || rc=2
+  if [ "$rc" = 0 ] && [ -n "$names" ]; then
+    missing=$(printf '%s\n' "$names" | grep -vixF -c -f "$PRIVATE_WORDS" 2>/dev/null) || rc=$?
   fi
-  [ -z "$names" ] || missing=$(grep -vixF -c -f "$PRIVATE_WORDS" <<<"$names")
-  if [ "$missing" -gt 0 ]; then
+  if [ "$rc" -gt 1 ]; then
+    c_warn "could not compare the private word list with your private repositories"
+  elif [ "$missing" -gt 0 ]; then
     c_warn "$missing private repository name(s) are not whole lines of the private word list: 'The publish check' in docs/how-it-works.md gives the command that lists them"
   else
     c_ok "the private word list has every private repository this account can reach"

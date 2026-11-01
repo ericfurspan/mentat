@@ -68,7 +68,7 @@ The merge, push and private text hooks only ask: they catch mistakes and are not
 
 One check looks at text an agent is about to publish on GitHub for the home directory path and each line of an optional word list, `~/.config/mentat/private-words`, kept outside any repository. A line is a fixed string, ignoring case; blank lines and lines starting with `#` are skipped. A hit is reported by category only, `a local path` or `a configured private name`, never the match. It applies only to a public repository: a private repository's own names are expected in its text, and a failed visibility lookup counts as public. `mentat check` warns when the list is missing or unreadable; the home path check still runs and a missing list never blocks.
 
-`mentat check` also warns, with a count and never a name, when a private repository the signed-in GitHub account can reach, as owner, organization member or collaborator, is not a whole line of the list, ignoring case. It warns when the lookup fails, and neither warning blocks. This command lists the missing names:
+`mentat check` also warns, with a count and never a name, when a private repository the signed-in GitHub account can reach, as owner, organization member or collaborator, is not a whole line of the list, ignoring case. It warns when the lookup or the comparison fails, and neither warning blocks. This command lists the missing names:
 
 ```
 gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' | grep -vixF -f ~/.config/mentat/private-words
