@@ -199,6 +199,7 @@ phrase_check skills/claude-review/SKILL.md "each call made without the maintaine
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
 phrase_check skills/propose/SKILL.md "the propose step's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:plan\`"
+phrase_check skills/propose/SKILL.md "a weigh for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets \`mentat weigh\`, however short."
 phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
 # An unasked follow-up is filed in the record, not left in chat.
 phrase_check rules.md "an unasked follow-up filed as a not-agreed backlog item" 'A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item'
