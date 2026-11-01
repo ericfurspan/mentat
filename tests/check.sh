@@ -58,7 +58,19 @@ cat >"$root/bin/grok" <<'STUBEOF'
 [ "$1" = --version ] && [ ! -f "$STUB/no_grok_version" ] && echo "grok 9.9.9 (stub) [stable]"
 exit 0
 STUBEOF
-chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok"
+# claude: prints $STUB/plugins, by default one Mentat copy; exits 1 too if $STUB/claude_fail
+# exists. Any call but the list is recorded in $STUB/writes and fails. Stands in for a real
+# claude, whose copies would change these results. Stderr carries a path that must not print.
+cat >"$root/bin/claude" <<'STUBEOF'
+#!/usr/bin/env bash
+printf 'claude %s traffic=%s\n' "$*" "${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-}" >>"$STUB/calls"
+[ "$*" = "plugin list --json" ] || { echo "$*" >>"$STUB/writes"; exit 99; }
+echo "/stubleakedpath/stubprojectname" >&2
+if [ -f "$STUB/plugins" ]; then cat "$STUB/plugins"
+else echo '[{"enabled":true,"id":"mentat@mentat","installPath":"/stubleakedpath/stubprojectname","scope":"user","version":"1.0.0"}]'; fi
+[ ! -f "$STUB/claude_fail" ]
+STUBEOF
+chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude"
 export PATH="$root/bin:$PATH"
 
 export HOME="$root/home"
@@ -162,6 +174,59 @@ check "signed out, the comparison does not run" '[ "$rc" = 1 ] && ! grep -q "use
 doc_command=$(grep '^gh api -X GET ' "$(dirname "$mentat")/../docs/how-it-works.md")
 reset; printf 'stubword\nSTUBWORD\nstubmissing-one\n' >"$STUB/repos"; doc_out=$(bash -c "$doc_command" 2>&1)
 check "the docs' command lists only the missing names" '[ "$doc_out" = stubmissing-one ]'
+
+# The Mentat plugin's copies, from the stub claude. Every entry names a path and a project,
+# and none may be printed.
+SAME_COPIES="OK: no Mentat plugin copies at different versions"
+NO_COMPARE="WARN: could not compare the installed Mentat plugin copies"
+entry() { printf '{"enabled":true,"id":"%s","installPath":"/stubleakedpath/stubprojectname/%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z","projectEnabled":false,"projectPath":"/stubleakedpath/stubprojectname","scope":"%s","version":"%s"}' "$1" "$3" "$2" "$3"; }
+no_leak() { ! grep -qi -e stubleakedpath -e stubprojectname -e 'installPath' "$STUB/out" && ! grep -qF "$HOME" "$STUB/out"; }
+ready_no_warning() { [ "$rc" = 0 ] && grep -qxF "$SAME_COPIES" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ] && no_leak; }
+cannot_compare() { [ "$rc" = 0 ] && grep -qxF "$NO_COMPARE" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$SAME_COPIES" "$STUB/out" && no_leak; }
+
+reset; rc=$(run)
+check "one copy gives no warning and prints no path or project name" 'ready_no_warning'
+check "asks claude once for the list, with its nonessential traffic off" '[ "$(grep -c "^claude " "$STUB/calls")" = 1 ] && grep -qxF "claude plugin list --json traffic=1" "$STUB/calls"'
+
+reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.0.0)" >"$STUB/plugins"; rc=$(run)
+check "two copies at the same version give no warning" 'ready_no_warning'
+
+reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.1.0)" >"$STUB/plugins"
+before=$(cd "$root" && find home cwd -type f -exec cksum {} + && find home cwd | sort); rc=$(run)
+after=$(cd "$root" && find home cwd -type f -exec cksum {} + && find home cwd | sort)
+check "two copies at different versions warn with each scope and version, still exit 0" '[ "$rc" = 0 ] && grep -qxF "WARN: the Mentat plugin is installed at different versions: user 1.0.0, project 1.1.0" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -qxF "$SAME_COPIES" "$STUB/out"'
+check "two copies at different versions print no path or project name" 'no_leak'
+check "two copies at different versions write nothing, there or locally" '[ ! -f "$STUB/writes" ] && [ "$before" = "$after" ]'
+
+reset; printf '[%s,%s,%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@other user 7.7.1)" "$(entry mentat-extra@mentat user 7.7.2)" "$(entry Mentat@mentat user 7.7.3)" >"$STUB/plugins"; rc=$(run)
+check "plugins with similar ids do not count" 'ready_no_warning && ! grep -q "7\.7\." "$STUB/out"'
+
+reset; printf '[%s]\n' "$(entry other@other user 1.0.0)" >"$STUB/plugins"; rc=$(run)
+check "no Mentat copy gives no warning" 'ready_no_warning'
+
+reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.1.0)" >"$STUB/plugins"; touch "$STUB/signed_out"; rc=$(run)
+check "signed out of gh, the copies are still compared" '[ "$rc" = 1 ] && grep -q "^WARN: the Mentat plugin is installed at different versions" "$STUB/out"'
+
+mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/noclaude/"
+reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "no claude command says nothing about copies and adds no warning" '[ "$rc" = 0 ] && ! grep -qi -e claude -e plugin "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+
+# A list that fails is not read, even when what it printed would compare.
+reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.1.0)" >"$STUB/plugins"; touch "$STUB/claude_fail"; rc=$(run)
+check "a failed list warns it could not compare, still exit 0" 'cannot_compare && ! grep -q "different versions" "$STUB/out"'
+
+unreadable() {
+  reset; printf '%s\n' "$2" >"$STUB/plugins"; rc=$(run)
+  check "$1 warns it could not compare, still exit 0" 'cannot_compare'
+}
+unreadable "output that is not JSON" "/stubleakedpath/stubprojectname is not JSON"
+unreadable "empty output" ""
+unreadable "JSON that is not a list" '{"id":"mentat@mentat","scope":"user","version":"1.0.0"}'
+unreadable "a list of something else" '["mentat@mentat"]'
+unreadable "a copy with no version" '[{"id":"mentat@mentat","scope":"user"}]'
+unreadable "a copy with no scope" '[{"id":"mentat@mentat","version":"1.0.0"}]'
+unreadable "a version that holds a path" "[$(entry mentat@mentat user 1.0.0),$(entry mentat@mentat project /stubleakedpath/stubprojectname)]"
+unreadable "a scope that holds a project name" "[$(entry mentat@mentat user 1.0.0),$(entry mentat@mentat "project stubprojectname" 1.1.0)]"
 
 rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)
 check "an argument is a usage error (exit 64)" '[ "$rc" = 64 ]'

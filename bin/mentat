@@ -40,8 +40,8 @@
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
 #     gh signed in, the repository readable; prints the codex and grok versions, and warns
 #     when the repository keeps head branches after merge, the private word list is
-#     missing or unreadable, or the list misses a private repository this account can
-#     reach, by count only.
+#     missing or unreadable, the list misses a private repository this account can
+#     reach, by count only, or the Mentat plugin is installed at different versions.
 #     0 Mentat can work (warnings printed), 1 it cannot.
 set -uo pipefail
 
