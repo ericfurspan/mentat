@@ -1,6 +1,6 @@
 ---
 name: claude-review
-description: "Turns the Codex and Grok reviews off for the rest of the session and has one Claude code-review replace them; no plan challenges and no `mentat weigh`, until the maintainer says in chat to turn Codex back on. Started by the maintainer."
+description: "Turns the Codex and Grok reviews off and has one Claude code-review replace them, with no plan challenges and no `mentat weigh`. This lasts for the rest of the session, until the maintainer says in chat to turn Codex back on. Started by the maintainer."
 disable-model-invocation: true
 ---
 

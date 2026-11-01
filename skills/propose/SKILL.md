@@ -1,6 +1,6 @@
 ---
 name: propose
-description: "Step 1 of a change: the teammate's view, any grill, the decisions, the weigh, the proposal and the maintainer's agreement, the spec, and when to call mentat:plan. Use before giving a view on any request that may change a repository, and after a compaction or a resumed session while this step is in progress."
+description: "Starts a change (step 1): gives a teammate's view, may offer a grill, asks the decisions still open, runs any `mentat weigh`, proposes the change, writes the spec once the maintainer agrees, and says when to call mentat:plan. Use before giving a view on any request that may change a repository, and after a compaction or a resumed session while this step is in progress."
 ---
 
 A weigh's `DO IT` is not the maintainer's agreement, and nothing is built before that agreement. The maintainer agrees once. Agreed work is not weighed again. A batch needs agreement under one spec whose numbered requirements cover each change.

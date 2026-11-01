@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: "Reading or changing the backlog, an external one (named in AGENTS.md, outside GitHub) or GitHub issues: items not agreed, the order of agreed work, labels and status, plans, evidence, the spec and waits on the maintainer. Use before filing, moving or reading a backlog item or issue, and right after `mentat weigh` or `mentat challenge`, to show the replies (and, with an external backlog, post them)."
+description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Covers items not agreed, the order of agreed work, labels and status, plans, evidence, the spec and waits on the maintainer. Use before filing, moving or reading a backlog item or issue, and right after `mentat weigh` or `mentat challenge`, to show the replies (and, with an external backlog, post them)."
 ---
 
 With no external backlog, the backlog is GitHub issues: only "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the item shape or steps 1 to 8.

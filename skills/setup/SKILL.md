@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Shows and sets Mentat's per-repository settings (the backlog, the test command and the Code Review Rules), which live as prose in the repository's AGENTS.md, including moving a repository's planning from GitHub issues to a Linear project. Started by the maintainer."
+description: "Shows and sets Mentat's per-repository settings (the backlog, the test command and the Code Review Rules), which live as prose in the repository's AGENTS.md. Can also move a repository's planning from GitHub issues to a Linear project. Started by the maintainer."
 disable-model-invocation: true
 ---
 
