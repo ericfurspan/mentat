@@ -12,7 +12,7 @@
 Mentat is a set of multi-agent AI development lifecycle tools (skills, hooks, commands) and rules for how agents communicate. It runs as a Claude Code plugin and covers brainstorming, planning, proposing, building and reviewing: Claude Code plans and builds, Codex and Grok give second opinions and review the code, and the maintainer decides what gets built and merges every pull request. Normally Codex reviews the pull request after every fix and Grok adds a second review where it is installed, and the maintainer merges. Along the way, the maintainer can step back with `/mentat:zoom-out`, put one question to several models with `/mentat:consult`, and review a session for improvements with `/mentat:retro`.
 
 <p align="center">
-  <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge. Codex and Grok give a second opinion on the request, Codex critiques the plan, and both review the code. The maintainer asks for the change, approves the plan and merges." width="680" height="320">
+  <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge. Codex and Grok give a second opinion on the request, Codex critiques the plan when needed, and both review the code. The maintainer asks for the change, approves the plan and merges." width="680" height="320">
 </p>
 
 ## How a change moves
