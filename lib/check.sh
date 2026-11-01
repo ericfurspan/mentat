@@ -8,6 +8,8 @@
 # owner's and are not read. It also reads the names of the private repositories
 # the signed-in account can reach, as owner, organization member or collaborator,
 # to compare them with the private word list, and prints only how many are missing.
+# When claude is installed, it reads the local plugin list, and prints only the scope
+# and version of each copy of the Mentat plugin.
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
 c_problem() { printf 'PROBLEM: %s\n' "$1"; check_problems=$((check_problems + 1)); }
@@ -37,6 +39,26 @@ c_word_list_covers_repos() {
     c_ok "the private word list has every private repository this account can reach"
   fi
 }
+# Warns when the Mentat plugin is installed at more than one version. Says nothing with
+# no claude command. The variable keeps the list off the network and out of the plugin
+# cache's in-use markers: without it, claude does both. jq -e fails on empty output, and
+# a scope or version that is not one plain word counts as unreadable, so a path cannot print.
+c_plugin_copies() {
+  local copies
+  command -v claude >/dev/null 2>&1 || return 0
+  if ! copies=$(CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude plugin list --json </dev/null 2>/dev/null | jq -er '
+    def word: if type == "string" and test("^[A-Za-z0-9._+-]+$") then . else error("unreadable") end;
+    if type == "array" then . else error("not a list") end
+    | [.[] | select(.id == "mentat@mentat") | {scope: (.scope | word), version: (.version | word)}]
+    | if (map(.version) | unique | length) > 1 then map(.scope + " " + .version) | join(", ") else "" end
+  ' 2>/dev/null); then
+    c_warn "could not compare the installed Mentat plugin copies"
+  elif [ -n "$copies" ]; then
+    c_warn "the Mentat plugin is installed at different versions: $copies"
+  else
+    c_ok "no Mentat plugin copies at different versions"
+  fi
+}
 check() {
   local repo tool v d list_ok=""
   [ $# -eq 0 ] || die "usage: mentat check" 64
@@ -53,6 +75,7 @@ check() {
     v=$(grok --version 2>/dev/null | head -n 1)
     c_ok "grok is installed (${v:-version unknown})"
   fi
+  c_plugin_copies
   # The publish check still looks for the home path without the list.
   if [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1
   else c_warn "the private word list ~/.config/mentat/private-words is missing or unreadable: the publish check looks only for the home path"; fi
