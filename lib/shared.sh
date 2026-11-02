@@ -115,7 +115,7 @@ request_fingerprint() { printf '%s' "$1" | shasum -a 256 | cut -c1-12; }
 review_criteria() {
   printf 'Read every AGENTS.md that applies, at the repository root and in nested directories, and follow its review rules.\n\n'
   printf 'Flag only problems with a realistic trigger that affect correctness, security or the requirements stated in the pull request. '
-  printf 'For each finding give the priority (P0 to P3), file:line, what goes wrong and when, and the fix. Skip style and wording. '
+  printf 'For each finding give the priority (P0 to P3), file:line, what goes wrong and when, and the fix. Skip style and wording, except in text agents follow as instructions, such as rules, skills, prompts and output styles. There, wording, names included, is a correctness problem when it can be read in a way that makes an agent act wrongly, conflicts with another instruction in the reviewed repository, or fails to direct something required; harmless redundancy and phrasing preferences are not findings. '
   printf 'Cite files by repository-relative path and line (path:line), never an absolute path. '
   printf 'Also flag tests that would pass whatever the code does, such as tests that restate the implementation instead of checking behavior. '
   printf 'Also flag a deleted test, a new skip, and an assertion removed or weakened, unless the pull request'"'"'s requirements remove what the test checked.\n\n'
