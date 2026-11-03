@@ -6,7 +6,7 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 - Step 2: statuses are Backlog (not agreed, or parked), Todo (agreed), In Progress, and Done, Canceled or Duplicate.
 - An item's type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
 - Step 4: on a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "You: merge #N." gets the same label and assignment, and the same removal.
-- Step 5: the order is a section "Order of agreed work, next first" in the project description. Update it with the connector's project save, which accepts partial edits.
+- Step 5: the next agreed work is the open Todo items without the `Waiting on you` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
 - Name the item's branch with its identifier as its own segment, lowercase, as in the branch names Linear itself suggests, after a Conventional Commits type, for example `feat/abc-26-branch-key`, so that Linear's GitHub integration attaches the pull request to the item. Step 6's hand-added link on the item stays, for a repository without the integration.
 - Hand-made items. Off unless the maintainer's own instructions turn it on. Then, when a session lists this project to choose or plan work (not while copying a spec for a review, not for `mentat:propose`'s read, and not from a skill that forbids writes), it refines each open item there that the project's lead created, that has none of the type labels and that has no `## Spec` or `## Agreed request` section. First it posts a comment headed as the maintainer's original text, holding the item's title and description as they are; if that comment is refused, the item stays unchanged. Then it sets a title, one type label (`Improvement` when the choice is unclear) and a description holding the item shape's opening sentence and the original's links. A question stays a question: refining neither answers nor researches it. An item in Triage moves to Backlog; one in Todo or In Progress keeps its status and is named in the reply. The assignee and other labels stay as they are. An item that cannot get a fair title or type without inventing what it asks stays unchanged and is named in the reply.
 - Merge waits left by GitHub. When a session lists this project to choose or plan work (not while copying a spec for a review, not for `mentat:propose`'s read, and not from a skill that forbids writes), it reads, with `gh pr view` in its repository, the pull request named by each open item with a merge wait: the `Waiting on you` label and an opening sentence saying it waits on the merge of that pull request. Merged: do what `mentat:review` says after "When the maintainer says #N merged" (the wait block's steps, then the item marked done), then the repository's own post-merge steps, unless the session can establish that they already ran. Closed without merging: remove the merge wait (step 4) and leave the status. Still open, or the lookup fails: leave the item unchanged, as with any other `Waiting on you` item. Name the cleared items in one line of the reply.
@@ -16,10 +16,6 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 ````
 Planning for the <repository> repository. Each item is the only record of a change: the request, plan, evidence, status and its "Spec" section, written in public-safe words. GitHub holds code and pull requests only; no issue is opened for agreed work. The `mentat:backlog` skill describes how items move.
 
-## Order of agreed work, next first
-
-Nothing agreed is waiting. Other items are in Backlog.
-
 ## How items move
 
 * Backlog: not agreed, or parked
@@ -27,4 +23,5 @@ Nothing agreed is waiting. Other items are in Backlog.
 * In Progress: a branch or pull request exists
 * Done, Canceled or Duplicate: how it ended
 * The "Waiting on you" label: the item waits on the maintainer and is assigned to the project's lead while it waits, with the steps at the top of its description (a merge wait names the pull request in its opening sentence instead)
+* Next agreed work: the open Todo items without the "Waiting on you" label, by Priority (Urgent, High, Medium, Low, then No priority), oldest first within a level. Linear's own drag order is not used. Priority is set only to a level the maintainer gave.
 ````
