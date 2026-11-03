@@ -154,7 +154,7 @@ phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it 
 phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
 phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
 phrase_check lib/shared.sh "the review prompt's rule for wording in text agents follow" 'There, wording, names included, is a correctness problem when it can be read in a way that makes an agent act wrongly'
-phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'it also says where the work came from'
+phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat'
 for s in 'Look here first' 'Not in scope'; do
   found=$(git ls-files -z -- . ':!tests/run' | xargs -0 grep -l -I -F -- "$s")
   if [ -z "$found" ]; then
@@ -216,13 +216,36 @@ else
   fail "skills/backlog/linear.md must exempt the propose step's read in both the hand-made items and merge waits bullets"
 fi
 
-# An item that is not agreed is described by what it is and where it stands, and waits on no one.
+# An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item the maintainer set aside says "parked" in its opening sentence'
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
 phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
 phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
-phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item and wait" 'what the item is (such as a bug, a proposal, a follow-up or a question), where it stands, and any wait on the maintainer (step 4)'
+# An item's description is short: an opening sentence that restates no status or wait the tracker shows,
+# except three, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
+phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The opening sentence: one plain sentence, not a heading, of at most about 25 words.'
+phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item" 'It says what the item is (such as a bug, a proposal, a follow-up or a question)'
+phrase_check skills/backlog/SKILL.md "no status or wait restated in the opening sentence" 'It does not restate status or waits, which the tracker'"'"'s fields show, so a change of status does not rewrite it.'
+phrase_check skills/backlog/SKILL.md "the opening sentence's three exceptions" 'It names only three things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), and, during a merge wait, that it waits on the merge of #N (step 4).'
+if grep -q -F -e 'where it stands, and any wait on the maintainer' -e 'Update it in the same edit as any change of status or wait' skills/backlog/SKILL.md; then
+  fail "skills/backlog/SKILL.md must not restate status or waits in the opening sentence (found the old rule)"
+else
+  pass "skills/backlog/SKILL.md does not restate status or waits in the opening sentence"
+fi
+if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
+  /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
+  pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the wait block, the spec, then the current plan"
+else
+  fail "skills/backlog/SKILL.md's item shape must put the opening sentence, the wait block, the spec, then the current plan, in that order"
+fi
+phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds only these, in this order:'
+phrase_check skills/backlog/SKILL.md "the wait block's one-line steps" 'numbered steps of one line each, plus anything to paste'
+phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
+phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at most five lines'
+phrase_check skills/backlog/SKILL.md "anything else in comments" 'Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description.'
+phrase_check skills/backlog/SKILL.md "older items not reshaped" 'Existing items are not reshaped: an agent that edits an older item for another reason leaves its opening sentence and sections as they are, except that it may drop a status clause this shape no longer keeps.'
+phrase_check skills/backlog/SKILL.md "the merge clause removed when the merge wait ends" 'then remove the merge clause from the opening sentence'
 phrase_check skills/backlog/SKILL.md "a wait on the maintainer for agreed work only, a hand test or setup step" 'when agreed work waits on a hand test or setup step only the maintainer can run'
 phrase_check skills/backlog/SKILL.md "where a wait goes, with either tracker" 'the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog'
 phrase_check skills/backlog/SKILL.md "the wait's shape" 'numbered steps (how many first), anything to paste, and one copy-ready command for a step repeated N times'
