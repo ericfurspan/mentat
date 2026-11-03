@@ -233,9 +233,9 @@ for f in skills/backlog/linear.md skills/setup/SKILL.md skills/zoom-out/SKILL.md
   fi
 done
 phrase_check skills/backlog/SKILL.md "the GitHub pinned issue's order" 'the pinned issue holds the order of agreed work, next first'
-phrase_check skills/backlog/SKILL.md "step 5's pointer to the tracker's order" '5. The order of agreed work, next first, is read as the tracker'"'"'s section says (Linear: `linear.md` step 5).'
+phrase_check skills/backlog/SKILL.md "step 5's pointer to the tracker's order" "5. The order of agreed work, next first, is read as the tracker's section says (Linear: \`linear.md\` step 5)."
 phrase_check skills/backlog/linear.md "no order section in the project description" 'Step 5: no section of the project description holds the order.'
-phrase_check skills/backlog/linear.md "the next agreed work's rank" 'The next agreed work is the open Todo items without the `Waiting on you` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level.'
+phrase_check skills/backlog/linear.md "the next agreed work's rank" "The next agreed work is the open Todo items without the \`Waiting on you\` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level."
 phrase_check skills/backlog/linear.md "every page read and waiting and In Progress items reported" 'Read every page of results before ranking, and report the waiting and In Progress items too.'
 phrase_check skills/backlog/linear.md "Priority only as the maintainer gave it" 'Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.'
 phrase_check skills/backlog/linear.md "the new project's rank line without the drag order" '* Next agreed work: the open Todo items without the "Waiting on you" label, by Priority (Urgent, High, Medium, Low, then No priority), oldest first within a level. Linear'"'"'s own drag order is not used.'
