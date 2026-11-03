@@ -225,8 +225,13 @@ phrase_check skills/backlog/linear.md "the new project's Backlog line as not agr
 
 # On Linear, no project section holds the order: the next agreed work is ranked from Todo items by Priority,
 # set only as the maintainer gave it, and setup's migration carries the pinned issue's order by creation order.
+# The one sentence that leaves an old order section alone is the only mention allowed.
+old_order_kept='A project description that still has an "Order of agreed work" section is left as it is, neither read nor updated.'
+phrase_check skills/backlog/linear.md "an old order section left alone" "$old_order_kept"
 for f in skills/backlog/linear.md skills/setup/SKILL.md skills/zoom-out/SKILL.md; do
-  if grep -q -F -e 'Order of agreed work' -e 'Nothing agreed is waiting' -e "project's order" -e 'order of agreed work' "$f"; then
+  text=$(cat "$f")
+  text=${text//"$old_order_kept"/}
+  if printf '%s\n' "$text" | grep -q -F -e 'Order of agreed work' -e 'Nothing agreed is waiting' -e "project's order" -e 'order of agreed work'; then
     fail "$f must not write or read a project order section on Linear"
   else
     pass "$f does not write or read a project order section on Linear"
@@ -264,7 +269,9 @@ phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds on
 phrase_check skills/backlog/SKILL.md "the wait block's one-line steps" 'numbered steps of one line each, plus anything to paste'
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
 phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at most five lines'
+phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:plan\`, goes in a comment, and the section keeps the next step."
 phrase_check skills/backlog/SKILL.md "anything else in comments" 'Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description.'
+phrase_check skills/backlog/SKILL.md "a refined hand-made item's links kept" "A refined hand-made item also keeps the original's links in the description, under the opening sentence, as \`linear.md\` says."
 phrase_check skills/backlog/SKILL.md "older items not reshaped" 'Existing items are not reshaped: an agent that edits an older item for another reason leaves its opening sentence and sections as they are, except that it may drop a status clause this shape no longer keeps.'
 phrase_check skills/backlog/SKILL.md "the merge clause removed when the merge wait ends" 'then remove the merge clause from the opening sentence'
 phrase_check skills/backlog/SKILL.md "a wait on the maintainer for agreed work only, a hand test or setup step" 'when agreed work waits on a hand test or setup step only the maintainer can run'
