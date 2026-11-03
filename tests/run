@@ -222,6 +222,27 @@ phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
 phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
 phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
+
+# On Linear, no project section holds the order: the next agreed work is ranked from Todo items by Priority,
+# set only as the maintainer gave it, and setup's migration carries the pinned issue's order by creation order.
+for f in skills/backlog/linear.md skills/setup/SKILL.md skills/zoom-out/SKILL.md; do
+  if grep -q -F -e 'Order of agreed work' -e 'Nothing agreed is waiting' -e "project's order" -e 'order of agreed work' "$f"; then
+    fail "$f must not write or read a project order section on Linear"
+  else
+    pass "$f does not write or read a project order section on Linear"
+  fi
+done
+phrase_check skills/backlog/SKILL.md "the GitHub pinned issue's order" 'the pinned issue holds the order of agreed work, next first'
+phrase_check skills/backlog/SKILL.md "step 5's pointer to the tracker's order" '5. The order of agreed work, next first, is read as the tracker'"'"'s section says (Linear: `linear.md` step 5).'
+phrase_check skills/backlog/linear.md "no order section in the project description" 'Step 5: no section of the project description holds the order.'
+phrase_check skills/backlog/linear.md "the next agreed work's rank" 'The next agreed work is the open Todo items without the `Waiting on you` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level.'
+phrase_check skills/backlog/linear.md "every page read and waiting and In Progress items reported" 'Read every page of results before ranking, and report the waiting and In Progress items too.'
+phrase_check skills/backlog/linear.md "Priority only as the maintainer gave it" 'Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.'
+phrase_check skills/backlog/linear.md "the new project's rank line without the drag order" '* Next agreed work: the open Todo items without the "Waiting on you" label, by Priority (Urgent, High, Medium, Low, then No priority), oldest first within a level. Linear'"'"'s own drag order is not used.'
+phrase_check skills/setup/SKILL.md "the migration's pinned order by creation order" 'only its order is carried to the project, by creation order'
+phrase_check skills/setup/SKILL.md "the migration's issue order and no Priority" 'Take the issues listed in the pinned issue'"'"'s order first, in that order, then the rest by issue number, and set no Priority on any item.'
+phrase_check skills/setup/SKILL.md "the mapping comment's note on the order" 'marked "order carried by creation order"'
+phrase_check skills/zoom-out/SKILL.md "zoom-out's read of the next agreed work" 'the next agreed work as its step 5 gives it'
 # An item's description is short: an opening sentence that restates no status or wait the tracker shows,
 # except three, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
 phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The opening sentence: one plain sentence, not a heading, of at most about 25 words.'
