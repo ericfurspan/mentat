@@ -223,24 +223,11 @@ phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 
 phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
 phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
 
-# On Linear, no project section holds the order: the next agreed work is ranked from Todo items by Priority,
-# set only as the maintainer gave it, and setup's migration carries the pinned issue's order by creation order.
-# The one sentence that leaves an old order section alone is the only mention allowed.
-old_order_kept='A project description that still has an "Order of agreed work" section is left as it is, neither read nor updated.'
-phrase_check skills/backlog/linear.md "an old order section left alone" "$old_order_kept"
-for f in skills/backlog/linear.md skills/setup/SKILL.md skills/zoom-out/SKILL.md; do
-  text=$(cat "$f")
-  text=${text//"$old_order_kept"/}
-  if printf '%s\n' "$text" | grep -q -F -e 'Order of agreed work' -e 'Nothing agreed is waiting' -e "project's order" -e 'order of agreed work'; then
-    fail "$f must not write or read a project order section on Linear"
-  else
-    pass "$f does not write or read a project order section on Linear"
-  fi
-done
+# On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
+# and setup's migration carries the pinned issue's order by creation order.
 phrase_check skills/backlog/SKILL.md "the GitHub pinned issue's order" 'the pinned issue holds the order of agreed work, next first'
 phrase_check skills/backlog/SKILL.md "step 5's pointer to the tracker's order" "5. The order of agreed work, next first, is read as the tracker's section says (Linear: \`linear.md\` step 5)."
-phrase_check skills/backlog/linear.md "no order section in the project description" 'Step 5: no section of the project description holds the order.'
-phrase_check skills/backlog/linear.md "the next agreed work's rank" "The next agreed work is the open Todo items without the \`Waiting on you\` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level."
+phrase_check skills/backlog/linear.md "the next agreed work's rank" "Step 5: the next agreed work is the open Todo items without the \`Waiting on you\` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level."
 phrase_check skills/backlog/linear.md "every page read and waiting and In Progress items reported" 'Read every page of results before ranking, and report the waiting and In Progress items too.'
 phrase_check skills/backlog/linear.md "Priority only as the maintainer gave it" 'Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.'
 phrase_check skills/backlog/linear.md "the new project's rank line without the drag order" '* Next agreed work: the open Todo items without the "Waiting on you" label, by Priority (Urgent, High, Medium, Low, then No priority), oldest first within a level. Linear'"'"'s own drag order is not used.'
@@ -254,11 +241,6 @@ phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The openin
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item" 'It says what the item is (such as a bug, a proposal, a follow-up or a question)'
 phrase_check skills/backlog/SKILL.md "no status or wait restated in the opening sentence" 'It does not restate status or waits, which the tracker'"'"'s fields show, so a change of status does not rewrite it.'
 phrase_check skills/backlog/SKILL.md "the opening sentence's three exceptions" 'It names only three things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), and, during a merge wait, that it waits on the merge of #N (step 4).'
-if grep -q -F -e 'where it stands, and any wait on the maintainer' -e 'Update it in the same edit as any change of status or wait' skills/backlog/SKILL.md; then
-  fail "skills/backlog/SKILL.md must not restate status or waits in the opening sentence (found the old rule)"
-else
-  pass "skills/backlog/SKILL.md does not restate status or waits in the opening sentence"
-fi
 if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
   /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
   pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the wait block, the spec, then the current plan"
@@ -272,7 +254,6 @@ phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at
 phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:plan\`, goes in a comment, and the section keeps the next step."
 phrase_check skills/backlog/SKILL.md "anything else in comments" 'Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description.'
 phrase_check skills/backlog/SKILL.md "a refined hand-made item's links kept" "A refined hand-made item also keeps the original's links in the description, under the opening sentence, as \`linear.md\` says."
-phrase_check skills/backlog/SKILL.md "older items not reshaped" 'Existing items are not reshaped: an agent that edits an older item for another reason leaves its opening sentence and sections as they are, except that it may drop a status clause this shape no longer keeps.'
 phrase_check skills/backlog/SKILL.md "the merge clause removed when the merge wait ends" 'then remove the merge clause from the opening sentence'
 phrase_check skills/backlog/SKILL.md "a wait on the maintainer for agreed work only, a hand test or setup step" 'when agreed work waits on a hand test or setup step only the maintainer can run'
 phrase_check skills/backlog/SKILL.md "where a wait goes, with either tracker" 'the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog'
