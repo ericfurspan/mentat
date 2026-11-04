@@ -76,6 +76,12 @@ phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" 'apply the
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
 phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "You: merge #N."'
+phrase_check skills/review/SKILL.md "the open hand check as the maintainer's, until the Verification says they checked it" 'A hand check is open when a requirement of the spec is one the maintainer checks by hand and the Verification does not say the maintainer checked it and what they saw.'
+phrase_check skills/review/SKILL.md "that a builder's or Claude Code's own look does not close a hand check" "A builder's or Claude Code's own look does not close it."
+phrase_check skills/review/SKILL.md "the record of the maintainer's reported hand check" 'record in the Verification that the maintainer checked it and what they saw'
+phrase_check skills/claude-review/SKILL.md "the open hand check as the maintainer's, not closed by an agent's own look" "(a requirement the maintainer checks by hand whose Verification row still does not say the maintainer checked it and what they saw; a builder's or Claude Code's own look does not close it)"
+phrase_check skills/backlog/SKILL.md "the spec's hand check requirement as the maintainer's" 'and one the maintainer checks by hand says so.'
+phrase_check skills/pr/SKILL.md "the spec shape's hand check requirement as the maintainer's" 'and one the maintainer checks by hand says so;'
 phrase_check skills/review/SKILL.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
 phrase_check skills/review/SKILL.md "the waived round's yes for that push" 'on their yes for that push'
 phrase_check skills/review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
@@ -200,6 +206,11 @@ phrase_check skills/claude-review/SKILL.md "each call made without the maintaine
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
 phrase_check skills/propose/SKILL.md "the propose step's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:plan\`"
+phrase_check skills/propose/SKILL.md "a small, clear request's hand check offer" 'When the change has something to try, the one-line view also offers the hand check of step 5.'
+phrase_check skills/propose/SKILL.md "the proposal's hand check offer for a change with something to try" "When the change has something the maintainer can try in a few minutes (a screen, a page, a command's output, a behavior they can trigger), the proposal offers them a hand check."
+phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "You: merge #N." until they report it.'
+phrase_check skills/propose/SKILL.md "no hand check offer for a change with nothing to try" 'A change with nothing to try gets no offer.'
+phrase_check skills/propose/SKILL.md "the spec's hand check only when accepted or asked for" 'The spec lists a requirement the maintainer checks by hand only when their agreement accepts the offer or they asked for one.'
 phrase_check skills/propose/SKILL.md "a weigh for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets \`mentat weigh\`, however short."
 phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
 # An unasked follow-up is filed in the record, not left in chat.
