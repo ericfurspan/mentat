@@ -222,6 +222,8 @@ else
 fi
 # A suggestion to keep handling leftovers of something a change removes is not adopted.
 phrase_check rules.md "a one-time cleanup instead of handling leftovers of what a change removes" 'leftovers get a one-time cleanup instead, and the old form keeps support only where records the change cannot rewrite or a requirement still in force need it.'
+# On instruction text, a finding that only covers a rare or harmless case is answered, not fixed.
+phrase_check rules.md "a rare or harmless case on instruction text answered, not fixed" 'On instruction text, a finding that only covers a rare or harmless case is answered with a reason, not fixed.'
 # The propose step's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/linear.md)" -eq 2 ]; then
   pass "skills/backlog/linear.md exempts the propose step's read from refining items and clearing merge waits"
