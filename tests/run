@@ -123,6 +123,9 @@ phrase_check skills/pr/SKILL.md "the alert type in one clause" 'Use the GitHub a
 phrase_check skills/pr/SKILL.md "a changed hook, CI workflow or instruction file, ranked right after a real blast radius" 'or a real blast radius (what breaks, for whom); a changed hook, CI workflow or agent instruction file whose behavior changes, named with the reason it deserves a look;'
 phrase_check skills/review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
 phrase_check skills/claude-review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
+# /mentat:consult weighs a plan at HEAD only in a repository without personal data, and sends only the text as given.
+phrase_check skills/consult/SKILL.md "that an AGENTS.md silent about personal data counts as none" 'an AGENTS.md that says nothing about it counts as none'
+phrase_check skills/consult/SKILL.md "that the file sent holds only the question or idea as given" 'The file holds only the maintainer'"'"'s question or idea as given, with nothing pasted from the working tree (file contents, diffs)'
 
 # Mentat neither turns on the desktop app's Auto-fix nor assumes it is on; its wake-ups,
 # a CI failure included, change neither whose comments are requests nor the hold after "You: merge #N.".
