@@ -213,7 +213,8 @@ phrase_check rules.md "what Claude Code settles without asking" 'Claude Code set
 # A decision prompt can be answered on its own, a call made without the maintainer reaches chat one line each,
 # mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
 phrase_check rules.md "a decision as one question about outcomes, never the mechanism" 'A decision reaches them as one question about what they get, pay or risk, never about the mechanism'
-phrase_check rules.md "what each option authorizes, gets and costs" 'each option saying what it authorizes, gets and costs'
+phrase_check rules.md "what each option authorizes and gets, with only the costs that differ" 'each option saying what it authorizes and gets, and naming only the costs that differ between the options (a cost every option shares is not repeated)'
+phrase_check rules.md "unasked follow-ups settled in an Intake sitting" "such items are settled in an Intake sitting (\`/mentat:intake\`)."
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question saying why the first is recommended, so the prompt alone suffices'
