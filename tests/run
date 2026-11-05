@@ -274,7 +274,8 @@ phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 
 phrase_check skills/backlog/SKILL.md "step 2's taken on stage, not agreed to build" "it is not agreed to build; agreement to build comes from \`mentat:propose\` and moves it to agreed."
 phrase_check skills/backlog/linear.md "Linear's Backlog status as taken on, not agreed to build" 'statuses are Backlog (taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on, whose opening sentence says so), Todo (agreed to build)'
 phrase_check skills/backlog/linear.md "the new project's Backlog line as taken on, not agreed to build" '* Backlog: taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on, whose opening sentence says so'
-phrase_check skills/setup/SKILL.md "the migration's Backlog item not taken on yet" 'Backlog only with none of these, with an opening sentence saying it is not taken on yet'
+phrase_check skills/setup/SKILL.md "the migration's undecided idea in the inbox, else a Backlog item not taken on yet" "An undecided idea goes in the project's inbox as the maintainer's own instructions say where they name one, and step 7's comment lists it as \"inbox\" in place of an item id; with none named, it is a Backlog item whose opening sentence says it is not taken on yet."
+phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
 phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,

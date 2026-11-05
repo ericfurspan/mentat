@@ -59,9 +59,9 @@ One word per meaning:
 - The main session: the maintainer's own instruction file, `rules.md` (the SessionStart hook prints it on startup, resume, clear, compact and fork), every `AGENTS.md` that applies, the skills it invokes, and, in a sitting, the channel readers the maintainer's own instructions name.
 - The builder subagent: `prompts/builder.md`, the main session's brief, and the `AGENTS.md` files the brief names.
 - Codex and Grok reviews: the repository's `AGENTS.md` files and their Code Review Rules, which the prompt tells them to read and follow, and, as data, the pull request's title and description, any linked issue and the spec passed with `--request`. Codex reads a checkout of the head, plus its own global instruction file when the user has one. Grok reads an export of the head without `.git`, in a Grok home of its own with Claude and Cursor rules, skills and hooks off.
-- Weigh: the idea file and the repository at HEAD (a detached checkout for Codex, an export for Grok), with every `AGENTS.md` that applies.
-- Challenge: the plan file and the checkout as it stands, with every `AGENTS.md` that applies; the prompt names HEAD and whether there are uncommitted changes.
-- Consult: the question file only, in an empty folder with no repository.
+- Weigh: the idea file and the repository at HEAD (a detached checkout for Codex, an export for Grok), with every `AGENTS.md` that applies, plus, for Codex, its own global instruction file when the user has one.
+- Challenge: the plan file and the checkout as it stands, with every `AGENTS.md` that applies, plus Codex's own global instruction file when the user has one; the prompt names HEAD and whether there are uncommitted changes.
+- Consult: the question file only, in an empty folder with no repository, plus, for Codex, its own global instruction file when the user has one.
 - A cloud session: no user instruction file and no user plugins, so neither `rules.md` nor Mentat's hooks.
 
 ## The repository comes first
