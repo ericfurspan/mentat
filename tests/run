@@ -269,6 +269,8 @@ phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item the maintainer set aside says "parked" in its opening sentence'
+phrase_check skills/backlog/SKILL.md "a GitHub issue not taken on, said in its opening sentence" 'Where no inbox is named, an issue filed but not taken on says so in its opening sentence.'
+phrase_check skills/backlog/SKILL.md "an Intake ending recorded on a GitHub issue" "An Intake decision rewrites that sentence and records the ending on the issue as \`/mentat:intake\` step 5 says; a duplicate is closed with \`--reason duplicate\` and a canceled one with \`--reason \"not planned\"\`, with the reason in a comment."
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
 # Taking an idea on in an Intake sitting is not agreement to build: Backlog holds it, and mentat:propose moves it to Todo.
 phrase_check skills/backlog/SKILL.md "step 2's taken on stage, not agreed to build" "it is not agreed to build; agreement to build comes from \`mentat:propose\` and moves it to agreed."
