@@ -237,10 +237,12 @@ fi
 # The listing session clears a hand wait from a comment reporting its Ends when result; an unclear case,
 # or any case read by a skill that forbids writes, is named as "may be done" and left unchanged.
 phrase_check skills/backlog/linear.md "the waits left open bullet" '- Waits left open. When a session lists this project to choose or plan work'
-phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits left to their own path" "Hand wait: for each open item with a wait block and no merge wait, it reads the item's comments."
+phrase_check skills/backlog/linear.md "the waits left open bullet's exemptions" "(not for \`mentat:propose\`'s read, not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
+phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits and open pull requests left to their own path" "Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments."
+phrase_check skills/backlog/linear.md "a hand wait with an open pull request left for review" "An item whose linked pull request is still open is left unchanged for \`mentat:review\`, and named \"may be done\" the same way when a comment may report its result."
 phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (step 4: the block, the label and the lead's assignment removed)."
 phrase_check skills/backlog/linear.md "an unclear hand wait named as may be done" "A comment that may report it, or a later report on a block with no \`Ends when\` line, leaves the item unchanged, and the item is named as \"may be done\" with the comment's date."
-phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
+phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
 
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
