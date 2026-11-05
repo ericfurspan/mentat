@@ -269,8 +269,12 @@ phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item the maintainer set aside says "parked" in its opening sentence'
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
-phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
-phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
+# Taking an idea on in an Intake sitting is not agreement to build: Backlog holds it, and mentat:propose moves it to Todo.
+phrase_check skills/backlog/SKILL.md "step 2's taken on stage, not agreed to build" "it is not agreed to build; agreement to build comes from \`mentat:propose\` and moves it to agreed."
+phrase_check skills/backlog/linear.md "Linear's Backlog status as taken on, not agreed to build" 'statuses are Backlog (taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on, whose opening sentence says so), Todo (agreed to build)'
+phrase_check skills/backlog/linear.md "the new project's Backlog line as taken on, not agreed to build" '* Backlog: taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on, whose opening sentence says so'
+phrase_check skills/setup/SKILL.md "the migration's Backlog item not taken on yet" 'Backlog only with none of these, with an opening sentence saying it is not taken on yet'
+phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
 # and setup's migration carries the pinned issue's order by creation order.
@@ -285,11 +289,11 @@ phrase_check skills/setup/SKILL.md "the migration's issue order and no Priority"
 phrase_check skills/setup/SKILL.md "the mapping comment's note on the order" 'marked "order carried by creation order"'
 phrase_check skills/zoom-out/SKILL.md "zoom-out's read of the next agreed work" 'the next agreed work as its step 5 gives it'
 # An item's description is short: an opening sentence that restates no status or wait the tracker shows,
-# except three, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
+# except four, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
 phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The opening sentence: one plain sentence, not a heading, of at most about 25 words.'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item" 'It says what the item is (such as a bug, a proposal, a follow-up or a question)'
 phrase_check skills/backlog/SKILL.md "no status or wait restated in the opening sentence" 'It does not restate status or waits, which the tracker'"'"'s fields show, so a change of status does not rewrite it.'
-phrase_check skills/backlog/SKILL.md "the opening sentence's three exceptions" 'It names only three things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), and, during a merge wait, that it waits on the merge of #N (step 4).'
+phrase_check skills/backlog/SKILL.md "the opening sentence's four exceptions" 'It names only four things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), during a merge wait, that it waits on the merge of #N (step 4), and, where no inbox is named, that an idea is not taken on yet (step 2).'
 if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
   /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
   pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the wait block, the spec, then the current plan"
