@@ -3,7 +3,7 @@
 For a repository whose AGENTS.md names a Linear project, by name and team.
 
 - Step 1: find the project with the Linear connector, by that name and team. If the connector's tools are not in the session, load them with ToolSearch (query `linear`); if they are still missing, Linear is not connected: step 1 applies.
-- Step 2: statuses are Backlog (taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on, whose opening sentence says so), Todo (agreed to build), In Progress, and Done, Canceled or Duplicate.
+- Step 2: statuses are Backlog (taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on or kept for reference, whose opening sentence says so), Todo (agreed to build), In Progress, and Done, Canceled or Duplicate.
 - An item's type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
 - Step 4: on a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "You: merge #N." gets the same label and assignment, and the same removal.
 - Step 5: the next agreed work is the open Todo items without the `Waiting on you` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
@@ -18,7 +18,7 @@ Planning for the <repository> repository. Each item is the only record of a chan
 
 ## How items move
 
-* Backlog: taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on, whose opening sentence says so
+* Backlog: taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on or kept for reference, whose opening sentence says so
 * Todo: agreed to build
 * In Progress: a branch or pull request exists
 * Done, Canceled or Duplicate: how it ended
