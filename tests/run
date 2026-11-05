@@ -228,12 +228,21 @@ fi
 phrase_check rules.md "a one-time cleanup instead of handling leftovers of what a change removes" 'leftovers get a one-time cleanup instead, and the old form keeps support only where records the change cannot rewrite or a requirement still in force need it.'
 # On instruction text, a finding that only covers a rare or harmless case is answered, not fixed.
 phrase_check rules.md "a rare or harmless case on instruction text answered, not fixed" 'On instruction text, a finding that only covers a rare or harmless case is answered with a reason, not fixed.'
-# The propose step's read (mentat:propose) neither refines hand-made items nor clears merge waits: both bullets exempt it.
+# The propose step's read (mentat:propose) neither refines hand-made items nor clears waits: both bullets exempt it.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s read," skills/backlog/linear.md)" -eq 2 ]; then
-  pass "skills/backlog/linear.md exempts the propose step's read from refining items and clearing merge waits"
+  pass "skills/backlog/linear.md exempts the propose step's read from refining items and clearing waits"
 else
-  fail "skills/backlog/linear.md must exempt the propose step's read in both the hand-made items and merge waits bullets"
+  fail "skills/backlog/linear.md must exempt the propose step's read in both the hand-made items and waits left open bullets"
 fi
+# The listing session clears a hand wait from a comment reporting its Ends when result; an unclear case,
+# or any case read by a skill that forbids writes, is named as "may be done" and left unchanged.
+phrase_check skills/backlog/linear.md "the waits left open bullet" '- Waits left open. When a session lists this project to choose or plan work'
+phrase_check skills/backlog/linear.md "the waits left open bullet's exemptions" "(not for \`mentat:propose\`'s read, not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
+phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits and open pull requests left to their own path" "Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments."
+phrase_check skills/backlog/linear.md "a hand wait with an open pull request left for review" "An item whose linked pull request is still open is left unchanged for \`mentat:review\`, and named \"may be done\" the same way when a comment may report its result."
+phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (step 4: the block, the label and the lead's assignment removed)."
+phrase_check skills/backlog/linear.md "an unclear hand wait named as may be done" "A comment that may report it, or a later report on a block with no \`Ends when\` line, leaves the item unchanged, and the item is named as \"may be done\" with the comment's date."
+phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
 
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
@@ -267,7 +276,7 @@ else
   fail "skills/backlog/SKILL.md's item shape must put the opening sentence, the wait block, the spec, then the current plan, in that order"
 fi
 phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds only these, in this order:'
-phrase_check skills/backlog/SKILL.md "the wait block's one-line steps" 'numbered steps of one line each, plus anything to paste'
+phrase_check skills/backlog/SKILL.md "the wait block's one-line steps and Ends when line" "numbered steps of one line each, plus anything to paste, then the \`Ends when:\` line."
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
 phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at most five lines'
 phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:plan\`, goes in a comment, and the section keeps the next step."
@@ -278,6 +287,9 @@ phrase_check skills/backlog/SKILL.md "a wait on the maintainer for agreed work o
 phrase_check skills/backlog/SKILL.md "where a wait goes, with either tracker" 'the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog'
 phrase_check skills/backlog/SKILL.md "the wait's shape" 'numbered steps (how many first), anything to paste, and one copy-ready command for a step repeated N times'
 phrase_check skills/backlog/SKILL.md "step 4's pointer to the wait's shape" '("Waits on the maintainer" gives the shape)'
+phrase_check skills/backlog/SKILL.md "the wait's steps in full" 'The steps are written in full in the wait, never pointing to a comment; text too long for a step, such as a prompt to copy, goes in a document attached to the item and linked from that step.'
+phrase_check skills/backlog/SKILL.md "the wait's Ends when line" "The wait's last line says what ends it, as \`Ends when: <the result that shows it is done>\`."
+phrase_check skills/setup/SKILL.md "the switch item's Ends when line" "\`Ends when: the pull request is merged and each listed issue is closed\`"
 phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
 phrase_check skills/setup/SKILL.md "step 8's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
