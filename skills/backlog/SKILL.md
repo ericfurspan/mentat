@@ -36,7 +36,7 @@ Anything else, such as progress notes, evidence and replaced plans, goes in comm
 
 ## Waits on the maintainer
 
-With either tracker, when agreed work waits on a hand test or setup step only the maintainer can run, the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog, as a heading saying it waits on the maintainer, numbered steps (how many first), anything to paste, and one copy-ready command for a step repeated N times. With no record, the steps go in chat once.
+With either tracker, when agreed work waits on a hand test or setup step only the maintainer can run, the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog, as a heading saying it waits on the maintainer, numbered steps (how many first), anything to paste, and one copy-ready command for a step repeated N times. The steps are written in full in the wait, never pointing to a comment; text too long for a step, such as a prompt to copy, goes in a document attached to the item and linked from that step. The wait's last line says what ends it, as `Ends when: <the result that shows it is done>`. With no record, the steps go in chat once.
 
 ## Replies in chat
 
