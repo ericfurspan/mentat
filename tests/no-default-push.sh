@@ -497,6 +497,11 @@ check "a cd to a branch changing instructions asks before gh pr create" \
 check "a cd away from a branch changing instructions still asks before gh pr create" \
   '[ "$(reason "$tmp/i-agents" "cd ../feat && gh pr create --fill")" = "$instr_reason" ]'
 check "a cd to a branch changing only other files leaves alone" '[ -z "$(decision "$tmp/feat" "cd ../i-other && gh pr create --fill")" ]'
+# Paths are read from the repository root, even from a subdirectory with diff.relative set.
+cp -R "$tmp/i-rules" "$tmp/i-relative"
+g -C "$tmp/i-relative" config diff.relative true
+check "a branch changing the root rules.md, from a subdirectory with diff.relative: asks with that reason" \
+  '[ "$(reason "$tmp/i-relative/docs" "gh pr create --fill")" = "$instr_reason" ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }
