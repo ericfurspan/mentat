@@ -423,6 +423,81 @@ check "with uncommitted changes asks before: gh --repo=o/r pr create --fill" '[ 
 check "with uncommitted changes leaves alone: gh -R o/r pr view" '[ -z "$(decision "$tmp/edited" "gh -R o/r pr view")" ]'
 check "with uncommitted changes leaves alone: gh pr -R o/r view" '[ -z "$(decision "$tmp/edited" "gh pr -R o/r view")" ]'
 
+# A pull request whose branch changes agent instruction files asks, from the merge base with origin/<default>.
+g init -q "$tmp/ibase"
+mkdir -p "$tmp/ibase/skills/x" "$tmp/ibase/prompts" "$tmp/ibase/docs/prompts"
+for f in AGENTS.md rules.md prompts/builder.md skills/x/SKILL.md docs/rules.md docs/prompts/x.md README.md; do
+  printf 'a\n' >"$tmp/ibase/$f"
+done
+g -C "$tmp/ibase" add -A
+g -C "$tmp/ibase" commit -q -m base
+g -C "$tmp/ibase" update-ref refs/remotes/origin/main HEAD
+g -C "$tmp/ibase" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+g -C "$tmp/ibase" checkout -q -b feat/i
+# branch <name> <change>: a copy of ibase with <change> run in it and committed.
+branch() {
+  cp -R "$tmp/ibase" "$tmp/$1"
+  (cd "$tmp/$1" && eval "$2") >/dev/null
+  g -C "$tmp/$1" add -A
+  g -C "$tmp/$1" commit -q -m change
+}
+branch i-agents 'printf "b\n" >>AGENTS.md'
+branch i-new 'mkdir -p a/b && printf "x\n" >a/b/AGENTS.override.md'
+branch i-claude 'printf "x\n" >docs/CLAUDE.md'
+branch i-skill 'printf "b\n" >>skills/x/SKILL.md'
+branch i-rules 'printf "b\n" >>rules.md'
+branch i-prompts 'printf "b\n" >>prompts/builder.md'
+branch i-rename 'g mv AGENTS.md notes.md'
+branch i-delete 'g rm -q rules.md'
+branch i-other 'printf "b\n" >>README.md; printf "b\n" >>docs/rules.md; printf "b\n" >>docs/prompts/x.md; printf "x\n" >AGENTS.txt'
+instr_reason="Mentat: this pull request changes agent instructions, and a change to what agents are told gets mentat weigh before the maintainer agrees to it. Approve if it was weighed, if Codex and Grok are off for this session, or if it changes no meaning."
+for d in i-agents i-new i-claude i-skill i-rules i-prompts i-rename i-delete; do
+  while IFS= read -r cmd; do
+    check "a branch changing instructions ($d) asks with that reason before: $cmd" '[ "$(reason "$tmp/$d" "$cmd")" = "$instr_reason" ]'
+  done <<'ASK'
+gh pr create --fill
+gh pr new --draft
+git push -u origin feat/i && gh pr create --fill
+ASK
+done
+while IFS= read -r cmd; do
+  check "a branch changing only other files leaves alone: $cmd" '[ -z "$(decision "$tmp/i-other" "$cmd")" ]'
+done <<'PASS'
+gh pr create --fill
+gh pr new --draft
+PASS
+while IFS= read -r cmd; do
+  check "a branch changing instructions leaves alone: $cmd" '[ -z "$(decision "$tmp/i-agents" "$cmd")" ]'
+done <<'PASS'
+git push
+git push -u origin feat/i
+gh pr view
+PASS
+# Without origin/HEAD, origin/main or origin/master is the default.
+cp -R "$tmp/i-agents" "$tmp/i-nohead"
+g -C "$tmp/i-nohead" symbolic-ref --delete refs/remotes/origin/HEAD
+check "a branch changing instructions, no origin/HEAD but origin/main: asks with that reason" \
+  '[ "$(reason "$tmp/i-nohead" "gh pr create --fill")" = "$instr_reason" ]'
+# No default-branch ref, or no merge base with it: nothing to compare, no prompt.
+cp -R "$tmp/i-nohead" "$tmp/i-noref"
+g -C "$tmp/i-noref" update-ref -d refs/remotes/origin/main
+check "a branch changing instructions, no default-branch ref: leaves alone" '[ -z "$(decision "$tmp/i-noref" "gh pr create --fill")" ]'
+cp -R "$tmp/i-agents" "$tmp/i-unrelated"
+g -C "$tmp/i-unrelated" update-ref refs/remotes/origin/main "$(g -C "$tmp/i-unrelated" commit-tree -m other "$(g -C "$tmp/i-unrelated" mktree </dev/null)")"
+check "a branch changing instructions, no merge base with the default branch: leaves alone" \
+  '[ -z "$(decision "$tmp/i-unrelated" "gh pr create --fill")" ]'
+# With uncommitted changes too, one prompt gives both reasons.
+cp -R "$tmp/i-agents" "$tmp/i-dirty"
+touch "$tmp/i-dirty/new.txt"
+check "a branch changing instructions with uncommitted changes: one prompt names both" \
+  '[ "$(reason "$tmp/i-dirty" "gh pr create --fill")" = "$unclean_reason $instr_reason" ]'
+# A cd is followed as for the clean-tree check, and the session directory is checked too.
+check "a cd to a branch changing instructions asks before gh pr create" \
+  '[ "$(reason "$tmp/feat" "cd ../i-agents && gh pr create --fill")" = "$instr_reason" ]'
+check "a cd away from a branch changing instructions still asks before gh pr create" \
+  '[ "$(reason "$tmp/i-agents" "cd ../feat && gh pr create --fill")" = "$instr_reason" ]'
+check "a cd to a branch changing only other files leaves alone" '[ -z "$(decision "$tmp/feat" "cd ../i-other && gh pr create --fill")" ]'
+
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }
 check "no cwd in the input: uses the process directory" '[ "$(nocwd)" = ask ]'

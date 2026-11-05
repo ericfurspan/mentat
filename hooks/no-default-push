@@ -7,7 +7,8 @@
 # branch change and passes. Two more commands that skip a rule ask too: a force
 # push (--force, -f, --force-with-lease or a +refspec) on any branch, and a git
 # push or gh pr create while git status --porcelain in its directory prints
-# anything. This is a net for mistakes, not a security boundary: other routes
+# anything. A gh pr create whose branch changes an agent instruction file
+# against origin/<default> asks whether the change was weighed. This is a net for mistakes, not a security boundary: other routes
 # exist. When it cannot read its input, it stays out of the way.
 set -uo pipefail
 
@@ -43,6 +44,26 @@ load() {
   else
     defaults="main master"
   fi
+}
+# instructions <dir>: notes a branch whose change from its merge base with
+# origin/<default> adds, changes, deletes or renames an AGENTS.md,
+# AGENTS.override.md, CLAUDE.md or SKILL.md, or the root rules.md or prompts/.
+# No default-branch ref, or a git error, notes nothing.
+instructions() {
+  local d paths p
+  load "$1"
+  for d in $defaults; do
+    git -C "$1" rev-parse -q --verify "refs/remotes/origin/$d" >/dev/null 2>&1 || continue
+    paths=$(git -c core.quotePath=false -C "$1" diff --name-only --no-renames "origin/$d...HEAD" 2>/dev/null) || continue
+    while IFS= read -r p; do
+      case "/$p" in
+        */AGENTS.md | */AGENTS.override.md | */CLAUDE.md | */SKILL.md | /rules.md | /prompts/*)
+          note "Mentat: this pull request changes agent instructions, and a change to what agents are told gets mentat weigh before the maintainer agrees to it. Approve if it was weighed, if Codex and Grok are off for this session, or if it changes no meaning."
+          return
+          ;;
+      esac
+    done <<<"$paths"
+  done
 }
 is_default() {
   local d
@@ -248,7 +269,9 @@ for pass in "$pieces" "$qpieces"; do
         skip_flags
         case "${words[i]:-}" in create | new) ;; *) continue ;; esac
         unclean "$here"
+        instructions "$here"
         [ "$here" = "$cwd" ] || unclean "$cwd"
+        [ "$here" = "$cwd" ] || instructions "$cwd"
         continue
         ;;
       git | */git) ;;
