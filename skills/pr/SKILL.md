@@ -13,7 +13,7 @@ description: "Writing a pull request body. Use when opening a pull request, or w
 ```markdown
 ## Summary
 
-**<State>.** <head commit>, tests <pass or fail>, CI <passed, failed, not finished or none>.
+**<State>.** <head commit>, <rounds, when any>, <findings settled, when any>, tests <pass or fail>, CI <passed, failed, not finished or none>.
 
 Why: <where the work came from, or "not recorded">
 
@@ -42,4 +42,4 @@ The note in the alert has at most two sentences, in plain words, with no heading
 
 The Verification table has one row per numbered requirement of the spec, by number (an older issue or item, agreed before the section had that name and with no numbered list, is read as each requirement it states); one check may cover several.
 
-The state is one of `Ready`, `In review`, `Blocked: <why>` or `Not reviewed: <why>`, and the line has no round number. For example, `**In review.** 75b1127, tests pass, CI not finished.` while the review runs, and `**Ready.** f155cd4, tests pass, CI passed.` at the final check.
+The state is one of `Ready`, `In review`, `Blocked: <why>` or `Not reviewed: <why>`. The rounds clause, `round <n> of <limit>`, gives the review rounds completed so far: the `codex rounds` count from `mentat status <N>` against a limit of five plus any extra rounds a Verification line records the maintainer allowing, or, on the Claude-only path (`mentat:claude-review`), the `claude rounds` count against two. Grok's review is not a round. With no completed round, or on a fast track, the clause is left out. The findings clause, `<n> findings fixed, <n> answered`, counts the Verification's one line per finding fixed or answered; a count of zero is left out, and the clause too when both are. For example, `**In review.** 75b1127, round 2 of 5, 3 findings fixed, 1 answered, tests pass, CI not finished.` while the review runs, and `**Ready.** f155cd4, round 1 of 5, tests pass, CI passed.` at the final check.
