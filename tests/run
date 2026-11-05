@@ -183,6 +183,26 @@ phrase_check skills/propose/SKILL.md "the grill offer at most once per request" 
 # A grill's record goes in the weigh's file.
 phrase_check skills/propose/SKILL.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
 
+# An Intake sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
+# after a compaction, and sends nothing it collects to Codex or Grok.
+for s in 'name: intake' 'disable-model-invocation: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/intake/SKILL.md; then
+    pass "skills/intake/SKILL.md's frontmatter sets $s"
+  else
+    fail "skills/intake/SKILL.md's frontmatter must set $s"
+  fi
+done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all`/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
+  pass "skills/intake/SKILL.md's description lists its arguments"
+else
+  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`, brainstorm <text or link>)"
+fi
+phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
+phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
+phrase_check skills/intake/SKILL.md "nothing collected sent to Codex or Grok" "Nothing a sitting collects goes to Codex or Grok, and no \`mentat weigh\`, \`mentat challenge\` or \`mentat consult\` runs inside a sitting."
+phrase_check skills/intake/SKILL.md "that taking an idea on is not agreement to build" "Taking an idea on is not agreement to build: that stays with \`mentat:propose\`"
+phrase_check skills/intake/SKILL.md "that only the maintainer's answer ends an idea" "Only the maintainer's answer in the sitting ends an idea."
+
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
 phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
