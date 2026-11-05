@@ -10,16 +10,18 @@
 
 [Who does what](#who-does-what) lists each step, who does it and when. The file that owns a step holds its procedure:
 
-1. Plan: the request, the maintainer's agreement and the spec. [`skills/propose`](../skills/propose/SKILL.md) for the view, the weigh and the agreement, [`skills/plan`](../skills/plan/SKILL.md) for a challenged plan, [`skills/backlog`](../skills/backlog/SKILL.md) for where the spec lives.
-2. Build: [`prompts/builder.md`](../prompts/builder.md).
-3. Pull request: [`skills/pr`](../skills/pr/SKILL.md).
-4. Review and final check: [`skills/review`](../skills/review/SKILL.md), or [`skills/claude-review`](../skills/claude-review/SKILL.md) with Codex off.
-5. Merge: the maintainer merges; [`skills/backlog`](../skills/backlog/SKILL.md) covers what follows.
+1. Intake: ideas gathered and settled; [`skills/intake`](../skills/intake/SKILL.md). Taking an idea on is not agreement to build.
+2. Plan: the request, the maintainer's agreement and the spec. [`skills/propose`](../skills/propose/SKILL.md) for the view, the weigh and the agreement, [`skills/plan`](../skills/plan/SKILL.md) for a challenged plan, [`skills/backlog`](../skills/backlog/SKILL.md) for where the spec lives.
+3. Build: [`prompts/builder.md`](../prompts/builder.md).
+4. Pull request: [`skills/pr`](../skills/pr/SKILL.md).
+5. Review and final check: [`skills/review`](../skills/review/SKILL.md), or [`skills/claude-review`](../skills/claude-review/SKILL.md) with Codex off.
+6. Merge: the maintainer merges; [`skills/backlog`](../skills/backlog/SKILL.md) covers what follows.
 
 ## Who does what
 
 | What | Who | When | How |
 |---|---|---|---|
+| Gathers ideas from each channel and settles each one with the maintainer, one question at a time | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:intake`, `skills/intake` |
 | Gives a view of a request or a change it suggests | Claude Code | every request and every change it suggests itself | chat |
 | Requests a change, decides what gets built and agrees on the plan | the maintainer | every change | chat or an issue |
 | Weighs an idea | Codex and Grok, in parallel | every request or change Claude Code suggests, except a one-line change with nothing to decide, before the maintainer agrees; one that changes the meaning of what an agent is told in standing instructions (Mentat's `rules.md`, skills or builder prompt, a repository's `AGENTS.md` or the like) is weighed however short | `mentat weigh` |
@@ -36,6 +38,31 @@
 | Marks the backlog item done, does the repository's own post-merge steps and reports in one line | Claude Code | after the maintainer merges | `skills/backlog`, chat |
 
 Outside the table, `/mentat:consult [--web] <question or idea>` (the maintainer starts it) asks Codex, Grok and Claude Code one question or idea and answers in five short lines at most, the consensus first, then what each model adds; it runs outside a change and does not replace a change's weigh. A plan for the repository the session runs in goes through `mentat weigh`, judged against its code at HEAD, unless the repository holds personal data; anything else, or anything after `--web`, goes through `mentat consult`, web on, no repository. `/mentat:grill` interviews the maintainer about a plan, one clickable question at a time; Claude Code may offer one when a request has several open decisions that depend on each other, and starts it only if the maintainer agrees. Agreement to build is a separate step after a confirmed grill: a change still gets its weigh, whose file carries the grill's questions and answers, and the proposal, without asking its decisions again.
+
+## Glossary
+
+One word per meaning:
+
+- Sitting: one run of `/mentat:intake`, started by the maintainer, that gathers ideas and settles each one.
+- Inbox: where the maintainer's own instructions file a project's undecided ideas. Where none is named, an undecided idea is a backlog item whose opening sentence says it is not taken on yet.
+- Taken on: an idea the maintainer chose to keep in a sitting. It is a backlog item (on Linear, Backlog), not agreed to build.
+- Agreed: the maintainer agreed to build it, through `skills/propose` after its weigh. It has a spec (on Linear, Todo).
+- Parked: an item the maintainer set aside; its opening sentence says so.
+- Weigh: Codex and Grok judge an idea against the repository at HEAD, before agreement (`mentat weigh`).
+- Challenge: Codex tests a written plan against the repository, after agreement and before the build (`mentat challenge`).
+- Consult: one question to several models, with no repository, outside a change (`/mentat:consult`).
+- Spec: the agreed text of a change: its intent, numbered requirements and what is out of scope. Reviews judge the change against it.
+- Hand check: a requirement the maintainer checks by trying the result. While open, it holds back "You: merge #N.".
+
+## Which instructions each session reads
+
+- The main session: the maintainer's own instruction file, `rules.md` (the SessionStart hook prints it on startup, resume, clear, compact and fork), every `AGENTS.md` that applies, the skills it invokes, and, in a sitting, the channel readers the maintainer's own instructions name.
+- The builder subagent: `prompts/builder.md`, the main session's brief, and the `AGENTS.md` files the brief names.
+- Codex and Grok reviews: the repository's `AGENTS.md` files and their Code Review Rules, which the prompt tells them to read and follow, and, as data, the pull request's title and description, any linked issue and the spec passed with `--request`. Codex reads a checkout of the head, plus its own global instruction file when the user has one. Grok reads an export of the head without `.git`, in a Grok home of its own with Claude and Cursor rules, skills and hooks off.
+- Weigh: the idea file and the repository at HEAD (a detached checkout for Codex, an export for Grok), with every `AGENTS.md` that applies.
+- Challenge: the plan file and the checkout as it stands, with every `AGENTS.md` that applies; the prompt names HEAD and whether there are uncommitted changes.
+- Consult: the question file only, in an empty folder with no repository.
+- A cloud session: no user instruction file and no user plugins, so neither `rules.md` nor Mentat's hooks.
 
 ## The repository comes first
 
