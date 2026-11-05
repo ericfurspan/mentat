@@ -237,7 +237,7 @@ fi
 # The listing session clears a hand wait from a comment reporting its Ends when result; an unclear case,
 # or any case read by a skill that forbids writes, is named as "may be done" and left unchanged.
 phrase_check skills/backlog/linear.md "the waits left open bullet" '- Waits left open. When a session lists this project to choose or plan work'
-phrase_check skills/backlog/linear.md "the hand wait's comments read" 'Hand wait: for each open item with a wait block, it reads the item'"'"'s comments.'
+phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits left to their own path" "Hand wait: for each open item with a wait block and no merge wait, it reads the item's comments."
 phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (step 4: the block, the label and the lead's assignment removed)."
 phrase_check skills/backlog/linear.md "an unclear hand wait named as may be done" "A comment that may report it, or a later report on a block with no \`Ends when\` line, leaves the item unchanged, and the item is named as \"may be done\" with the comment's date."
 phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
@@ -274,7 +274,7 @@ else
   fail "skills/backlog/SKILL.md's item shape must put the opening sentence, the wait block, the spec, then the current plan, in that order"
 fi
 phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds only these, in this order:'
-phrase_check skills/backlog/SKILL.md "the wait block's one-line steps" 'numbered steps of one line each, plus anything to paste'
+phrase_check skills/backlog/SKILL.md "the wait block's one-line steps and Ends when line" "numbered steps of one line each, plus anything to paste, then the \`Ends when:\` line."
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
 phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at most five lines'
 phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:plan\`, goes in a comment, and the section keeps the next step."
