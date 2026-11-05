@@ -215,7 +215,7 @@ phrase_check skills/propose/SKILL.md "the proposal's hand check offer for a chan
 phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "You: merge #N." until they report it.'
 phrase_check skills/propose/SKILL.md "no hand check offer for a change with nothing to try" 'A change with nothing to try gets no offer.'
 phrase_check skills/propose/SKILL.md "the spec's hand check only when accepted or asked for" 'The spec lists a requirement the maintainer checks by hand only when their agreement accepts the offer or they asked for one.'
-phrase_check skills/propose/SKILL.md "a weigh for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets \`mentat weigh\`, however short."
+phrase_check skills/propose/SKILL.md "a weigh for a change to what an agent is told, however short" "A request, or a change Claude Code suggests itself, that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets \`mentat weigh\`, however short."
 phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
 # An unasked follow-up is filed in the record, not left in chat.
 phrase_check rules.md "an unasked follow-up filed as a not-agreed backlog item" 'A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item'
@@ -301,7 +301,7 @@ for f in rules.md skills/propose/SKILL.md; do
 done
 
 # The propose step's procedure is in mentat:propose, with its standing lines on agreement.
-phrase_check rules.md "the call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request."
+phrase_check rules.md "the call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request or suggesting a change of its own, a fix to its own output included."
 phrase_check skills/propose/SKILL.md "that a weigh's DO IT is not agreement" "A weigh's \`DO IT\` is not the maintainer's agreement"
 phrase_check skills/propose/SKILL.md "that nothing is built before agreement" 'nothing is built before that agreement'
 phrase_check skills/propose/SKILL.md "that the maintainer agrees once" 'The maintainer agrees once.'
