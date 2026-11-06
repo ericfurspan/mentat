@@ -277,7 +277,7 @@ else
 fi
 phrase_check skills/agenda/SKILL.md "that it forbids writes and asks nothing" 'This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing.'
 phrase_check skills/agenda/SKILL.md "that the backlog's listing writes do not run" 'Its listing writes do not run'
-phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
+phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`../backlog/linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
 phrase_check skills/agenda/SKILL.md "a decision answered in chat recorded nowhere" 'record nothing and say in one line where the answer goes'
 phrase_check skills/work-tickets/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
 phrase_check skills/work-tickets/SKILL.md "the opening yes as a session control" 'That yes is a session control, not an agreement'
