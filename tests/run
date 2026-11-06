@@ -202,6 +202,17 @@ phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 
 phrase_check skills/intake/SKILL.md "nothing collected sent to Codex or Grok" "Nothing a sitting collects goes to Codex or Grok, and no \`mentat weigh\`, \`mentat challenge\` or \`mentat consult\` runs inside a sitting."
 phrase_check skills/intake/SKILL.md "that taking an idea on is not agreement to build" "Taking an idea on is not agreement to build: that stays with \`mentat:propose\`"
 phrase_check skills/intake/SKILL.md "that only the maintainer's answer ends an idea" "Only the maintainer's answer in the sitting ends an idea."
+# With many questions, a sitting offers a smaller set first; the rest stays for a later sitting.
+phrase_check skills/intake/SKILL.md "the smaller set offered above 10 questions" 'With more than 10, the first prompt offers a smaller set, saying how many questions each holds'
+phrase_check skills/intake/SKILL.md "all questions asked at 10 or fewer" 'With 10 or fewer, say how many there are and ask them all.'
+phrase_check skills/intake/SKILL.md "questions outside the chosen set left for a later sitting" 'Questions outside the chosen set stay as they are, undecided, for a later sitting'
+phrase_check skills/intake/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
+phrase_check skills/intake/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
+phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas" 'then settle just those, from step 3 on, asking them all with no smaller set.'
+# An idea that lands in the same change as an existing item is recommended as a Merge, and a Merge into an agreed item is not asked again.
+phrase_check skills/intake/SKILL.md "Merge recommended for an idea in the same change" 'When an idea would land in the same change as an existing item or idea, agreed or not, recommend Merge into it; recommend Take on only when the idea can ship on its own.'
+phrase_check skills/intake/SKILL.md "a Merge into an agreed item not asked again" "A Merge into an agreed item agrees the added scope through the maintainer's answer, so it is not asked again"
+phrase_check skills/backlog/SKILL.md "an Intake Merge into an agreed item taken into its spec without asking" 'An Intake Merge into an agreed item is one the maintainer already agreed: take in the scope its comment names, without asking again.'
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
