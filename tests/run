@@ -209,13 +209,13 @@ phrase_check skills/intake/SKILL.md "questions outside the chosen set left for a
 phrase_check skills/intake/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
 phrase_check skills/intake/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
 phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas" 'then settle just those, from step 3 on, asking them all with no smaller set.'
-# An idea that lands in the same change as an existing item is recommended as a Merge. A Merge into an agreed item is
-# weighed when the item is next planned, or once its work has started, and the sitting's answer agrees it unless the weigh
-# finds a reason not to build it.
+# An idea that lands in the same change as an existing item is recommended as a Merge. Scope merged into an agreed item
+# is taken on, not agreed, and is weighed and agreed through mentat:propose when the item is next planned; scope still
+# not agreed when the item ends becomes its own taken-on item.
 phrase_check skills/intake/SKILL.md "Merge recommended for an idea in the same change" 'When an idea would land in the same change as an existing item or idea, agreed or not, recommend Merge into it; recommend Take on only when the idea can ship on its own.'
-phrase_check skills/intake/SKILL.md "a Merge into an agreed item weighed, then not asked again" "When the item is next planned, or once the sitting ends where its work has started, \`mentat:propose\` weighs that scope; the answer is the maintainer's agreement to it, asked again only if the weigh finds a reason not to build it as merged."
-phrase_check skills/backlog/SKILL.md "an Intake Merge into an agreed item weighed, then taken into its spec" "For an Intake Merge into an agreed item, weigh the scope its comment names through \`mentat:propose\`, then take it in without asking again unless the weigh finds a reason not to."
-phrase_check skills/propose/SKILL.md "scope an Intake sitting merged into agreed work weighed" "Scope an Intake sitting merged into agreed work is weighed when that work is next planned, or at once where it has started; the sitting's answer is its agreement unless the weigh finds a reason not to build it, which goes to the maintainer."
+phrase_check skills/intake/SKILL.md "scope merged into an agreed item taken on, agreed when next planned" "That scope is taken on, not agreed: \`mentat:propose\` asks for its agreement when the item is next planned, after its weigh."
+phrase_check skills/backlog/SKILL.md "scope merged into an agreed item kept out of its spec until agreed" "Scope an Intake sitting merged into an agreed item, named in a comment on it, joins the section only once agreed through \`mentat:propose\`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, taken on, linking the item."
+phrase_check skills/propose/SKILL.md "scope merged into agreed work weighed and agreed when next planned" "Scope an Intake sitting merged into agreed work is taken on, not agreed: it is weighed and agreed when that work is next planned."
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
