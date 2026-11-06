@@ -218,6 +218,39 @@ phrase_check skills/backlog/SKILL.md "scope merged into an agreed item kept out 
 phrase_check skills/backlog/SKILL.md "scope still not agreed filed as its own issue when a GitHub issue closes" '- When an issue closes with scope an Intake sitting merged into it still not agreed, file that scope as its own issue, taken on, linking the closed one.'
 phrase_check skills/propose/SKILL.md "scope merged into agreed work weighed and agreed when next planned" "Scope an Intake sitting merged into agreed work is taken on, not agreed: it is weighed and agreed when that work is next planned."
 
+# Skills only agents call stay out of the / menu and stay callable by the agent.
+for s in propose pr review backlog grill challenge; do
+  f=skills/$s/SKILL.md
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "user-invocable: false" { found = 1; exit 0 } END { exit !found }' "$f"; then
+    pass "$f's frontmatter sets user-invocable: false"
+  else
+    fail "$f's frontmatter must set user-invocable: false"
+  fi
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^disable-model-invocation:/ { found = 1; exit 0 } END { exit !found }' "$f"; then
+    fail "$f's frontmatter must not set disable-model-invocation, so the agent can call it"
+  else
+    pass "$f's frontmatter does not set disable-model-invocation"
+  fi
+done
+
+# A planning session is started only by the maintainer, lists its argument and never briefs a builder.
+for s in 'name: plan' 'disable-model-invocation: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/plan/SKILL.md; then
+    pass "skills/plan/SKILL.md's frontmatter sets $s"
+  else
+    fail "skills/plan/SKILL.md's frontmatter must set $s"
+  fi
+done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional backlog item id/ { found = 1; exit 0 } END { exit !found }' skills/plan/SKILL.md; then
+  pass "skills/plan/SKILL.md's description lists its argument"
+else
+  fail "skills/plan/SKILL.md's description must list its argument (optional backlog item id)"
+fi
+phrase_check skills/plan/SKILL.md "that it never briefs a builder" 'Never brief a builder, create a branch or edit a file of the repository'
+phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
+phrase_check skills/plan/SKILL.md "every agreement through mentat:propose" "Every agreement to build goes through \`mentat:propose\`"
+phrase_check skills/plan/SKILL.md "no backlog write but recorded answers" 'reading the backlog here refines no hand-made item and clears no wait'
+
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
 phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
@@ -245,7 +278,7 @@ phrase_check skills/review/SKILL.md "each call made without the maintainer, one 
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
 phrase_check skills/propose/SKILL.md "the propose step's planning with overlapping items" 'overlapping items and the plan around them'
-phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:plan\`"
+phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:challenge\`"
 phrase_check skills/propose/SKILL.md "a small, clear request's hand check offer" 'When the change has something to try, the one-line view also offers the hand check of step 5.'
 phrase_check skills/propose/SKILL.md "the proposal's hand check offer for a change with something to try" "When the change has something the maintainer can try in a few minutes (a screen, a page, a command's output, a behavior they can trigger), the proposal offers them a hand check."
 phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "You: merge #N." until they report it.'
@@ -328,7 +361,7 @@ phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds on
 phrase_check skills/backlog/SKILL.md "the wait block's one-line steps and Ends when line" "numbered steps of one line each, plus anything to paste, then the \`Ends when:\` line."
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
 phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at most five lines'
-phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:plan\`, goes in a comment, and the section keeps the next step."
+phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:challenge\`, goes in a comment, and the section keeps the next step."
 phrase_check skills/backlog/SKILL.md "anything else in comments" 'Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description.'
 phrase_check skills/backlog/SKILL.md "a refined hand-made item's links kept" "A refined hand-made item also keeps the original's links in the description, under the opening sentence, as \`linear.md\` says."
 phrase_check skills/backlog/SKILL.md "the merge clause removed when the merge wait ends" 'then remove the merge clause from the opening sentence'
@@ -352,7 +385,7 @@ phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt
 phrase_check skills/backlog/SKILL.md "the replies block and waits with GitHub issues" 'only "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply'
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
-phrase_check skills/plan/SKILL.md "the challenge's replies block at hand-off" 'replies block'
+phrase_check skills/challenge/SKILL.md "the challenge's replies block at hand-off" 'replies block'
 for f in rules.md skills/propose/SKILL.md; do
   if grep -q -F 'in one line beside its own' "$f"; then
     fail "$f must show the weigh replies as one block (found: in one line beside its own)"
