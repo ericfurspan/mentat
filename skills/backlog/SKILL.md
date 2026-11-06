@@ -65,4 +65,5 @@ For a repository whose AGENTS.md names no external backlog: its GitHub issues ar
 - Where the repository uses them, the pinned issue holds the order of agreed work, next first, without closed issues. An entry whose issue waits on the maintainer points to the wait.
 - An issue Claude Code files or the maintainer agrees opens with one sentence saying where the work came from, in the terms of the item shape's first bullet.
 - Where no inbox is named, an issue filed but not taken on says so in its opening sentence. An Intake decision rewrites that sentence and records the ending on the issue as `/mentat:intake` step 5 says; a duplicate is closed with `--reason duplicate` and a canceled one with `--reason "not planned"`, with the reason in a comment.
+- When an issue closes with scope an Intake sitting merged into it still not agreed, file that scope as its own issue, taken on, linking the closed one.
 - Each issue gets one label for what it is, from the repository's own (GitHub defaults: `bug`, `enhancement`, `documentation`, `question`).
