@@ -1,6 +1,7 @@
 ---
 name: grill
-description: "Interviewing the maintainer about a plan, decision or idea, one clickable question at a time, until every decision that is theirs is agreed. Use when the maintainer types /mentat:grill or asks to be grilled (\"grill me\"). Claude Code starts it on its own only after the maintainer agrees to an offer of a grill."
+description: "Interviewing the maintainer about a plan, decision or idea, one clickable question at a time, until every decision that is theirs is agreed. Use when the maintainer asks to be grilled (\"grill me\"). Claude Code starts it on its own only after the maintainer agrees to an offer of a grill."
+user-invocable: false
 ---
 
 The maintainer wants to be questioned about a plan, decision or idea until the two of you agree on it. If they typed text after the command, grill them on that; otherwise on the request in hand. This runs once: do it, then normal work resumes.

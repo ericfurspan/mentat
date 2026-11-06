@@ -4,7 +4,7 @@ description: "Turns the Codex and Grok reviews off and has one Claude code-revie
 disable-model-invocation: true
 ---
 
-The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:plan` step 2) and `mentat weigh` (`mentat:propose`) with nothing; Claude Code's own view of a request still runs. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say it is on; that starts no review, and the next review goes through `mentat:review`, with Grok where it has not yet run.
+The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the plan challenge (`mentat:challenge` step 2) and `mentat weigh` (`mentat:propose`) with nothing; Claude Code's own view of a request still runs. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say it is on; that starts no review, and the next review goes through `mentat:review`, with Grok where it has not yet run.
 
 When started, say in one line that Codex is off for this session. If a `mentat review`, `mentat challenge` or `mentat weigh` is running, stop it and say so.
 
@@ -31,4 +31,4 @@ Every description update here rewrites the status line in full and keeps the not
 
 ## Plans
 
-When `mentat:propose` calls for `mentat:plan`, still write the plan, but do not run `mentat challenge`. The handoff says the plan was not challenged because the maintainer turned Codex off. The Claude review does not apply to plans. Likewise run no `mentat weigh`: give Claude Code's own view alone and say the weighing was skipped because the maintainer turned Codex off.
+When `mentat:propose` calls for `mentat:challenge`, still write the plan, but do not run `mentat challenge`. The handoff says the plan was not challenged because the maintainer turned Codex off. The Claude review does not apply to plans. Likewise run no `mentat weigh`: give Claude Code's own view alone and say the weighing was skipped because the maintainer turned Codex off.

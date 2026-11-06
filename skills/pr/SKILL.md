@@ -1,6 +1,7 @@
 ---
 name: pr
 description: "Writing a pull request body. Use when opening a pull request, or when its diff changes and the description needs updating."
+user-invocable: false
 ---
 
 1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`. With an external backlog there is no issue: read the spec from the backlog through `mentat:backlog` (its `## Spec` section, or `## Agreed request` on an older item), write no `Closes #`, and never name the backlog's workspace or item in the body.

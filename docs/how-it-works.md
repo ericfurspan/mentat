@@ -11,7 +11,7 @@
 [Who does what](#who-does-what) lists each step, who does it and when. The file that owns a step holds its procedure:
 
 1. Intake: ideas gathered and settled; [`skills/intake`](../skills/intake/SKILL.md). Taking an idea on is not agreement to build.
-2. Plan: the request, the maintainer's agreement and the spec. [`skills/propose`](../skills/propose/SKILL.md) for the view, the weigh and the agreement, [`skills/plan`](../skills/plan/SKILL.md) for a challenged plan, [`skills/backlog`](../skills/backlog/SKILL.md) for where the spec lives.
+2. Plan: the request, the maintainer's agreement and the spec. [`skills/propose`](../skills/propose/SKILL.md) for the view, the weigh and the agreement, [`skills/challenge`](../skills/challenge/SKILL.md) for a challenged plan, [`skills/backlog`](../skills/backlog/SKILL.md) for where the spec lives.
 3. Build: [`prompts/builder.md`](../prompts/builder.md).
 4. Pull request: [`skills/pr`](../skills/pr/SKILL.md).
 5. Review and final check: [`skills/review`](../skills/review/SKILL.md), or [`skills/claude-review`](../skills/claude-review/SKILL.md) with Codex off.
@@ -22,10 +22,11 @@
 | What | Who | When | How |
 |---|---|---|---|
 | Gathers ideas from each channel and settles each one with the maintainer, one question at a time | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:intake`, `skills/intake` |
+| Plans one backlog item, or interviews the maintainer across the open backlog, one decision per prompt; builds nothing and ends with the agreed items' ids to paste into a new session | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:plan [item id]`, `skills/plan` |
 | Gives a view of a request or a change it suggests | Claude Code | every request and every change it suggests itself | chat |
 | Requests a change, decides what gets built and agrees on the plan | the maintainer | every change | chat or an issue |
 | Weighs an idea | Codex and Grok, in parallel | every request or change Claude Code suggests, except a one-line change with nothing to decide, before the maintainer agrees; one that changes the meaning of what an agent is told in standing instructions (Mentat's `rules.md`, skills or builder prompt, a repository's `AGENTS.md` or the like) is weighed however short | `mentat weigh` |
-| Challenges a plan | Codex | an uncertain or consequential plan, after agreement and before the build | `mentat challenge`, through `skills/plan` |
+| Challenges a plan | Codex | an uncertain or consequential plan, after agreement and before the build | `mentat challenge`, through `skills/challenge` |
 | Builds and runs the test command | the builder subagent | every change and every review fix | one branch, one checkout |
 | Runs the test command again, on a clean tree | Claude Code | before every push | the repository's test command |
 | Pushes, opens and describes the pull request | Claude Code | every change | `git push`, `gh pr create`; the body from `skills/pr` |
@@ -37,7 +38,7 @@
 | Merges | the maintainer | every pull request | |
 | Marks the backlog item done, does the repository's own post-merge steps and reports in one line | Claude Code | after the maintainer merges | `skills/backlog`, chat |
 
-Outside the table, `/mentat:consult [--web] <question or idea>` (the maintainer starts it) asks Codex, Grok and Claude Code one question or idea and answers in five short lines at most, the consensus first, then what each model adds; it runs outside a change and does not replace a change's weigh. A plan for the repository the session runs in goes through `mentat weigh`, judged against its code at HEAD, unless the repository holds personal data; anything else, or anything after `--web`, goes through `mentat consult`, web on, no repository. `/mentat:grill` interviews the maintainer about a plan, one clickable question at a time; Claude Code may offer one when a request has several open decisions that depend on each other, and starts it only if the maintainer agrees. Agreement to build is a separate step after a confirmed grill: a change still gets its weigh, whose file carries the grill's questions and answers, and the proposal, without asking its decisions again.
+Outside the table, `/mentat:consult [--web] <question or idea>` (the maintainer starts it) asks Codex, Grok and Claude Code one question or idea and answers in five short lines at most, the consensus first, then what each model adds; it runs outside a change and does not replace a change's weigh. A plan for the repository the session runs in goes through `mentat weigh`, judged against its code at HEAD, unless the repository holds personal data; anything else, or anything after `--web`, goes through `mentat consult`, web on, no repository. A grill interviews the maintainer about a plan, one clickable question at a time. The maintainer asks for one in words ("grill me"), or Claude Code offers one when a request has several open decisions that depend on each other, and starts it only if the maintainer agrees. Agreement to build is a separate step after a confirmed grill: a change still gets its weigh, whose file carries the grill's questions and answers, and the proposal, without asking its decisions again.
 
 ## Glossary
 
