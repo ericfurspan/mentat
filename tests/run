@@ -250,6 +250,40 @@ phrase_check skills/plan/SKILL.md "that it never briefs a builder" 'Never brief 
 phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
 phrase_check skills/plan/SKILL.md "every agreement through mentat:propose" "Every agreement to build goes through \`mentat:propose\`"
 phrase_check skills/plan/SKILL.md "a read that refines no item and clears no wait" 'This read changes no item it does not record an answer on: it refines no hand-made item, clears no wait'
+phrase_check skills/plan/SKILL.md "the paste line as the work-tickets command" "the full \`/mentat:work-tickets <ids>\` command"
+
+# The agenda and a work-tickets run are started only by the maintainer and list their arguments; the agenda
+# writes nothing, and a work-tickets run sends an item that needs planning to /mentat:plan and treats its
+# opening yes as a session control.
+for k in agenda work-tickets; do
+  f=skills/$k/SKILL.md
+  for s in "name: $k" 'disable-model-invocation: true'; do
+    if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" "$f"; then
+      pass "$f's frontmatter sets $s"
+    else
+      fail "$f's frontmatter must set $s"
+    fi
+  done
+done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional project names or `all` \(none: the session.s project\)/ { found = 1; exit 0 } END { exit !found }' skills/agenda/SKILL.md; then
+  pass "skills/agenda/SKILL.md's description lists its arguments"
+else
+  fail "skills/agenda/SKILL.md's description must list its arguments (optional project names or \`all\`; none: the session's project)"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional backlog item ids \(none: the project.s next agreed work\)/ { found = 1; exit 0 } END { exit !found }' skills/work-tickets/SKILL.md; then
+  pass "skills/work-tickets/SKILL.md's description lists its arguments"
+else
+  fail "skills/work-tickets/SKILL.md's description must list its arguments (optional backlog item ids; none: the project's next agreed work)"
+fi
+phrase_check skills/agenda/SKILL.md "that it forbids writes and asks nothing" 'This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing.'
+phrase_check skills/agenda/SKILL.md "that the backlog's listing writes do not run" 'Its listing writes do not run'
+phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
+phrase_check skills/agenda/SKILL.md "a decision answered in chat recorded nowhere" 'record nothing and say in one line where the answer goes'
+phrase_check skills/work-tickets/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
+phrase_check skills/work-tickets/SKILL.md "the opening yes as a session control" 'That yes is a session control, not an agreement'
+phrase_check skills/work-tickets/SKILL.md "that it never plans scope" 'It builds and never plans scope'
+phrase_check skills/work-tickets/SKILL.md "the merge line kept for the final message" '"You: merge #N." goes into the final message instead of ending the run'
+phrase_check skills/work-tickets/SKILL.md "that it never merges" 'The run never merges.'
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
