@@ -183,6 +183,41 @@ phrase_check skills/propose/SKILL.md "the grill offer at most once per request" 
 # A grill's record goes in the weigh's file.
 phrase_check skills/propose/SKILL.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
 
+# An Intake sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
+# after a compaction, and sends nothing it collects to Codex or Grok.
+for s in 'name: intake' 'disable-model-invocation: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/intake/SKILL.md; then
+    pass "skills/intake/SKILL.md's frontmatter sets $s"
+  else
+    fail "skills/intake/SKILL.md's frontmatter must set $s"
+  fi
+done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all`/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
+  pass "skills/intake/SKILL.md's description lists its arguments"
+else
+  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`, brainstorm <text or link>)"
+fi
+phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
+phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
+phrase_check skills/intake/SKILL.md "nothing collected sent to Codex or Grok" "Nothing a sitting collects goes to Codex or Grok, and no \`mentat weigh\`, \`mentat challenge\` or \`mentat consult\` runs inside a sitting."
+phrase_check skills/intake/SKILL.md "that taking an idea on is not agreement to build" "Taking an idea on is not agreement to build: that stays with \`mentat:propose\`"
+phrase_check skills/intake/SKILL.md "that only the maintainer's answer ends an idea" "Only the maintainer's answer in the sitting ends an idea."
+# With many questions, a sitting offers a smaller set first; the rest stays for a later sitting.
+phrase_check skills/intake/SKILL.md "the smaller set offered above 10 questions" 'With more than 10, the first prompt offers a smaller set, saying how many questions each holds'
+phrase_check skills/intake/SKILL.md "all questions asked at 10 or fewer" 'With 10 or fewer, say how many there are and ask them all.'
+phrase_check skills/intake/SKILL.md "questions outside the chosen set left for a later sitting" 'Questions outside the chosen set stay as they are, undecided, for a later sitting'
+phrase_check skills/intake/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
+phrase_check skills/intake/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
+phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas" 'then settle just those, from step 3 on, asking them all with no smaller set.'
+# An idea that lands in the same change as an existing item is recommended as a Merge. Scope merged into an agreed item
+# is taken on, not agreed, and is weighed and agreed through mentat:propose when the item is next planned; scope still
+# not agreed when the item ends becomes its own taken-on item.
+phrase_check skills/intake/SKILL.md "Merge recommended for an idea in the same change" 'When an idea would land in the same change as an existing item or idea, agreed or not, recommend Merge into it; recommend Take on only when the idea can ship on its own.'
+phrase_check skills/intake/SKILL.md "scope merged into an agreed item taken on, agreed when next planned" "That scope is taken on, not agreed: \`mentat:propose\` asks for its agreement when the item is next planned, after its weigh."
+phrase_check skills/backlog/SKILL.md "scope merged into an agreed item kept out of its spec until agreed" "Scope an Intake sitting merged into an agreed item, named in a comment on it, joins the section only once agreed through \`mentat:propose\`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, taken on, linking the item."
+phrase_check skills/backlog/SKILL.md "scope still not agreed filed as its own issue when a GitHub issue closes" '- When an issue closes with scope an Intake sitting merged into it still not agreed, file that scope as its own issue, taken on, linking the closed one.'
+phrase_check skills/propose/SKILL.md "scope merged into agreed work weighed and agreed when next planned" "Scope an Intake sitting merged into agreed work is taken on, not agreed: it is weighed and agreed when that work is next planned."
+
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
 phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
@@ -193,7 +228,8 @@ phrase_check rules.md "what Claude Code settles without asking" 'Claude Code set
 # A decision prompt can be answered on its own, a call made without the maintainer reaches chat one line each,
 # mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
 phrase_check rules.md "a decision as one question about outcomes, never the mechanism" 'A decision reaches them as one question about what they get, pay or risk, never about the mechanism'
-phrase_check rules.md "what each option authorizes, gets and costs" 'each option saying what it authorizes, gets and costs'
+phrase_check rules.md "what each option authorizes and gets, with only the costs that differ" 'each option saying what it authorizes and gets, and naming only the costs that differ between the options (a cost every option shares is not repeated)'
+phrase_check rules.md "unasked follow-ups settled in an Intake sitting" "such items are settled in an Intake sitting (\`/mentat:intake\`)."
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question saying why the first is recommended, so the prompt alone suffices'
@@ -248,9 +284,21 @@ phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'An item the maintainer set aside says "parked" in its opening sentence'
+phrase_check skills/backlog/SKILL.md "a GitHub issue not taken on, said in its opening sentence" 'Where no inbox is named, an issue filed but not taken on says so in its opening sentence.'
+phrase_check skills/backlog/SKILL.md "an Intake ending recorded on a GitHub issue" "An Intake decision rewrites that sentence and records the ending on the issue as \`/mentat:intake\` step 5 says; a duplicate is closed with \`--reason duplicate\` and a canceled one with \`--reason \"not planned\"\`, with the reason in a comment."
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
-phrase_check skills/backlog/linear.md "Linear's Backlog status as not agreed" 'statuses are Backlog (not agreed'
-phrase_check skills/backlog/linear.md "the new project's Backlog line as not agreed" '* Backlog: not agreed, or parked'
+# Taking an idea on in an Intake sitting is not agreement to build: Backlog holds it, and mentat:propose moves it to Todo.
+phrase_check skills/backlog/SKILL.md "step 2's taken on stage, not agreed to build" "it is not agreed to build; agreement to build comes from \`mentat:propose\` and moves it to agreed."
+phrase_check skills/backlog/linear.md "Linear's Backlog status as taken on, not agreed to build" 'statuses are Backlog (taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on or kept for reference, whose opening sentence says so), Todo (agreed to build)'
+phrase_check skills/backlog/linear.md "the new project's Backlog line as taken on, not agreed to build" '* Backlog: taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on or kept for reference, whose opening sentence says so'
+phrase_check skills/setup/SKILL.md "the migration's undecided idea in the inbox, else a Backlog item not taken on yet" "An undecided idea goes in the project's inbox as the maintainer's own instructions say where they name one, and step 7's comment lists it as \"inbox\" in place of an item id; with none named, it is a Backlog item whose opening sentence says it is not taken on yet."
+phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
+phrase_check skills/intake/SKILL.md "the four options on an idea's prompt" 'An idea'"'"'s prompt shows four options: the recommended ending, Leave (or one other ending when Leave is recommended), one other likely ending, and "Later" last.'
+phrase_check skills/intake/SKILL.md "every ending not shown named in the question" 'Its question names every ending not shown, and an Other answer naming one chooses it.'
+phrase_check skills/intake/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project, the same as no project names, and is neither a project name nor a reader option."
+phrase_check skills/intake/SKILL.md "each answer recorded so the idea is not found again" 'so step 2 does not find the idea again'
+phrase_check skills/intake/SKILL.md "a dropped Backlog item canceled with its reason" 'Drop: mark it canceled, with the reason in a comment.'
+phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
 # and setup's migration carries the pinned issue's order by creation order.
@@ -265,11 +313,11 @@ phrase_check skills/setup/SKILL.md "the migration's issue order and no Priority"
 phrase_check skills/setup/SKILL.md "the mapping comment's note on the order" 'marked "order carried by creation order"'
 phrase_check skills/zoom-out/SKILL.md "zoom-out's read of the next agreed work" 'the next agreed work as its step 5 gives it'
 # An item's description is short: an opening sentence that restates no status or wait the tracker shows,
-# except three, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
+# except five, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
 phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The opening sentence: one plain sentence, not a heading, of at most about 25 words.'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item" 'It says what the item is (such as a bug, a proposal, a follow-up or a question)'
 phrase_check skills/backlog/SKILL.md "no status or wait restated in the opening sentence" 'It does not restate status or waits, which the tracker'"'"'s fields show, so a change of status does not rewrite it.'
-phrase_check skills/backlog/SKILL.md "the opening sentence's three exceptions" 'It names only three things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), and, during a merge wait, that it waits on the merge of #N (step 4).'
+phrase_check skills/backlog/SKILL.md "the opening sentence's five exceptions" 'It names only five things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), during a merge wait, that it waits on the merge of #N (step 4), and, where no inbox is named, that an idea is not taken on yet or is kept for reference (step 2). An Intake decision rewrites it.'
 if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
   /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
   pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the wait block, the spec, then the current plan"

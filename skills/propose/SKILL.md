@@ -3,7 +3,7 @@ name: propose
 description: "Starts a change (step 1). Use before giving a view on any request that may change a repository or before suggesting such a change of its own, and after a compaction or a resumed session while this step is in progress."
 ---
 
-A change Claude Code suggests itself counts as a request here. A weigh's `DO IT` is not the maintainer's agreement, and nothing is built before that agreement. The maintainer agrees once. Agreed work is not weighed again. A batch needs agreement under one spec whose numbered requirements cover each change.
+A change Claude Code suggests itself counts as a request here. A weigh's `DO IT` is not the maintainer's agreement, and nothing is built before that agreement. The maintainer agrees once. Agreed work is not weighed again. Scope an Intake sitting merged into agreed work is taken on, not agreed: it is weighed and agreed when that work is next planned. A batch needs agreement under one spec whose numbered requirements cover each change. An Intake sitting's "take on" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo.
 
 A small, clear request (one line, nothing for the maintainer to decide, such as fixing a typo) gets a one-line view, and the maintainer's yes to it is the agreement: no backlog read, grill, decisions, `mentat weigh` or `mentat:plan`. When the change has something to try, the one-line view also offers the hand check of step 5. Steps 6 and 7 still apply. A request that changes the meaning of what an agent is told in Mentat's `rules.md`, skills or builder prompt, or in a repository's `AGENTS.md` or other standing agent instructions, is not small and gets `mentat weigh`, however short. Every other request follows steps 1 to 8.
 
