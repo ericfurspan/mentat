@@ -102,7 +102,10 @@ git clone -q "$root/origin.git" "$root/work"
 echo dirty >"$root/work/README"
 
 # gh: pr view serves $STUB/head (moved_head replaces it after the first read);
-# pr comment records the body, or fails when comment_fails exists.
+# check runs come from $STUB/check_runs.json (check_runs_later.json from the second
+# read on), and a file named push_on_ci holds a head to switch to when CI is read;
+# pr comment records the body, or fails when comment_fails exists, and adds it to
+# the comments mentat status reads, as this account's.
 cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
@@ -125,20 +128,27 @@ case "$1 $2" in
     printf 'Issue %s#%s: %s\n\n%s' "$r" "$3" "$(head -1 "$f")" "$(tail -n +2 "$f")" ;;
   "api --paginate")
     case "$3" in
-      */check-runs) cat "$STUB/check_runs.json" ;;
+      */check-runs)
+        n=$(($(cat "$STUB/ci_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/ci_reads"
+        [ -f "$STUB/push_on_ci" ] && cp "$STUB/push_on_ci" "$STUB/head"
+        if [ "$n" -ge 2 ] && [ -f "$STUB/check_runs_later.json" ]; then cat "$STUB/check_runs_later.json"; else cat "$STUB/check_runs.json"; fi ;;
+      */comments) cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]' ;;
       *) exit 99 ;;
     esac ;;
+  "api user") echo agent-bot ;;
   "pr comment")
     [ -f "$STUB/comment_fails" ] && exit 1
     while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$STUB/comment"; shift; done
+    jq --rawfile b "$STUB/comment" '. + [{user: {login: "agent-bot"}, body: $b}]' <<<"$(cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]')" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json"
     echo https://example.test/comment ;;
   *) exit 99 ;;
 esac
 STUBEOF
-# codex: records where it ran and what it read, then replies with $STUB/reply.
+# codex: records where it ran and what it read, and its run in the calls gh records, then replies with $STUB/reply.
 cat >"$root/bin/codex" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
+echo codex >>"$STUB/calls"
 printf '%s\n' "$@" >"$STUB/args"
 cat >"$STUB/prompt"
 [ ! -f "$STUB/live" ] || "$LIVE_SELF" --probe
@@ -148,7 +158,8 @@ pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
 while [ $# -gt 0 ]; do [ "$1" = -o ] && sed -e "s|@TREE@|$(pwd)|g" -e "s|@TREEP@|$(pwd -P)|g" "$STUB/reply" >"$2"; shift; done
 STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/codex"
-export PATH="$root/bin:$PATH"
+# CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
+export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
 reset() {
   rm -f "$STUB"/*
@@ -181,8 +192,28 @@ RACEEOF
 chmod +x "$root/racebin/git"
 race() { PATH="$root/racebin:$PATH" run; }
 
-reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
-check "failed CI is not reviewed (exit 4): Codex does not run and nothing is posted" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && [ ! -f "$STUB/prompt" ] && ! posted'
+# Codex runs at once; the wait for CI on the same head comes after it, and the post only once CI passed.
+runs() { printf '{"check_runs":[{"name":"test","status":"%s","conclusion":%s}]}\n' "$1" "$2"; }
+# The model run, the CI reads and the post, in the order gh and codex saw them.
+order() { sed -n -e 's/^codex$/model/p' -e 's#.*/check-runs$#ci#p' -e 's/^pr comment .*/post/p' "$STUB/calls" | uniq | tr '\n' ' '; }
+# The text printed after the exit-4 line naming the head, without the blank line that follows it.
+unposted() { sed "1,/^Review of $H, not posted and not a round:\$/d" "$STUB/out" | sed 1d; }
+status() { (cd "$root/work" && "$mentat" status 7 2>&1); }
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
+check "a review that finishes before CI is posted only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "found nothing on $H" "$STUB/out" && ! grep -q "not posted" "$STUB/out"'
+check "a posted review counts as a round" 'status | grep -q "codex rounds 1,"'
+reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
+check "CI failing after the review exits 4, posts nothing and names the failing check" '[ "$rc" = 4 ] && ! posted && ! grep -q "pr comment" "$STUB/calls" && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out"'
+check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(cat "$STUB/reply")" ]'
+check "a review not posted for failed CI counts no round" 'status | grep -q "codex rounds 0,"'
+reset; printf -- '- P2 README:1 still running\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs queued null >"$STUB/check_runs.json"; rc=$(run)
+check "CI still running at the timeout exits 4, posts nothing and prints the review" '[ "$rc" = 4 ] && ! posted && grep -q "CI did not finish on $H within 2 seconds" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ]'
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
+check "a head that moves during the wait for CI exits 3 and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(order)" = "model ci " ] && grep -q "the head moved from $H" "$STUB/out"'
+reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)
+check "no CI check on the head: says so, then posts (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx "No CI checks ran on $H" "$STUB/out"'
+reset; printf 'Looks fine to me.\n' >"$STUB/reply"; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run)
+check "a reply without a result line is not reviewed before any wait for CI" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! grep -q check-runs "$STUB/calls" && ! posted'
 reset; rc=$(run)
 check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
 check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'

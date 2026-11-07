@@ -3,7 +3,7 @@
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for `mentat ci`, which waits for CI on a pull request's head and
 # reviews nothing, and for the review command's usage errors, using a stub gh.
-# The wait for CI is the same one every review runs first. Prints PASS/FAIL per
+# The wait for CI is the same one every review runs after its model run. Prints PASS/FAIL per
 # case; exits 1 on any FAIL.
 set -uo pipefail
 
@@ -57,11 +57,11 @@ check "ci waits for running CI, then passes (exit 0)" '[ "$rc" = 0 ] && [ "$(cat
 check "ci reads CI by the head commit" 'grep -q "repos/owner/repo/commits/$H/check-runs" "$STUB/calls"'
 check "ci posts nothing" '! grep -q -- "-X POST\|pr comment" "$STUB/calls"'
 reset; runs completed failure >"$STUB/check_runs.json"; rc=$(runci)
-check "ci reports failed CI (exit 4) and names the check" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out"'
+check "ci reports failed CI (exit 4) and names the check, with no review" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out" && ! grep -q "not posted" "$STUB/out"'
 reset; runs queued null >"$STUB/check_runs.json"; rc=$(runci)
 check "ci reports CI still running at the timeout (exit 4)" '[ "$rc" = 4 ] && grep -q "CI did not finish on $H" "$STUB/out"'
 reset; runs >"$STUB/check_runs.json"; rc=$(runci)
-check "ci with no CI at all passes after the grace period (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "CI passed on $H" "$STUB/out"'
+check "ci with no CI at all passes after the grace period (exit 0), saying no check ran" '[ "$rc" = 0 ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "CI passed on $H" "$STUB/out" && grep -qx "No CI checks ran on $H" "$STUB/out"'
 reset; echo "$OLD" >"$STUB/push_on_ci"; rc=$(runci)
 check "ci catches a push during the wait (exit 3)" '[ "$rc" = 3 ] && ! grep -q "CI passed" "$STUB/out"'
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)

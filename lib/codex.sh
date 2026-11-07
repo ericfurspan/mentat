@@ -82,7 +82,8 @@ run_codex() {
 
 # A local review reads the pull request's head as GitHub has it, never this
 # checkout's working tree: it fetches that commit, reviews it in a temporary
-# worktree, and posts the result only if the head has not moved since.
+# worktree, then waits for CI on that commit, and posts the result only once CI
+# passed there and the head has not moved since.
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp headref baseref
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64 ;; esac
@@ -99,7 +100,6 @@ review_local() {
   if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
     not_reviewed "could not read the repository with gh"
   fi
-  wait_for_ci "$repo" "$head"
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
   read_issues "$pr" "$info"
@@ -140,6 +140,8 @@ review_local() {
     "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
     *) not_reviewed "Codex's reply has no final REVIEW RESULT line" ;;
   esac
+  # The review ran without waiting for CI; it is posted only once CI passes on the same head.
+  wait_for_ci "$repo" "$head" "$out"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run mentat review again" 3
   {

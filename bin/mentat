@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 # mentat: Mentat's command line. Usage errors exit 64.
-#   mentat review <PR>  Waits for CI on the pull request's head, then reviews that head
-#     with local Codex and posts the result. 0 no findings, 2 findings posted (link
-#     printed), 1 not reviewed (error, incomplete review or no result in time), 3 the head
-#     moved, 4 CI did not pass on the head (failing checks printed; nothing reviewed).
+#   mentat review <PR>  Reviews the pull request's head with local Codex at once, then
+#     waits for CI on that head and posts the result only once CI passed. 0 no findings,
+#     2 findings posted (link printed), 1 not reviewed (error, incomplete review or no
+#     result in time), 3 the head moved, 4 CI did not pass on the head (failing or
+#     unfinished checks printed, then the review, which is not posted and not a round).
+#     When no CI check ran on the head, a line says so.
 #     `mentat review --local <PR>` is the same. A comment that holds a local path or a
 #     private name, in a public repository, is kept in a local file and not posted (exit 1).
-#   mentat review --grok <PR>  Waits for CI the same way, then reviews the pull
-#     request's head with Grok, if installed, and posts the result. Same exit codes.
+#   mentat review --grok <PR>  The same with Grok, if installed: its start comment and
+#     review are posted only once CI passed on the head it reviewed. Same exit codes.
 #     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
 #     MENTAT_GROK_REASONING_EFFORT to pass --reasoning-effort to Grok (weigh too);
 #     unset leaves Grok's default.
 #     Both take `--request <file>` after the mode, if any: `mentat review --request <file> <PR>`.
 #     The file holds the agreed request (what to build, what to leave alone, how it is checked)
-#     for a repository that keeps it outside GitHub. It is read once, before the wait for CI;
+#     for a repository that keeps it outside GitHub. It is read once, before the review;
 #     a missing, unreadable or blank file is not reviewed. It goes to the reviewing tool as
 #     its own data block, and the posted comment records a fingerprint of it.
 #   mentat ci <PR>  Waits for CI on the pull request's head the same way, and

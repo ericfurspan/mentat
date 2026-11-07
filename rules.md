@@ -7,9 +7,9 @@ The repository comes first. Before any work, Claude Code reads every AGENTS.md t
 ## A change
 1. Claude Code calls the Skill tool with `mentat:propose` before giving a view on any request or suggesting a change of its own, a fix to its own output included.
 2. One builder (the `builder` subagent), branch and checkout per pull request. The main session edits no files, review fixes included.
-3. Before pushing, Claude Code runs the tests on the pushed commit, with a clean working tree (`git status --porcelain` prints nothing), not relying on the builder's report.
+3. Before pushing, Claude Code runs the tests on the pushed commit, with a clean working tree (`git status --porcelain` prints nothing), not relying on the builder's report, unless the repository's AGENTS.md says its CI runs the test command on every pull request. Then CI is that run, except that after CI fails on the branch, the next commit is tested this way before it is pushed; and when that run was skipped, a head with no CI check runs is not a pass: Claude Code runs the test command on that commit before any review of it counts.
 4. Claude Code opens a normal pull request by default, and writes and updates its description by calling the Skill tool with `mentat:pr`.
-5. When the build is done and the test command passes, Claude Code pushes and calls the Skill tool with `mentat:review`. After "You: merge #N.", it pushes nothing to #N's branch until the maintainer answers a reply opening "Hold #N: <reason>".
+5. When the build is done and any test run step 3 calls for passes, Claude Code pushes and calls the Skill tool with `mentat:review`. After "You: merge #N.", it pushes nothing to #N's branch until the maintainer answers a reply opening "Hold #N: <reason>".
 
 After compaction or a resumed session, Claude Code calls the skill for the step in progress if its text is gone.
 

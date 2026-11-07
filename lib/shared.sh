@@ -22,8 +22,10 @@ result_word() {
 
 # CI on commit $2 of repository $1: check runs, read by commit so a
 # push cannot swap them. Returns when every check passed (success, neutral or
-# skipped). Exits 4, printing the checks that did not pass, when one failed or CI
-# is still running after CI_TIMEOUT_SECONDS. Checks appear a little after a push,
+# skipped), or when no check ran, saying so. Exits 4, printing the checks that did
+# not pass, when one failed or CI is still running CI_TIMEOUT_SECONDS after the wait
+# began; then $3, a finished review's reply when given, is printed after a line
+# saying it was not posted and is not a round. Checks appear a little after a push,
 # and not all at once, so neither "no checks" nor "all passed" counts until
 # CI_GRACE_SECONDS have passed since the wait began or since the last check
 # finished. A failed read is a missed poll; still failing at the timeout, it is
@@ -35,16 +37,23 @@ ci_lines() { # $1 repo, $2 commit: prints "<pass|fail|pending> <epoch finished> 
     + " " + ((.completed_at // "1970-01-01T00:00:00Z") | fromdateiso8601 | tostring) + " " + .name') || return 1
   printf '%s\n' "$runs" | grep -v '^$' || true
 }
-wait_for_ci() {
-  local repo="$1" commit="$2" secs=0 lines said=no last
+ci_stop() { # $1 commit, $2 reply file or empty
+  if [ -n "$2" ]; then
+    printf '\nReview of %s, not posted and not a round:\n\n' "$1"
+    cat "$2"
+  fi
+  exit 4
+}
+wait_for_ci() { # $1 repo, $2 commit, $3 optional reply file
+  local repo="$1" commit="$2" reply="${3:-}" secs=0 lines said=no last
   while :; do
     if lines=$(ci_lines "$repo" "$commit"); then
       if [ -z "$lines" ]; then
-        [ "$secs" -lt "$CI_GRACE_SECONDS" ] || return 0
+        [ "$secs" -lt "$CI_GRACE_SECONDS" ] || { printf 'No CI checks ran on %s\n' "$commit"; return 0; }
       elif grep -q '^fail ' <<<"$lines"; then
-        printf 'CI did not pass on %s; not reviewed. Failing checks:\n' "$commit"
+        printf 'CI did not pass on %s. Failing checks:\n' "$commit"
         grep '^fail ' <<<"$lines" | sed -E 's/^fail [0-9]+ /- /'
-        exit 4
+        ci_stop "$commit" "$reply"
       elif ! grep -q '^pending ' <<<"$lines"; then
         last=$(awk '{ if ($2 > m) m = $2 } END { print m + 0 }' <<<"$lines")
         [ "$secs" -lt "$CI_GRACE_SECONDS" ] && [ $(( $(date -u +%s) - last )) -lt "$CI_GRACE_SECONDS" ] || return 0
@@ -53,9 +62,9 @@ wait_for_ci() {
       not_reviewed "could not read CI on $commit"
     fi
     if [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
-      printf 'CI did not finish on %s within %s seconds; not reviewed. Still running:\n' "$commit" "$CI_TIMEOUT_SECONDS"
+      printf 'CI did not finish on %s within %s seconds. Still running:\n' "$commit" "$CI_TIMEOUT_SECONDS"
       grep '^pending ' <<<"$lines" | sed -E 's/^pending [0-9]+ /- /'
-      exit 4
+      ci_stop "$commit" "$reply"
     fi
     [ "$said" = yes ] || { printf 'Waiting for CI on %s\n' "$commit" >&2; said=yes; }
     sleep "$REVIEW_INTERVAL_SECONDS"
@@ -93,7 +102,7 @@ read_issues() { # $1 pr, $2 pull request JSON
 }
 # The agreed request, for a repository with an external backlog (skills/backlog):
 # `mentat review --request <file>`. Reads the caller's request_file once,
-# before the wait for CI, and sets the caller's `request` (its text) and
+# before the review starts, and sets the caller's `request` (its text) and
 # `request_fp` (the first 12 hex characters of the SHA-256 of that text without
 # trailing newlines, or "none" with no file). A file that is missing, unreadable or
 # blank is not reviewed. The text is data for the reviewing tool, never instructions.

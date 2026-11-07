@@ -57,8 +57,11 @@ GH_REAL=$(cd -P "$GH_USER" && pwd -P)
 export GROK_HOME="$GH_USER" XAI_API_KEY=fake-xai-key MENTAT_CANARY=fake-canary GROK_FOLDER_TRUST=0
 
 # gh: pr view serves $STUB/head (moved_head replaces it after the first read);
-# pr comment records each comment as $STUB/comment.N, and fails when comment_fails
-# exists (every comment) or result_fails exists (a --body-file comment).
+# check runs come from $STUB/check_runs.json (check_runs_later.json from the second
+# read on), and a file named push_on_ci holds a head to switch to when CI is read;
+# pr comment records each comment as $STUB/comment.N, and adds it to the comments
+# read back, as this account's; it fails when comment_fails exists (every comment)
+# or result_fails exists (a --body-file comment).
 cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
@@ -84,7 +87,9 @@ case "$1 $2" in
       */check-runs)
         # spoof_during_ci: this account's start comment appears while CI is being waited on.
         [ -f "$STUB/spoof_during_ci" ] && jq -n --arg b "Grok review started on $(cat "$STUB/head")" '[{user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"
-        cat "$STUB/check_runs.json" ;;
+        n=$(($(cat "$STUB/ci_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/ci_reads"
+        [ -f "$STUB/push_on_ci" ] && cp "$STUB/push_on_ci" "$STUB/head"
+        if [ "$n" -ge 2 ] && [ -f "$STUB/check_runs_later.json" ]; then cat "$STUB/check_runs_later.json"; else cat "$STUB/check_runs.json"; fi ;;
       */comments) [ -f "$STUB/comments_fail" ] && exit 1; cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]' ;;
       *) exit 99 ;;
     esac ;;
@@ -101,11 +106,12 @@ case "$1 $2" in
       shift
     done
     echo "$n" >"$STUB/comment_count"
+    jq --rawfile b "$STUB/comment.$n" '. + [{user: {login: "agent-bot"}, body: $b}]' <<<"$(cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]')" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json"
     echo "https://example.test/comment/$n" ;;
   *) exit 99 ;;
 esac
 STUBEOF
-# grok: records how it was started and what it can see, then replies with
+# grok: records how it was started and what it can see, and its run in the calls gh records, then replies with
 # $STUB/out_json (stdout) and $STUB/exit_code. In live mode it hands over to the
 # real Grok instead, without the sign-in, and keeps the sandbox event.
 # (mentat starts it with an empty environment, so its own path is written in.)
@@ -121,6 +127,7 @@ if [ "${1:-}" = models ]; then
   fi
   exit 0
 fi
+echo grok >>"$STUB/calls"
 args=("$@")
 prev=""
 printf '%s\n' "$@" >"$STUB/args"
@@ -161,7 +168,8 @@ cat >"$STUB/codex_prompt"
 while [ $# -gt 0 ]; do [ "$1" = -o ] && printf 'ok\n\nREVIEW RESULT: NO FINDINGS\n' >"$2"; shift; done
 STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/grok" "$root/bin/codex"
-export PATH="$root/bin:$PATH"
+# CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
+export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
 reply() { # $1 text, $2 stop reason
   jq -n --arg t "$1" --arg s "${2:-end_turn}" '{text: $t, stopReason: $s, sessionId: "s", modelUsage: {"grok-stub": {}}}' >"$STUB/out_json"
@@ -312,8 +320,29 @@ check "an INCOMPLETE reason that names the export is posted and printed as a rep
 reset; reply $'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read'; rc=$(run)
 check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with no did-not-finish comment or log" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" && folded | grep -qx "I could not read the linked issue." && ! grep -rq "Grok review did not finish" "$STUB/out" "$STUB"/comment.* && grep -q "not reviewed: Grok says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing\|can read it at" "$STUB/out" && [ -z "$(left_over)" ]'
 
-reset; echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"failure"}]}' >"$STUB/check_runs.json"; rc=$(run)
-check "failed CI is not reviewed (exit 4): no start record, Grok does not run" '[ "$rc" = 4 ] && grep -q "CI did not pass on $H" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+# Grok runs at once; the wait for CI on the same head comes after it, and the start comment and
+# the review are posted only once CI passed, so a run that is not posted leaves Grok's one run unused.
+runs() { printf '{"check_runs":[{"name":"test","status":"%s","conclusion":%s}]}\n' "$1" "$2"; }
+# The model run, the CI reads and the posts, in the order gh and grok saw them.
+order() { sed -n -e 's/^grok$/model/p' -e 's#.*/check-runs$#ci#p' -e 's/^pr comment .*/post/p' "$STUB/calls" | uniq | tr '\n' ' '; }
+# The text printed after the exit-4 line naming the head, without the blank line that follows it.
+unposted() { sed "1,/^Review of $H, not posted and not a round:\$/d" "$STUB/out" | sed 1d; }
+status() { (cd "$root/work tree" && "$mentat" status 7 2>&1); }
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
+check "a review that finishes before CI posts its start comment and review only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && ! grep -q "not posted" "$STUB/out"'
+check "a posted review is Grok's one run" 'status | grep -q "grok: done,"'
+reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
+check "CI failing after the review exits 4, posts nothing, not even the start comment, and names the failing check" '[ "$rc" = 4 ] && grok_ran && [ "$(comments)" = 0 ] && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out" && [ -z "$(left_over)" ]'
+check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(jq -r .text "$STUB/out_json")" ]'
+check "a review not posted for failed CI leaves Grok not run" 'status | grep -q "grok: none,"'
+runs completed '"success"' >"$STUB/check_runs.json"; rm "$STUB/check_runs_later.json" "$STUB/args"; rc=$(run)
+check "so a later review --grok is not refused, and posts (exit 2)" '[ "$rc" = 2 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ]'
+reset; runs queued null >"$STUB/check_runs.json"; rc=$(run)
+check "CI still running at the timeout exits 4, posts nothing and prints the review" '[ "$rc" = 4 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "CI did not finish on $H within 2 seconds" "$STUB/out" && [ "$(unposted)" = "$(jq -r .text "$STUB/out_json")" ]'
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
+check "a head that moves during the wait for CI exits 3 and posts nothing, not even the start comment" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && [ "$(order)" = "model ci " ] && grep -q "the head moved from $H" "$STUB/out" && [ -z "$(left_over)" ]'
+reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)
+check "no CI check on the head: says so, then posts (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && grep -qx "No CI checks ran on $H" "$STUB/out"'
 reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(run)
 check "a head the fetch does not match is exit 3, with no start record" '[ "$rc" = 3 ] && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; rc=$(race)
@@ -326,10 +355,11 @@ reset; rc=$(run)
 check "a review leaves the checkout's origin/main alone" '[ "$rc" = 0 ] && [ "$(git -C "$root/work tree" rev-parse refs/remotes/origin/main)" = "$stale" ]'
 git -C "$root/work tree" update-ref refs/remotes/origin/main "$BASE"
 
-# Every way a review can fail after the start record leaves a did-not-finish comment and no review.
+# Every way Grok's run can fail is found before the wait for CI and before any comment: nothing is
+# posted, so Grok's one run is not used, and the raw log is kept privately, not printed.
 not_finished() { # $1 description, $2 expected reason fragment
   frag=$2
-  check "$1: exit 1, a did-not-finish comment, no review, no log printed" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "^Grok review did not finish on $H: .*$frag" "$STUB/comment.2" && ! grep -rq "^## Local Grok review" "$STUB"/comment.* && ! grep -q "SECRET-LOG-TEXT" "$STUB/out" "$STUB"/comment.* && [ -z "$(left_over)" ]'
+  check "$1: exit 1 before CI is read, nothing posted, no log printed" '[ "$rc" = 1 ] && grep -q "not reviewed: .*$frag" "$STUB/out" && [ "$(comments)" = 0 ] && ! grep -q check-runs "$STUB/calls" && ! grep -q "SECRET-LOG-TEXT" "$STUB/out" && [ -z "$(left_over)" ]'
 }
 reset; echo 3 >"$STUB/exit_code"; rc=$(run)
 not_finished "Grok exiting non-zero" "exited with status 3"
@@ -362,11 +392,11 @@ reset; : >"$STUB/out_json"; rc=$(run)
 not_finished "no output" "complete review"
 reset; touch "$STUB/hang"; rc=$(cd "$root/work tree" && MENTAT_GROK_TIMEOUT_SECONDS=2 "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
 not_finished "a timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "did not finish within 2 seconds"
-check "a timeout still leaves the debug record in the private log" 'p=$(sed -n "s/.*can read it at //p" "$STUB/out"); [ -n "$p" ] && grep -q DEBUG-LOG-TEXT "$p" && ! grep -q DEBUG-LOG-TEXT "$STUB/out" "$STUB"/comment.*'
+check "a timeout still leaves the debug record in the private log" 'p=$(sed -n "s/.*can read it at //p" "$STUB/out"); [ -n "$p" ] && grep -q DEBUG-LOG-TEXT "$p" && ! grep -q DEBUG-LOG-TEXT "$STUB/out" && [ "$(comments)" = 0 ]'
 reset; rc=$(cd "$root/work tree" && MENTAT_REVIEW_TIMEOUT_SECONDS=0 "$mentat" review --grok 7 >"$STUB/out" 2>&1; echo $?)
 check "the Codex review timeout does not limit Grok" '[ "$rc" = 0 ]'
 reset; touch "$STUB/result_fails"; rc=$(run)
-not_finished "a failed post of the review" "could not post the review"
+check "a failed post of the review, after the start comment: exit 1, a did-not-finish comment, no review, no log printed" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "^Grok review did not finish on $H: .*could not post the review" "$STUB/comment.2" && ! grep -rq "^## Local Grok review" "$STUB"/comment.* && ! grep -q "SECRET-LOG-TEXT" "$STUB/out" "$STUB"/comment.* && [ -z "$(left_over)" ]'
 
 # The publish check, on each comment, right before its post.
 held_file() { sed -n 's/.*the maintainer can read it at \([^;]*\).*/\1/p' "$STUB/out"; }
@@ -375,7 +405,7 @@ says_held() { # $1 category, $2 the match: named the category and a file holding
 }
 printf '# a comment\n\nStubCodename\nreview started on\ndid not finish on\n' >"$LIST"
 reset; rc=$(run)
-check "a start comment with a hit is not posted, is kept, and Grok does not run" '[ "$rc" = 1 ] && [ "$(comments)" = 0 ] && ! grok_ran && says_held "a configured private name" "review started on" && [ "$(cat "$(held_file)")" = "Grok review started on $H" ]'
+check "a start comment with a hit is not posted, is kept, and nothing is posted" '[ "$rc" = 1 ] && [ "$(comments)" = 0 ] && grok_ran && says_held "a configured private name" "review started on" && [ "$(cat "$(held_file)")" = "Grok review started on $H" ]'
 printf '# a comment\n\nStubCodename\ndid not finish on\n' >"$LIST"
 reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a failure comment with a hit is skipped, with no second try, and the review exits as not reviewed" '[ "$rc" = 1 ] && [ "$(comments)" = 1 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "not reviewed: the review was held back and not posted" "$STUB/out" && [ -z "$(left_over)" ]'
@@ -398,9 +428,9 @@ reset; reply "$(printf -- '- P3 at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOM
 check "with a missing word list the home path is still found" '[ "$rc" = 1 ] && says_held "a local path" "$HOME"'
 
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
-check "a head that moves during the review does not lose it: the review is posted for the commit Grok reviewed (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && heading "no findings" none && fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -q "Change reviewed:" && [ -z "$(left_over)" ]'
+check "a head that moves during the review exits 3 and posts nothing, not even the start comment" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && [ -z "$(left_over)" ]'
 reset; touch "$STUB/comment_fails"; rc=$(run)
-check "a start record that cannot be posted is not reviewed and Grok does not run" '[ "$rc" = 1 ] && grep -q "could not post the start comment" "$STUB/out" && ! grok_ran'
+check "a start record that cannot be posted is not reviewed, and the review is not posted" '[ "$rc" = 1 ] && grep -q "could not post the start comment" "$STUB/out" && grok_ran && [ "$(comments)" = 0 ]'
 reset; rm "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 check "no Grok sign-in is not reviewed, with no start record" '[ "$rc" = 1 ] && grep -q "Grok is not signed in" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ ! -e "$STUB/args_models" ]'
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2020-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
@@ -441,7 +471,7 @@ check "a start comment from another account does not stop the review" '[ "$rc" =
 reset; start_comment agent-bot >"$STUB/issue_comments.json"; rc=$(run)
 check "the signed-in account own start comment stops it: not reviewed, no new comment, Grok does not run" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; touch "$STUB/spoof_during_ci"; rc=$(run)
-check "a start comment that appears during the CI wait stops the run: no comment posted, Grok does not run" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ -z "$(left_over)" ]'
+check "this account's start comment appearing before the post (here during the CI wait) stops it: exit 1, nothing posted" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && grok_ran && [ "$(comments)" = 0 ] && [ -z "$(left_over)" ]'
 reset; touch "$STUB/user_fails"; rc=$(run)
 check "an account that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q "could not read which GitHub account" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; touch "$STUB/comments_fail"; rc=$(run)

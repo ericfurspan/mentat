@@ -3,8 +3,11 @@
 # its sandbox profile and its isolated home. Sourced by bin/mentat.
 
 # A Grok review (`mentat review --grok`) runs beside the main review, once per
-# pull request. Grok gets read-only file tools and no shell, a plain export of the
-# head without git history, and the diff inside its prompt. It runs as the user's
+# pull request. Grok runs at once; the review waits for CI on the same head after
+# it, and the start comment and the review are posted only once CI passed there and
+# the head has not moved, so a run that is not posted is not Grok's one run. Grok
+# gets read-only file tools and no shell, a plain export of the head without git
+# history, and the diff inside its prompt. It runs as the user's
 # Grok sign-in, in a home folder Mentat builds for it, inside Grok's own sandbox
 # (a custom profile built on `strict`), which fails closed: if the profile cannot
 # be applied, Grok refuses to start. The profile and the permission rules are
@@ -20,9 +23,9 @@
 # `mentat consult` runs it on any question with web search alone: no file tools and
 # an empty export. The functions below that they share (grok_signin, grok_run_folder,
 # grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
-# function named in `fail`: not_reviewed before a review's start comment, grok_fail
-# after it. The pull-request steps (reading it, the start comment, the diff prompt,
-# the did-not-finish comment and posting) stay in review_grok's own functions.
+# function named in `fail`: not_reviewed before Grok runs, grok_fail from then on.
+# The pull-request steps (reading it, the diff prompt, the start comment, the
+# did-not-finish comment and posting) stay in review_grok's own functions.
 # Convention: these functions set the caller's variables by name and never return
 # values; that keeps the pull-request path and the weigh path on one set of steps
 # without passing a dozen arguments. A reader tracing a variable should start from
@@ -45,9 +48,9 @@ grok_not_started() { # $1 repo, $2 pull request, $3 this account's login
   [ "$n" = 0 ] || not_reviewed "Grok already reviewed #$2 (its start comment is on the pull request); it runs once per pull request"
 }
 
-# Reads the pull request and everything the review needs from GitHub and git, and
-# stops with "not reviewed" when something is missing. Sets the caller's variables
-# (top, info, head, base, repo, me, title, body, issues, mb, grok_bin, real_grok), and reads the caller's request and request_fp.
+# Reads the pull request and everything the review needs from GitHub and git, without
+# waiting for CI, and stops with "not reviewed" when something is missing. Sets the
+# caller's variables (top, info, head, base, repo, me, title, body, issues, mb, grok_bin, real_grok), and reads the caller's request and request_fp.
 grok_prepare() {
   local tool fetched headref baseref
   for tool in git gh jq grok; do
@@ -64,7 +67,6 @@ grok_prepare() {
   fi
   me=$(gh api user --jq .login) && [ -n "$me" ] || not_reviewed "could not read which GitHub account gh is signed in as"
   grok_not_started "$repo" "$pr" "$me"
-  wait_for_ci "$repo" "$head"
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
   read_issues "$pr" "$info"
@@ -309,9 +311,10 @@ grok_keep_log() {
   fi
 }
 
-# After the start comment, any failure says so on the pull request. The log is
-# Grok's raw output and may hold a credential, so it is not printed or posted; a
-# copy is kept for the maintainer. A publish check hit on this comment skips the post.
+# Once Grok has run, any failure keeps a copy of its log for the maintainer; the log
+# is Grok's raw output and may hold a credential, so it is not printed or posted.
+# After the start comment, the failure also says so on the pull request. A publish
+# check hit on that comment skips the post.
 # $2, optional, is for the local message only. Reads the caller's pr, repo, head,
 # started, err, out and ghome.
 grok_fail() {
@@ -347,19 +350,17 @@ grok_exec() {
   [ "$rc" -eq 0 ] || "$fail" "Grok exited with status $rc"
 }
 
-# Posts the start record, then runs Grok.
-grok_run() {
-  # The start record comes after CI passed and the head matched, and is what keeps
-  # the review loop from starting a second Grok review on this pull request. The
-  # check is repeated here because a start comment may have appeared during the CI
-  # wait (this narrows the window; it does not serialize two sessions).
+# Posts the start record, which keeps the review loop from starting a second Grok
+# review on this pull request. It comes after CI passed and the head matched, right
+# before the review. The check is repeated because a start comment may have appeared
+# while Grok ran or CI was waited on (this narrows the window; it does not serialize
+# two sessions).
+grok_start() {
   grok_not_started "$repo" "$pr" "$me"
   local held
   if held=$(held_comment "Grok review started on $head" "$repo"); then not_reviewed "$held"; fi
   gh pr comment "$pr" --body "Grok review started on $head" >/dev/null || not_reviewed "could not post the start comment on #$pr"
   started=yes
-  fail=grok_fail
-  grok_exec
 }
 
 # Reads Grok's reply from $out into $result_file, and calls "$fail" unless it is a
@@ -374,14 +375,9 @@ grok_reply() {
   jq -r '.text' "$out" >"$result_file" || "$fail" "could not read Grok's reply"
 }
 
-# Checks Grok's reply, posts it on the pull request and exits with the result. The
-# review is posted for the commit Grok reviewed, even if the head has moved since:
-# the start comment stops a rerun, so a review dropped here would be lost.
-# A reply ending INCOMPLETE is a complete reply: it is posted like any other and
-# then exits 1 as "not reviewed", with no did-not-finish comment or private log
-# (grok_fail's), because the posted review is the record.
-grok_post() {
-  local result model url held
+# Checks Grok's reply, in $result_file with its paths rewritten, and sets the
+# caller's result to its final REVIEW RESULT line.
+grok_check() {
   grok_reply
   localize_review_paths "$result_file" "$repo" "$head" "$run/export" "$cache/mentat/${run##*/}/export" || grok_fail "could not rewrite the paths in Grok's reply"
   result=$(last_line "$result_file")
@@ -389,6 +385,14 @@ grok_post() {
     "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
     *) grok_fail "Grok's reply has no final REVIEW RESULT line" ;;
   esac
+}
+
+# Posts the checked reply on the pull request, after the start comment, and exits
+# with the result. A reply ending INCOMPLETE is a complete reply: it is posted like
+# any other and then exits 1 as "not reviewed", with no did-not-finish comment or
+# private log (grok_fail's), because the posted review is the record.
+grok_post() {
+  local model url held
   model=$(jq -r 'if (.modelUsage | type) == "object" and (.modelUsage | length) > 0 then (.modelUsage | keys | join(", ")) else "unknown" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9._, -') || model=unknown
   [ -n "$model" ] || model=unknown
   {
@@ -414,7 +418,7 @@ grok_post() {
 }
 
 review_grok() {
-  local pr="${1:-}" repo info head base title body top mb issues grok_bin me request request_fp
+  local pr="${1:-}" repo info head base title body top mb issues grok_bin me request request_fp now result
   local run="" started=no real_grok home_real tmpdir denied roots cache ghome
   local entries args=() out err result_file fail=not_reviewed
   # shellcheck disable=SC2034 # read by grok_args
@@ -427,6 +431,12 @@ review_grok() {
   grok_pr_prompt
   grok_home
   grok_args
-  grok_run
+  fail=grok_fail
+  grok_exec
+  grok_check
+  wait_for_ci "$repo" "$head" "$result_file"
+  now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
+  [ "$now" = "$head" ] || die "the head moved from $head; run mentat review --grok again" 3
+  grok_start
   grok_post
 }
