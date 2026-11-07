@@ -192,10 +192,10 @@ for s in 'name: intake' 'disable-model-invocation: true'; do
     fail "skills/intake/SKILL.md's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all` \(none: asks first which projects. ideas to settle\)/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all` \(neither: asks first which projects. ideas to settle\)/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
   pass "skills/intake/SKILL.md's description lists its arguments"
 else
-  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`, none: asks first which projects' ideas to settle; brainstorm <text or link>)"
+  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`, neither: asks first which projects' ideas to settle; brainstorm <text or link>)"
 fi
 phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
 phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
@@ -386,8 +386,8 @@ phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unsco
 phrase_check skills/intake/SKILL.md "the four options on an idea's prompt" 'An idea'"'"'s prompt shows four options: the recommended ending, Leave (or one other ending when Leave is recommended), one other likely ending, and "Later" last.'
 phrase_check skills/intake/SKILL.md "every ending not shown named in the question" 'Its question names every ending not shown, and an Other answer naming one chooses it.'
 phrase_check skills/intake/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project and is neither a project name nor a reader option."
-# A sitting with no project names asks once which projects' ideas it settles, as a session control, unless no project list is named.
-phrase_check skills/intake/SKILL.md "the opening question on a run with no project names" "With no project names, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then \`all\`, another through Other."
+# A sitting with neither project names nor `all` asks once which projects' ideas it settles, as a session control, unless no project list is named.
+phrase_check skills/intake/SKILL.md "the opening question on a run with neither project names nor all" "With neither project names nor \`all\`, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then \`all\`, another through Other."
 phrase_check skills/intake/SKILL.md "the opening question as a session control, not asked again" 'It is a session control, not a decision: it has no "N of M" and is not asked again after a compaction.'
 phrase_check skills/intake/SKILL.md "the opening question's answer not a limit on what readers file" 'The answer names the projects whose ideas the sitting settles, not a limit on what readers file (step 1).'
 phrase_check skills/intake/SKILL.md "readers run as with all after the opening question" "With projects chosen at the opening question, every reader runs as with \`all\`, and the sitting asks only about those projects' ideas and the readers' hand-offs for them."
