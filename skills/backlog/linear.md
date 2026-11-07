@@ -15,13 +15,4 @@ For a repository whose AGENTS.md names a Linear project, by name and team.
 
 ````
 Planning for the <repository> repository. Each item is the only record of a change: the request, plan, evidence, status and its "Spec" section, written in public-safe words. GitHub holds code and pull requests only; no issue is opened for agreed work. The `mentat:backlog` skill describes how items move.
-
-## How items move
-
-* Backlog: taken on, not agreed to build; parked; or holding only a decision for the maintainer; where no inbox is named, also an idea not yet taken on or kept for reference, whose opening sentence says so
-* Todo: agreed to build
-* In Progress: a branch or pull request exists
-* Done, Canceled or Duplicate: how it ended
-* The "Waiting on you" label: the item waits on the maintainer and is assigned to the project's lead while it waits, with the steps at the top of its description (a merge wait names the pull request in its opening sentence instead)
-* Next agreed work: the open Todo items without the "Waiting on you" label, by Priority (Urgent, High, Medium, Low, then No priority), oldest first within a level. Linear's own drag order is not used. Priority is set only to a level the maintainer gave.
 ````
