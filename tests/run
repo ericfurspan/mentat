@@ -361,6 +361,12 @@ phrase_check skills/backlog/linear.md "a hand wait with an open pull request lef
 phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (step 4: the block, the label and the lead's assignment removed)."
 phrase_check skills/backlog/linear.md "an unclear hand wait named as may be done" "A comment that may report it, or a later report on a block with no \`Ends when\` line, leaves the item unchanged, and the item is named as \"may be done\" with the comment's date."
 phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
+# A new Linear project's page holds one purpose line as its short summary, an empty description and the repository link;
+# setup asks for that line and stops when the tools cannot write that shape.
+phrase_check skills/backlog/linear.md "a new project's overview shape" "A new project's overview holds only what is unique to it: its short summary is one line saying what the project is for, its long description stays empty, and its repository, where there is one, is a link under Resources."
+phrase_check skills/setup/SKILL.md "the stop when the Linear tools cannot write the project's shape" "If the Linear tools cannot write a project's short summary on its own or add a link under its Resources, stop and say so; create no project in another shape."
+phrase_check skills/setup/SKILL.md "the purpose line asked, with a draft from the README" "ask the maintainer for the project's purpose line, one line saying what it is for, offering a draft from the README."
+phrase_check skills/setup/SKILL.md "the project created in the new project shape" "Create the project in the new project shape in \`../backlog/linear.md\`, with that line as its short summary, the repository's link under Resources and the maintainer as lead."
 
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
