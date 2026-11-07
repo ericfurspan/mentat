@@ -412,7 +412,7 @@ else
   fail "skills/backlog/SKILL.md's item shape must put the opening sentence, the wait block, the spec, then the current plan, in that order"
 fi
 phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds only these, in this order:'
-phrase_check skills/backlog/SKILL.md "the wait block's one-line steps and Ends when line" "numbered steps of one line each, plus anything to paste, then the \`Ends when:\` line."
+phrase_check skills/backlog/SKILL.md "the wait block's pointer to the wait's shape" 'It is the first heading of the description, in the shape "Waits on the maintainer" gives.'
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
 phrase_check skills/backlog/SKILL.md "the current plan's five-line limit" 'in at most five lines'
 phrase_check skills/backlog/SKILL.md "a longer plan in a comment" "A longer plan, such as one for \`mentat:challenge\`, goes in a comment, and the section keeps the next step."
@@ -426,7 +426,7 @@ phrase_check skills/backlog/SKILL.md "a backlog item's wait kept only there, wit
 phrase_check skills/backlog/SKILL.md "each step's one line naming where it runs" 'Each step is one line naming where it runs: a website page, or an app and folder, the folder only in terms the record may hold'
 phrase_check skills/backlog/SKILL.md "what the maintainer should see before a dependent step" 'A step whose result a later step depends on says what the maintainer should see.'
 phrase_check skills/backlog/SKILL.md "each command in its own fenced block with real values" 'Each command or text to paste sits in its own fenced block under its step, complete with real, non-secret values and no placeholder the maintainer must look up; a step run N times keeps its one command.'
-phrase_check skills/backlog/SKILL.md "step 4's pointer to the wait's shape" '("Waits on the maintainer" gives the shape)'
+phrase_check skills/backlog/SKILL.md "step 4's pointer to the wait's shape" 'then the steps ("Waits on the maintainer" gives the shape)'
 phrase_check skills/backlog/SKILL.md "the wait's steps in full" 'The steps are written in full in the wait, never pointing to a comment or a document; long text to paste, such as a prompt, also sits in a fenced block under its step.'
 phrase_check skills/backlog/SKILL.md "an unchecked detail marked unverified" 'A detail the writer has not checked is marked unverified, never guessed.'
 phrase_check skills/backlog/SKILL.md "the wait's Ends when line as its only overall pass" "The wait's last line says what ends it, as \`Ends when: <the result that shows it is done>\`, and is its only overall pass."
