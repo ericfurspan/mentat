@@ -209,9 +209,11 @@ phrase_check skills/intake/SKILL.md "questions outside the chosen set left for a
 phrase_check skills/intake/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
 phrase_check skills/intake/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
 phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas, up to the maintainer's cap" "then settle just those, from step 3 on, asking them all with no smaller set, up to the cap the maintainer's instructions set where they set one; the rest stay undecided for a later sitting."
-# A sitting keeps each item's questions together, readers' included, still asks each idea's ending, and leaves a big
-# decision, and those that depend on it, to the item's own planning session, recorded as its next step and reported.
-phrase_check skills/intake/SKILL.md "each item's questions asked together, readers' included" "Ask each item's questions together, never interleaved with another item's: a reader's question about an idea the sitting asks comes just before that idea's question, not first."
+# A sitting keeps each item's questions together, a reader's question about an idea just before it, still asks each
+# idea's ending, and leaves a big decision, and those that depend on it, to the item's own planning session, recorded
+# as its next step and reported.
+phrase_check skills/intake/SKILL.md "each item's questions asked together" "Ask each item's questions together, never interleaved with another item's."
+phrase_check skills/intake/SKILL.md "a reader's question about an idea asked just before it, others first" "Readers' questions about no idea the sitting asks come first, then ideas by project, then ideas with no project, each oldest first by the idea's own date where the maintainer's instructions give one; a reader's question about an idea the sitting asks comes just before that idea's question."
 phrase_check skills/intake/SKILL.md "a big decision not asked in a sitting" "A decision that sets direction past its own item, or needs analysis or discussion that would dominate the sitting, is not asked; opening further decisions is not by itself the test."
 phrase_check skills/intake/SKILL.md "a big decision's dependents left open and independent questions asked" "It and any decision that depends on it stay open for its own planning session, independent questions go on, and the report names \`/mentat:plan <id>\` for it."
 phrase_check skills/intake/SKILL.md "each idea's ending still asked" "Each idea's ending is still asked; such a decision inside an idea taken on goes to that planning session."
@@ -389,7 +391,7 @@ phrase_check skills/intake/SKILL.md "a left inbox idea's note on its line or iss
 phrase_check skills/intake/SKILL.md "inbox ideas in no project read in a sitting covering every project" "A sitting covering every current project also reads the inbox ideas the maintainer's instructions keep in no project."
 phrase_check skills/intake/SKILL.md "every page of a list read" 'Read every page of a list.'
 phrase_check skills/intake/SKILL.md "the maintainer's cap applied before counting" "4. Ask. Where the maintainer's instructions cap how many undecided ideas a sitting asks, apply that cap first, oldest first, and leave the rest undecided for a later sitting. Then count the questions."
-phrase_check skills/intake/SKILL.md "ideas with no project after the projects', oldest first by their own date" "then ideas by project, then ideas with no project, each oldest first by the idea's own date where the maintainer's instructions give one."
+phrase_check skills/intake/SKILL.md "ideas with no project after the projects', oldest first by their own date" "then ideas by project, then ideas with no project, each oldest first by the idea's own date where the maintainer's instructions give one;"
 phrase_check skills/setup/SKILL.md "the migration's undecided idea in the inbox, else a Backlog item not taken on yet" "An undecided idea goes in the project's inbox as the maintainer's own instructions say where they name one, and step 7's comment lists it as \"inbox\" in place of an item id; with none named, it is a Backlog item whose opening sentence says it is not taken on yet."
 phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
 phrase_check skills/intake/SKILL.md "the four options on an idea's prompt" 'An idea'"'"'s prompt shows four options: the recommended ending, Leave (or one other ending when Leave is recommended), one other likely ending, and "Later" last.'
