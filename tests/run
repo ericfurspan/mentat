@@ -119,6 +119,15 @@ phrase_check skills/review/SKILL.md "the final check reading Grok's fingerprint 
 phrase_check skills/pr/SKILL.md "a check that failed first as the builder's report" "a check that failed before the fix and passed after is the builder's report"
 phrase_check skills/pr/SKILL.md "titles in Conventional Commits" 'Titles follow Conventional Commits.'
 phrase_check skills/pr/SKILL.md "the alert type in one clause" 'Use the GitHub alert type that fits the note.'
+# The builder commits each logical change on its own, one per review finding, and runs the test command once, last.
+phrase_check prompts/builder.md "a commit per logical change a reviewer can read alone" 'commit each logical change a reviewer can read alone'
+phrase_check prompts/builder.md "one commit for what is only coherent together" 'keep together what is only coherent together, such as a wording change and the check that pins it'
+phrase_check prompts/builder.md "one commit per review finding fixed" 'When the brief fixes review findings, make one commit per finding fixed'
+phrase_check prompts/builder.md "a shared commit for findings on the same lines" 'findings that must change the same lines share a commit'
+phrase_check prompts/builder.md "a subject that says what the commit does" 'Each subject says what the commit does'
+phrase_check prompts/builder.md "the subject's format from AGENTS.md, else Conventional Commits" "in the commit format the repository's AGENTS.md names, otherwise Conventional Commits"
+phrase_check prompts/builder.md "no finding text, local path or private name in a subject" 'holds no finding text, local path or private name'
+phrase_check prompts/builder.md "the test command once, on the last commit" 'The test command runs once, on the last commit; earlier commits need not pass it.'
 # A changed hook, workflow or instruction file reaches the note or Verification, defined once in mentat:pr.
 phrase_check skills/pr/SKILL.md "a changed hook, CI workflow or instruction file, ranked right after a real blast radius" 'or a real blast radius (what breaks, for whom); a changed hook, CI workflow or agent instruction file whose behavior changes, named with the reason it deserves a look;'
 phrase_check skills/review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
