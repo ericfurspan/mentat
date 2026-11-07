@@ -141,7 +141,7 @@ review_local() {
     *) not_reviewed "Codex's reply has no final REVIEW RESULT line" ;;
   esac
   # The review ran without waiting for CI; it is posted only once CI passes on the same head.
-  wait_for_ci "$repo" "$head" "$out"
+  wait_for_ci "$repo" "$head" "$out" "$pr" "mentat review"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run mentat review again" 3
   {

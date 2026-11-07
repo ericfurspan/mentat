@@ -434,7 +434,7 @@ review_grok() {
   fail=grok_fail
   grok_exec
   grok_check
-  wait_for_ci "$repo" "$head" "$result_file"
+  wait_for_ci "$repo" "$head" "$result_file" "$pr" "mentat review --grok"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run mentat review --grok again" 3
   grok_start
