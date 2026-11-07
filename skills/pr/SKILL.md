@@ -9,7 +9,7 @@ user-invocable: false
 2. Use the repository's pull request template if it has one, adding any part below that it lacks; otherwise the template below. Where the repository has a `GLOSSARY.md`, use its terms. Titles follow Conventional Commits.
 3. The note's first sentence states the change's intent for the maintainer, the sentence Codex and Grok (or Claude, with Codex off) compare their own against. If you cannot state it in one sentence, ask the maintainer before opening the pull request.
 4. Every claim matches the diff on the head commit. After every push, rewrite the status line for the new head commit; when the push changes what the diff does, update the rest of the body too.
-5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer written on the pull request (`mentat:backlog` "Waits on the maintainer") goes first in the body, above `## Summary`.
+5. Rewrite the status line and the note in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer goes first in the body, above `## Summary`, as `mentat:backlog` "Waits on the maintainer" says: with an external backlog, only its one line saying the steps are on the backlog item; otherwise, the wait itself when it is written on the pull request.
 
 ```markdown
 ## Summary

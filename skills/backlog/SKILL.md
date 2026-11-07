@@ -38,7 +38,11 @@ Anything else, such as progress notes, evidence and replaced plans, goes in comm
 
 ## Waits on the maintainer
 
-With either tracker, when agreed work waits on a hand test or setup step only the maintainer can run, the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog, as a heading saying it waits on the maintainer, numbered steps (how many first), anything to paste, and one copy-ready command for a step repeated N times. The steps are written in full in the wait, never pointing to a comment; text too long for a step, such as a prompt to copy, goes in a document attached to the item and linked from that step. The wait's last line says what ends it, as `Ends when: <the result that shows it is done>`. With no record, the steps go in chat once.
+With either tracker, when agreed work waits on a hand test or setup step only the maintainer can run, the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog, as a heading saying it waits on the maintainer, then numbered steps (how many first). On an external backlog item the full wait lives only there; the top of the work's pull request carries one line saying it waits on the maintainer and the steps are on the backlog item, naming neither the backlog's workspace nor the item.
+
+Each step is one line naming where it runs: a website page, or an app and folder, the folder only in terms the record may hold (`rules.md` "Records"). A step whose result a later step depends on says what the maintainer should see. Each command or text to paste sits in its own fenced block under its step, complete with real, non-secret values and no placeholder the maintainer must look up; a step run N times keeps its one command. The steps are written in full in the wait, never pointing to a comment; text too long for a fenced block, such as a long prompt to copy, goes in a document attached to the item and linked from that step. A detail the writer has not checked is marked unverified, never guessed. The wait's last line says what ends it, as `Ends when: <the result that shows it is done>`, and is its only overall pass.
+
+When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command. With no record, the steps go in chat once.
 
 ## Replies in chat
 
