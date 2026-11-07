@@ -208,7 +208,7 @@ phrase_check skills/intake/SKILL.md "all questions asked at 10 or fewer" 'With 1
 phrase_check skills/intake/SKILL.md "questions outside the chosen set left for a later sitting" 'Questions outside the chosen set stay as they are, undecided, for a later sitting'
 phrase_check skills/intake/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
 phrase_check skills/intake/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
-phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas" 'then settle just those, from step 3 on, asking them all with no smaller set.'
+phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas, up to the maintainer's cap" "then settle just those, from step 3 on, asking them all with no smaller set, up to the cap the maintainer's instructions set where they set one; the rest stay undecided for a later sitting."
 # An idea that lands in the same change as an existing item is recommended as a Merge. Scope merged into an agreed item
 # is taken on, not agreed, and is weighed and agreed through mentat:propose when the item is next planned; scope still
 # not agreed when the item ends becomes its own taken-on item.
