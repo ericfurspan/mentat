@@ -117,6 +117,8 @@ done
 phrase_check skills/review/SKILL.md "the latest comment read once Codex is turned back on" 'or Codex was just turned back on'
 phrase_check skills/review/SKILL.md "the final check reading Grok's fingerprint from its comment" 'read from its comment, because status compares only the last Codex or Claude review'
 phrase_check skills/pr/SKILL.md "a check that failed first as the builder's report" "a check that failed before the fix and passed after is the builder's report"
+# The builder shows each check it adds or changes fails when the source breaks its requirement.
+phrase_check prompts/builder.md "the smallest source edit that breaks a new check's requirement" "make the smallest edit to the source that makes the requirement it covers untrue, leaving the check's search text in place (for a check that forbids something, introduce it). Never edit the test to force a failure. Show that check failing with a focused run of it, not an extra full test run."
 phrase_check skills/pr/SKILL.md "titles in Conventional Commits" 'Titles follow Conventional Commits.'
 phrase_check skills/pr/SKILL.md "the alert type in one clause" 'Use the GitHub alert type that fits the note.'
 # A changed hook, workflow or instruction file reaches the note or Verification, defined once in mentat:pr.
