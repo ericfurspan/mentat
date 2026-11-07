@@ -28,7 +28,9 @@ result_word() {
 # saying it was not posted and is not a round. Before that, when the head of pull
 # request $4 has moved from the commit, it exits 3 instead, saying to run $5 again
 # (a failed read keeps exit 4): CI on an old head often fails or never finishes
-# because of the push itself. Checks appear a little after a push,
+# because of the push itself. With the caller's require_ci=yes (mentat review
+# --require-ci), a head where no check ran is not a pass: it exits 4 the same way,
+# after saying no check ran. Checks appear a little after a push,
 # and not all at once, so neither "no checks" nor "all passed" counts until
 # CI_GRACE_SECONDS have passed since the wait began or since the last check
 # finished. A failed read is a missed poll; still failing at the timeout, it is
@@ -60,7 +62,12 @@ wait_for_ci() { # $1 repo, $2 commit, $3 reply file or empty, $4 pull request, $
   while :; do
     if lines=$(ci_lines "$repo" "$commit"); then
       if [ -z "$lines" ]; then
-        [ "$secs" -lt "$CI_GRACE_SECONDS" ] || { printf 'No CI checks ran on %s\n' "$commit"; return 0; }
+        if [ "$secs" -ge "$CI_GRACE_SECONDS" ]; then
+          [ "${require_ci:-no}" = yes ] || { printf 'No CI checks ran on %s\n' "$commit"; return 0; }
+          ci_moved "$commit" "$pr" "$again"
+          printf 'No CI checks ran on %s\n' "$commit"
+          ci_stop "$commit" "$reply"
+        fi
       elif grep -q '^fail ' <<<"$lines"; then
         ci_moved "$commit" "$pr" "$again"
         printf 'CI did not pass on %s. Failing checks:\n' "$commit"

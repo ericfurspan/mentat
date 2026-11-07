@@ -13,7 +13,9 @@
 #     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
 #     MENTAT_GROK_REASONING_EFFORT to pass --reasoning-effort to Grok (weigh too);
 #     unset leaves Grok's default.
-#     Both take `--request <file>` after the mode, if any: `mentat review --request <file> <PR>`.
+#     Both take `--request <file>` and `--require-ci` after the mode, if any, in either order:
+#     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran
+#     exits 4 like failed CI, posting nothing; without it, such a head is reviewed and posted.
 #     The file holds the agreed request (what to build, what to leave alone, how it is checked)
 #     for a repository that keeps it outside GitHub. It is read once, before the review;
 #     a missing, unreadable or blank file is not reviewed. It goes to the reviewing tool as
@@ -72,13 +74,21 @@ case "${1:-}" in
     # --grok" would otherwise run local Codex.
     mode=local
     case "${1:-}" in --local) shift ;; --grok) shift; mode=grok ;; esac
-    request_file="" request_given=no
-    if [ "${1:-}" = --request ]; then
-      [ $# -ge 2 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64
-      # shellcheck disable=SC2034 # read by read_request in lib/shared.sh
-      request_file=$2 request_given=yes; shift 2
-    fi
-    [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64
+    # --request <file> and --require-ci, each at most once, in either order.
+    request_file="" request_given=no require_ci=no
+    while :; do
+      case "${1:-}" in
+        --request)
+          [ "$request_given" = no ] && [ $# -ge 2 ] || die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64
+          # shellcheck disable=SC2034 # read by read_request in lib/shared.sh
+          request_file=$2 request_given=yes; shift 2 ;;
+        --require-ci)
+          [ "$require_ci" = no ] || die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64
+          require_ci=yes; shift ;;
+        *) break ;;
+      esac
+    done
+    [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64
     case "$mode" in grok) review_grok "$@" ;; *) review_local "$@" ;; esac ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   status) shift; status "$@" ;;
@@ -86,5 +96,5 @@ case "${1:-}" in
   weigh) shift; weigh "$@" ;;
   consult) shift; consult "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
 esac

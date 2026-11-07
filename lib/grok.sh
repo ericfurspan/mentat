@@ -423,7 +423,7 @@ review_grok() {
   local entries args=() out err result_file fail=not_reviewed
   # shellcheck disable=SC2034 # read by grok_args
   local web_search=""
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--request <file>] <pull request number>" 64 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   read_request "$pr"
   grok_prepare
   grok_run_folder

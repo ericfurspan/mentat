@@ -443,6 +443,21 @@ check "--request with no mode flag reviews locally and records the fingerprint" 
 rc=$("$mentat" review --local --request >"$STUB/out" 2>&1; echo $?)
 check "--request without a file and a pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
+# --require-ci: a head where no CI check ran is not a pass.
+runrc() { (cd "$root/work" && "$mentat" review --local "$@" >"$STUB/out" 2>&1); echo $?; }
+reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
+check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
+check "--require-ci: a review not posted for a head with no CI counts no round" 'status | grep -q "codex rounds 0,"'
+reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci --request "$root/req dir/agreed request.md" 7)
+check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && grep -q "BEGIN AGREED REQUEST DATA" "$STUB/prompt"'
+reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
+check "--require-ci after --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment"'
+for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
+  # shellcheck disable=SC2086 # the words are the arguments
+  rc=$("$mentat" review --local $args >/dev/null 2>&1; echo $?)
+  check "usage error (exit 64) for: review --local $args" '[ "$rc" = 64 ]'
+done
+
 # Live sandbox check. Replays the -c settings the review passed to the stub through the
 # real `codex sandbox` (no model call) and runs shell probes against the review
 # worktree. It does not prove that `codex exec --ignore-user-config --strict-config`

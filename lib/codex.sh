@@ -86,7 +86,7 @@ run_codex() {
 # passed there and the head has not moved since.
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp headref baseref
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --grok] [--request <file>] <pull request number>" 64 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   read_request "$pr"
   local tool
   for tool in git codex; do

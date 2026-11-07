@@ -345,6 +345,14 @@ reset; runs completed '"failure"' >"$STUB/check_runs.json"; echo 333333333333333
 check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing, not even the start comment" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from $H; run mentat review --grok again" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out" && [ -z "$(left_over)" ]'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)
 check "no CI check on the head: says so, then posts (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && grep -qx "No CI checks ran on $H" "$STUB/out"'
+# --require-ci: a head where no CI check ran is not a pass, and Grok's run is not used.
+reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci 7 >"$STUB/out" 2>&1; echo $?)
+check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing, not even the start comment" '[ "$rc" = 4 ] && grok_ran && [ "$(comments)" = 0 ] && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(jq -r .text "$STUB/out_json")" ] && [ -z "$(left_over)" ]'
+check "--require-ci: a review not posted for a head with no CI leaves Grok not run" 'status | grep -q "grok: none,"'
+rm "$STUB/args"; rc=$(run)
+check "so a later review --grok without --require-ci is not refused, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ]'
+reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
+check "--require-ci before --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment.2"'
 reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(run)
 check "a head the fetch does not match is exit 3, with no start record" '[ "$rc" = 3 ] && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; rc=$(race)
@@ -479,7 +487,7 @@ check "an account that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q
 reset; touch "$STUB/comments_fail"; rc=$(run)
 check "comments that cannot be read are not reviewed" '[ "$rc" = 1 ] && grep -q "could not read the comments" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 
-for args in "--grok" "--grok abc" "--grok 7 8" "--grok --local 7" "--grok --local" "--local --grok 7" "--grok 7 --local"; do
+for args in "--grok" "--grok abc" "--grok 7 8" "--grok --local 7" "--grok --local" "--local --grok 7" "--grok 7 --local" "--grok --require-ci --require-ci 7" "--require-ci --grok 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   rc=$("$mentat" review $args >/dev/null 2>&1; echo $?)
   check "usage error (exit 64) for: review $args" '[ "$rc" = 64 ]'
