@@ -284,6 +284,11 @@ phrase_check skills/work-tickets/SKILL.md "the opening yes as a session control"
 phrase_check skills/work-tickets/SKILL.md "that it never plans scope" 'It builds and never plans scope'
 phrase_check skills/work-tickets/SKILL.md "the merge line kept for the final message" '"You: merge #N." goes into the final message instead of ending the run'
 phrase_check skills/work-tickets/SKILL.md "that it never merges" 'The run never merges.'
+phrase_check skills/agenda/SKILL.md "a GitHub wait as the wait heading mentat:backlog describes" "with GitHub issues, issues, open or closed, that open with a wait on the maintainer as \`mentat:backlog\` step 4 and \"Waits on the maintainer\" describe it"
+phrase_check skills/agenda/SKILL.md "the next item from ordered records beside each record with no order" 'from the next agreed work of the records that have a recorded order, and, for each record with no recorded order, a phrase saying it offers no item. Both show when the run covers both kinds.'
+phrase_check skills/work-tickets/SKILL.md "each item built through A change steps 2 to 5" "through \`rules.md\` \"A change\" steps 2 to 5"
+phrase_check skills/work-tickets/SKILL.md "no mentat:propose for a queued item" "The run does not call \`mentat:propose\` for a queued item, since each is agreed with a spec."
+phrase_check skills/work-tickets/SKILL.md "nothing offered or built from a tracker with no order" 'When the tracker records no order, such as GitHub issues with no pinned order, the check says so, offers no item from it and builds nothing from it.'
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
