@@ -21,8 +21,10 @@
 
 | What | Who | When | How |
 |---|---|---|---|
+| Says what waits on the maintainer and the one item to do next; changes nothing | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:agenda [project ... \| all]`, `skills/agenda` |
 | Gathers ideas from each channel and settles each one with the maintainer, one question at a time | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:intake`, `skills/intake` |
-| Plans one backlog item, or interviews the maintainer across the open backlog, one decision per prompt; builds nothing and ends with the agreed items' ids to paste into a new session | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:plan [item id]`, `skills/plan` |
+| Plans one backlog item, or interviews the maintainer across the open backlog, one decision per prompt; builds nothing and ends with a `/mentat:work-tickets` command for the agreed items, to paste into a new session | the maintainer starts it; Claude Code runs it | when the maintainer chooses | `/mentat:plan [item id]`, `skills/plan` |
+| Builds agreed backlog items in a row, one pull request each, after one quick check; leaves an item that needs planning to `/mentat:plan` and ends with what to merge | the maintainer starts it; Claude Code runs it, each item through the steps below | when the maintainer chooses | `/mentat:work-tickets [item id ...]`, `skills/work-tickets` |
 | Gives a view of a request or a change it suggests | Claude Code | every request and every change it suggests itself | chat |
 | Requests a change, decides what gets built and agrees on the plan | the maintainer | every change | chat or an issue |
 | Weighs an idea | Codex and Grok, in parallel | every request or change Claude Code suggests, except a one-line change with nothing to decide, before the maintainer agrees; one that changes the meaning of what an agent is told in standing instructions (Mentat's `rules.md`, skills or builder prompt, a repository's `AGENTS.md` or the like) is weighed however short | `mentat weigh` |
