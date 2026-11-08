@@ -81,7 +81,8 @@ claude_pick_model() {
 }
 
 # A plain export of commit $2 of the repository at $1 into folder $3: no .git, and
-# nothing from the working tree.
+# nothing from the working tree. Symlinks stay: dontAsk denies a read through one to
+# a file outside the export.
 claude_export() {
   GIT_INDEX_FILE="$3.index" git -C "$1" -c core.sparseCheckout=false read-tree "$2" &&
     GIT_INDEX_FILE="$3.index" git -C "$1" checkout-index -a -q --prefix="$3/"
