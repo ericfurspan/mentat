@@ -2,15 +2,16 @@
 # mentat check. Sourced by bin/mentat.
 
 # Check reads GitHub and changes nothing, there or locally. It looks only for
-# what Mentat itself needs, plus one repository setting, whether merged head
-# branches are deleted, which it warns about and never changes. The rest of the
-# repository's settings (rulesets, required approvals, merge methods) are the
+# what Mentat itself needs, plus, only when ~/.config/mentat/warn-kept-branches
+# exists, one repository setting, whether merged head branches are deleted, which
+# it warns about and never changes. The rest of the repository's settings (rulesets, required approvals, merge methods) are the
 # owner's and are not read. When the private word list is readable, it also reads the
 # names of the private repositories the signed-in account can reach, as owner,
 # organization member or collaborator, to compare them with the list, and prints only
 # how many are missing. With no list, it says nothing about it.
 # When claude is installed, it reads the local plugin list, and prints only the scope
 # and version of each copy of the Mentat plugin.
+KEPT_BRANCHES_FILE="$HOME/.config/mentat/warn-kept-branches"
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
 c_problem() { printf 'PROBLEM: %s\n' "$1"; check_problems=$((check_problems + 1)); }
@@ -116,6 +117,7 @@ check() {
   [ -n "$repo" ] || { c_problem "could not tell which GitHub repository this is; run mentat check inside a checkout of it"; c_finish; }
   if gh api -X GET "repos/$repo" --jq .full_name >/dev/null 2>&1; then c_ok "$repo is readable"
   else c_problem "could not read $repo"; c_finish; fi
+  [ -e "$KEPT_BRANCHES_FILE" ] || c_finish
   d=$(gh api -X GET "repos/$repo" --jq .delete_branch_on_merge 2>/dev/null) || d=""
   case "$d" in
     true) c_ok "merged head branches are deleted" ;;

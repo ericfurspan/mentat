@@ -83,6 +83,9 @@ export HOME="$root/home"
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$(dirname "$LIST")"
 echo stubword >"$LIST"
+# The kept-branches warning is on for every case but those that turn it off.
+KEPT="$HOME/.config/mentat/warn-kept-branches"
+touch "$KEPT"
 reset() { rm -f "$STUB"/*; }
 run() { (cd "$root/cwd" && "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
@@ -124,6 +127,11 @@ reset; touch "$STUB/keeps_branches"; rc=$(run)
 check "kept merged head branches warn, still exit 0, and write nothing" '[ "$rc" = 0 ] && grep -q "^WARN: merged head branches are kept after merge" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && [ ! -f "$STUB/writes" ]'
 reset; touch "$STUB/setting_unreadable"; rc=$(run)
 check "an unreadable branch setting warns, still exit 0" '[ "$rc" = 0 ] && grep -q "^WARN: could not read whether merged head branches are deleted" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+# With the setting off, check neither reads nor reports whether head branches are kept.
+for stub in keeps_branches setting_unreadable; do
+  reset; rm "$KEPT"; touch "$STUB/$stub"; rc=$(run); touch "$KEPT"
+  check "with the kept-branches setting off, $stub reads no branch setting and adds no line or warning" '[ "$rc" = 0 ] && grep -qx "OK: owner/repo is readable" "$STUB/out" && ! grep -q delete_branch_on_merge "$STUB/calls" && ! grep -q "head branches" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+done
 reset; touch "$STUB/no_repo"; rc=$(run)
 check "no repository to find fails and says to run it inside a checkout" '[ "$rc" = 1 ] && grep -q "run mentat check inside a checkout" "$STUB/out"'
 
