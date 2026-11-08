@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for hooks/no-secret-commit, the PreToolUse hook, with a stub
+# Behavior tests for hooks/no-commit-secrets, the PreToolUse hook, with a stub
 # gitleaks. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-hook="$root/hooks/no-secret-commit"
+hook="$root/hooks/no-commit-secrets"
 failures=0
-check() { if eval "$2"; then printf 'PASS: no-secret-commit %s\n' "$1"; else printf 'FAIL: no-secret-commit %s\n' "$1"; failures=$((failures + 1)); fi; }
+check() { if eval "$2"; then printf 'PASS: no-commit-secrets %s\n' "$1"; else printf 'FAIL: no-commit-secrets %s\n' "$1"; failures=$((failures + 1)); fi; }
 
 base=$(mktemp -d)
 trap 'rm -rf "$base"' EXIT
@@ -106,6 +106,6 @@ rc=$(jq -n --arg d "$repo" '{tool_name: "Bash", cwd: $d, tool_input: {command: "
 check "with gitleaks missing it does nothing" 'quiet'
 
 check "hooks.json runs it on PreToolUse for Bash" \
-  'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | select(endswith(\"/hooks/no-secret-commit\"))] | length == 1" "$root/hooks/hooks.json" >/dev/null'
+  'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | select(endswith(\"/hooks/no-commit-secrets\"))] | length == 1" "$root/hooks/hooks.json" >/dev/null'
 
 [ "$failures" -eq 0 ]
