@@ -199,6 +199,9 @@ phrase_check skills/grill/SKILL.md "the Stop here option on every prompt" 'Every
 phrase_check skills/propose/SKILL.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
 # A grill's record goes in the weigh's file.
 phrase_check skills/propose/SKILL.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
+# A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
+phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
+phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
 
 # An Intake sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
 # after a compaction, and sends nothing it collects to Codex or Grok.
