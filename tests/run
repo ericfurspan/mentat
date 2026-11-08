@@ -423,13 +423,13 @@ phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comm
 phrase_check skills/backlog/linear.md "an unclear hand wait named as may be done" "A comment that may report it, or a later report on a block with no \`Ends when\` line, leaves the item unchanged, and the item is named as \"may be done\" with the comment's date."
 phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
 # A new Linear project's page holds one purpose line as its short summary, an empty description and the repository link;
-# setup asks for that line and stops when the tools cannot write that shape.
+# the Linear skill asks for that line and stops when the tools cannot write that shape.
 phrase_check skills/backlog/linear.md "a new project's overview shape" "A new project's overview holds only what is unique to it: its short summary is one line saying what the project is for, its long description stays empty, and its repository, where there is one, is a link under Resources."
-phrase_check skills/setup/SKILL.md "the stop when the Linear tools cannot write the project's shape" "If the Linear tools cannot write a project's short summary on its own or add a link under its Resources, stop and say so; create no project in another shape."
-phrase_check skills/setup/SKILL.md "the purpose line asked, with a draft from the README" "ask the maintainer for the project's purpose line, one line saying what it is for, offering a draft from the README."
+phrase_check skills/linear/SKILL.md "the stop when the Linear tools cannot write the project's shape" "If the Linear tools cannot write a project's short summary on its own or add a link under its Resources, stop and say so; create no project in another shape."
+phrase_check skills/linear/SKILL.md "the purpose line asked, with a draft from the README" "ask the maintainer for the project's purpose line, one line saying what it is for, offering a draft from the README."
 phrase_check skills/backlog/linear.md "the GitHub integration warning for the maintainer" "- Warning for the maintainer: Linear's GitHub integration can post an item's description, a wait block included, to GitHub. The maintainer sets its \"Comments in GitHub\" to post without issue descriptions and turns it off for public repositories; agents do not change it."
-phrase_check skills/setup/SKILL.md "the GitHub integration warning said when it creates a Linear project" "Then, before writing any item to it, tell the maintainer that Linear's GitHub integration can post an item's description, a wait block included, to GitHub, so they should set its \"Comments in GitHub\" to post without issue descriptions and turn it off for public repositories; agents do not change it."
-phrase_check skills/setup/SKILL.md "the project created in the new project shape" "Create the project in the new project shape in \`../backlog/linear.md\`, with that line as its short summary, the repository's link under Resources and the maintainer as lead."
+phrase_check skills/linear/SKILL.md "the GitHub integration warning said when it creates a Linear project" "Then, before writing any item to it, tell the maintainer that Linear's GitHub integration can post an item's description, a wait block included, to GitHub, so they should set its \"Comments in GitHub\" to post without issue descriptions and turn it off for public repositories; agents do not change it."
+phrase_check skills/linear/SKILL.md "the project created in the new project shape" "Create the project in the new project shape in \`../backlog/linear.md\`, with that line as its short summary, the repository's link under Resources and the maintainer as lead."
 
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
 phrase_check skills/backlog/SKILL.md "step 2's first status, not agreed" "   - Not agreed, Claude Code's own suggestions included."
@@ -453,7 +453,7 @@ phrase_check skills/intake/SKILL.md "inbox ideas in no project read in a sitting
 phrase_check skills/intake/SKILL.md "every page of a list read" 'Read every page of a list.'
 phrase_check skills/intake/SKILL.md "the maintainer's cap applied before counting" "4. Ask. Where the maintainer's instructions cap how many undecided ideas a sitting asks, apply that cap first, oldest first, and leave the rest undecided for a later sitting. Then count the questions."
 phrase_check skills/intake/SKILL.md "ideas with no project after the projects', oldest first by their own date" "then ideas by project, then ideas with no project, each oldest first by the idea's own date where the maintainer's instructions give one;"
-phrase_check skills/setup/SKILL.md "the migration's undecided idea in the inbox, else a Backlog item not taken on yet" "An undecided idea goes in the project's inbox as the maintainer's own instructions say where they name one, and step 7's comment lists it as \"inbox\" in place of an item id; with none named, it is a Backlog item whose opening sentence says it is not taken on yet."
+phrase_check skills/linear/SKILL.md "the migration's undecided idea in the inbox, else a Backlog item not taken on yet" "An undecided idea goes in the project's inbox as the maintainer's own instructions say where they name one, and step 7's comment lists it as \"inbox\" in place of an item id; with none named, it is a Backlog item whose opening sentence says it is not taken on yet."
 phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
 phrase_check skills/intake/SKILL.md "the four options on an idea's prompt" 'An idea'"'"'s prompt shows four options: the recommended ending, Leave (or one other ending when Leave is recommended), one other likely ending, and "Later" last.'
 phrase_check skills/intake/SKILL.md "every ending not shown named in the question" 'Its question names every ending not shown, and an Other answer naming one chooses it.'
@@ -470,15 +470,15 @@ phrase_check skills/intake/SKILL.md "a dropped Backlog item canceled with its re
 phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
-# and setup's migration carries the pinned issue's order by creation order.
+# and the Linear skill's migration carries the pinned issue's order by creation order.
 phrase_check skills/backlog/SKILL.md "the GitHub pinned issue's order" 'the pinned issue holds the order of agreed work, next first'
 phrase_check skills/backlog/SKILL.md "step 5's pointer to the tracker's order" "5. The order of agreed work, next first, is read as the tracker's section says (Linear: \`linear.md\` step 5)."
 phrase_check skills/backlog/linear.md "the next agreed work's rank" "Step 5: the next agreed work is the open Todo items without the \`Waiting on you\` label, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level."
 phrase_check skills/backlog/linear.md "every page read and waiting and In Progress items reported" 'Read every page of results before ranking, and report the waiting and In Progress items too.'
 phrase_check skills/backlog/linear.md "Priority only as the maintainer gave it" 'Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.'
-phrase_check skills/setup/SKILL.md "the migration's pinned order by creation order" 'only its order is carried to the project, by creation order'
-phrase_check skills/setup/SKILL.md "the migration's issue order and no Priority" 'Take the issues listed in the pinned issue'"'"'s order first, in that order, then the rest by issue number, and set no Priority on any item.'
-phrase_check skills/setup/SKILL.md "the mapping comment's note on the order" 'marked "order carried by creation order"'
+phrase_check skills/linear/SKILL.md "the migration's pinned order by creation order" 'only its order is carried to the project, by creation order'
+phrase_check skills/linear/SKILL.md "the migration's issue order and no Priority" 'Take the issues listed in the pinned issue'"'"'s order first, in that order, then the rest by issue number, and set no Priority on any item.'
+phrase_check skills/linear/SKILL.md "the mapping comment's note on the order" 'marked "order carried by creation order"'
 phrase_check skills/zoom-out/SKILL.md "zoom-out's read of the next agreed work" 'the next agreed work as its step 5 gives it'
 # An item's description is short: an opening sentence that restates no status or wait the tracker shows,
 # except five, then the wait block, the spec and the current plan, each with a limit; anything else goes in comments.
@@ -512,9 +512,10 @@ phrase_check skills/backlog/SKILL.md "the wait's steps in full" 'The steps are w
 phrase_check skills/backlog/SKILL.md "an unchecked detail marked unverified" 'A detail the writer has not checked is marked unverified, never guessed.'
 phrase_check skills/backlog/SKILL.md "the wait's Ends when line as its only overall pass" "The wait's last line says what ends it, as \`Ends when: <the result that shows it is done>\`, and is its only overall pass."
 phrase_check skills/backlog/SKILL.md "a GitHub-only record's general terms, with the commands in chat once" 'When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command.'
-phrase_check skills/setup/SKILL.md "the switch item's Ends when line" "\`Ends when: the pull request is merged and each listed issue is closed\`"
-phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
-phrase_check skills/setup/SKILL.md "step 9's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
+phrase_check skills/linear/SKILL.md "the switch item's Ends when line" "\`Ends when: the pull request is merged and each listed issue is closed\`"
+phrase_check skills/linear/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
+phrase_check skills/linear/SKILL.md "step 6's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
+phrase_check skills/setup/SKILL.md "the one-line pointer to /mentat:linear" 'To move planning to Linear, the maintainer runs `/mentat:linear`.'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 
 # After a weigh or a plan challenge, the maintainer sees each tool's reply and what Claude Code did with it in one block.
