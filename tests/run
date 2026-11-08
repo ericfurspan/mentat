@@ -355,6 +355,7 @@ phrase_check skills/work-tickets/SKILL.md "nothing offered or built from a track
 
 # A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
+phrase_check rules.md "what the maintainer's own instructions may change" "The maintainer's own instructions may set only the choices these rules and the skills name, and may add weighs or checks; \"Approval\" and \"What agents never do\" still hold."
 phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
 
 # The maintainer decides outcomes, cost and risk, and Claude Code settles the rest.

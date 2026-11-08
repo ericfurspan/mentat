@@ -4,6 +4,8 @@ The maintainer owns this repository. Claude Code plans and builds. Codex reviews
 
 The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a named workflow that commits to the default branch), the repository wins and Claude Code says so once; "Approval" and "What agents never do" always hold.
 
+The maintainer's own instructions may set only the choices these rules and the skills name, and may add weighs or checks; "Approval" and "What agents never do" still hold.
+
 ## A change
 1. Claude Code calls the Skill tool with `mentat:propose` before giving a view on any request or suggesting a change of its own, a fix to its own output included.
 2. One builder (the `builder` subagent), branch and checkout per pull request. The main session edits no files, review fixes included.
