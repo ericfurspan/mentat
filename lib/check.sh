@@ -5,9 +5,10 @@
 # what Mentat itself needs, plus one repository setting, whether merged head
 # branches are deleted, which it warns about and never changes. The rest of the
 # repository's settings (rulesets, required approvals, merge methods) are the
-# owner's and are not read. It also reads the names of the private repositories
-# the signed-in account can reach, as owner, organization member or collaborator,
-# to compare them with the private word list, and prints only how many are missing.
+# owner's and are not read. When the private word list is readable, it also reads the
+# names of the private repositories the signed-in account can reach, as owner,
+# organization member or collaborator, to compare them with the list, and prints only
+# how many are missing. With no list, it says nothing about it.
 # When claude is installed, it reads the local plugin list, and prints only the scope
 # and version of each copy of the Mentat plugin.
 check_problems=0 check_warnings=0
@@ -104,9 +105,10 @@ check() {
     c_ok "gitleaks is installed (${v:-version unknown})"
   else c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
   c_plugin_copies
-  # The publish check still looks for the home path without the list.
-  if [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1
-  else c_warn "the private word list ~/.config/mentat/private-words is missing or unreadable: the publish check looks only for the home path"; fi
+  # The publish check still looks for the home path without the list. No list is not a warning.
+  if [ ! -e "$PRIVATE_WORDS" ]; then :
+  elif [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1
+  else c_warn "the private word list ~/.config/mentat/private-words is unreadable: the publish check looks only for the home path"; fi
   # Exit status only: gh auth status can print token details.
   if gh auth status >/dev/null 2>&1; then c_ok "gh is signed in"; else c_problem "gh is not signed in (run gh auth login)"; c_finish; fi
   [ -z "$list_ok" ] || c_word_list_covers_repos
