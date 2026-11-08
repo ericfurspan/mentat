@@ -28,6 +28,8 @@ Claude Code plans and builds each change, Codex and Grok give second opinions an
 - Optional: Grok Build (`grok`), signed in with `grok login`, for a second review.
 - Optional: `gitleaks`, to catch likely secrets before a commit.
 
+The builder subagent runs on Opus, which costs more than other models.
+
 ## Install
 
 In each repository:
