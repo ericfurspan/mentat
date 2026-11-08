@@ -53,6 +53,7 @@ Ask for a change in chat and Mentat runs the workflow. These commands do the res
 - `/mentat:zoom-out`: a short summary of the goal, progress and next step.
 - `/mentat:retro`: review a session and propose improvements.
 - `/mentat:setup`: show and change the repository's Mentat settings.
+- `/mentat:linear [project name] [team name]`: move the repository's planning from GitHub issues to Linear.
 - `/mentat:consult [--web] <question or idea>`: ask Codex, Grok and Claude Code one question.
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
