@@ -1,6 +1,6 @@
 ---
 name: plan
-description: "Runs one planning session: plans one backlog item, or with no argument interviews the maintainer across the project's open backlog, one decision per prompt. Builds nothing; ends with a `/mentat:work-tickets` command for the agreed items, to paste into a new session. Arguments: optional backlog item id (none: the whole open backlog). Started by the maintainer."
+description: "Plans backlog work with you, one decision at a time, and gives the command that builds it. Arguments: a backlog item id."
 argument-hint: "[item id]"
 disable-model-invocation: true
 ---

@@ -1,6 +1,6 @@
 ---
 name: agenda
-description: "Says what waits on the maintainer and what to do next, from the backlog of each project it covers. Read-only: changes nothing. Arguments: optional project names or `all`. Started by the maintainer."
+description: "Says what waits on you and what to do next. Arguments: project names or all."
 argument-hint: "[project ... | all]"
 disable-model-invocation: true
 ---

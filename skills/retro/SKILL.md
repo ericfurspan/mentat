@@ -1,6 +1,6 @@
 ---
 name: retro
-description: "Looks back at a session and lists what would have made it go better: changes to Mentat, the repository's AGENTS.md, automated checks and tooling, ranked by severity with evidence. Started by the maintainer."
+description: "Lists what would have made a session go better, worst first. Arguments: what to focus on."
 disable-model-invocation: true
 ---
 
