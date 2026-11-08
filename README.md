@@ -24,7 +24,7 @@ Claude Code plans and builds each change, Codex and Grok give second opinions an
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
-- For reviews, weigh, challenge and consult: the Codex CLI, signed in and installed under `/opt/homebrew` or `/usr/local`.
+- For reviews: the Codex CLI, signed in and installed under `/opt/homebrew` or `/usr/local`. Weigh, challenge and consult need it only when it is in effect (see Review tools).
 - Optional: Grok Build (`grok`), signed in with `grok login`, for a second review.
 - Optional: `gitleaks`, to catch likely secrets before a commit.
 
@@ -57,6 +57,10 @@ Ask for a change in chat and Mentat runs the workflow. These commands do the res
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
 [`rules.md`](rules.md) has the full workflow.
+
+## Review tools
+
+Weigh and consult run Codex and Grok unless `~/.config/mentat/reviewers` lists tools, any of `claude`, `codex` and `grok`; then they run the listed ones. Challenge runs Codex unless that file lists tools without `codex`; then it runs Claude. In weigh and challenge, Claude has read-only file tools and no shell or web; in consult, it has web search only. Claude runs headless on the most capable Claude model in a family other than the builder's, or on the model named in `~/.config/mentat/claude-model`. `/mentat:setup` shows and changes both files, and `mentat check` reports each tool in effect.
 
 ## Credits
 
