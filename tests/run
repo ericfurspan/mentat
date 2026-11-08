@@ -397,6 +397,8 @@ phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits
 phrase_check skills/backlog/linear.md "a new project's overview shape" "A new project's overview holds only what is unique to it: its short summary is one line saying what the project is for, its long description stays empty, and its repository, where there is one, is a link under Resources."
 phrase_check skills/setup/SKILL.md "the stop when the Linear tools cannot write the project's shape" "If the Linear tools cannot write a project's short summary on its own or add a link under its Resources, stop and say so; create no project in another shape."
 phrase_check skills/setup/SKILL.md "the purpose line asked, with a draft from the README" "ask the maintainer for the project's purpose line, one line saying what it is for, offering a draft from the README."
+phrase_check skills/backlog/linear.md "the GitHub integration warning" 'Set its "Comments in GitHub" to post without issue descriptions, and turn it off for public repositories.'
+phrase_check skills/setup/SKILL.md "the GitHub integration warning said when it creates a Linear project" 'Then tell the maintainer the GitHub integration warning in `../backlog/linear.md`.'
 phrase_check skills/setup/SKILL.md "the project created in the new project shape" "Create the project in the new project shape in \`../backlog/linear.md\`, with that line as its short summary, the repository's link under Resources and the maintainer as lead."
 
 # An item that is not agreed waits on no one, and a parked one says so in its opening sentence.
