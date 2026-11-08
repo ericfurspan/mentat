@@ -11,7 +11,7 @@
 
 Mentat is a Claude Code plugin for building software with multiple AI agents.
 
-Claude Code plans and builds each change, Codex and Grok give second opinions and review the code, and you decide what gets built and merge every pull request. Hooks ask you before risky commands, such as a merge or a push to the default branch.
+Claude Code plans and builds each change, Codex and Grok give second opinions and review code, and you decide what gets built and merge every pull request. Hooks ask you before risky commands, such as a merge or a push to the default branch.
 
 <p align="center">
   <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge, with Codex and Grok checking along the way and you approving and merging." width="680" height="320">
@@ -24,9 +24,9 @@ Claude Code plans and builds each change, Codex and Grok give second opinions an
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
-- For reviews: the Codex CLI, signed in and installed under `/opt/homebrew` or `/usr/local`. Weigh, challenge and consult need it only when it is in effect (see Review tools).
+- For reviews: the Codex CLI, signed in, under `/opt/homebrew` or `/usr/local`.
 - Optional: Grok Build (`grok`), signed in with `grok login`, for a second review.
-- Optional: `gitleaks`, to catch likely secrets before a commit.
+- Optional: `gitleaks`, to catch secrets before a commit.
 
 The builder subagent runs on Opus, which costs more than other models.
 
@@ -47,16 +47,16 @@ Where pull requests need approval, give the agent its own GitHub account.
 
 ## Usage
 
-Ask for a change in chat and Mentat runs the workflow. These commands do the rest:
+Ask for a change in chat and Mentat runs the workflow. Commands:
 
-- `/mentat:agenda [project ... | all]`: what waits on you, and the one thing to do next.
-- `/mentat:intake [project ... | all] | brainstorm <text or link>`: gather ideas and settle each with you.
-- `/mentat:plan [item id]`: plan one backlog item, or the whole backlog, without building.
-- `/mentat:work-tickets [item id ...]`: build agreed backlog items in a row, one pull request each.
-- `/mentat:zoom-out`: a short summary of the goal, progress and next step.
-- `/mentat:retro`: review a session and propose improvements.
+- `/mentat:agenda [project ... | all]`: what waits on you and what to do next.
+- `/mentat:intake [project ... | all] | brainstorm <text or link>`: settle ideas with you.
+- `/mentat:plan [item id]`: plan one item, or the whole backlog, without building.
+- `/mentat:work-tickets [item id ...]`: build agreed items in a row, one pull request each.
+- `/mentat:zoom-out`: summarize the goal, progress and next step.
+- `/mentat:retro`: propose improvements from a session.
 - `/mentat:setup [first-run]`: show and change settings; start with `first-run`.
-- `/mentat:linear [project name] [team name]`: move the repository's planning from GitHub issues to Linear.
+- `/mentat:linear [project name] [team name]`: move planning from GitHub issues to Linear.
 - `/mentat:consult [--web] <question or idea>`: ask Codex, Grok and Claude Code one question.
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
@@ -64,8 +64,8 @@ Ask for a change in chat and Mentat runs the workflow. These commands do the res
 
 ## Review tools
 
-Weigh and consult run Codex and Grok unless `~/.config/mentat/reviewers` lists tools, any of `claude`, `codex` and `grok`; then they run the listed ones. Challenge runs Codex unless that file lists tools without `codex`; then it runs Claude. In weigh and challenge, Claude has read-only file tools and no shell or web; in consult, it has web search only. Claude runs headless on the most capable Claude model in a family other than the builder's, or on the model named in `~/.config/mentat/claude-model`. `/mentat:setup` shows and changes both files, and `mentat check` reports each tool in effect.
+Weigh and consult run Codex and Grok; challenge runs Codex. If `~/.config/mentat/reviewers` lists tools (`claude`, `codex`, `grok`), weigh and consult run those; challenge runs Claude unless `codex` is listed. Claude gets only read-only file tools in weigh and challenge, and only web search in consult. It uses the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
 
 ## Credits
 
-Third-party credits and licenses are in the `CREDITS.md` files under `skills/`.
+Third-party licenses are in `skills/*/CREDITS.md`.

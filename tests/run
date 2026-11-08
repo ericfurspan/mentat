@@ -26,6 +26,14 @@ else
   printf '%s\n' "$retired"
 fi
 
+# The README stays short: at most 500 words by wc -w.
+readme_words=$(wc -w <README.md | tr -d ' ')
+if [ "$readme_words" -le 500 ]; then
+  pass "README.md is at most 500 words ($readme_words)"
+else
+  fail "README.md is $readme_words words, over 500"
+fi
+
 # After "You: merge #N.", nothing reaches #N's branch until the maintainer answers a hold.
 # Each file must keep the words that carry the obligation, not just the reply's template.
 hold_check() {
