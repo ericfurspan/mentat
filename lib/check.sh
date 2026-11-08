@@ -75,6 +75,10 @@ check() {
     v=$(grok --version 2>/dev/null | head -n 1)
     c_ok "grok is installed (${v:-version unknown})"
   fi
+  if command -v gitleaks >/dev/null 2>&1; then
+    v=$(gitleaks version 2>/dev/null | head -n 1)
+    c_ok "gitleaks is installed (${v:-version unknown})"
+  else c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
   c_plugin_copies
   # The publish check still looks for the home path without the list.
   if [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1

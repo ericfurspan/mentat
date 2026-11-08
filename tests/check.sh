@@ -70,7 +70,13 @@ if [ -f "$STUB/plugins" ]; then cat "$STUB/plugins"
 else echo '[{"enabled":true,"id":"mentat@mentat","installPath":"/stubleakedpath/stubprojectname","scope":"user","version":"1.0.0"}]'; fi
 [ ! -f "$STUB/claude_fail" ]
 STUBEOF
-chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude"
+# gitleaks: prints a version.
+cat >"$root/bin/gitleaks" <<'STUBEOF'
+#!/usr/bin/env bash
+[ "$1" = version ] && echo "8.99.9"
+exit 0
+STUBEOF
+chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude" "$root/bin/gitleaks"
 export PATH="$root/bin:$PATH"
 
 export HOME="$root/home"
@@ -94,13 +100,19 @@ check "prints the installed grok version" 'grep -qx "OK: grok is installed (grok
 reset; touch "$STUB/no_grok_version"; rc=$(run)
 check "a grok with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: grok is installed (version unknown)" "$STUB/out"'
 # Grok is optional: without it, nothing is printed about it and there is no warning.
-mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/nogrok/"
+mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/gitleaks" "$root/nogrok/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogrok:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a missing grok prints nothing and warns of nothing" '[ "$rc" = 0 ] && ! grep -qi grok "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 # Codex is needed for mentat review, challenge and weigh: without it, check fails.
-mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/gh" "$root/bin/grok" "$root/nocodex/"
+mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/gh" "$root/bin/grok" "$root/bin/gitleaks" "$root/nocodex/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nocodex:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a missing codex is a problem (exit 1) that says what still runs without it" '[ "$rc" = 1 ] && grep -qx "PROBLEM: codex is not installed: mentat review, mentat challenge and mentat weigh need it; mentat ci and mentat review --grok still run without it" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+reset; rc=$(run)
+check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
+# Without gitleaks, the commit hook does not scan: check warns and still passes.
+mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/nogitleaks/"
+reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "a missing gitleaks warns, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: gitleaks is not installed: the commit hook does not scan staged changes for likely secrets" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
@@ -207,7 +219,7 @@ check "no Mentat copy gives no warning" 'ready_no_warning'
 reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.1.0)" >"$STUB/plugins"; touch "$STUB/signed_out"; rc=$(run)
 check "signed out of gh, the copies are still compared" '[ "$rc" = 1 ] && grep -q "^WARN: the Mentat plugin is installed at different versions" "$STUB/out"'
 
-mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/noclaude/"
+mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/gitleaks" "$root/noclaude/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "no claude command says nothing about copies and adds no warning" '[ "$rc" = 0 ] && ! grep -qi -e claude -e plugin "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 
