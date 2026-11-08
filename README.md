@@ -14,7 +14,7 @@ Mentat is a Claude Code plugin for building software with multiple AI agents.
 Claude Code plans and builds each change, Codex and Grok give second opinions and review the code, and you decide what gets built and merge every pull request. Hooks ask you before risky commands, such as a merge or a push to the default branch.
 
 <p align="center">
-  <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge, with Codex and Grok checking along the way and the maintainer approving and merging." width="680" height="320">
+  <img src="docs/images/mentat-checks.svg" alt="A change moves from request to plan, build, review and merge, with Codex and Grok checking along the way and you approving and merging." width="680" height="320">
 </p>
 
 <p align="center">
@@ -43,7 +43,7 @@ This writes the repository's `.claude/settings.json`, so Mentat is on for everyo
 - Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>`.
 - Remove: `claude plugin uninstall mentat@mentat --scope <install scope>`.
 
-Where a repository requires an approval, the agent needs its own GitHub account.
+Where pull requests need approval, give the agent its own GitHub account.
 
 ## Usage
 
