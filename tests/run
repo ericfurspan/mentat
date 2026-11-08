@@ -511,7 +511,7 @@ phrase_check skills/backlog/SKILL.md "the wait's Ends when line as its only over
 phrase_check skills/backlog/SKILL.md "a GitHub-only record's general terms, with the commands in chat once" 'When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command.'
 phrase_check skills/setup/SKILL.md "the switch item's Ends when line" "\`Ends when: the pull request is merged and each listed issue is closed\`"
 phrase_check skills/setup/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
-phrase_check skills/setup/SKILL.md "step 8's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
+phrase_check skills/setup/SKILL.md "step 9's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 
 # After a weigh or a plan challenge, the maintainer sees each tool's reply and what Claude Code did with it in one block.
@@ -524,6 +524,10 @@ phrase_check skills/backlog/SKILL.md "the replies block and waits with GitHub is
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 phrase_check skills/challenge/SKILL.md "the challenge's replies block at hand-off" 'replies block'
+# Claude, as a review tool the setting lists, gets its own line and comment headings.
+phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <verdict> - <its main point>'
+phrase_check skills/backlog/SKILL.md "the Claude comment headings" '"Claude: weigh", "Codex: plan challenge", "Claude: plan challenge"'
+phrase_check skills/setup/SKILL.md "the review tools setting written only to its two files" 'write only those two files, never AGENTS.md'
 for f in rules.md skills/propose/SKILL.md; do
   if grep -q -F 'in one line beside its own' "$f"; then
     fail "$f must show the weigh replies as one block (found: in one line beside its own)"

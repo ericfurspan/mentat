@@ -4,7 +4,7 @@ description: "Shows and sets this repository's Mentat settings, and can move its
 disable-model-invocation: true
 ---
 
-The maintainer wants to see or change this repository's Mentat settings. They live as prose in the repository's AGENTS.md. There is no config file, and this skill adds none. This runs once: do it, then normal work resumes. If the maintainer typed text after the command, start from that.
+The maintainer wants to see or change this repository's Mentat settings. They live as prose in the repository's AGENTS.md, and this skill adds no config file to the repository; step 8's per-user review tools setting is the one file outside it. This runs once: do it, then normal work resumes. If the maintainer typed text after the command, start from that.
 
 1. Read every AGENTS.md that applies (root and nested, and `AGENTS.override.md` if present, which replaces the AGENTS.md beside it). Show the three effective settings in one line: the backlog (the named external one, else GitHub issues), the test command AGENTS.md names or "not named", and whether a Code Review Rules section exists. Show effective values, never "default". Change nothing yet.
 2. Ask only about what is missing or would change, one decision at a time with a recommendation, as `rules.md` "What goes to the maintainer" says. When the maintainer typed what to change, do that. When they typed nothing, ask once which of the three settings to change, naming the missing ones first, with a recommendation. "None" ends the skill: no pull request.
@@ -49,4 +49,5 @@ The maintainer wants to see or change this repository's Mentat settings. They li
    gh issue close <N> --reason "not planned" --comment "Planning for this repository moved to its backlog outside GitHub on <date>; this issue's content lives there now. Pull requests stay on GitHub."
    ```
    The comment links nothing. Then set the switch item to Done, remove its wait block and label, and clear the assignee if it is still the project's lead. From then on a pull request body here writes no `Closes #`. The held-back issues stay as they are.
-8. End with one line to the maintainer saying what was set. A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt (`rules.md` "What goes to the maintainer").
+8. The review tools setting, for this user in every repository. Step 1 also shows, on a second line, the contents of `~/.config/mentat/reviewers` (the tools `mentat weigh`, `mentat challenge` and `mentat consult` run, any of `claude`, `codex` and `grok`; missing or empty runs Codex and Grok) and `~/.config/mentat/claude-model` (Claude's model; missing picks one). When the maintainer asks, write only those two files, never AGENTS.md, then run `mentat check`; this needs no pull request.
+9. End with one line to the maintainer saying what was set. A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt (`rules.md` "What goes to the maintainer").
