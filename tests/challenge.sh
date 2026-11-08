@@ -10,6 +10,9 @@ root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 export STUB="$root/stub"
 mkdir -p "$STUB" "$root/bin"
+# A home of its own, so no review tools setting of the user's applies.
+export HOME="$root/home"
+mkdir -p "$HOME"
 failures=0
 check() { if eval "$2"; then printf 'PASS: challenge %s\n' "$1"; else printf 'FAIL: challenge %s\n' "$1"; failures=$((failures + 1)); fi; }
 

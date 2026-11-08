@@ -21,6 +21,9 @@ check() { if eval "$2"; then printf 'PASS: weigh %s\n' "$1"; else printf 'FAIL: 
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export TMPDIR="$root/tmp" XDG_CACHE_HOME="$cache"
+# A home of its own, so no review tools setting of the user's applies.
+export HOME="$root/home"
+mkdir -p "$HOME"
 real_git=$(command -v git)
 
 # The user's Grok home: a sign-in, and the things that must never reach a run.
