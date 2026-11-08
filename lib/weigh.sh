@@ -1,10 +1,12 @@
 # shellcheck shell=bash
-# mentat weigh: Codex and Grok each judge an idea, in parallel and apart from Claude
-# Code's own view, and the result is printed for the maintainer. Sourced by bin/mentat.
+# mentat weigh: the review tools (Codex and Grok, or those the setting lists) each
+# judge an idea, in parallel and apart from Claude Code's own view, and the result is
+# printed for the maintainer. Sourced by bin/mentat.
 
-# The two runners, their result files, the stop and cancel handlers and the printers
-# are in lib/parallel.sh, shared with mentat consult. This file keeps what is weigh's:
-# the git checks, the worktree and export, the repository prompt and the verdict line.
+# The parallel runs, their result files, the stop and cancel handlers and the printers
+# are in lib/parallel.sh, shared with mentat consult; Claude's runner is in
+# lib/claude.sh. This file keeps what is weigh's: the git checks, the worktree and
+# export, the repository prompt and the verdict line.
 
 # The verdict line, as challenge reads its own: exactly one of these, and a reason
 # that is not only spaces. (A `DO IT*` pattern would also match DO IT DIFFERENTLY.)
@@ -17,7 +19,7 @@ weigh_verdict_ok() {
   esac
 }
 
-# The prompt both tools get after a line about where they are. The idea describes
+# The prompt each tool gets after a line about where they are. The idea describes
 # the proposal neutrally and is data.
 weigh_body() { # $1 idea file
   printf 'An idea is proposed for this repository. Judge it as a teammate would: is it worth doing, with its value weighed against the cost to build and maintain; '
@@ -81,8 +83,9 @@ weigh() {
   local idea="${1:-}"
   [ $# -eq 1 ] || die "usage: mentat weigh <idea file>" 64
   [ -f "$idea" ] || die "idea file not found: $idea" 64
-  # shellcheck disable=SC2034 # cpid and gpid are set by pair_run and read by pair_cancel
-  local top head changes dirty=no res="" cpid="" gpid="" csecs="" gsecs=""
+  # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
+  local top head changes dirty=no res="" run_pids="" tools reviewers reviewers_why t both="both tools were"
+  review_tools
   command -v git >/dev/null 2>&1 || die "not weighed: git is not installed" 1
   top=$(git rev-parse --show-toplevel) || die "not weighed: not inside a git repository" 1
   head=$(git -C "$top" rev-parse HEAD) || die "not weighed: could not read HEAD" 1
@@ -95,21 +98,21 @@ weigh() {
   cp -- "$idea" "$res/idea" || die "not weighed: could not read $idea" 1
   weigh_body "$res/idea" >"$res/body" || die "not weighed: could not write the prompt" 1
 
-  pair_run weigh_codex weigh_grok
+  # shellcheck disable=SC2086 # tools is a list of plain words
+  pair_run weigh $tools
 
   printf '## Weighing %s\n\n- Commit weighed: %s\n' "$idea" "$head"
+  case "$tools" in *' '*' '*) both="each tool was" ;; *' '*) ;; *) both="the tool was" ;; esac
   if [ "$dirty" = yes ]; then
-    printf -- '- Uncommitted changes: yes. They were not weighed; both tools were given only that commit.\n\n'
+    printf -- '- Uncommitted changes: yes. They were not weighed; %s given only that commit.\n\n' "$both"
   else
     printf -- '- Uncommitted changes: no\n\n'
   fi
-  pair_report codex Codex "$csecs" "not weighed"
-  pair_report grok Grok "$gsecs" "not weighed"
+  for t in $tools; do pair_report "$t" "not weighed"; done
   printf '## Verdicts\n\n'
-  pair_line codex Codex "$csecs" "not weighed"
-  pair_line grok Grok "$gsecs" "not weighed"
-  # At least one verdict is a result; neither is a failure.
-  if [ -s "$res/codex.final" ] || [ -s "$res/grok.final" ]; then exit 0; fi
+  for t in $tools; do pair_line "$t" "not weighed"; done
+  # At least one verdict is a result; none is a failure.
+  for t in $tools; do [ ! -s "$res/$t.final" ] || exit 0; done
   printf 'mentat: not weighed by either tool; give Claude Code'"'"'s view alone, say the weighing did not happen, and ask the maintainer to agree\n' >&2
   exit 1
 }

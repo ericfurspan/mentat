@@ -1,15 +1,16 @@
 # shellcheck shell=bash
-# shellcheck disable=SC2154 # res, tool, cpid, gpid, csecs and gsecs are the caller's variables
-# The plumbing mentat weigh and mentat consult share: Codex and Grok each run in a
-# background subshell, in parallel, and the result is printed for the maintainer.
-# Sourced by bin/mentat.
+# shellcheck disable=SC2154 # res, tool and run_pids are the caller's variables
+# The plumbing mentat weigh and mentat consult share: each review tool (Codex, Grok,
+# Claude) runs in a background subshell, in parallel, and the result is printed for
+# the maintainer. Sourced by bin/mentat.
 
 # Each tool runs in its own background subshell, so a failure (which exits) and the
 # EXIT trap that cleans up its folder stay inside it. A runner leaves its result in
 # files in the parent's folder, outside any folder a runner removes: the reply and
-# its final line when it delivered, otherwise the reason it did not. The functions
-# here read and set the caller's variables by name (res, tool, cpid, gpid, csecs,
-# gsecs), as the Grok functions do. They know nothing of what the tools are asked.
+# its final line when it delivered, otherwise the reason it did not; the parent
+# notes how long each took. The functions here read and set the caller's variables
+# by name (res, tool, run_pids), as the Grok functions do. They know nothing of what
+# the tools are asked.
 
 # Ends a runner and records why its tool did not deliver. Reads the caller's res and tool.
 pair_fail() {
@@ -47,55 +48,63 @@ pair_stop() {
   exit 143
 }
 
-# The parent killed: stop both runners, wait for them, then leave.
+# The parent killed: stop every runner, wait for them, then leave.
 pair_cancel() {
   local p
-  for p in $cpid $gpid; do kill "$p" 2>/dev/null; done
+  for p in $run_pids; do kill "$p" 2>/dev/null; done
   wait
   exit 143
 }
 
-# Starts the Codex runner function $1 and the Grok runner function $2, each in its own
-# subshell, and waits for both, noting how long each took. Sets the caller's cpid,
-# gpid, csecs and gsecs.
-pair_run() { # $1 Codex runner, $2 Grok runner
-  local alive
+# Starts each tool's runner, named <$1>_<tool> (weigh_codex, consult_claude), each in
+# its own subshell, and waits for all, writing how long each took to $res/<tool>.secs.
+# Sets the caller's run_pids.
+pair_run() { # $1 runner prefix, $2... tools
+  local prefix=$1 t i alive pids=()
+  shift
   SECONDS=0
+  run_pids=""
   # The runners are subshells that share the caller's variables; each ends with
   # `exit`, so only the runner stops.
-  ( tool=codex; trap pair_stop TERM; "$1" ) &
-  cpid=$!
-  ( tool=grok; trap pair_stop TERM; "$2" ) &
-  gpid=$!
+  for t in "$@"; do
+    ( tool=$t; trap pair_stop TERM; "${prefix}_$t" ) &
+    pids+=("$!")
+    run_pids="$run_pids $!"
+  done
   while :; do
-    alive=no
-    if kill -0 "$cpid" 2>/dev/null; then alive=yes; elif [ -z "$csecs" ]; then csecs=$SECONDS; fi
-    if kill -0 "$gpid" 2>/dev/null; then alive=yes; elif [ -z "$gsecs" ]; then gsecs=$SECONDS; fi
+    alive=no i=0
+    for t in "$@"; do
+      if kill -0 "${pids[$i]}" 2>/dev/null; then alive=yes
+      elif [ ! -e "$res/$t.secs" ]; then printf '%s\n' "$SECONDS" >"$res/$t.secs"; fi
+      i=$((i + 1))
+    done
     [ "$alive" = yes ] || break
     sleep 1
   done
-  wait "$cpid"
-  wait "$gpid"
+  for t in "${pids[@]}"; do wait "$t"; done
 }
 
 # The printers take the caller's word for a tool that did not deliver ("not weighed",
 # "not consulted").
-pair_report() { # $1 tool key, $2 heading, $3 seconds, $4 word
-  printf '## %s\n\n' "$2"
+pair_name() { # $1 tool key
+  case "$1" in codex) printf Codex ;; grok) printf Grok ;; claude) printf Claude ;; esac
+}
+pair_report() { # $1 tool key, $2 word
+  printf '## %s\n\n' "$(pair_name "$1")"
   if [ -s "$res/$1.final" ]; then
     cat "$res/$1.reply"
   else
-    printf '%s: %s\n' "$4" "$(pair_why "$1")"
+    printf '%s: %s\n' "$2" "$(pair_why "$1")"
   fi
-  printf '\n(%s seconds)\n\n' "$3"
+  printf '\n(%s seconds)\n\n' "$(cat "$res/$1.secs" 2>/dev/null)"
 }
 pair_why() { # $1 tool key
   if [ -s "$res/$1.why" ]; then cat "$res/$1.why"; else printf 'it ended without a result'; fi
 }
-pair_line() { # $1 tool key, $2 heading, $3 seconds, $4 word
+pair_line() { # $1 tool key, $2 word
   if [ -s "$res/$1.final" ]; then
-    printf -- '- %s (%s seconds): %s\n' "$2" "$3" "$(cat "$res/$1.final")"
+    printf -- '- %s (%s seconds): %s\n' "$(pair_name "$1")" "$(cat "$res/$1.secs" 2>/dev/null)" "$(cat "$res/$1.final")"
   else
-    printf -- '- %s (%s seconds): %s: %s\n' "$2" "$3" "$4" "$(pair_why "$1")"
+    printf -- '- %s (%s seconds): %s: %s\n' "$(pair_name "$1")" "$(cat "$res/$1.secs" 2>/dev/null)" "$2" "$(pair_why "$1")"
   fi
 }

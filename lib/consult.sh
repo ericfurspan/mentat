@@ -1,13 +1,14 @@
 # shellcheck shell=bash
-# mentat consult: Codex and Grok each answer any question, in parallel and apart from
-# Claude Code's own view, with the web on, and the result is printed for the maintainer.
-# Sourced by bin/mentat.
+# mentat consult: the review tools (Codex and Grok, or those the setting lists) each
+# answer any question, in parallel and apart from Claude Code's own view, with the web
+# on, and the result is printed for the maintainer. Sourced by bin/mentat.
 
 # Unlike weigh, consult needs no repository: it reads nothing but the question file,
-# and gives neither tool a file or a repository. Each tool runs in an empty folder, so
-# the question is all it has. The two runners, their result files and the printers are
-# in lib/parallel.sh, shared with mentat weigh. This file keeps what is consult's: the
-# empty folders, the question prompt, the CONSULT line and the web settings.
+# and gives no tool a file or a repository. Each tool runs in an empty folder, so the
+# question is all it has. The parallel runs, their result files and the printers are
+# in lib/parallel.sh, shared with mentat weigh; Claude's runner is in lib/claude.sh.
+# This file keeps what is consult's: the empty folders, the question prompt, the
+# CONSULT line and the web settings.
 
 # The final line: CONSULT: and an answer that is not only spaces.
 consult_line_ok() {
@@ -17,7 +18,7 @@ consult_line_ok() {
   esac
 }
 
-# The prompt both tools get after a line about where they are. The question is data.
+# The prompt each tool gets after a line about where they are. The question is data.
 consult_body() { # $1 question file
   printf 'You are consulted on a question, as one of several advisors whose answers are shown side by side to the person asking. '
   printf 'Answer it plainly: your view, your reasoning and the evidence for it. Use web search where it helps, and cite what you used. '
@@ -76,8 +77,9 @@ consult() {
   local question="${1:-}"
   [ $# -eq 1 ] || die "usage: mentat consult <question file>" 64
   [ -f "$question" ] || die "question file not found: $question" 64
-  # shellcheck disable=SC2034 # cpid and gpid are set by pair_run and read by pair_cancel
-  local res="" cpid="" gpid="" csecs="" gsecs=""
+  # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
+  local res="" run_pids="" tools reviewers reviewers_why t
+  review_tools
   res=$(mktemp -d) || die "not consulted: could not create a temporary directory" 1
   # shellcheck disable=SC2064 # expand now, so the path is fixed when the trap is set
   trap "rm -rf $(printf %q "$res")" EXIT
@@ -85,16 +87,15 @@ consult() {
   cp -- "$question" "$res/question" || die "not consulted: could not read $question" 1
   consult_body "$res/question" >"$res/body" || die "not consulted: could not write the prompt" 1
 
-  pair_run consult_codex consult_grok
+  # shellcheck disable=SC2086 # tools is a list of plain words
+  pair_run consult $tools
 
   printf '## Consulting %s\n\n' "$question"
-  pair_report codex Codex "$csecs" "not consulted"
-  pair_report grok Grok "$gsecs" "not consulted"
+  for t in $tools; do pair_report "$t" "not consulted"; done
   printf '## Views\n\n'
-  pair_line codex Codex "$csecs" "not consulted"
-  pair_line grok Grok "$gsecs" "not consulted"
-  # At least one view is a result; neither is a failure.
-  if [ -s "$res/codex.final" ] || [ -s "$res/grok.final" ]; then exit 0; fi
+  for t in $tools; do pair_line "$t" "not consulted"; done
+  # At least one view is a result; none is a failure.
+  for t in $tools; do [ ! -s "$res/$t.final" ] || exit 0; done
   printf 'mentat: not consulted by either tool; give Claude Code'"'"'s view alone, say the consultation did not happen, and ask the maintainer how to proceed\n' >&2
   exit 1
 }
