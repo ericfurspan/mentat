@@ -30,15 +30,16 @@ Claude Code plans and builds each change, Codex and Grok give second opinions an
 
 ## Install
 
+In each repository:
+
 ```bash
-claude plugin install mentat --marketplace ericfurspan/mentat
+claude plugin install mentat --marketplace ericfurspan/mentat --scope project
 ```
 
-This installs for your user, so Mentat is on in every folder. Before Claude Code 2.1.292, run `claude plugin marketplace add ericfurspan/mentat`, then `claude plugin install mentat@mentat`.
+This writes the repository's `.claude/settings.json`, so Mentat is on for everyone using Claude Code there. Use `--scope local` for only you, or `--scope user` for every folder.
 
-- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope user`.
-- Turn off in one project: `claude plugin disable mentat@mentat --scope local`.
-- Remove: `claude plugin uninstall mentat@mentat --scope user`.
+- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>`.
+- Remove: `claude plugin uninstall mentat@mentat --scope <install scope>`.
 
 Where a repository requires an approval, the agent needs its own GitHub account.
 
@@ -52,7 +53,7 @@ Ask for a change in chat and Mentat runs the workflow. These commands do the res
 - `/mentat:work-tickets [item id ...]`: build agreed backlog items in a row, one pull request each.
 - `/mentat:zoom-out`: a short summary of the goal, progress and next step.
 - `/mentat:retro`: review a session and propose improvements.
-- `/mentat:setup`: show and change the repository's Mentat settings.
+- `/mentat:setup [first-run]`: show and change settings; start with `first-run`.
 - `/mentat:linear [project name] [team name]`: move the repository's planning from GitHub issues to Linear.
 - `/mentat:consult [--web] <question or idea>`: ask Codex, Grok and Claude Code one question.
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
