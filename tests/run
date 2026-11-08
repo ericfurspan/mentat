@@ -100,7 +100,7 @@ phrase_check skills/claude-review/SKILL.md "the waived round's status line" "the
 phrase_check skills/claude-review/SKILL.md "that an earlier Claude round does not make a waived push Ready" 'an earlier Claude round does not make it Ready'
 # Before "You: merge #N.", the owner is asked again unless they approved the current head.
 for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
-  phrase_check "$f" "the owner's review request unless they approved the head" "If the repository owner is not the author, request their review (\`gh pr edit <N> --add-reviewer <owner>\`) unless their latest submitted review approves the head (\`gh pr view <N> --json reviews,headRefOid\`); if that read fails, request it."
+  phrase_check "$f" "the owner's review request unless they approved the head" "If the repository owner is not the author, request their review (\`gh pr edit <N> --add-reviewer <owner>\`) unless their latest submitted review is \`APPROVED\` with a commit oid equal to \`headRefOid\` (\`gh pr view <N> --json reviews,headRefOid\`; not \`reviewDecision\`); if that read fails, request it."
 done
 
 # A P0 or P1 finding from Codex or Grok that was answered, not fixed, is named in the final check.
