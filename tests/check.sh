@@ -182,10 +182,11 @@ check "an empty list misses every repository" '[ "$rc" = 0 ] && grep -q "^WARN: 
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "signed out, the comparison does not run" '[ "$rc" = 1 ] && ! grep -q "user/repos" "$STUB/calls"'
 
-# The command the docs give lists the missing names, by the same lookup.
-doc_command=$(grep '^gh api -X GET ' "$(dirname "$mentat")/../docs/how-it-works.md")
-reset; printf 'stubword\nSTUBWORD\nstubmissing-one\n' >"$STUB/repos"; doc_out=$(bash -c "$doc_command" 2>&1)
-check "the docs' command lists only the missing names" '[ "$doc_out" = stubmissing-one ]'
+# The command the warning prints lists the missing names, by the same lookup.
+reset; printf 'stubword\nSTUBWORD\nstubmissing-one\n' >"$STUB/repos"; rc=$(run)
+warn_command=$(sed -n 's/^WARN: .* private word list; to list them, run: //p' "$STUB/out")
+warn_out=$(bash -c "$warn_command" 2>&1)
+check "the warning's command lists only the missing names" '[ -n "$warn_command" ] && [ "$warn_out" = stubmissing-one ]'
 
 # The Mentat plugin's copies, from the stub claude. Every entry names a path and a project,
 # and none may be printed.
