@@ -207,10 +207,10 @@ for s in 'name: intake' 'disable-model-invocation: true'; do
     fail "skills/intake/SKILL.md's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, reader options, or brainstorm and a text or link\./ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
   pass "skills/intake/SKILL.md's description lists its arguments"
 else
-  fail "skills/intake/SKILL.md's description must list its arguments (Arguments: project names or all, reader options, or brainstorm and a text or link.)"
+  fail "skills/intake/SKILL.md's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
 fi
 phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
 phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'

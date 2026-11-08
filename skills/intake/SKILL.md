@@ -1,6 +1,6 @@
 ---
 name: intake
-description: "Gathers ideas and settles each with you, one question at a time. Arguments: project names or all, reader options, or brainstorm and a text or link."
+description: "Gathers ideas and settles each with you, one question at a time. Arguments: project names or all, source options, or brainstorm with a text or link."
 argument-hint: "[project ... | all] [reader options] | brainstorm <text or link>"
 disable-model-invocation: true
 ---

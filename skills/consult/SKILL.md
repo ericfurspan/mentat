@@ -1,6 +1,6 @@
 ---
 name: consult
-description: "Gets Codex, Grok and Claude views on your question or idea. Arguments: the question or idea, with --web to ask with the web only."
+description: "Gets Codex, Grok and Claude views on your question or idea. Arguments: the question or idea; add --web to ask without reading this repository."
 argument-hint: "[--web] <question or idea>"
 disable-model-invocation: true
 ---
