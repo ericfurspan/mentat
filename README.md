@@ -22,7 +22,7 @@ Mentat is a Claude Code plugin for building software with several AI agents. Cla
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
-- For reviews: the Codex CLI, signed in and installed under `/opt/homebrew` or `/usr/local`.
+- For reviews, weigh, challenge and consult: the Codex CLI, signed in and installed under `/opt/homebrew` or `/usr/local`.
 - Optional: Grok Build (`grok`), signed in with `grok login`, for a second review.
 - Optional: `gitleaks`, to catch likely secrets before a commit.
 
