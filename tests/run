@@ -207,10 +207,10 @@ for s in 'name: intake' 'disable-model-invocation: true'; do
     fail "skills/intake/SKILL.md's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all`/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all`;/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
   pass "skills/intake/SKILL.md's description lists its arguments"
 else
-  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`, brainstorm <text or link>)"
+  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`; brainstorm <text or link>)"
 fi
 phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
 phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
@@ -299,17 +299,19 @@ for k in agenda work-tickets; do
     fi
   done
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional project names or `all` \(none: the session.s project\)/ { found = 1; exit 0 } END { exit !found }' skills/agenda/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional project names or `all`\. Started by the maintainer\./ { found = 1; exit 0 } END { exit !found }' skills/agenda/SKILL.md; then
   pass "skills/agenda/SKILL.md's description lists its arguments"
 else
-  fail "skills/agenda/SKILL.md's description must list its arguments (optional project names or \`all\`; none: the session's project)"
+  fail "skills/agenda/SKILL.md's description must list its arguments (Arguments: optional project names or \`all\`. Started by the maintainer.)"
 fi
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional backlog item ids \(none: the project.s next agreed work\)/ { found = 1; exit 0 } END { exit !found }' skills/work-tickets/SKILL.md; then
   pass "skills/work-tickets/SKILL.md's description lists its arguments"
 else
   fail "skills/work-tickets/SKILL.md's description must list its arguments (optional backlog item ids; none: the project's next agreed work)"
 fi
-phrase_check skills/agenda/SKILL.md "that it forbids writes and asks nothing" 'This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing.'
+phrase_check skills/agenda/SKILL.md "that it forbids writes and asks only step 2's question" "This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing but step 2's question on a run with no argument."
+phrase_check skills/agenda/SKILL.md "the one question on a run with no argument" "With no argument, before reading any record, ask once which projects to cover: the session's project first, then \`all\`, another through Other."
+phrase_check skills/agenda/SKILL.md "no question where no project list is named" 'With no such instructions, the run asks nothing and covers only the session'"'"'s repository'
 phrase_check skills/agenda/SKILL.md "that the backlog's listing writes do not run" 'Its listing writes do not run'
 phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`../backlog/linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
 phrase_check skills/agenda/SKILL.md "a decision answered in chat recorded nowhere" 'record nothing and say in one line where the answer goes'
@@ -359,6 +361,10 @@ phrase_check skills/propose/SKILL.md "no hand check offer for a change with noth
 phrase_check skills/propose/SKILL.md "the spec's hand check only when accepted or asked for" 'The spec lists a requirement the maintainer checks by hand only when their agreement accepts the offer or they asked for one.'
 phrase_check skills/propose/SKILL.md "a weigh for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets \`mentat weigh\`, however short."
 phrase_check skills/propose/SKILL.md "a change Claude Code suggests itself taken as a request" 'A change Claude Code suggests itself counts as a request here.'
+# A spec says what a skill's run with no arguments does, and a skill that takes project names asks which, the same way everywhere.
+phrase_check skills/propose/SKILL.md "a spec's bare run for a skill that takes arguments" 'When the change adds a skill that takes arguments (text typed after its command) or changes what they do, the spec says what a run with no arguments does.'
+phrase_check skills/propose/SKILL.md "the bare-run question for a skill that takes project names" "A skill that takes project names, run with none, asks once which projects to cover before it reads or writes anything else: the session's project first, then \`all\`, another through Other."
+phrase_check skills/propose/SKILL.md "no bare-run question where no project list is named" "Where the maintainer's own instructions name no project list, it asks nothing and covers the session's repository."
 phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
 # An unasked follow-up is filed in the record, not left in chat.
 phrase_check rules.md "an unasked follow-up filed as a not-agreed backlog item" 'A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item'
@@ -419,7 +425,14 @@ phrase_check skills/setup/SKILL.md "the migration's undecided idea in the inbox,
 phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
 phrase_check skills/intake/SKILL.md "the four options on an idea's prompt" 'An idea'"'"'s prompt shows four options: the recommended ending, Leave (or one other ending when Leave is recommended), one other likely ending, and "Later" last.'
 phrase_check skills/intake/SKILL.md "every ending not shown named in the question" 'Its question names every ending not shown, and an Other answer naming one chooses it.'
-phrase_check skills/intake/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project, the same as no project names, and is neither a project name nor a reader option."
+phrase_check skills/intake/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project and is neither a project name nor a reader option."
+# A sitting with neither project names nor `all` asks once which projects' ideas it settles, as a session control, unless no project list is named.
+phrase_check skills/intake/SKILL.md "the opening question on a run with neither project names nor all" "With neither project names nor \`all\`, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then \`all\`, another through Other."
+phrase_check skills/intake/SKILL.md "the opening question as a session control, not asked again" 'It is a session control, not a decision: it has no "N of M" and is not asked again after a compaction.'
+phrase_check skills/intake/SKILL.md "the opening question's answer not a limit on what readers file" 'The answer names the projects whose ideas the sitting settles, not a limit on what readers file (step 1).'
+phrase_check skills/intake/SKILL.md "readers run as with all after the opening question" "With projects chosen at the opening question, every reader runs as with \`all\`, and the sitting asks only about those projects' ideas and the readers' hand-offs for them."
+phrase_check skills/intake/SKILL.md "no opening question where no project list is named" "Where the maintainer's own instructions name no project list, ask nothing: the sitting covers the session's repository."
+phrase_check skills/intake/SKILL.md "brainstorm mode's own project question" 'Brainstorm mode keeps its own project question.'
 phrase_check skills/intake/SKILL.md "each answer recorded so the idea is not found again" 'so step 2 does not find the idea again'
 phrase_check skills/intake/SKILL.md "a dropped Backlog item canceled with its reason" 'Drop: mark it canceled, with the reason in a comment.'
 phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
