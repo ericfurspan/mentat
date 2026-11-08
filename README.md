@@ -60,7 +60,7 @@ Ask for a change in chat and Mentat runs the workflow. These commands do the res
 
 ## Review tools
 
-Weigh, challenge and consult run Codex and Grok unless `~/.config/mentat/reviewers` lists the tools to run: any of `claude`, `codex` and `grok`. Challenge runs Codex when listed, else Claude. Claude runs headless with read-only tools, on the most capable Claude model in a family other than the builder's, or on the model named in `~/.config/mentat/claude-model`. `/mentat:setup` shows and changes both files, and `mentat check` reports each tool in effect.
+Weigh and consult run Codex and Grok unless `~/.config/mentat/reviewers` lists tools, any of `claude`, `codex` and `grok`; then they run the listed ones. Challenge runs Codex unless that file lists tools without `codex`; then it runs Claude. In weigh and challenge, Claude has read-only file tools and no shell or web; in consult, it has web search only. Claude runs headless on the most capable Claude model in a family other than the builder's, or on the model named in `~/.config/mentat/claude-model`. `/mentat:setup` shows and changes both files, and `mentat check` reports each tool in effect.
 
 ## Credits
 
