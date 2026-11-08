@@ -56,13 +56,13 @@
     <rect class="gb" x="536" y="128" width="104" height="44" rx="8"/>
     <text class="gt" x="588" y="150" font-size="14" font-weight="600">Merge</text>
     <rect class="ab" x="40" y="204" width="104" height="56" rx="8"/>
-    <text class="at" x="92" y="223" font-size="14" font-weight="600">Maintainer</text>
+    <text class="at" x="92" y="223" font-size="14" font-weight="600">You</text>
     <text class="as" x="92" y="243" font-size="12" font-weight="400">asks</text>
     <rect class="ab" x="164" y="204" width="104" height="56" rx="8"/>
-    <text class="at" x="216" y="223" font-size="14" font-weight="600">Maintainer</text>
+    <text class="at" x="216" y="223" font-size="14" font-weight="600">You</text>
     <text class="as" x="216" y="243" font-size="12" font-weight="400">approves plan</text>
     <rect class="ab" x="536" y="204" width="104" height="56" rx="8"/>
-    <text class="at" x="588" y="223" font-size="14" font-weight="600">Maintainer</text>
+    <text class="at" x="588" y="223" font-size="14" font-weight="600">You</text>
     <text class="as" x="588" y="243" font-size="12" font-weight="400">merges</text>
     <path class="l" d="M 92 98 L 92 126" marker-end="url(#a)"/>
     <path class="l" d="M 216 98 L 216 126" marker-end="url(#a)"/>
@@ -74,6 +74,6 @@
     <path class="l" d="M 92 202 L 92 174" marker-end="url(#a)"/>
     <path class="l" d="M 216 202 L 216 174" marker-end="url(#a)"/>
     <path class="l" d="M 588 202 L 588 174" marker-end="url(#a)"/>
-    <text class="lt" x="340" y="296" font-size="12" font-weight="400">Gray: Claude Code's work. Teal: other vendors' models. Amber: the maintainer.</text>
+    <text class="lt" x="340" y="296" font-size="12" font-weight="400">Gray: Claude Code's work. Teal: other vendors' models. Amber: you.</text>
   </g>
 </svg>
