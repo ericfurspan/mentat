@@ -59,6 +59,38 @@ c_plugin_copies() {
     c_ok "no Mentat plugin copies at different versions"
   fi
 }
+# The review tools in effect. With no setting: Codex, and Grok where installed (it is
+# optional then). With one: each listed tool, and Claude when Codex is not listed,
+# since mentat challenge then runs Claude. A listed tool that is missing is a problem;
+# a missing Codex that is not in effect is a note, since mentat review still needs it.
+c_review_tools() {
+  # shellcheck disable=SC2034 # claude_same is set by claude_pick_model
+  local v reviewers reviewers_why claude_builder claude_reviewer claude_same
+  if ! reviewers_read; then c_problem "$reviewers_why"; reviewers=""; fi
+  if [ -z "$reviewers" ] || [ "${reviewers#*codex}" != "$reviewers" ]; then
+    if command -v codex >/dev/null 2>&1; then
+      v=$(codex --version 2>/dev/null | head -n 1)
+      c_ok "codex is installed (${v:-version unknown})"
+    else c_problem "codex is not installed: mentat review, mentat challenge and mentat weigh need it; mentat ci and mentat review --grok still run without it"; fi
+  elif ! command -v codex >/dev/null 2>&1; then
+    printf 'NOTE: codex is not installed: mentat review needs it; the review tools setting does not use it for weigh, challenge or consult\n'
+  fi
+  if command -v grok >/dev/null 2>&1 && { [ -z "$reviewers" ] || [ "${reviewers#*grok}" != "$reviewers" ]; }; then
+    v=$(grok --version 2>/dev/null | head -n 1)
+    c_ok "grok is installed (${v:-version unknown})"
+  elif [ "${reviewers#*grok}" != "$reviewers" ]; then
+    c_problem "grok is not installed: ~/.config/mentat/reviewers lists it"
+  fi
+  [ -n "$reviewers" ] && { [ "${reviewers#*claude}" != "$reviewers" ] || [ "${reviewers#*codex}" = "$reviewers" ]; } || return 0
+  if ! command -v claude >/dev/null 2>&1; then
+    c_problem "claude is not installed: the review tools setting runs it"
+  elif ! claude_pick_model; then
+    c_problem "the Claude model setting ~/.config/mentat/claude-model does not hold a model id"
+  else
+    v=$(claude --version 2>/dev/null | head -n 1)
+    c_ok "claude is installed (${v:-version unknown}); it reviews with ${claude_reviewer}, the builder with ${claude_builder}"
+  fi
+}
 check() {
   local repo tool v d list_ok=""
   [ $# -eq 0 ] || die "usage: mentat check" 64
@@ -66,15 +98,7 @@ check() {
     if command -v "$tool" >/dev/null 2>&1; then c_ok "$tool is installed"; else c_problem "$tool is not installed"; fi
   done
   [ "$check_problems" = 0 ] || c_finish
-  if command -v codex >/dev/null 2>&1; then
-    v=$(codex --version 2>/dev/null | head -n 1)
-    c_ok "codex is installed (${v:-version unknown})"
-  else c_problem "codex is not installed: mentat review, mentat challenge and mentat weigh need it; mentat ci and mentat review --grok still run without it"; fi
-  # Grok is optional: no warning when it is missing.
-  if command -v grok >/dev/null 2>&1; then
-    v=$(grok --version 2>/dev/null | head -n 1)
-    c_ok "grok is installed (${v:-version unknown})"
-  fi
+  c_review_tools
   if command -v gitleaks >/dev/null 2>&1; then
     v=$(gitleaks version 2>/dev/null | head -n 1)
     c_ok "gitleaks is installed (${v:-version unknown})"
