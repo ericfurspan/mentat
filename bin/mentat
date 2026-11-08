@@ -52,9 +52,10 @@
 #     variables as weigh. Grok and Claude have web search alone; Grok's local fetch tool is denied.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools, each review tool in
 #     effect, gh signed in, the repository readable; prints the codex and grok versions, and warns
-#     when the repository keeps head branches after merge, the private word list is
-#     missing or unreadable, the list misses a private repository this account can
-#     reach, by count only, or the Mentat plugin is installed at different versions.
+#     when the private word list is unreadable, the list misses a private repository
+#     this account can reach, by count only, the Mentat plugin is installed at different
+#     versions, or, with ~/.config/mentat/warn-kept-branches present, the repository keeps
+#     head branches after merge.
 #     0 Mentat can work (warnings printed), 1 it cannot.
 set -uo pipefail
 

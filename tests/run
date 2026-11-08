@@ -352,9 +352,12 @@ phrase_check skills/agenda/SKILL.md "the next item from ordered records beside e
 phrase_check skills/work-tickets/SKILL.md "each item built through A change steps 2 to 5" "through \`rules.md\` \"A change\" steps 2 to 5"
 phrase_check skills/work-tickets/SKILL.md "no mentat:propose for a queued item" "The run does not call \`mentat:propose\` for a queued item, since each is agreed with a spec."
 phrase_check skills/work-tickets/SKILL.md "nothing offered or built from a tracker with no order" 'When the tracker records no order, such as GitHub issues with no pinned order, the check says so, offers no item from it and builds nothing from it.'
+phrase_check skills/work-tickets/SKILL.md "no plan limit read without the maintainer's own instructions" 'with no such instructions, read no plan limit.'
 
-# A decision that does not block work reaches the maintainer as their own instructions say, and mentat:propose points there.
+# A decision that does not block work reaches the maintainer as their own instructions say, else as rules.md says, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
+phrase_check rules.md "the default route for a decision that does not block" 'Otherwise it reaches them as the bullet above says.'
+phrase_check rules.md "what the maintainer's own instructions may change" "The maintainer's own instructions may set only the choices these rules and the skills name, and may add weighs or checks; \"Approval\" and \"What agents never do\" still hold."
 phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
 
 # The maintainer decides outcomes, cost and risk, and Claude Code settles the rest.

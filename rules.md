@@ -4,6 +4,8 @@ The maintainer owns this repository. Claude Code plans and builds. Codex reviews
 
 The repository comes first. Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a named workflow that commits to the default branch), the repository wins and Claude Code says so once; "Approval" and "What agents never do" always hold.
 
+The maintainer's own instructions may set only the choices these rules and the skills name, and may add weighs or checks; "Approval" and "What agents never do" still hold.
+
 ## A change
 1. Claude Code calls the Skill tool with `mentat:propose` before giving a view on any request or suggesting a change of its own, a fix to its own output included.
 2. One builder (the `builder` subagent), branch and checkout per pull request. The main session edits no files, review fixes included.
@@ -21,7 +23,7 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 ## What goes to the maintainer
 - The maintainer decides outcomes, cost and risk: what to build and in what order, a change in scope or cost, a blocking disagreement, undoing what they recently asked for. Claude Code settles the rest, including approach, code, tests, wording, findings and how to split work, and does not ask about it. It names a consequential call in the pull request description and in one line of the next message the maintainer reads.
 - A decision reaches them as one question about what they get, pay or risk, never about the mechanism: one decision per `AskUserQuestion` prompt, the recommended option first, each option saying what it authorizes and gets, and naming only the costs that differ between the options (a cost every option shares is not repeated), and the question saying why the first is recommended, so the prompt alone suffices. It keeps detail they need to judge, such as which outside services receive their data. A decision that needs talking through goes in chat, in plain words, one at a time. A fact a question rests on is checked first, and a record is re-read right before asking about it. An answer typed in Other that picks an option chooses it, and any condition it adds holds.
-- Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply. A skill with its own reply shape does not change this.
+- Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply. Otherwise it reaches them as the bullet above says. A skill with its own reply shape does not change this.
 - A hand step only the maintainer can run is written as `mentat:backlog` "Waits on the maintainer" says. A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item, or in the project's inbox where the project or the maintainer's own instructions name one; such items are settled in an Intake sitting (`/mentat:intake`).
 
 ## Approval
