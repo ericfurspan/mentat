@@ -14,7 +14,7 @@ CLAUDE_MODEL_FILE="$HOME/.config/mentat/claude-model"
 CLAUDE_MODELS="claude-fable-5-1 claude-opus-5-5 claude-sonnet-5-5 claude-haiku-5-5"
 
 # Credential files inside the export, denied to Claude's file tools, as CREDENTIAL_DENY
-# denies them to Codex.
+# denies them to Codex. A Read rule also hides the matching files from Grep and Glob.
 CLAUDE_CREDENTIAL_DENY=('Read(**/.env)' 'Read(**/.env.*)' 'Read(**/*.pem)' 'Read(**/*.key)' 'Read(**/*.p12)' 'Read(**/*.pfx)'
   'Read(**/id_rsa*)' 'Read(**/id_ecdsa*)' 'Read(**/id_ed25519*)' 'Read(**/.netrc)' 'Read(**/.npmrc)' 'Read(**/.pypirc)')
 
