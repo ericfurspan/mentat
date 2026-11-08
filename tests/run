@@ -207,10 +207,10 @@ for s in 'name: intake' 'disable-model-invocation: true'; do
     fail "skills/intake/SKILL.md's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /brainstorm <text or link>/ && /project names or `all`;/ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
   pass "skills/intake/SKILL.md's description lists its arguments"
 else
-  fail "skills/intake/SKILL.md's description must list its arguments (project names or \`all\`; brainstorm <text or link>)"
+  fail "skills/intake/SKILL.md's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
 fi
 phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
 phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
@@ -245,6 +245,30 @@ phrase_check skills/backlog/SKILL.md "scope merged into an agreed item kept out 
 phrase_check skills/backlog/SKILL.md "scope still not agreed filed as its own issue when a GitHub issue closes" '- When an issue closes with scope an Intake sitting merged into it still not agreed, file that scope as its own issue, taken on, linking the closed one.'
 phrase_check skills/propose/SKILL.md "scope merged into agreed work weighed and agreed when next planned" "Scope an Intake sitting merged into agreed work is taken on, not agreed: it is weighed and agreed when that work is next planned."
 
+# The / menu shows descriptions as plain text: no skill's description holds <, > or a backtick, and a menu
+# skill's description value is one short line of at most 150 characters.
+for f in skills/*/SKILL.md; do
+  d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && /^description: / { print; exit }' "$f")
+  if [ -z "$d" ]; then
+    fail "$f's frontmatter must have a description line"
+    continue
+  fi
+  case $d in
+    *'<'* | *'>'* | *'`'*) fail "$f's description must hold no <, > or backtick" ;;
+    *) pass "$f's description holds no <, > or backtick" ;;
+  esac
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "user-invocable: false" { found = 1; exit 0 } END { exit !found }' "$f"; then
+    continue
+  fi
+  v=${d#description: \"}
+  v=${v%\"}
+  if [ "${#v}" -le 150 ]; then
+    pass "$f's menu description is at most 150 characters"
+  else
+    fail "$f's menu description must be at most 150 characters (it has ${#v})"
+  fi
+done
+
 # Skills only agents call stay out of the / menu and stay callable by the agent.
 for s in propose pr review backlog grill challenge; do
   f=skills/$s/SKILL.md
@@ -268,10 +292,10 @@ for s in 'name: plan' 'disable-model-invocation: true'; do
     fail "skills/plan/SKILL.md's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional backlog item id/ { found = 1; exit 0 } END { exit !found }' skills/plan/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: a backlog item id\./ { found = 1; exit 0 } END { exit !found }' skills/plan/SKILL.md; then
   pass "skills/plan/SKILL.md's description lists its argument"
 else
-  fail "skills/plan/SKILL.md's description must list its argument (optional backlog item id)"
+  fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
 fi
 phrase_check skills/plan/SKILL.md "that it never briefs a builder" 'Never brief a builder, create a branch or edit a file of the repository'
 phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
@@ -299,16 +323,17 @@ for k in agenda work-tickets; do
     fi
   done
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional project names or `all`\. Started by the maintainer\./ { found = 1; exit 0 } END { exit !found }' skills/agenda/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all\./ { found = 1; exit 0 } END { exit !found }' skills/agenda/SKILL.md; then
   pass "skills/agenda/SKILL.md's description lists its arguments"
 else
-  fail "skills/agenda/SKILL.md's description must list its arguments (Arguments: optional project names or \`all\`. Started by the maintainer.)"
+  fail "skills/agenda/SKILL.md's description must list its arguments (Arguments: project names or all.)"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: optional backlog item ids \(none: the project.s next agreed work\)/ { found = 1; exit 0 } END { exit !found }' skills/work-tickets/SKILL.md; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: backlog item ids\./ { found = 1; exit 0 } END { exit !found }' skills/work-tickets/SKILL.md; then
   pass "skills/work-tickets/SKILL.md's description lists its arguments"
 else
-  fail "skills/work-tickets/SKILL.md's description must list its arguments (optional backlog item ids; none: the project's next agreed work)"
+  fail "skills/work-tickets/SKILL.md's description must list its arguments (Arguments: backlog item ids.)"
 fi
+phrase_check skills/work-tickets/SKILL.md "the project's next agreed work with no ids" "With none: the project's next agreed work as the tracker's section reads it"
 phrase_check skills/agenda/SKILL.md "that it forbids writes and asks only step 2's question" "This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing but step 2's question on a run with no argument."
 phrase_check skills/agenda/SKILL.md "the one question on a run with no argument" "With no argument, before reading any record, ask once which projects to cover: the session's project first, then \`all\`, another through Other."
 phrase_check skills/agenda/SKILL.md "no question where no project list is named" 'With no such instructions, the run asks nothing and covers only the session'"'"'s repository'

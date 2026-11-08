@@ -1,6 +1,6 @@
 ---
 name: zoom-out
-description: "Steps back from the task in hand and gives the maintainer one holistic view: the goal, what is done, what is still unanswered, what looks like weeds, and the next step. Started by the maintainer."
+description: "Gives one view of the whole picture: the goal, what is done, what is unanswered and the next step. Arguments: what to focus on."
 disable-model-invocation: true
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: intake
-description: "Runs one sitting that gathers ideas from every channel and settles each one with the maintainer, one question at a time. Arguments: optional project names or `all`; `brainstorm <text or link>` to capture ideas from a text or link instead; other words are options for the channel readers. Started by the maintainer."
+description: "Gathers ideas and settles each with you, one question at a time. Arguments: project names or all, source options, or brainstorm with a text or link."
 argument-hint: "[project ... | all] [reader options] | brainstorm <text or link>"
 disable-model-invocation: true
 ---

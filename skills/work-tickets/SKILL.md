@@ -1,6 +1,6 @@
 ---
 name: work-tickets
-description: "Builds agreed backlog items in a row, one pull request each, after one quick check with the maintainer. Builds only; planning stays with `/mentat:plan`. Arguments: optional backlog item ids (none: the project's next agreed work). Started by the maintainer."
+description: "Builds agreed backlog items in a row, one pull request each. Arguments: backlog item ids."
 argument-hint: "[item id ...]"
 disable-model-invocation: true
 ---

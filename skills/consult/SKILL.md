@@ -1,6 +1,6 @@
 ---
 name: consult
-description: "Gets Codex, Grok and Claude Code's views on the maintainer's question or idea: a plan for this repository is weighed against its code at HEAD, anything else, or anything after `--web`, is asked with the web only. Answers in five short lines at most: the consensus first, then what each model adds. Started by the maintainer, with the question or idea after the command."
+description: "Gets Codex, Grok and Claude views on your question or idea. Arguments: the question or idea; add --web to ask without reading this repository."
 argument-hint: "[--web] <question or idea>"
 disable-model-invocation: true
 ---
