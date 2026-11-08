@@ -34,7 +34,7 @@ c_word_list_covers_repos() {
   if [ "$rc" -gt 1 ]; then
     c_warn "could not compare the private word list with your private repositories"
   elif [ "$missing" -gt 0 ]; then
-    c_warn "$missing private repository name(s) are not whole lines of the private word list: 'The publish check' in docs/how-it-works.md gives the command that lists them"
+    c_warn "$missing private repository name(s) are not whole lines of the private word list; to list them, run: gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' | grep -vixF -f ~/.config/mentat/private-words"
   else
     c_ok "the private word list has every private repository this account can reach"
   fi
