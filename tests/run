@@ -98,6 +98,10 @@ phrase_check skills/claude-review/SKILL.md "the open hand check's status line" '
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
 phrase_check skills/claude-review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
 phrase_check skills/claude-review/SKILL.md "that an earlier Claude round does not make a waived push Ready" 'an earlier Claude round does not make it Ready'
+# Before "You: merge #N.", the owner is asked again unless they approved the current head.
+for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
+  phrase_check "$f" "the owner's review request unless they approved the head" "If the repository owner is not the author, request their review (\`gh pr edit <N> --add-reviewer <owner>\`) unless their latest submitted review is \`APPROVED\` with a commit oid equal to \`headRefOid\` (\`gh pr view <N> --json reviews,headRefOid\`; not \`reviewDecision\`); if that read fails, request it."
+done
 
 # A P0 or P1 finding from Codex or Grok that was answered, not fixed, is named in the final check.
 phrase_check skills/review/SKILL.md "a serious finding answered, not fixed, in one Verification line and the merge message" 'A P0 or P1 finding from Codex or Grok that was answered instead of fixed is named in one Verification line, which can be its line in step 4'"'"'s list, and in one sentence of the "You: merge #N." message; a pull request with none adds no line.'
