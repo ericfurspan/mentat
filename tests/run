@@ -516,6 +516,7 @@ phrase_check skills/linear/SKILL.md "the switch item's Ends when line" "\`Ends w
 phrase_check skills/linear/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
 phrase_check skills/linear/SKILL.md "step 6's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/setup/SKILL.md "the one-line pointer to /mentat:linear" 'To move planning to Linear, the maintainer runs `/mentat:linear`.'
+phrase_check skills/setup/SKILL.md "the first run's per-repository install recommendation" 'Recommend installing per repository, so Mentat runs only where the maintainer turns it on'
 phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 
 # After a weigh or a plan challenge, the maintainer sees each tool's reply and what Claude Code did with it in one block.
