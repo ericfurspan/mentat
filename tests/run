@@ -566,6 +566,7 @@ phrase_check skills/backlog/SKILL.md "the replies block and waits with GitHub is
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 phrase_check skills/challenge/SKILL.md "the challenge's replies block at hand-off" 'replies block'
+phrase_check skills/challenge/SKILL.md "exit 5 as a stale checkout to update, not a handoff" '   - 5: the checkout is behind the default branch. Update it and run the challenge again; this is not a failure to hand off.'
 # Claude, as a review tool the setting lists, gets its own line and comment headings.
 phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <verdict> - <its main point>'
 phrase_check skills/backlog/SKILL.md "the Claude comment headings" '"Claude: weigh", "Codex: plan challenge", "Claude: plan challenge"'
