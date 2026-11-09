@@ -225,6 +225,14 @@ phrase_check skills/propose/SKILL.md "the agreement question's note of an unweig
 # A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
 phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
 phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
+# A lasting lesson from a correction is followed at once and filed for Intake only on a yes asked in the reply to it, never with another question.
+phrase_check rules.md "a correction followed at once" 'Claude Code follows any correction at once.'
+phrase_check rules.md "the triggers for asking to file a lesson" 'When the maintainer corrected the same point twice, said it should hold in later work, or stated a preference about how agents work in general,'
+phrase_check rules.md "the lesson asked once in the reply to the correction" "its reply to that correction asks once, in one \`AskUserQuestion\` prompt, whether to file it;"
+phrase_check rules.md "what does not trigger the lesson ask, and once per point" 'never for a one-off instruction for this task, a reversal already asked as a scope question or a failed check inside the review loop, and at most once per point per session.'
+phrase_check rules.md "a yes files a lesson for Intake, naming what it would change" "A yes files a not-agreed item, or an inbox idea where one is named, for Intake, naming what it would change (for a working-style preference, the maintainer's own instructions);"
+phrase_check rules.md "the lesson's yes agrees nothing else and is asked alone" 'it agrees nothing else and is never combined with another question, such as the next-work offer.'
+phrase_check rules.md "a lesson filed only on a yes, unlike other unasked follow-ups" 'Unlike other unasked follow-ups, a lesson is filed only on that yes.'
 
 # An Intake sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
 # after a compaction, and sends nothing it collects to Codex or Grok.
