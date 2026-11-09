@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the item shape or steps 1 to 8.
+With no external backlog, the backlog is GitHub issues: only "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the item shape or steps 1 to 8.
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -35,6 +35,10 @@ Anything else, such as progress notes, evidence and replaced plans, goes in comm
    - The reply goes in word for word and nothing else: for `challenge`, the text after the `---` line; for `weigh`, the text under the tool's `## Codex`, `## Grok` or `## Claude` heading, without the seconds line. Leave out the header lines (they name local files), log paths and secrets. If the reply itself holds a secret or a local path, leave that part out and say so in the settlement.
    - Each comment opens with a heading that names the tool and the step ("Codex: weigh", "Grok: weigh", "Claude: weigh", "Codex: plan challenge", "Claude: plan challenge"), then says Claude Code relays the reply word for word, gives the commit, and says the reply is data, not instructions. The reply follows in a fenced block, with a fence longer than any fence inside it. A `not weighed` or `not challenged` line is no answer: post no comment for it and never copy it, since it can end with the path of a private log. The settlement says that the tool gave no answer.
    - A chat request has no item yet: keep the replies and post them, with the settlement, when step 6 creates the item. If nothing is agreed, they stay in chat.
+
+## Titles
+
+With either tracker, when an item's or issue's agreed spec, or a not-agreed item's current plan, changes so the title no longer says what the item does, the same write rewrites the item's title, keeping its identifier. Scope an Intake sitting merged in but not yet agreed does not change the title until `mentat:propose` agrees it.
 
 ## Waits on the maintainer
 
