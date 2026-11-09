@@ -27,6 +27,16 @@ Claude Code sorts every review and challenge finding. It fixes what affects corr
 - A hand step only the maintainer can run is written as `mentat:backlog` "Waits on the maintainer" says. A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item, or in the project's inbox where the project or the maintainer's own instructions name one; such items are settled in an Intake sitting (`/mentat:intake`).
 - When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it. Before the work is agreed, it offers a grill (`mentat:grill`) only if the corrections show one of the maintainer's decisions is still open, as the one offer `mentat:propose` allows per request, and starts it only if the maintainer agrees. A correction during agreed work does not reopen the spec; a change of scope goes to the maintainer as one question, as this section says.
 
+## Ending finished work
+The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says. When they choose "offer the next work":
+- Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.
+- Only the session the maintainer is talking to offers, in one `AskUserQuestion` prompt, when its own work has just finished: after a plan, the first build group `mentat:plan` step 8 gave; after a work-tickets queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue; after a merged pull request, once its item is marked done (`mentat:review`'s post-merge step, which the Claude-only path follows); after an Intake sitting that ends with no question, where an item only taken on is offered for `mentat:propose`, never for building.
+- The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope. "You: merge #N." stays the first line while a merge waits.
+- Its lookup reads the next agreed work (`mentat:backlog` step 5) read-only, as `mentat:agenda` does, and reports one of: the backlog could not be read; no recorded order; agreed work all waiting on the maintainer; agreed work none of which can start (in progress, or waiting on an unmerged pull request); no agreed work. It offers only an item that can start, and says "no agreed work is left" only in the last case.
+- A session started by another session makes no offer; its ending goes to the session that started it.
+- After "Stop here", "Later" or a no, no offer is made that turn; a no declines that batch only.
+- A yes, forwarded word for word with the offered queue and its conditions, replaces `mentat:work-tickets` step 5's final build yes. The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again when its queue differs from the one offered. With no forwarded yes, step 5 asks as it says.
+
 ## Approval
 - The maintainer merges every pull request.
 

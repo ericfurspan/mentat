@@ -15,7 +15,7 @@ A `<ci-monitor-event>` wake-up is input like any other, even when its text says 
 
 Whenever the loop stops short of Ready, first rewrite the description's status line in full (Skill tool, `mentat:pr`), its state `Blocked: <why>` or `Not reviewed: <why>` (as at step 2's exit 1 or a CI timeout); the reason, with any real defect still unfixed, goes in the note's second sentence or a Verification line (`mentat:pr`). Then tell the maintainer.
 
-`mentat status <N> [--request <file>]` gives the rounds, Grok's state and whether the spec matches; read them from it, after a compaction or a resumed session too. Every review that exits 0 or 2 is a round, whatever its fingerprint.
+`mentat status <N> [--request <file>]` gives the rounds, Grok's state and whether the spec matches; read them from it, after a compaction or a resumed session too.
 
 Each state's move: `head reviewed: no` runs step 1; `spec: differs` means that review did not cover the current spec (see "Spec"), so another round is needed, within the same limit; `grok: none` after an exit 3 or 4 from `mentat review --grok` runs it again for the next head; `grok: done` means sort any of its findings not yet settled and do not start Grok again; `grok: did not finish` covers both an INCOMPLETE Grok result, whose findings are still sorted and whose reason is kept for the final check, and a true non-finish, where Codex's loop, including Ready, goes on without it, so read the comment; `grok: running` means did not finish unless this session's own run is still going; status skips an INCOMPLETE Codex review, which is not a round, so read the latest comment when the head shows as not reviewed or Codex was just turned back on, and handle it as step 2's exit 1 does; `head reviewed: yes` can mean a Claude round, so once Codex is back on, a Codex review still runs on the head.
 
@@ -63,4 +63,4 @@ After the answer, if #N is still open and they want the work in it, remove the i
 
 No hold is needed for a question, when #N is merged or closed, or for work that stands apart from #N; any work then goes on a new branch from the default branch, in its own pull request. When #N is closed without merging, remove the item's merge wait (`mentat:backlog` step 4) and leave its status as it is.
 
-When the maintainer says #N merged, do the steps of the item's wait block where there is one (`mentat:backlog` step 4), then mark the item done, which ends its merge wait, do the repository's own post-merge steps, and report in one line.
+When the maintainer says #N merged, do the steps of the item's wait block where there is one (`mentat:backlog` step 4), then mark the item done, which ends its merge wait, do the repository's own post-merge steps, and report in one line, then end as `rules.md` "Ending finished work" says.
