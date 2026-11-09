@@ -38,10 +38,16 @@
 #     replies names the builder and reviewer models.
 #   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result;
 #     Claude instead, on an export of HEAD with file tools only, when the setting does not
-#     list Codex. 0 challenge delivered (read the verdict), 1 not challenged, 64 usage.
+#     list Codex. 0 challenge delivered (read the verdict), 1 not challenged, 5 the checkout
+#     is behind origin's default branch (not a tool failure: update it and run again), 64 usage.
+#     Weigh and challenge first fetch origin's default branch into a private ref, leaving
+#     origin/<default> and FETCH_HEAD as they are; when that fails or there is no origin,
+#     a local origin/<default> still counts, and the output says when freshness could
+#     not be checked.
 #   mentat weigh <idea file>  Has Codex and Grok (or the setting's tools) each judge an idea,
 #     at HEAD and in parallel, and prints each reply with its verdict line. Nothing is posted.
-#     0 at least one tool delivered a verdict, 1 none did, 64 usage. Time limits:
+#     0 at least one tool delivered a verdict, 1 none did, 5 the checkout is behind (as for
+#     challenge), 64 usage. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex and Claude) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
 #     MENTAT_GROK_REASONING_EFFORT sets Grok's effort. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied. Claude reads an export with file tools only.

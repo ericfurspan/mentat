@@ -78,19 +78,22 @@ weigh_grok() {
 }
 
 # The idea is weighed as of HEAD, never the working tree, and the result is printed,
-# not posted: nothing here talks to GitHub.
+# not posted: nothing here talks to GitHub but fresh_check's fetch of origin's default
+# branch, and a checkout behind it is not weighed (exit 5).
 weigh() {
   local idea="${1:-}"
   [ $# -eq 1 ] || die "usage: mentat weigh <idea file>" 64
   [ -f "$idea" ] || die "idea file not found: $idea" 64
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
-  local top head changes dirty=no res="" run_pids="" tools reviewers reviewers_why t both="both tools were"
+  local top head changes dirty=no res="" run_pids="" tools reviewers reviewers_why t both="both tools were" fresh_def fresh_behind fresh_note
   review_tools
   command -v git >/dev/null 2>&1 || die "not weighed: git is not installed" 1
   top=$(git rev-parse --show-toplevel) || die "not weighed: not inside a git repository" 1
   head=$(git -C "$top" rev-parse HEAD) || die "not weighed: could not read HEAD" 1
   changes=$(git -C "$top" status --porcelain) || die "not weighed: could not read git status" 1
   [ -z "$changes" ] || dirty=yes
+  fresh_check "$top"
+  fresh_stop "mentat weigh"
   res=$(mktemp -d) || die "not weighed: could not create a temporary directory" 1
   # shellcheck disable=SC2064 # expand now, so the path is fixed when the trap is set
   trap "rm -rf $(printf %q "$res")" EXIT
@@ -102,6 +105,7 @@ weigh() {
   pair_run weigh $tools
 
   printf '## Weighing %s\n\n- Commit weighed: %s\n' "$idea" "$head"
+  [ -z "$fresh_note" ] || printf -- '- %s\n' "$fresh_note"
   case "$tools" in *' '*' '*) both="each tool was" ;; *' '*) ;; *) both="the tool was" ;; esac
   if [ "$dirty" = yes ]; then
     printf -- '- Uncommitted changes: yes. They were not weighed; %s given only that commit.\n\n' "$both"

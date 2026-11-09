@@ -2,8 +2,9 @@
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for `mentat weigh`, using a stub codex, a stub grok and a local
-# repository with no remote. Any gh call or git fetch fails the run: weigh talks to
-# no one. Prints PASS/FAIL per case; exits 1 on any FAIL.
+# repository with no remote, where any gh call or git fetch fails the run; the
+# freshness cases at the end add a local origin. Prints PASS/FAIL per case; exits 1
+# on any FAIL.
 set -uo pipefail
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
@@ -146,7 +147,7 @@ check "both deliver (exit 0): a section for each in order, and a summary of both
 check "a delivered weighing keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
 check "a delivered weighing prints no such line on stderr" '! grep -q "not weighed by either tool" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit weighed: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
-check "nothing is posted and nothing is fetched (no gh call, no git fetch)" 'no_outside'
+check "no remote, no fetch: nothing is posted and nothing is fetched (no gh call, no git fetch)" 'no_outside'
 check "nothing is left behind: no worktree, no Grok run folder, no temporary folder" 'clean'
 check "Codex runs in a detached worktree at that commit, not the checkout" '[ "$(cat "$STUB/cwd_head")" = "$H" ] && [ ! -s "$STUB/cwd_branch" ] && [ "$(cat "$STUB/cwd")" != "$top" ] && [ "$(cat "$STUB/cwd")" != "$top/sub" ]'
 check "Codex runs plain codex exec with the read-only profile and cached search, not --sandbox" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -q -- "--sandbox" "$STUB/args" && grep -qx "default_permissions=\"mentat-review\"" "$STUB/args" && grep -qF "\":workspace_roots\"={\".\"=\"read\", " "$STUB/args" && grep -qF "\"$top/.git\"=\"read\"" "$STUB/args" && grep -qF "\"/tmp\"=\"deny\"" "$STUB/args" && ! grep -q "write" "$STUB/args" && grep -qx "web_search=\"cached\"" "$STUB/args" && grep -qx -- --ephemeral "$STUB/args" && grep -qx -- --ignore-user-config "$STUB/args" && grep -qx -- --strict-config "$STUB/args" && grep -qx "approval_policy=\"never\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args" && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args"'
@@ -312,5 +313,46 @@ rc=$("$mentat" weigh >/dev/null 2>&1; echo $?)
 check "usage errors come before anything else, even outside a repository" '[ "$rc" = 64 ]'
 reset; rc=$(cd "$root" && "$mentat" weigh "$idea" >"$STUB/stdout" 2>/dev/null </dev/null; echo $?)
 check "outside a git repository nothing is weighed (exit 1)" '[ "$rc" = 1 ] && ! codex_ran && ! grok_ran'
+
+# Freshness: HEAD is checked against origin's default branch, fetched into a private ref.
+reset; rc=$(run "$idea")
+check "no remote: weigh runs, fetches nothing and says the checkout's freshness could not be checked" '[ "$rc" = 0 ] && codex_ran && no_outside && grep -q "^- The checkout.s freshness could not be checked: the checkout has no origin remote\.$" "$STUB/stdout"'
+O="$root/fresh origin.git" U="$root/fresh upstream" F="$root/fresh repo"
+"$real_git" init -q --bare -b trunk "$O" || exit 1
+"$real_git" init -q -b trunk "$U" && (cd "$U" && echo one >README && printf 'Read me.\n' >AGENTS.md && "$real_git" add -A && "$real_git" commit -q -m one && "$real_git" remote add origin "$O" && "$real_git" push -q origin trunk) || exit 1
+"$real_git" clone -q "$O" "$F" || exit 1
+upstream_commit() { (cd "$U" && echo "$1" >>README && "$real_git" commit -q -am "$1" && "$real_git" push -q origin trunk) || exit 1; }
+run_in() { (cd "$F" && "$mentat" weigh "$idea" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); echo $?; }
+tracking() { "$real_git" -C "$F" rev-parse refs/remotes/origin/trunk; }
+fetch_head() { cat "$F/.git/FETCH_HEAD" 2>/dev/null || echo none; }
+runs_fresh() { [ "$rc" = 0 ] && codex_ran && [ -s "$CALLS/fetch" ] && ! grep -q "freshness" "$STUB/stdout"; }
+refused() { # $1 the count and its noun
+  [ "$rc" = 5 ] && ! codex_ran && ! grok_ran && [ ! -s "$STUB/stdout" ] && ! grep -q "not weighed" "$STUB/stderr" \
+    && grep -qF "mentat: the checkout is behind origin's default branch trunk: HEAD lacks $1 on it. Update the checkout and run mentat weigh again. This is not a tool failure: do not go on with Claude Code's own view alone." "$STUB/stderr"
+}
+reset; rc=$(run_in)
+check "HEAD up to date with the default branch runs as before, after a fetch, with no freshness line" 'runs_fresh'
+upstream_commit two; upstream_commit three
+before_tracking=$(tracking) before_fetch_head=$(fetch_head)
+reset; rc=$(run_in)
+check "HEAD behind the default branch is refused (exit 5) before any tool runs, naming the count, not as a tool failure" 'refused "2 commits"'
+check "the fetch leaves origin/<default> as it was, though the remote moved" '[ "$(tracking)" = "$before_tracking" ] && [ "$before_tracking" != "$("$real_git" -C "$O" rev-parse trunk)" ]'
+check "the fetch leaves FETCH_HEAD as it was" '[ "$(fetch_head)" = "$before_fetch_head" ]'
+check "the fetched private ref is deleted" '[ -z "$("$real_git" -C "$F" for-each-ref refs/mentat)" ]'
+"$real_git" -C "$F" pull -q --ff-only || exit 1
+(cd "$F" && echo local >>README && "$real_git" commit -q -am local) || exit 1
+reset; rc=$(run_in)
+check "HEAD ahead of the default branch runs as before" 'runs_fresh'
+"$real_git" -C "$F" checkout -q -b feature || exit 1
+upstream_commit four
+reset; rc=$(run_in)
+check "a feature branch missing a default-branch commit is refused (exit 5)" 'refused "1 commit"'
+"$real_git" -C "$F" remote set-url origin "$root/gone.git" || exit 1
+stale=$("$real_git" -C "$F" commit-tree -p HEAD -m stale "HEAD^{tree}") && "$real_git" -C "$F" update-ref refs/remotes/origin/trunk "$stale" || exit 1
+reset; rc=$(run_in)
+check "a failed fetch with a local origin/<default> that HEAD is behind is refused (exit 5)" 'refused "1 commit"'
+"$real_git" -C "$F" update-ref refs/remotes/origin/trunk HEAD || exit 1
+reset; rc=$(run_in)
+check "a failed fetch with a local origin/<default> HEAD has runs, saying the freshness could not be checked" '[ "$rc" = 0 ] && codex_ran && grep -q "^- The checkout.s freshness could not be checked: origin.s default branch trunk could not be fetched\.$" "$STUB/stdout"'
 
 [ "$failures" -eq 0 ]
