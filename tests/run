@@ -426,7 +426,7 @@ phrase_check skills/review/SKILL.md "each call made without the maintainer, one 
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
 # An opt-in ending offers the next agreed work (rules.md "Ending finished work"), and plan, Intake, work-tickets and review point to it.
 phrase_check rules.md "the ending finished work section" '## Ending finished work'
-phrase_check rules.md "the maintainer's choice of ending and its default" "The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says."
+phrase_check rules.md "the maintainer's choice of ending, its default and the opt-in condition" "The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says. When they choose \"offer the next work\":"
 phrase_check rules.md "never suggesting an end unless the maintainer said so" 'Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.'
 phrase_check rules.md "the offer made only by the session the maintainer is talking to, in one prompt" "Only the session the maintainer is talking to offers, in one \`AskUserQuestion\` prompt, when its own work has just finished:"
 phrase_check rules.md "the offer after a plan" "after a plan, the first build group \`mentat:plan\` step 8 gave;"
