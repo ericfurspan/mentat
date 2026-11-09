@@ -190,20 +190,22 @@ challenge_verdict_ok() {
 
 # A plan is about the repository as it stands, so Codex reads the working tree
 # in place. The result is printed, not posted: the plan may live anywhere. Codex
-# runs when the review tools setting lists it or there is none, else Claude.
+# runs when the review tools setting lists it or there is none, else Claude. Either
+# way, a checkout behind origin's default branch is not challenged (exit 5).
 challenge() {
-  local plan="${1:-}" reviewers reviewers_why
+  # shellcheck disable=SC2034 # fresh_check sets these; fresh_stop and challenge_claude read them
+  local plan="${1:-}" reviewers reviewers_why top fresh_def fresh_behind fresh_note
   [ -n "$plan" ] || die "usage: mentat challenge <plan file>" 64
   [ -f "$plan" ] || die "plan file not found: $plan" 64
   reviewers_read || die "$reviewers_why" 64
-  case " $reviewers " in "  " | *" codex "*) ;; *) challenge_claude "$plan"; return ;; esac
-  local tool
-  for tool in git codex; do
-    command -v "$tool" >/dev/null 2>&1 || not_challenged "$tool is not installed"
-  done
-
-  local top head changes dirty=no tmp
+  command -v git >/dev/null 2>&1 || not_challenged "git is not installed"
   top=$(git rev-parse --show-toplevel) || not_challenged "not inside a git repository"
+  fresh_check "$top"
+  fresh_stop "mentat challenge"
+  case " $reviewers " in "  " | *" codex "*) ;; *) challenge_claude "$plan"; return ;; esac
+  command -v codex >/dev/null 2>&1 || not_challenged "codex is not installed"
+
+  local head changes dirty=no tmp
   head=$(git -C "$top" rev-parse HEAD) || not_challenged "could not read HEAD"
   changes=$(git -C "$top" status --porcelain) || not_challenged "could not read git status"
   [ -z "$changes" ] || dirty=yes
@@ -223,6 +225,7 @@ challenge() {
   challenge_verdict_ok "$verdict" || not_challenged "Codex's reply has no final CHALLENGE VERDICT line"
   printf '## Plan challenge by local Codex, run by the agent\n\n'
   printf -- '- Plan: %s\n- Started at commit: %s (uncommitted changes: %s)\n' "$plan" "$head" "$dirty"
+  [ -z "$fresh_note" ] || printf -- '- %s\n' "$fresh_note"
   printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n- Time: %s\n' \
     "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf -- '- This is a plan challenge, not a review.\n\n---\n\n'

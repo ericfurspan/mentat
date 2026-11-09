@@ -201,6 +201,7 @@ challenge_claude() {
   challenge_verdict_ok "$verdict" || not_challenged "Claude's reply has no final CHALLENGE VERDICT line"
   printf '## Plan challenge by local Claude, run by the agent\n\n'
   printf -- '- Plan: %s\n- Started at commit: %s (uncommitted changes: %s; only the commit was read)\n' "$plan" "$head" "$dirty"
+  [ -z "${fresh_note:-}" ] || printf -- '- %s\n' "$fresh_note"
   printf -- '- Claude Code: %s\n- Time: %s\n' "$(claude --version 2>/dev/null | head -n 1)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf -- '- This is a plan challenge, not a review.\n\n---\n\n'
   cat "$out"

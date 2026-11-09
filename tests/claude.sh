@@ -3,8 +3,8 @@
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for the Claude review tool and the review tools setting, in mentat
 # weigh, consult, challenge and check, using a stub claude, a stub codex, a stub gh and
-# a local repository with no remote. Grok is never installed here. Prints PASS/FAIL per
-# case; exits 1 on any FAIL.
+# a local repository with no remote until the freshness cases at the end add one. Grok
+# is never installed here. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 src="$(cd "$(dirname "$0")/.." && pwd)"
@@ -189,5 +189,15 @@ reset; set_reviewers "claude gemini"; rc=$(run_check)
 check "check reports an unknown word in the setting as a problem" '[ "$rc" = 1 ] && grep -q "^PROBLEM: the review tools setting ~/.config/mentat/reviewers holds an unknown word (gemini)" "$STUB/stdout"'
 reset; set_reviewers claude; echo "bad;model" >"$CONF/claude-model"; rc=$(run_check)
 check "check reports a claude-model that is not a model id as a problem" '[ "$rc" = 1 ] && grep -qx "PROBLEM: the Claude model setting ~/.config/mentat/claude-model does not hold a model id" "$STUB/stdout"'
+
+# Freshness: a Claude challenge checks HEAD against origin's default branch before Claude runs.
+reset; set_reviewers claude; cp "$root/challenge_out" "$STUB/claude_out"; rc=$(run_challenge)
+check "no remote: a Claude challenge runs and says the checkout's freshness could not be checked" '[ "$rc" = 0 ] && claude_ran && grep -q "^- The checkout.s freshness could not be checked: the checkout has no origin remote\.$" "$STUB/stdout"'
+git init -q --bare -b trunk "$root/fresh origin.git" || exit 1
+git -C "$top" remote add origin "$root/fresh origin.git" && git -C "$top" push -q origin trunk || exit 1
+git clone -q "$root/fresh origin.git" "$root/fresh repo" || exit 1
+(cd "$root/fresh repo" && echo more >>README && git commit -q -am more && git push -q origin trunk) || exit 1
+reset; set_reviewers claude; cp "$root/challenge_out" "$STUB/claude_out"; rc=$(run_challenge)
+check "HEAD behind the default branch is refused (exit 5) before Claude runs, naming the count, not as a tool failure" '[ "$rc" = 5 ] && ! claude_ran && ! codex_ran && [ ! -s "$STUB/stdout" ] && ! grep -q "not challenged" "$STUB/stderr" && grep -qF "mentat: the checkout is behind origin'"'"'s default branch trunk: HEAD lacks 1 commit on it. Update the checkout and run mentat challenge again. This is not a tool failure: do not go on with Claude Code'"'"'s own view alone." "$STUB/stderr"'
 
 [ "$failures" -eq 0 ]

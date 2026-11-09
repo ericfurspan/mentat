@@ -104,4 +104,16 @@ check "no plan file is a usage error (exit 64)" '[ "$rc" = 64 ] && [ ! -f "$STUB
 reset; rc=$(run "$root/missing plan.md")
 check "missing plan file is a usage error (exit 64)" '[ "$rc" = 64 ] && [ ! -f "$STUB/args" ]'
 
+# Freshness: HEAD is checked against origin's default branch before Codex runs.
+reset; rc=$(run "$plan")
+check "no remote: the challenge runs and says the checkout's freshness could not be checked" '[ "$rc" = 0 ] && [ -f "$STUB/args" ] && grep -q "^- The checkout.s freshness could not be checked: the checkout has no origin remote\.$" "$STUB/stdout"'
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
+git init -q --bare -b trunk "$root/fresh origin.git" || exit 1
+git -C "$top" remote add origin "$root/fresh origin.git" && git -C "$top" push -q origin trunk || exit 1
+git clone -q "$root/fresh origin.git" "$root/fresh repo" || exit 1
+(cd "$root/fresh repo" && echo more >>sub/file && git commit -q -am more && git push -q origin trunk) || exit 1
+reset; (cd "$top/sub" && "$mentat" challenge "$plan" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); rc=$?
+check "HEAD behind the default branch is refused (exit 5) before Codex runs, naming the count, not as a tool failure" '[ "$rc" = 5 ] && [ ! -f "$STUB/args" ] && [ ! -s "$STUB/stdout" ] && ! grep -q "not challenged" "$STUB/stderr" && grep -qF "mentat: the checkout is behind origin'"'"'s default branch trunk: HEAD lacks 1 commit on it. Update the checkout and run mentat challenge again. This is not a tool failure: do not go on with Claude Code'"'"'s own view alone." "$STUB/stderr"'
+
 [ "$failures" -eq 0 ]

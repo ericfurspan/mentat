@@ -11,6 +11,55 @@ not_reviewed() { die "not reviewed: $1" 1; }
 not_challenged() { die "not challenged: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
+# How many commits on origin's default branch HEAD lacks, so weigh and challenge never
+# judge a stale checkout. Sets the caller's fresh_def (the default branch), fresh_behind
+# (the count, or empty when unknown) and fresh_note (why freshness could not be checked,
+# or empty). The default branch is the one the remote names, else the local origin/HEAD.
+# It is fetched into a ref of this run's own, as review --local does, so origin/<default>
+# and git's record of the last fetch stay as they are, and the ref is deleted once counted. When the fetch
+# fails or there is no origin remote, a local origin/<default> that HEAD is behind still
+# counts. Call it before setting an EXIT trap: it sets and clears its own.
+# shellcheck disable=SC2034 # fresh_note is the caller's, read by weigh and challenge
+fresh_check() { # $1 top level
+  local top=$1 ref="refs/mentat/fresh-$$" why="" n
+  fresh_def="" fresh_behind="" fresh_note=""
+  if git -C "$top" remote get-url origin >/dev/null 2>&1; then
+    fresh_def=$(GIT_TERMINAL_PROMPT=0 git -C "$top" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
+  else
+    why="the checkout has no origin remote"
+  fi
+  if [ -z "$fresh_def" ]; then
+    fresh_def=$(git -C "$top" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
+    fresh_def=${fresh_def#refs/remotes/origin/}
+  fi
+  if [ -z "$fresh_def" ]; then
+    [ -n "$why" ] || why="origin's default branch could not be found"
+    fresh_note="The checkout's freshness could not be checked: $why."
+    return 0
+  fi
+  if [ -z "$why" ]; then
+    # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
+    trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$ref") >/dev/null 2>&1" EXIT
+    if GIT_TERMINAL_PROMPT=0 git -C "$top" fetch -q --no-tags --no-write-fetch-head --refmap= origin "+refs/heads/$fresh_def:$ref" >/dev/null 2>&1; then
+      fresh_behind=$(git -C "$top" rev-list --count "HEAD..$ref" 2>/dev/null)
+    fi
+    git -C "$top" update-ref -d "$ref" >/dev/null 2>&1
+    trap - EXIT
+    [ -n "$fresh_behind" ] || why="origin's default branch $fresh_def could not be fetched"
+  fi
+  if [ -z "$fresh_behind" ]; then
+    n=$(git -C "$top" rev-list --count "HEAD..refs/remotes/origin/$fresh_def" 2>/dev/null) && [ "$n" -gt 0 ] && fresh_behind=$n
+  fi
+  [ -n "$fresh_behind" ] || fresh_note="The checkout's freshness could not be checked: $why."
+}
+# Exits 5 when fresh_check found HEAD behind; $1 is the command to run again.
+fresh_stop() {
+  local word=commits
+  [ -n "$fresh_behind" ] && [ "$fresh_behind" -gt 0 ] || return 0
+  [ "$fresh_behind" != 1 ] || word=commit
+  die "the checkout is behind origin's default branch $fresh_def: HEAD lacks $fresh_behind $word on it. Update the checkout and run $1 again. This is not a tool failure: do not go on with Claude Code's own view alone." 5
+}
+
 # The word a posted review's heading gives for its checked REVIEW RESULT line $1.
 result_word() {
   case "$1" in
