@@ -320,7 +320,7 @@ else
   fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
 fi
 phrase_check skills/plan/SKILL.md "that it never briefs a builder" 'Never brief a builder, create a branch or edit a file of the repository'
-phrase_check skills/plan/SKILL.md "the freshness check before reading code or asking" "3. Before reading code or asking the maintainer anything, compare the checkout with origin's default branch. When it lacks commits there, fast-forward it if it is a clean checkout of that branch; otherwise stop and say why. A checkout that lacks none goes on."
+phrase_check skills/plan/SKILL.md "the freshness check before reading code or asking" "3. Before reading code or asking the maintainer anything, fetch origin's default branch and compare the checkout with it; if the fetch fails, compare with the local copy and say so. When the checkout lacks commits there, fast-forward it if it is a clean checkout of that branch; otherwise stop and say why. A checkout that lacks none goes on."
 phrase_check skills/plan/SKILL.md "the fast-forward allowed despite the no-edit rule" "edit a file of the repository, beyond step 3's fast-forward;"
 phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
 phrase_check skills/plan/SKILL.md "every agreement through mentat:propose" "Every agreement to build goes through \`mentat:propose\`"
@@ -417,7 +417,7 @@ fi
 phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
-phrase_check skills/propose/SKILL.md "the freshness check before reading code or asking" "1. Before reading code or asking the maintainer anything, Claude Code compares the checkout with origin's default branch. When the checkout lacks commits there, Claude Code fast-forwards it if it is a clean checkout of that branch; otherwise it stops and says why. A checkout that lacks none goes on."
+phrase_check skills/propose/SKILL.md "the freshness check before reading code or asking" "1. Before reading code or asking the maintainer anything, Claude Code fetches origin's default branch and compares the checkout with it; if the fetch fails, it compares with the local copy and says so. When the checkout lacks commits there, Claude Code fast-forwards it if it is a clean checkout of that branch; otherwise it stops and says why. A checkout that lacks none goes on."
 phrase_check skills/propose/SKILL.md "the freshness check on a small, clear request" "Step 1's freshness check and steps 6 and 7 still apply."
 phrase_check skills/propose/SKILL.md "the propose step's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:challenge\`"
@@ -567,7 +567,7 @@ phrase_check skills/backlog/SKILL.md "the replies block and waits with GitHub is
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 phrase_check skills/challenge/SKILL.md "the challenge's replies block at hand-off" 'replies block'
-phrase_check skills/challenge/SKILL.md "exit 5 as a stale checkout to update, not a handoff" '   - 5: the checkout is behind the default branch. Do not hand off: update the checkout, revise the plan if the update changes it, and run the challenge again.'
+phrase_check skills/challenge/SKILL.md "exit 5 as a stale checkout to update, not a handoff" '   - 5: the checkout is behind the default branch. Do not hand off: fast-forward a clean checkout of the default branch, revise the plan if that changes it, and run the challenge again; otherwise stop and say why.'
 # Claude, as a review tool the setting lists, gets its own line and comment headings.
 phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <verdict> - <its main point>'
 phrase_check skills/backlog/SKILL.md "the Claude comment headings" '"Claude: weigh", "Codex: plan challenge", "Claude: plan challenge"'
