@@ -431,7 +431,7 @@ phrase_check rules.md "never suggesting an end unless the maintainer said so" 'C
 phrase_check rules.md "the offer made only by the session the maintainer is talking to, in one prompt" "Only the session the maintainer is talking to offers, in one \`AskUserQuestion\` prompt, when its own work has just finished:"
 phrase_check rules.md "the offer after a plan" "after a plan, the first build group \`mentat:plan\` step 8 gave;"
 phrase_check rules.md "the offer after a work-tickets queue, none mid-queue and no appending" 'after a work-tickets queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue;'
-phrase_check rules.md "the offer after a merged pull request" "after a merged pull request, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows);"
+phrase_check rules.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
 phrase_check rules.md "the offer after Intake, taken-on items for propose only" "after an Intake sitting that ends with no question, where an item only taken on is offered for \`mentat:propose\`, never for building."
 phrase_check rules.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
 phrase_check rules.md "the merge line first while a merge waits" '"You: merge #N." stays the first line while a merge waits.'
