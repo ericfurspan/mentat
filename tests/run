@@ -320,6 +320,8 @@ else
   fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
 fi
 phrase_check skills/plan/SKILL.md "that it never briefs a builder" 'Never brief a builder, create a branch or edit a file of the repository'
+phrase_check skills/plan/SKILL.md "the freshness check before reading code or asking" "3. Before reading code or asking the maintainer anything, check that the checkout is not behind origin's default branch: when it is, fast-forward a clean checked-out default branch, otherwise stop and say why."
+phrase_check skills/plan/SKILL.md "the fast-forward allowed despite the no-edit rule" "edit a file of the repository, beyond step 3's fast-forward;"
 phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
 phrase_check skills/plan/SKILL.md "every agreement through mentat:propose" "Every agreement to build goes through \`mentat:propose\`"
 phrase_check skills/plan/SKILL.md "a read that refines no item and clears no wait" 'This read changes no item it does not record an answer on: it refines no hand-made item, clears no wait'
@@ -415,6 +417,7 @@ fi
 phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
+phrase_check skills/propose/SKILL.md "the freshness check before reading code or asking" "1. Before reading code or asking the maintainer anything, Claude Code checks that the checkout is not behind origin's default branch: when it is, it fast-forwards a clean checked-out default branch, otherwise it stops and says why."
 phrase_check skills/propose/SKILL.md "the propose step's planning with overlapping items" 'overlapping items and the plan around them'
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no weigh" "no backlog read, grill, decisions, \`mentat weigh\` or \`mentat:challenge\`"
 phrase_check skills/propose/SKILL.md "a small, clear request's hand check offer" 'When the change has something to try, the one-line view also offers the hand check of step 5.'
