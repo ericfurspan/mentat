@@ -216,6 +216,12 @@ phrase_check skills/grill/SKILL.md "the Stop here option on every prompt" 'Every
 phrase_check skills/propose/SKILL.md "the grill offer at most once per request" 'at most once per request, and starts it only if the maintainer agrees'
 # A grill's record goes in the weigh's file.
 phrase_check skills/propose/SKILL.md "the grill's record in the weigh's file" "answers (with any grill's record, as \`mentat:grill\` defines it)"
+# A settlement that changes the idea gets another weigh round, up to three, before the one agreement question.
+phrase_check skills/propose/SKILL.md "another weigh round only for an adopted change to the idea" "It runs another round only when the last round's settlement adopts a change to the idea's requirements, scope or approach; a wording-only change does not count."
+phrase_check skills/propose/SKILL.md "when the weigh rounds stop" 'The rounds stop when a settlement adopts no such change, or after three rounds in all.'
+phrase_check skills/propose/SKILL.md "a later round's file with the whole revised idea and no earlier replies" "Each later round's file holds the whole revised idea, with its answers and deferred choices, and no earlier replies or summary of them."
+phrase_check skills/propose/SKILL.md "one agreement question after the last round" 'It asks the maintainer to agree once, after the last round,'
+phrase_check skills/propose/SKILL.md "the agreement question's note of an unweighed last change" 'says when the last adopted change was not weighed'
 # A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
 phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
 phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
@@ -555,6 +561,8 @@ phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for a
 
 # After a weigh or a plan challenge, the maintainer sees each tool's reply and what Claude Code did with it in one block.
 phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
+phrase_check skills/backlog/SKILL.md "the round in each weigh comment heading" "With more than one weigh round (\`mentat:propose\` step 4), each weigh heading also names its round (\"Codex: weigh, round 2\")."
+phrase_check skills/backlog/SKILL.md "each round's replies block, only the last opening the agreement question" "each round's block is shown, with a first line \`Round <n>\` as its one addition, and only the last round's block opens the agreement question."
 phrase_check skills/backlog/SKILL.md "the replies block's Adopting line" 'Adopting: <'
 phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'Not adopting: <'
 phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "\`not weighed\` or \`not challenged\` and why"
