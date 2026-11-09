@@ -17,7 +17,8 @@ else
 fi
 
 # CHANGELOG.md is refreshed on request, so parallel pull requests do not each edit it.
-if grep -qF 'refreshed only when the maintainer asks' AGENTS.md &&
+# shellcheck disable=SC2016 # the backticks are literal text in AGENTS.md
+if grep -qxF -- '- `CHANGELOG.md` is refreshed only when the maintainer asks: one pull request adds dated lines, newest date first, written from the titles of the pull requests merged since its last entry.' AGENTS.md &&
   ! grep -qE '[Ee]very pull request.*CHANGELOG' AGENTS.md; then
   pass "AGENTS.md holds the changelog refresh rule and no per-pull-request changelog rule"
 else
