@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat weigh or mentat challenge, to show the replies (and, with an external backlog, post them)."
+description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat second-opinion, to show the replies (and, with an external backlog, post them)."
 user-invocable: false
 ---
 
@@ -13,7 +13,7 @@ Item shape. Keep an item's description short, so items look alike. It holds only
 - The opening sentence: one plain sentence, not a heading, of at most about 25 words. It says what the item is (such as a bug, a proposal, a follow-up or a question) and, from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat, written by the maintainer, found by an agent while building, a subtask of another request, or proposed by an agent and agreed. It does not restate status or waits, which the tracker's fields show, so a change of status does not rewrite it. It names only four things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), during a merge wait, that it waits on the merge of #N (step 4), and anything the tracker's adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.
 - The wait block (step 4), only while steps wait on the maintainer. It is the first heading of the description, in the shape "Waits on the maintainer" gives. Remove it when the wait ends.
 - The "Spec" section (step 6), absent until agreement: intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written. It runs from its `## Spec` heading to the next heading of the same level or higher (such as `## Current plan`); subheadings inside it belong to it. Its body, without the heading line, is the request that is exported and fingerprinted. Its text stays byte for byte as agreed, since reviews fingerprint it. Reshaping an item never rewords, retitles or re-spaces it; only a change of scope updates it, as step 6 says. An item agreed before the spec had that name keeps its `## Agreed request` heading and body as they are; every place that reads the section accepts either heading.
-- The current plan, optional, under its own heading `## Current plan`: a short plan or the next step in at most five lines, replaced in place. A longer plan, such as one for `mentat:challenge`, goes in a comment, and the section keeps the next step.
+- The current plan, optional, under its own heading `## Current plan`: a short plan or the next step in at most five lines, replaced in place. A longer plan goes in a comment, and the section keeps the next step.
 
 Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description. A refined hand-made item also keeps the original's links in the description, under the opening sentence, as `linear.md` says.
 

@@ -49,22 +49,20 @@ Where pull requests need approval, give the agent its own GitHub account.
 
 Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
 
-- `/mentat:agenda [project ... | all]`: what waits on you and what to do next.
+- `/mentat:status [project ... | all]`: what waits on you, what is next and your unanswered asks.
 - `/mentat:triage [project ... | all] | brainstorm <text or link>`: go through the Inbox with you.
 - `/mentat:plan [item id]`: plan with you and start building what you commit.
-- `/mentat:work-tickets [item id ...]`: build committed items, one pull request each.
-- `/mentat:zoom-out`: summarize the goal, progress and next step.
+- `/mentat:build [item id ...]`: build committed items, one pull request each.
 - `/mentat:retro`: propose improvements from a session.
 - `/mentat:setup [first-run]`: show and change settings; start with `first-run`.
 - `/mentat:linear [project name] [team name]`: move planning from GitHub issues to Linear.
-- `/mentat:consult [--web] <question or idea>`: ask Codex, Grok and Claude Code one question.
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
 [`rules.md`](rules.md) has the full workflow.
 
 ## Review tools
 
-The design review (weigh) and consult run Codex and Grok; challenge runs Codex. A `~/.config/mentat/reviewers` list (`claude`, `codex`, `grok`) replaces those; challenge then runs Claude unless `codex` is listed. Claude gets read-only file tools in weigh and challenge, web search only in consult, and the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
+`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. A `~/.config/mentat/reviewers` list (`claude`, `codex`, `grok`) replaces them. Claude gets read-only file tools on an idea, web search only with `--web`, and the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
 
 ## Credits
 
