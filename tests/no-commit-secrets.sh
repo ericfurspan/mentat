@@ -285,6 +285,12 @@ reset; hit "$repo/new.txt"; run "$repo" 'git add "$f" && git commit -m x'
 check "an add word that cannot be read asks as a failed simulation" 'sim_failed'
 reset; hit "$repo/new.txt"; run "$repo" 'git add nothere.txt && git commit -m x'
 check "an add that git rejects asks as a failed simulation" 'sim_failed'
+reset; hit "$repo/new.txt"; run "$repo" 'cd missing; git add -A && git commit -m x'
+check "a staging command whose folder has no repository asks as a failed simulation" 'sim_failed'
+reset; stage_hit; run "$repo" 'cd missing && git commit -m x'
+check "a commit with nothing staged in the command whose folder is missing stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
+reset; run "$base" 'git commit -m x'
+check "a commit with nothing staged in the command outside a repository stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
 for c in 'git commit -m x -- "$file"' 'git commit -m x "$file"' 'git commit -m x "$flag"' 'git commit -n"$x" -m x'; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c asks as a failed simulation" 'sim_failed'
