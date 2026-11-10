@@ -234,8 +234,21 @@ phrase_check rules.md "a yes files a lesson for Intake, naming what it would cha
 phrase_check rules.md "the lesson's yes agrees nothing else and is asked alone" 'it agrees nothing else and is never combined with another question, such as the next-work offer.'
 phrase_check rules.md "a lesson filed only on a yes, unlike other unasked follow-ups" 'Unlike other unasked follow-ups, a lesson is filed only on that yes.'
 
-# An Intake sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
+# A triage sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
 # after a compaction, and sends nothing it collects to Codex or Grok.
+for s in 'name: triage' 'disable-model-invocation: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/triage/SKILL.md; then
+    pass "skills/triage/SKILL.md's frontmatter sets $s"
+  else
+    fail "skills/triage/SKILL.md's frontmatter must set $s"
+  fi
+done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' skills/triage/SKILL.md; then
+  pass "skills/triage/SKILL.md's description lists its arguments"
+else
+  fail "skills/triage/SKILL.md's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
+fi
+# The old command stays as a thin alias that runs triage during the rollout.
 for s in 'name: intake' 'disable-model-invocation: true'; do
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/intake/SKILL.md; then
     pass "skills/intake/SKILL.md's frontmatter sets $s"
@@ -243,40 +256,48 @@ for s in 'name: intake' 'disable-model-invocation: true'; do
     fail "skills/intake/SKILL.md's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' skills/intake/SKILL.md; then
-  pass "skills/intake/SKILL.md's description lists its arguments"
-else
-  fail "skills/intake/SKILL.md's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
-fi
-phrase_check skills/intake/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
-phrase_check skills/intake/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
-phrase_check skills/intake/SKILL.md "nothing collected sent to Codex or Grok" "Nothing a sitting collects goes to Codex or Grok, and no \`mentat weigh\`, \`mentat challenge\` or \`mentat consult\` runs inside a sitting."
-phrase_check skills/intake/SKILL.md "that taking an idea on is not agreement to build" "Taking an idea on is not agreement to build: that stays with \`mentat:propose\`"
-phrase_check skills/intake/SKILL.md "that only the maintainer's answer ends an idea" "Only the maintainer's answer in the sitting ends an idea."
+phrase_check skills/intake/SKILL.md "the alias's pointer to triage" "This command is now \`/mentat:triage\`. Read \`../triage/SKILL.md\` and follow it with the same arguments."
+phrase_check skills/triage/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
+phrase_check skills/triage/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
+phrase_check skills/triage/SKILL.md "nothing collected sent to Codex or Grok" "Nothing a sitting collects goes to Codex or Grok, and no \`mentat weigh\`, \`mentat challenge\` or \`mentat consult\` runs inside a sitting."
+phrase_check skills/triage/SKILL.md "that accepting an item is not a commitment to build" "Accepting an item is not a commitment to build: that stays with \`mentat:propose\`, after its design review, whose yes commits the item to Todo."
+phrase_check skills/triage/SKILL.md "that only the maintainer's answer ends an item" "Only the maintainer's answer in the sitting ends an item."
 # With many questions, a sitting offers a smaller set first; the rest stays for a later sitting.
-phrase_check skills/intake/SKILL.md "the smaller set offered above 10 questions" 'With more than 10, the first prompt offers a smaller set, saying how many questions each holds'
-phrase_check skills/intake/SKILL.md "all questions asked at 10 or fewer" 'With 10 or fewer, say how many there are and ask them all.'
-phrase_check skills/intake/SKILL.md "questions outside the chosen set left for a later sitting" 'Questions outside the chosen set stay as they are, undecided, for a later sitting'
-phrase_check skills/intake/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
-phrase_check skills/intake/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
-phrase_check skills/intake/SKILL.md "brainstorm mode asking all its picked ideas, up to the maintainer's cap" "then settle just those, from step 3 on, asking them all with no smaller set, up to the cap the maintainer's instructions set where they set one; the rest stay undecided for a later sitting."
-# A sitting keeps each item's questions together, a reader's question about an idea just before it, still asks each
-# idea's ending, and leaves a big decision, and those that depend on it, to the item's own planning session, recorded
-# as its next step and reported; only a taken-on item without one is offered for mentat:propose.
-phrase_check skills/intake/SKILL.md "each item's questions asked together" "Ask each item's questions together, never interleaved with another item's."
-phrase_check skills/intake/SKILL.md "a reader's question about an idea asked just before it, others first" "Readers' questions about no idea the sitting asks come first, then ideas by project, then ideas with no project, each oldest first by the idea's own date where the maintainer's instructions give one; a reader's question about an idea the sitting asks comes just before that idea's question."
-phrase_check skills/intake/SKILL.md "a big decision not asked in a sitting" "A decision that sets direction past its own item, or needs analysis or discussion that would dominate the sitting, is not asked; opening further decisions is not by itself the test."
-phrase_check skills/intake/SKILL.md "a big decision's dependents left open and independent questions asked" "It and any decision that depends on it stay open for its own planning session, independent questions go on, and the report names \`/mentat:plan <id>\` for it."
-phrase_check skills/intake/SKILL.md "each idea's ending still asked" "Each idea's ending is still asked; such a decision inside an idea taken on goes to that planning session."
-phrase_check skills/intake/SKILL.md "the next step recorded in the current plan" "An item with a decision step 4 sends to its own planning session gets that next step, \`/mentat:plan <id>\`, in its \`## Current plan\` section."
-phrase_check skills/intake/SKILL.md "the report's line naming /mentat:plan for a big decision" "one line per decision step 4 sent to its own planning session, naming \`/mentat:plan <id>\`; one line per consequential call"
-phrase_check skills/intake/SKILL.md "mentat:propose offered only for a taken-on item with no big decision" "A taken-on item has no decision step 4 sent to its own planning session, whether or not questions are left: one \`AskUserQuestion\` asks which such item to plan first with \`mentat:propose\`"
-phrase_check skills/intake/SKILL.md "an item with a big decision kept to its /mentat:plan step" "An item with such a decision is not offered; its next step stays \`/mentat:plan <id>\`."
-# An idea that lands in the same change as an existing item is recommended as a Merge. Scope merged into an agreed item
-# is taken on, not agreed, and is weighed and agreed through mentat:propose when the item is next planned; scope still
-# not agreed when the item ends becomes its own taken-on item.
-phrase_check skills/intake/SKILL.md "Merge recommended for an idea in the same change" 'When an idea would land in the same change as an existing item or idea, agreed or not, recommend Merge into it; recommend Take on only when the idea can ship on its own.'
-phrase_check skills/intake/SKILL.md "scope merged into an agreed item taken on, agreed when next planned" "That scope is taken on, not agreed: \`mentat:propose\` asks for its agreement when the item is next planned, after its weigh."
+phrase_check skills/triage/SKILL.md "the smaller set offered above 10 questions" 'With more than 10, the first prompt offers a smaller set, saying how many questions each holds'
+phrase_check skills/triage/SKILL.md "all questions asked at 10 or fewer" 'With 10 or fewer, say how many there are and ask them all.'
+phrase_check skills/triage/SKILL.md "questions outside the chosen set left in the Inbox for a later sitting" 'Questions outside the chosen set stay as they are, in the Inbox, for a later sitting'
+phrase_check skills/triage/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
+phrase_check skills/triage/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
+phrase_check skills/triage/SKILL.md "brainstorm mode asking all its picked ideas" "then settle just those, from step 3 on, asking them all with no smaller set."
+# Each Inbox item gets one of four outcomes, recorded as the outcome says; Stop ends the asking and is not Later.
+phrase_check skills/triage/SKILL.md "the four options on an item's prompt, Stop last" 'An item'"'"'s prompt shows four options: the recommended outcome, two other outcomes, and "Stop" last.'
+phrase_check skills/triage/SKILL.md "the outcome not shown named in the question" 'Its question names the outcome not shown, and an Other answer naming one chooses it.'
+phrase_check skills/triage/SKILL.md "Stop as a session control distinct from Later" '"Stop" at any question ends the asking; what was not asked stays in the Inbox as it is. Stop is a session control, not the Later outcome: it records nothing on an item.'
+phrase_check skills/triage/SKILL.md "the Accept outcome" '   - Accept: to Backlog, an item accepted but not committed.'
+phrase_check skills/triage/SKILL.md "the Close outcome" '   - Close, with a reason.'
+phrase_check skills/triage/SKILL.md "the Merge outcome" '   - Merge into a named existing item.'
+phrase_check skills/triage/SKILL.md "the Later outcome" '   - Later: it stays in the Inbox, asked again only once a fact behind it changes or the maintainer raises it.'
+phrase_check skills/triage/SKILL.md "Accept recorded through the item shape, never the tracker's own triage actions" "   - Accept: Claude Code writes the item shape through \`mentat:backlog\`, moves it to Backlog and reads it back, never through the tracker's own triage actions."
+phrase_check skills/triage/SKILL.md "Close recorded as an opening outcome line and canceled" "   - Close: one update adds the first description line \`Closed <date>: <the maintainer's reason in their terms>.\` and ends the item as canceled. A retry adds no line the description already opens with."
+phrase_check skills/triage/SKILL.md "Merge recorded as a duplicate with a comment on the target" '   - Merge: mark it a duplicate of the named item, and comment on that item, citing the answer and naming the item merged.'
+phrase_check skills/triage/SKILL.md "Later recorded as a dated note" '   - Later: a dated note citing the answer, as a comment or on its inbox line.'
+phrase_check skills/triage/SKILL.md "the search reading the Close outcome lines" "and earlier decisions recorded for the project, such as the \`Closed <date>:\` lines step 5 writes."
+# A sitting keeps each item's questions together, a reader's question about an item just before it, still asks each
+# item's outcome, and leaves a big decision, and those that depend on it, to the item's own planning session, recorded
+# as its next step and reported; only an accepted item without one is offered for mentat:propose.
+phrase_check skills/triage/SKILL.md "each item's questions asked together" "Ask each item's questions together, never interleaved with another item's."
+phrase_check skills/triage/SKILL.md "a reader's question about an item asked just before it, others first" "Readers' questions about no item the sitting asks come first, then items by project, then items with no project, each oldest first by the item's own date where the maintainer's instructions give one; a reader's question about an item the sitting asks comes just before that item's question."
+phrase_check skills/triage/SKILL.md "a big decision not asked in a sitting" "A decision that sets direction past its own item, or needs analysis or discussion that would dominate the sitting, is not asked; opening further decisions is not by itself the test."
+phrase_check skills/triage/SKILL.md "a big decision's dependents left open and independent questions asked" "It and any decision that depends on it stay open for its own planning session, independent questions go on, and the report names \`/mentat:plan <id>\` for it."
+phrase_check skills/triage/SKILL.md "each item's outcome still asked" "Each item's outcome is still asked; such a decision inside an accepted item goes to that planning session."
+phrase_check skills/triage/SKILL.md "the next step recorded in the current plan" "An item with a decision step 4 sends to its own planning session gets that next step, \`/mentat:plan <id>\`, in its \`## Current plan\` section."
+phrase_check skills/triage/SKILL.md "the report's line naming /mentat:plan for a big decision" "one line per decision step 4 sent to its own planning session, naming \`/mentat:plan <id>\`; one line per consequential call"
+phrase_check skills/triage/SKILL.md "mentat:propose offered only for an accepted item with no big decision" "An accepted item has no decision step 4 sent to its own planning session, whether or not questions are left: one \`AskUserQuestion\` asks which such item to plan first with \`mentat:propose\`"
+phrase_check skills/triage/SKILL.md "an item with a big decision kept to its /mentat:plan step" "An item with such a decision is not offered; its next step stays \`/mentat:plan <id>\`."
+# An item that lands in the same change as an existing item is recommended as a Merge. Scope merged into a Todo item
+# is not committed: it is agreed through mentat:propose, after its design review, when the item is next planned.
+phrase_check skills/triage/SKILL.md "Merge recommended for an item in the same change" 'When an item would land in the same change as an existing item, in any stage, recommend Merge into it; recommend Accept only when the item can ship on its own.'
+phrase_check skills/triage/SKILL.md "scope merged into a Todo item not committed, agreed when next planned" "Merged into a Todo item, that scope is not committed: it joins the spec only once agreed through \`mentat:propose\`, which asks for it, after its design review, when the item is next planned."
 phrase_check skills/backlog/SKILL.md "scope merged into a Todo item not committed, kept out of its spec until agreed" "Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the section only once agreed through \`mentat:propose\`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, linking the item."
 phrase_check skills/backlog/github.md "scope still not agreed filed as its own issue when a GitHub issue closes" '- When an issue closes with scope triage merged into it still not agreed, file that scope as its own issue, in Backlog, linking the closed one.'
 phrase_check skills/backlog/SKILL.md "an item's title rewritten when its scope changes, with either tracker" "With either tracker, when an item's or issue's agreed spec, or a not-agreed item's current plan, changes so the title no longer says what the item does, the same write rewrites the item's title, keeping its identifier. Scope triage merged in but not yet agreed does not change the title until \`mentat:propose\` agrees it."
@@ -457,7 +478,7 @@ phrase_check rules.md "a forwarded yes replacing step 5's build yes" "A yes, for
 phrase_check rules.md "the build session's checks kept and a differing queue asked again" 'The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again when its queue differs from the one offered.'
 phrase_check rules.md "step 5 asking as it says without a forwarded yes" 'With no forwarded yes, step 5 asks as it says.'
 phrase_check skills/plan/SKILL.md "the pointer to the ending" "Then end as \`rules.md\` \"Ending finished work\" says."
-phrase_check skills/intake/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
+phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
 phrase_check skills/work-tickets/SKILL.md "a forwarded yes replacing step 5's last prompt" "A yes forwarded as \`rules.md\` \"Ending finished work\" says replaces this last prompt."
 phrase_check skills/work-tickets/SKILL.md "the final message's pointer to the ending" "and each decision made without the maintainer. Then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/review/SKILL.md "the post-merge pointer to the ending" "and report in one line, then end as \`rules.md\` \"Ending finished work\" says."
@@ -544,29 +565,25 @@ phrase_check skills/backlog/github.md "a GitHub issue's opening sentence on wher
 # At agreement the spec's fingerprint is recorded on the item, from the tracker's read-back.
 phrase_check skills/backlog/SKILL.md "the fingerprint comment from the read-back body" "Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as \`mentat:review\` \"Spec\" computes it (the same span, the same command), never from the text written, and post one comment on the item: \`Spec fingerprint: <12 hex>\`, citing the agreement."
 phrase_check skills/backlog/SKILL.md "the latest fingerprint comment as the record" 'Do it again whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint.'
-# An inbox kept as issues is read by Intake, and a left idea's dated note goes on its issue, so the next sitting skips it.
-phrase_check skills/intake/SKILL.md "an inbox's ideas read as lines or issues" "its inbox ideas where the maintainer's instructions name an inbox (lines or issues, as they say), else"
-phrase_check skills/intake/SKILL.md "a left-open note read from an inbox issue's comments" 'Leave out an idea with a dated left-open note, on its inbox line or in a comment on its item or inbox issue,'
-phrase_check skills/intake/SKILL.md "a left inbox idea's note on its line or issue" 'An inbox idea left gets the dated note on its line, or as a comment on its issue when the inbox is kept as issues.'
-# Intake reads ideas kept in no project and every page, applies the maintainer's cap before counting, and orders ideas by their own date.
-phrase_check skills/intake/SKILL.md "inbox ideas in no project read in a sitting covering every project" "A sitting covering every current project also reads the inbox ideas the maintainer's instructions keep in no project."
-phrase_check skills/intake/SKILL.md "every page of a list read" 'Read every page of a list.'
-phrase_check skills/intake/SKILL.md "the maintainer's cap applied before counting" "4. Ask. Where the maintainer's instructions cap how many undecided ideas a sitting asks, apply that cap first, oldest first, and leave the rest undecided for a later sitting. Then count the questions."
-phrase_check skills/intake/SKILL.md "ideas with no project after the projects', oldest first by their own date" "then ideas by project, then ideas with no project, each oldest first by the idea's own date where the maintainer's instructions give one;"
+# Triage reads the Inbox as the tracker's adapter maps it, plus further inboxes, and skips an item with a Later note.
+phrase_check skills/triage/SKILL.md "the Inbox read through the tracker's adapter, plus further inboxes" "its Inbox items (\`mentat:backlog\` step 2, as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say)."
+phrase_check skills/triage/SKILL.md "an item with a Later note left out until a fact changes" 'Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.'
+# Triage reads ideas kept in no project and every page, and orders items by their own date.
+phrase_check skills/triage/SKILL.md "inbox ideas in no project read in a sitting covering every project" "A sitting covering every current project also reads the inbox ideas the maintainer's instructions keep in no project."
+phrase_check skills/triage/SKILL.md "every page of a list read" 'Read every page of a list.'
+phrase_check skills/triage/SKILL.md "the questions counted first" '4. Ask. Count the questions.'
+phrase_check skills/triage/SKILL.md "items with no project after the projects', oldest first by their own date" "then items by project, then items with no project, each oldest first by the item's own date where the maintainer's instructions give one;"
 phrase_check skills/linear/SKILL.md "the migration's undecided idea in the Inbox" "An undecided idea goes in the Inbox, the Triage status (\`../backlog/linear.md\` step 2), with no type label or item shape, and step 7's comment lists it as \"Inbox\" beside its id."
-phrase_check skills/intake/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
-phrase_check skills/intake/SKILL.md "the four options on an idea's prompt" 'An idea'"'"'s prompt shows four options: the recommended ending, Leave (or one other ending when Leave is recommended), one other likely ending, and "Later" last.'
-phrase_check skills/intake/SKILL.md "every ending not shown named in the question" 'Its question names every ending not shown, and an Other answer naming one chooses it.'
-phrase_check skills/intake/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project and is neither a project name nor a reader option."
+phrase_check skills/triage/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
+phrase_check skills/triage/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project and is neither a project name nor a reader option."
 # A sitting with neither project names nor `all` asks once which projects' ideas it settles, as a session control, unless no project list is named.
-phrase_check skills/intake/SKILL.md "the opening question on a run with neither project names nor all" "With neither project names nor \`all\`, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then \`all\`, another through Other."
-phrase_check skills/intake/SKILL.md "the opening question as a session control, not asked again" 'It is a session control, not a decision: it has no "N of M" and is not asked again after a compaction.'
-phrase_check skills/intake/SKILL.md "the opening question's answer not a limit on what readers file" 'The answer names the projects whose ideas the sitting settles, not a limit on what readers file (step 1).'
-phrase_check skills/intake/SKILL.md "readers run as with all after the opening question" "With projects chosen at the opening question, every reader runs as with \`all\`, and the sitting asks only about those projects' ideas and the readers' hand-offs for them."
-phrase_check skills/intake/SKILL.md "no opening question where no project list is named" "Where the maintainer's own instructions name no project list, ask nothing: the sitting covers the session's repository."
-phrase_check skills/intake/SKILL.md "brainstorm mode's own project question" 'Brainstorm mode keeps its own project question.'
-phrase_check skills/intake/SKILL.md "each answer recorded so the idea is not found again" 'so step 2 does not find the idea again'
-phrase_check skills/intake/SKILL.md "a dropped Backlog item canceled with its reason" 'Drop: mark it canceled, with the reason in a comment.'
+phrase_check skills/triage/SKILL.md "the opening question on a run with neither project names nor all" "With neither project names nor \`all\`, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then \`all\`, another through Other."
+phrase_check skills/triage/SKILL.md "the opening question as a session control, not asked again" 'It is a session control, not a decision: it has no "N of M" and is not asked again after a compaction.'
+phrase_check skills/triage/SKILL.md "the opening question's answer not a limit on what readers file" 'The answer names the projects whose ideas the sitting settles, not a limit on what readers file (step 1).'
+phrase_check skills/triage/SKILL.md "readers run as with all after the opening question" "With projects chosen at the opening question, every reader runs as with \`all\`, and the sitting asks only about those projects' items and the readers' hand-offs for them."
+phrase_check skills/triage/SKILL.md "no opening question where no project list is named" "Where the maintainer's own instructions name no project list, ask nothing: the sitting covers the session's repository."
+phrase_check skills/triage/SKILL.md "brainstorm mode's own project question" 'Brainstorm mode keeps its own project question.'
+phrase_check skills/triage/SKILL.md "each answer recorded so the item is not found again" 'so step 2 does not find the item again'
 phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
