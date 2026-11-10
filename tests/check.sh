@@ -186,6 +186,10 @@ reset; printf 'stubother\nstubkept\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; p
 check "blank and # list lines cover nothing" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
 reset; echo stubother >"$STUB/repos"; cp "$LIST" "$LIST.keep"; : >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
 check "an empty list misses every repository" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
+reset; printf 'stubword\nSTUBWORD\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo exact:stubword >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a marked list line covers its repository, ignoring case" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && no_name'
+reset; printf 'stubother\nexact\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; printf 'exact:\n' >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a list line that is only exact: covers nothing" '[ "$rc" = 0 ] && grep -q "^WARN: 2 private repository name(s)" "$STUB/out" && no_name'
 
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "signed out, the comparison does not run" '[ "$rc" = 1 ] && ! grep -q "user/repos" "$STUB/calls"'
@@ -195,6 +199,10 @@ reset; printf 'stubword\nSTUBWORD\nstubmissing-one\n' >"$STUB/repos"; rc=$(run)
 warn_command=$(sed -n 's/^WARN: .* private word list; to list them, run: //p' "$STUB/out")
 warn_out=$(bash -c "$warn_command" 2>&1)
 check "the warning's command lists only the missing names" '[ -n "$warn_command" ] && [ "$warn_out" = stubmissing-one ]'
+reset; printf 'stubword\nstubmissing-one\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo exact:stubword >"$LIST"; rc=$(run)
+warn_command=$(sed -n 's/^WARN: .* private word list; to list them, run: //p' "$STUB/out")
+warn_out=$(bash -c "$warn_command" 2>&1); mv "$LIST.keep" "$LIST"
+check "the warning's command, with a marked line, lists only the missing names" '[ -n "$warn_command" ] && [ "$warn_out" = stubmissing-one ]'
 
 # The Mentat plugin's copies, from the stub claude. Every entry names a path and a project,
 # and none may be printed.
