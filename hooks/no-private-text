@@ -90,18 +90,21 @@ unquote() {
 }
 
 # Assignments outside a gh command, in order: a_name, a_val, a_word (as written),
-# a_plain (no $ or backtick in the value), a_alone (the command only assigns, or is
+# a_plain (no $ or backtick in the value), a_block (a $( or backtick, so the walk
+# cannot tell where the assignment ends), a_alone (the command only assigns, or is
 # export) and a_temp (the value is a temp path).
-a_name=() a_val=() a_word=() a_plain=() a_alone=() a_temp=()
+a_name=() a_val=() a_word=() a_plain=() a_block=() a_alone=() a_temp=()
 # lookup <name>: sets $val, the value $name has here: the latest plain value assigned
-# alone, else TMPDIR or HOME from the environment. A value it cannot know returns 1.
+# alone, else TMPDIR or HOME from the environment. An assignment in front of another
+# command lasts only for it. A value it cannot know returns 1.
 lookup() {
   local k=${#a_name[@]}
   while [ "$k" -gt 0 ]; do
     k=$((k - 1))
     [ "${a_name[k]}" = "$1" ] || continue
-    [ -n "${a_plain[k]}" ] || return 1
+    [ -z "${a_block[k]}" ] || return 1
     [ -n "${a_alone[k]}" ] || continue
+    [ -n "${a_plain[k]}" ] || return 1
     val=${a_val[k]}
     return 0
   done
@@ -200,6 +203,7 @@ assign() {
   unquote "${1#*=}"
   a_name[k]=${1%%=*} a_val[k]=$v a_word[k]=$1 a_alone[k]="" a_temp[k]=""
   case "$v" in *'$'* | *'`'*) a_plain[k]="" ;; *) a_plain[k]=1 ;; esac
+  case "$v" in *'$('* | *'`'*) a_block[k]=1 ;; *) a_block[k]="" ;; esac
   if [ -z "$subst" ] && is_temp "$v"; then
     a_temp[k]=1
     kept+=$held${m%"$1"}$mark$k$mark; held=""
@@ -259,7 +263,11 @@ outside() {
     '>'* | [0-9]'>'*) p=${w#[0-9]}; p=${p#>}; p=${p#>}; locate "$w" "$p"; return ;;
   esac
   if [ -z "$o_cmd" ] || [ "$o_cmd" = export ]; then
-    if [[ $w =~ $assign_re ]]; then assign "$w"; return; fi
+    # A ( or { opening a group comes before the command's first word.
+    p=$w
+    while :; do case "$p" in "("* | "{"*) p=${p#?} ;; *) break ;; esac; done
+    [ -n "$p" ] || { keep; return; }
+    if [[ $p =~ $assign_re ]]; then assign "$p"; return; fi
     [ -n "$o_cmd" ] || { o_cmd=$w; keep; return; }
   fi
   case "$o_cmd" in sed | */sed | gsed) sed_word "$w"; return ;; esac

@@ -470,6 +470,11 @@ S=$TMPDIR/plain; gh api repos/o/r/issues/1/comments -F body=@\$S/word.md
 S=$TMPDIR/plain; gh api repos/o/r/issues/1/comments --field=body=@\$S/word.md
 S=$TMPDIR/plain; (gh pr edit 1 --body-file \$S/word.md)
 S=$tdir; S=$TMPDIR/plain; gh pr edit 1 --body-file \$S/word.md
+(S=$TMPDIR/plain; gh pr edit 1 --body-file "\$S/word.md")
+{ S=$TMPDIR/plain; gh pr edit 1 --body-file "\$S/word.md"; }
+( S=$TMPDIR/plain; gh pr edit 1 --body-file "\$S/word.md")
+S=$TMPDIR/plain; S="\$OTHER" true; gh pr edit 1 --body-file "\$S/word.md"
+S=$TMPDIR/plain; S=\$OTHER true; gh pr edit 1 --body-file \$S/word.md
 gh pr edit 1 --body-file "\$TMPDIR/word.md"
 gh pr edit 1 --body-file "\${TMPDIR}/word.md"
 gh pr edit 1 --body-file \$HOME/word.md
