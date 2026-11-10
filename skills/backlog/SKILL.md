@@ -65,6 +65,7 @@ Not adopting: <what> (<why>)
 - One line per tool that ran or was due. With no review tools setting (`mentat:setup`), Codex, and a Grok line only where `grok` is installed; with one, each listed tool. A tool with no answer gets `no second opinion` and why, in public-safe words, never a log path.
 - Plain words, about 25 a line. Leave out an empty line; add nothing else.
 - When a decision prompt follows, the block opens its question, which then says why the first option is recommended; otherwise it goes in the message.
+- Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included.
 - With more than one second opinion round (`mentat:propose` step 4), each round's block is shown, with a first line `Round <n>` as its one addition, and only the last round's block opens the agreement question.
 
 ## Tracker: Linear
