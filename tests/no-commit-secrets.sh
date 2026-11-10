@@ -138,6 +138,18 @@ for c in 'git commit -am "msg"' 'git commit -a -m x' 'git commit --all -m x'; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c scans a changed tracked file" 'names clean.txt'
 done
+for c in 'HUSKY=0 git commit -am x' 'if true; then git commit -am x; fi' 'command git commit -a -m x' 'env A=1 B="$b" git commit -am x' '! git commit -am x'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c scans a changed tracked file" 'names clean.txt'
+done
+reset; hit "$repo/new.txt"; run "$repo" 'HUSKY=0 git add -A && HUSKY=0 git commit -m x'
+check "an assignment before git add still counts the add" 'names new.txt'
+for c in 'GIT_INDEX_FILE=other git add -A && git commit -m x' 'GIT_DIR=other git commit -am x'; do
+  reset; hit "$repo/new.txt"; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c asks as a failed simulation" 'sim_failed'
+done
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'echo git commit -a -m x'
+check "echo git commit -a is not read as a commit that stages" 'quiet && [ ! -f "$STUB/calls" ]'
 reset; fine "$repo/clean.txt"; hit "$repo/new.txt"; run "$repo" 'git commit -a -m x'
 check "git commit -a leaves an untracked file out" 'scanned && has clean.txt && ! has new.txt'
 
