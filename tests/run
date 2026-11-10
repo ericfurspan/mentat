@@ -703,7 +703,11 @@ phrase_check skills/backlog/SKILL.md "the replies block's Adopting line" 'Adopti
 phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'Not adopting: <'
 phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "\`not weighed\` or \`not challenged\` and why"
 phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
-phrase_check skills/backlog/SKILL.md "stages, the fingerprint comment, titles, the replies block and waits with GitHub issues" 'only step 2'"'"'s stages, step 6'"'"'s fingerprint comment, "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply'
+phrase_check skills/backlog/SKILL.md "stages, item creation, the fingerprint comment, titles, the replies block and waits with GitHub issues" 'only step 2'"'"'s stages, step 6'"'"'s item creation and fingerprint comment, "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply'
+# Committing to Todo, with either answer, always needs an item: one is created first, an issue with GitHub issues.
+phrase_check skills/backlog/SKILL.md "an item created first on agreement with either answer" "6. When the maintainer agrees to build something, with either answer to \`mentat:propose\`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item."
+phrase_check skills/propose/SKILL.md "the spec written on an item created first, never chat only" "7. Once agreed, with either answer, it writes the spec (shape in \`mentat:pr\`) in the backlog item, creating the item first when the request has none (with GitHub issues, an issue), so the spec, the fingerprint comment and the Todo stage are recorded on it, and, unless the backlog is external, in the pull request once open. Committing to Todo always needs an item."
+phrase_check skills/backlog/github.md "how an issue committed to Todo is marked" "- An issue committed to Todo, a new one included, gets the \`ready\` label where the repository uses stage labels, else an entry in the pinned issue's order."
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 phrase_check skills/challenge/SKILL.md "the challenge's replies block at hand-off" 'replies block'
