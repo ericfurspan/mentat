@@ -314,7 +314,9 @@ for f in --body-file --notes-file -F; do
   check "an unquoted home path after $f in a body is a local path" '[ "$(HOME=$nospace reason "gh pr comment 5 --body \"see $f $nospace/clean.md\"")" = "${path_hit}" ]'
 done
 check "a body naming the same file as the real flag is still a local path" '[ "$(reason "gh pr comment 5 --body \"see --body-file '"'"'$HOME/clean.md'"'"'\" --body-file '"'"'$HOME/clean.md'"'"'")" = "$path_hit" ]'
-check "a file flag before gh is no flag of gh" '[ "$(reason "echo --body-file \"$HOME/clean.md\"; gh pr comment 5 --body ok")" = "$path_hit" ]'
+# HOME is under a temp folder here, so a check that a name outside gh stays uses a HOME outside them.
+outhome=/nonexistent-mentat-home
+check "a file flag before gh is no flag of gh" '[ "$(HOME=$outhome reason "echo --body-file \"$outhome/clean.md\"; gh pr comment 5 --body ok")" = "$path_hit" ]'
 check "a file named only in a body is not read" '[ -z "$(decision "gh pr comment 5 --body \"see --body-file word.md\"")" ]'
 c="gh pr comment 5 --body 'don'\\''t see --body-file \"$HOME/clean.md\"'"
 check "a home path after a file flag in a single-quoted body with an escaped quote is a local path" '[ "$(reason "$c")" = "$path_hit" ]'
@@ -337,7 +339,7 @@ c='gh pr comment 5 \
   --body-file \
   ~/clean.md'
 check "a clean file named across a line continuation is no hit" '[ -z "$(decision "$c")" ]'
-check "a real flag is read where gh is not its own word, and its name stays" '[ "$(decision "(gh pr comment 5 --body-file word.md)")" = ask ] && [ "$(reason "(gh pr comment 5 --body-file \"$HOME/clean.md\")")" = "$path_hit" ]'
+check "a real flag is read where gh is not its own word, and its name stays" '[ "$(decision "(gh pr comment 5 --body-file word.md)")" = ask ] && [ "$(HOME=$outhome reason "(gh pr comment 5 --body-file \"$outhome/clean.md\")")" = "$path_hit" ]'
 # Past the stop the words cannot be told apart: a flag is still read, nothing leaves the text.
 check "past a stop, a file with a hit asks" '[ "$(decision "gh pr create --title \"\$(x)\" --body-file word.md")" = ask ]'
 check "past a stop, a clean file under the home folder asks, its path stays in the text" '[ "$(reason "gh pr create --title \"\$(x)\" --body-file \"$HOME/clean.md\"")" = "$path_hit" ]'
@@ -346,6 +348,129 @@ c='gh pr comment 5 --body-file - <<EOF
 see --body-file word.md
 EOF'
 check "a file named in a heredoc is read too" '[ "$(decision "$c")" = ask ]'
+
+# Outside the gh command, a temp path that only locates a file is not checked. TMPDIR
+# here is under a temp folder, and StubCodename in a path is the hit.
+reset
+tdir="$TMPDIR/StubCodename"
+scratch="$TMPDIR/claude-501/-Users-stubcodename-Work-proj/abc/scratchpad"
+mkdir -p "$tdir" "$scratch" "$TMPDIR/plain" "$TMPDIR/a dir"
+for f in "$tdir/pr.md" "$scratch/pr.md" "$scratch/body.md"; do cp "$root/work/clean.md" "$f"; done
+for f in "$TMPDIR/plain/word.md" "$TMPDIR/word.md" "$TMPDIR/a dir/word.md"; do cp "$root/work/word.md" "$f"; done
+while IFS= read -r c; do
+  check "leaves alone a temp path that only locates a file: $c" '[ -z "$(decision "$c")" ]'
+done <<EOF
+S=$scratch; sed -i '' 's/a/b/' \$S/pr.md; gh pr edit 5 --body-file \$S/pr.md
+sed -i '' 's/a/b/' $scratch/body.md; gh pr edit 5 --body-file $scratch/body.md
+S=$tdir; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; gh pr edit 1 --body-file "\${S}/pr.md"
+S="$tdir"; gh pr edit 1 --body-file "\$S/pr.md"
+S='$tdir'; gh pr edit 1 --body-file "\$S"/pr.md
+export S=$tdir; gh pr edit 1 --body-file \$S/pr.md
+S=$TMPDIR/plain; S=$tdir; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir && gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; gh pr edit 1 --body-file=\$S/pr.md
+S=$tdir; gh pr edit 1 --body-file \$S/pr.md --body-file \$S/pr.md
+S=$tdir; gh pr edit 1 --body-file \$S/pr.md --title "\$SX \$S_x"
+S=$tdir; gh api repos/o/r/issues/1/comments -F body=@\$S/pr.md
+S=$tdir; gh api repos/o/r/issues/1/comments --field "body=@\$S/pr.md"
+S=$tdir; gh pr edit 1 --body-file \$S/pr.md > \$S/out.txt
+S=$tdir; sed -i '' 's/a/b/' "\$S/pr.md"; gh pr edit 1 --body-file "\$S/pr.md"
+S=$tdir; printf x > \$S/pr.md; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; (gh pr edit 1 --body-file \$S/pr.md)
+S=/private/tmp/no-such-mentat-test/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=/tmp/no-such-mentat-test/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=/var/folders/no-such/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=/private/var/folders/no-such/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=\$TMPDIR/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=\${TMPDIR}/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+sed -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -i 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -i.bak 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed --in-place 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -i '' -e 's/a/b/' -e 's/c/d/' $tdir/pr.md $scratch/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -E -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -i '' 's/a/b/' "\$TMPDIR/StubCodename/pr.md"; gh pr edit 1 --body-file "\$TMPDIR/StubCodename/pr.md"
+printf x > $tdir/pr.md && gh pr edit 1 --body-file $tdir/pr.md
+printf x >$tdir/pr.md && gh pr edit 1 --body-file $tdir/pr.md
+printf x >> $tdir/pr.md && gh pr edit 1 --body-file $tdir/pr.md
+printf x 2>$tdir/err.txt; gh pr edit 1 --body-file $tdir/pr.md
+(gh pr edit 1 --body-file $tdir/pr.md)
+(gh api repos/o/r/issues/1/comments -F body=@$tdir/pr.md)
+(gh pr edit 1 --body-file=$tdir/pr.md)
+EOF
+c="S=$tdir
+gh pr edit 1 --body-file \$S/pr.md"
+check "leaves alone a temp path assigned on the line before" '[ -z "$(decision "$c")" ]'
+while IFS= read -r c; do
+  check "asks for a hit outside the gh command that does not only locate a temp file: $c" '[ "$(decision "$c")" = ask ]'
+done <<EOF
+S=$tdir; gh pr edit 1 --body "see \$S"
+S=$tdir; gh pr edit 1 --body-file \$S/pr.md --title "\${S##*/}"
+S=$tdir; gh pr edit 1 --body "\$(cat \$S/x)" --body-file \$S/pr.md
+S=$tdir; cat \$S/x; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; echo \$S; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; x=\$(cat \$S/pr.md); gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; sed -i '' "s|x|\$S|" \$S/pr.md; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; sed 's/a/b/' \$S/pr.md >/dev/null; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; S=/Users/stub/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=/Users/stub/StubCodename; S=$tdir; gh pr edit 1 --body-file \$S/pr.md
+S="\$(mktemp -d)/StubCodename"; gh pr edit 1 --body-file \$S/pr.md
+S=\$(mktemp -d /tmp/StubCodename.XXXXXX); gh pr edit 1 --body-file \$S/pr.md
+S=/tmp/../Users/StubCodename; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; gh api repos/o/r/issues/1/comments -F body=\$S/pr.md
+printf x > /Users/stubcodename/x; gh pr edit 1 --body ok
+printf x > /tmp/../StubCodename/x; gh pr edit 1 --body ok
+ls $tdir; gh pr edit 1 --body ok
+sed 's/a/b/' $tdir/pr.md; gh pr edit 1 --body ok
+cat < $tdir/pr.md; gh pr edit 1 --body ok
+(gh api repos/o/r/issues/1/comments -F body=$tdir/x)
+gh pr edit 1 --body-file $tdir/pr.md >$tdir/out.txt
+EOF
+c="S=$tdir; cat > \$S/pr.md <<'X'
+hello
+X
+gh pr edit 1 --body-file \$S/pr.md"
+check "asks for a temp path assigned before a heredoc that names it" '[ "$(decision "$c")" = ask ]'
+c="S=$tdir; gh pr edit 1 --body-file - <<X
+see \$S
+X"
+check "asks for a temp path assigned before a heredoc body that uses it" '[ "$(decision "$c")" = ask ]'
+
+# A body file named through a variable is read: a plain value assigned earlier in the
+# command, else TMPDIR or HOME from the environment.
+while IFS= read -r c; do
+  check "reads a body file named through a variable: $c" '[ "$(decision "$c")" = ask ]'
+done <<EOF
+S=$TMPDIR/plain; gh pr edit 1 --body-file \$S/word.md
+S=$TMPDIR/plain; gh pr edit 1 --body-file "\${S}/word.md"
+S="$TMPDIR/a dir"; gh pr edit 1 --body-file "\$S/word.md"
+export S=$TMPDIR/plain; gh pr edit 1 --body-file \$S/word.md
+S=$TMPDIR/plain; gh pr edit 1 --body-file=\$S/word.md
+S=$TMPDIR/plain; gh pr edit 1 --notes-file \$S/word.md
+S=$TMPDIR/plain; gh pr comment 1 -F \$S/word.md
+S=$TMPDIR/plain; gh api repos/o/r/issues/1/comments -F body=@\$S/word.md
+S=$TMPDIR/plain; gh api repos/o/r/issues/1/comments --field=body=@\$S/word.md
+S=$TMPDIR/plain; (gh pr edit 1 --body-file \$S/word.md)
+S=$tdir; S=$TMPDIR/plain; gh pr edit 1 --body-file \$S/word.md
+gh pr edit 1 --body-file "\$TMPDIR/word.md"
+gh pr edit 1 --body-file "\${TMPDIR}/word.md"
+gh pr edit 1 --body-file \$HOME/word.md
+gh pr edit 1 --body-file "\${HOME}/word.md"
+EOF
+c="S=$TMPDIR/plain
+gh pr edit 1 --body-file \$S/word.md"
+check "reads a body file named through a variable assigned on the line before" '[ "$(decision "$c")" = ask ]'
+while IFS= read -r c; do
+  check "does not read a body file through a value it cannot know: $c" '[ -z "$(decision "$c")" ]'
+done <<EOF
+S=$TMPDIR/plain; S=\$(mktemp -d); gh pr edit 1 --body-file \$S/word.md
+S=$TMPDIR/plain; S="\$(mktemp -d)"; gh pr edit 1 --body-file \$S/word.md
+S=$TMPDIR/plain; S=\$X; gh pr edit 1 --body-file \$S/word.md
+S=$TMPDIR/plain gh pr edit 1 --body-file \$S/word.md
+gh pr edit 1 --body-file \$SX/word.md
+EOF
 
 # What the prompt says.
 reset

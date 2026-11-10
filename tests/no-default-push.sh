@@ -286,6 +286,77 @@ check "a bare cd goes to HOME" '[ "$(HOME="$tmp/edited" decision "$tmp/feat" "cd
 check "a cd ~/ goes to HOME" '[ "$(HOME="$tmp" decision "$tmp/feat" "cd ~/edited && gh pr create --fill")" = ask ]'
 check "a cd after a push does not apply to it" '[ -z "$(decision "$tmp/feat" "git push && cd ../edited")" ]'
 
+# A cd joined to the push or pull request only by && at the same level: only its folder is checked.
+while IFS= read -r cmd; do
+  check "from a checkout on main, a cd joined by && leaves alone: $cmd" '[ -z "$(decision "$tmp/repo" "$cmd")" ]'
+done <<PASS
+cd ../feat && git push -q
+cd ../feat && git push -q origin HEAD
+cd $tmp/feat && tests/run && git push
+cd ../feat && make 2>&1 && git push
+cd ../feat && make >log 2>&1 && git push -q
+cd ../feat && git add -A && git commit -qm "fix: a; b | c & d" && git push -q origin HEAD
+cd ../feat && git commit -m "fix: x (WRK-1)" && git push
+cd ../feat && git push origin &>/dev/null
+cd ../feat && gh pr create --fill
+command cd ../feat && git push
+A=1 cd ../feat && git push
+{ cd ../feat && git push; }
+(cd ../feat && git push)
+true; cd ../feat && git push
+git status && cd ../feat && git push
+PASS
+cont_cd=$'cd ../feat && \\\n  git push -q'
+check "from a checkout on main, a cd joined by && across a continued line leaves alone" '[ -z "$(decision "$tmp/repo" "$cont_cd")" ]'
+while IFS= read -r cmd; do
+  check "from a checkout on main, a cd not joined by && alone still asks: $cmd" '[ "$(decision "$tmp/repo" "$cmd")" = ask ]'
+done <<'ASK'
+cd ../feat; git push -q
+cd ../feat || git push -q
+cd ../feat | git push -q
+cd ../feat & git push -q
+cd ../feat && true; git push -q
+cd ../feat && true || git push -q
+cd ../feat && true | git push -q
+cd ../feat && make |& cat && git push -q
+cd ../feat && (true) && git push -q
+cd ../feat && { true; } && git push -q
+(cd ../feat) && git push -q
+(cd ../feat && true) && git push -q
+(cd ../feat && true) 2>&1 && git push -q
+(cd ../feat && true) >log && git push -q
+false || cd ../feat && git push -q
+true | cd ../feat && git push -q
+env cd ../feat && git push -q
+sudo cd ../feat && git push -q
+nohup cd ../feat && git push -q
+time cd ../feat && git push -q
+cd nowhere && git push -q
+cd ~nobody-here && git push -q
+cd "$WT" && git push -q
+git push origin &>/dev/null
+ASK
+newline_cd=$'cd ../feat\ngit push -q'
+check "from a checkout on main, a cd on the line before still asks" '[ "$(decision "$tmp/repo" "$newline_cd")" = ask ]'
+while IFS= read -r cmd; do
+  check "a cd joined by && to a feature checkout still asks before: $cmd" '[ "$(decision "$tmp/repo" "$cmd")" = ask ]'
+done <<ASK
+cd ../feat && git push origin main
+cd ../feat && git push origin HEAD:main
+cd ../feat && git push origin main &>/dev/null
+cd ../feat && git push --all
+cd ../feat && git push --mirror
+cd ../feat && git push --force
+cd ../feat && git push -f origin feat/x
+cd ../feat && git push origin +feat/x
+cd ../feat && git push origin 'refs/heads/*:refs/heads/*'
+cd ../feat && git -C ../repo push
+cd ../feat && git -C $tmp/repo push
+cd ../edited && git push -q
+cd ../edited && gh pr create --fill
+ASK
+check "a cd joined by && to a checkout on main still asks" '[ "$(decision "$tmp/feat" "cd ../repo && git push -q")" = ask ]'
+
 # ~, $HOME and ${HOME} in git -C and cd go to HOME.
 mkdir "$tmp/home"
 cp -R "$tmp/edited" "$tmp/home/repo"
@@ -497,6 +568,11 @@ check "a cd to a branch changing instructions asks before gh pr create" \
 check "a cd away from a branch changing instructions still asks before gh pr create" \
   '[ "$(reason "$tmp/i-agents" "cd ../feat && gh pr create --fill")" = "$instr_reason" ]'
 check "a cd to a branch changing only other files leaves alone" '[ -z "$(decision "$tmp/feat" "cd ../i-other && gh pr create --fill")" ]'
+check "a cd joined by && away from a branch changing instructions leaves alone" '[ -z "$(decision "$tmp/i-agents" "cd ../i-other && gh pr create --fill")" ]'
+check "a cd joined by ; away from a branch changing instructions still asks" \
+  '[ "$(reason "$tmp/i-agents" "cd ../i-other; gh pr create --fill")" = "$instr_reason" ]'
+check "a cd joined by && to a branch changing instructions asks" \
+  '[ "$(reason "$tmp/i-other" "cd ../i-agents && gh pr create --fill")" = "$instr_reason" ]'
 # Paths are read from the repository root, even from a subdirectory with diff.relative set.
 cp -R "$tmp/i-rules" "$tmp/i-relative"
 g -C "$tmp/i-relative" config diff.relative true
