@@ -176,6 +176,10 @@ reset; stage_hit; fine "$repo/clean.txt"; run "$repo" 'git commit -i -m x clean.
 check "git commit -i with paths keeps the staged changes" 'names "dir one/file two.txt"'
 reset; hit "$repo/new.txt"; g -C "$repo" add new.txt; run "$repo" 'git commit -m x -- new.txt'
 check "a commit naming a newly staged file scans it" 'names new.txt'
+for o in '' --cached; do
+  reset; g -C "$repo" rm -q ${o:+"$o"} clean.txt; hit "$repo/clean.txt"; run "$repo" 'git commit -m x -- clean.txt'
+  check "a commit naming a path after git rm${o:+ $o} and a rewrite scans its working version" 'names clean.txt'
+done
 for c in 'git commit -m x "dir one"' 'git commit -i -m x "dir one"'; do
   reset; hit "$repo/dir one/new.txt"; printf 'fine\n' >>"$repo/dir one/kept.txt"; run "$repo" "$c"
   check "$c leaves an untracked file in the folder out" 'scanned && has "dir one/kept.txt" && ! has "dir one/new.txt"'
