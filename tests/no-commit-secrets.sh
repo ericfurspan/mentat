@@ -186,6 +186,16 @@ reset; hit "$repo/new.txt"; run "$repo" 'git add "$f" && git commit -m x'
 check "an add word that cannot be read asks as a failed simulation" 'sim_failed'
 reset; hit "$repo/new.txt"; run "$repo" 'git add nothere.txt && git commit -m x'
 check "an add that git rejects asks as a failed simulation" 'sim_failed'
+for c in 'git commit -m x -- "$file"' 'git commit -m x "$file"' 'git commit -m x "$flag"' 'git commit -n"$x" -m x'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c asks as a failed simulation" 'sim_failed'
+done
+for c in 'git commit -m "$msg"' 'git commit -m"$msg"' 'git commit --message="$msg"' 'git commit -F "$f"'; do
+  reset; fine "$repo/new.txt"; g -C "$repo" add new.txt; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c takes the unread word as its value" 'scanned && has new.txt && ! has clean.txt'
+done
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -am"$msg"'
+check "git commit -am\"\$msg\" scans a changed tracked file" 'names clean.txt'
 
 reset; hit "$repo/new.txt"; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"
 for c in 'git add -p && git commit -m x' 'git rm -q "dir one/kept.txt" && git commit -m x' 'git mv clean.txt moved.txt && git commit -m x'; do
