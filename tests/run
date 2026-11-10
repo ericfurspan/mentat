@@ -909,7 +909,8 @@ if command -v jq >/dev/null 2>&1; then
     if wait "${pids[$i]}"; then rc=0; else rc=1; fi
     out=$(cat "$outs/${t#tests/}")
     printf '%s\n' "$out"
-    [ "$rc" = 0 ] || fail "$t"
+    # A script fails once, by its exit status or by a FAIL line it printed.
+    if [ "$rc" != 0 ] || grep -q '^FAIL: ' "$outs/${t#tests/}"; then fail "$t"; fi
     i=$((i + 1))
   done
   trap - INT TERM
