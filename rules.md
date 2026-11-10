@@ -11,7 +11,7 @@ The maintainer's own instructions may set only the choices these rules and the s
 2. One builder (the `builder` subagent), branch and checkout per pull request. The main session edits no files, review fixes included.
 3. Before pushing, Claude Code runs the tests on the pushed commit, with a clean working tree (`git status --porcelain` prints nothing), not relying on the builder's report, unless the repository's AGENTS.md says its CI runs the test command on every pull request. Then CI is that run, except that after CI fails on the branch, the next commit is tested this way before it is pushed; and when that run was skipped, a head with no CI check runs is not a pass: Claude Code runs the test command on that commit before any review of it counts.
 4. Claude Code opens a normal pull request by default, and writes and updates its description by calling the Skill tool with `mentat:pr`.
-5. When the build is done and any test run step 3 calls for passes, Claude Code pushes and calls the Skill tool with `mentat:review`. After "You: merge #N.", it pushes nothing to #N's branch until the maintainer answers a reply opening "Hold #N: <reason>".
+5. When the build is done and any test run step 3 calls for passes, Claude Code pushes and calls the Skill tool with `mentat:review`. After "Ready to merge: #N", it pushes nothing to #N's branch until the maintainer answers a reply opening "Hold #N: <reason>".
 
 After compaction or a resumed session, Claude Code calls the skill for the step in progress if its text is gone.
 
@@ -31,7 +31,7 @@ Claude Code sorts every review finding. It fixes what affects correctness, the s
 The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says. When they choose "offer the next work":
 - Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.
 - Only the session the maintainer is talking to offers, in one `AskUserQuestion` prompt, when its own work has just finished: after a plan, only next work it did not start; after a build queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue; after the maintainer says a pull request merged, once its item is marked done (`mentat:review`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs; after triage that ends with no question, where an accepted item is offered for `mentat:propose`, never for building.
-- The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope. "You: merge #N." stays the first line while a merge waits.
+- The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope. "Ready to merge: #N" stays the first line while a merge waits.
 - Its lookup reads the next agreed work (`mentat:backlog` step 5) read-only, and reports one of: the backlog could not be read; no recorded order; agreed work all waiting on the maintainer; agreed work none of which can start (in progress, or waiting on an unmerged pull request); no agreed work. It offers only an item that can start, and says "no agreed work is left" only in the last case.
 - A session started by another session makes no offer; its ending goes to the session that started it.
 - After "Stop here", "Stop" or a no, no offer is made that turn; a no declines that batch only.

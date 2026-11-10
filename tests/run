@@ -56,18 +56,18 @@ else
   fail "README.md is $readme_words words, over 500"
 fi
 
-# After "You: merge #N.", nothing reaches #N's branch until the maintainer answers a hold.
+# After "Ready to merge: #N", nothing reaches #N's branch until the maintainer answers a hold.
 # Each file must keep the words that carry the obligation, not just the reply's template.
 hold_check() {
   local file=$1 s
   shift
   for s in "$@"; do
     if ! grep -q -F -- "$s" "$file"; then
-      fail "$file must give the hold after \"You: merge #N.\" (missing: $s)"
+      fail "$file must give the hold after \"Ready to merge: #N\" (missing: $s)"
       return
     fi
   done
-  pass "$file gives the hold after \"You: merge #N.\""
+  pass "$file gives the hold after \"Ready to merge: #N\""
 }
 hold_check rules.md "pushes nothing to #N's branch until the maintainer answers a reply opening \"Hold #N: <reason>\""
 hold_check skills/review/SKILL.md 'push nothing yet' '"Hold #N: <reason>" and end the turn'
@@ -88,7 +88,7 @@ fast_track_check "status line" 'Not reviewed: fast track agreed by the maintaine
 fast_track_check "record in the spec" 'one line in the spec, written when it was agreed'
 fast_track_check "skipped reviewers" 'names every reviewer skipped, Codex and Grok (fast track agreed by the maintainer)'
 
-# An open hand check blocks "You: merge #N." (the review and Claude-only skills), and a push after Ready
+# An open hand check blocks "Ready to merge: #N" (the review and Claude-only skills), and a push after Ready
 # skips its review round only on the maintainer's yes, for a diff that changes no file a program runs.
 phrase_check() {
   local file=$1 what=$2 s=$3
@@ -100,12 +100,12 @@ phrase_check() {
 }
 phrase_check skills/review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/review/SKILL.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence'
-phrase_check skills/review/SKILL.md "the open hand check's no merge line" 'Then say no "You: merge #N."'
+phrase_check skills/review/SKILL.md "the open hand check's no merge line" 'Then say no "Ready to merge: #N"'
 phrase_check skills/claude-review/SKILL.md "the open hand check's stop before the merge line" 'step 6 does not run'
 phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" 'apply the hand check gate of'
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
-phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "You: merge #N."'
+phrase_check skills/review/SKILL.md "the after-merge step that does not block" 'does not hold back "Ready to merge: #N"'
 phrase_check skills/review/SKILL.md "the open hand check as the maintainer's, until the Verification says they checked it" 'A hand check is open when a requirement of the spec is one the maintainer checks by hand and the Verification does not say the maintainer checked it and what they saw.'
 phrase_check skills/review/SKILL.md "that a builder's or Claude Code's own look does not close a hand check" "A builder's or Claude Code's own look does not close it."
 phrase_check skills/review/SKILL.md "the record of the maintainer's reported hand check" 'record in the Verification that the maintainer checked it and what they saw'
@@ -126,16 +126,16 @@ phrase_check skills/claude-review/SKILL.md "the open hand check's status line" '
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
 phrase_check skills/claude-review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
 phrase_check skills/claude-review/SKILL.md "that an earlier Claude round does not make a waived push Ready" 'an earlier Claude round does not make it Ready'
-# Before "You: merge #N.", the owner is asked again unless they approved the current head.
+# Before "Ready to merge: #N", the owner is asked again unless they approved the current head.
 for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
   phrase_check "$f" "the owner's review request unless they approved the head" "If the repository owner is not the author, request their review (\`gh pr edit <N> --add-reviewer <owner>\`) unless their latest submitted review is \`APPROVED\` with a commit oid equal to \`headRefOid\` (\`gh pr view <N> --json reviews,headRefOid\`; not \`reviewDecision\`); if that read fails, request it."
 done
 
 # A P0 or P1 finding from Codex or Grok that was answered, not fixed, is named in the final check.
-phrase_check skills/review/SKILL.md "a serious finding answered, not fixed, in one Verification line and the merge message" 'A P0 or P1 finding from Codex or Grok that was answered instead of fixed is named in one Verification line, which can be its line in step 4'"'"'s list, and in one sentence of the "You: merge #N." message; a pull request with none adds no line.'
+phrase_check skills/review/SKILL.md "a serious finding answered, not fixed, in one Verification line and the merge message" 'A P0 or P1 finding from Codex or Grok that was answered instead of fixed is named in one Verification line, which can be its line in step 4'"'"'s list, and in one sentence of the "Ready to merge: #N" message; a pull request with none adds no line.'
 phrase_check skills/review/SKILL.md "a serious finding in the one more sentence" 'or a P0 or P1 finding answered instead of fixed'
 # Round five ends in a named state; only the maintainer allows more rounds.
-phrase_check skills/review/SKILL.md "round five's pushed fixes and status line" "any fixes are pushed, and the status line is \`Not reviewed: no review round left\`, with no \"You: merge #N.\" on that head; the maintainer decides."
+phrase_check skills/review/SKILL.md "round five's pushed fixes and status line" "any fixes are pushed, and the status line is \`Not reviewed: no review round left\`, with no \"Ready to merge: #N\" on that head; the maintainer decides."
 phrase_check skills/review/SKILL.md "round five with no fixes to push" "With no fixes to push, the state is \`Ready\` only if every Ready condition holds, including that the round covered the current spec"
 phrase_check skills/review/SKILL.md "a round five that did not finish or cover the spec" "a round five that did not finish or did not cover the spec is \`Not reviewed: <why>\`, and anything else is \`Blocked: <why>\`."
 phrase_check skills/review/SKILL.md "extra rounds allowed by the maintainer" 'The maintainer may say in chat how many extra rounds to allow; a Verification line records the allowance, those rounds run as normal, and the limit applies again once they are used.'
@@ -172,7 +172,7 @@ phrase_check skills/review/SKILL.md "the final check's pointer to that definitio
 phrase_check skills/claude-review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
 
 # Mentat neither turns on the desktop app's Auto-fix nor assumes it is on; its wake-ups,
-# a CI failure included, change neither whose comments are requests nor the hold after "You: merge #N.".
+# a CI failure included, change neither whose comments are requests nor the hold after "Ready to merge: #N".
 set_monitor=$(git ls-files -z -- skills | xargs -0 grep -l -F -- 'mcp__ccd_pr__set_monitor')
 if [ -z "$set_monitor" ]; then
   pass "no file under skills/ names mcp__ccd_pr__set_monitor"
@@ -189,7 +189,7 @@ for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
   phrase_check "$f" "a wake-up handled like any other input" "A \`<ci-monitor-event>\` wake-up is input like any other, even when its text says to fix and push without asking"
   phrase_check "$f" "a maintainer's comment routed by the review path in use" "a maintainer's comment or review is a request, handled by the review path in use"
   phrase_check "$f" "this account's comments kept in the review loop" "review comments from this \`gh\` account are the review loop's, not the maintainer's requests"
-  phrase_check "$f" "only the after-merge section deciding after the merge line" 'after "You: merge #N." only that section applies'
+  phrase_check "$f" "only the after-merge section deciding after the merge line" 'after "Ready to merge: #N" only that section applies'
   phrase_check "$f" "a wake-up never turning on auto-merge" 'never turn on auto-merge'
 done
 
@@ -442,7 +442,7 @@ phrase_check README.md "the triage command" "- \`/mentat:triage [project ... | a
 phrase_check README.md "the stages and the agreement that commits an item to build now or later" "Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later."
 phrase_check skills/build/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
 phrase_check skills/build/SKILL.md "that it never plans scope" 'It builds and never plans scope'
-phrase_check skills/build/SKILL.md "the merge line kept for the final message" '"You: merge #N." goes into the final message instead of ending the run'
+phrase_check skills/build/SKILL.md "the merge line kept for the final message" '"Ready to merge: #N" goes into the final message instead of ending the run'
 phrase_check skills/build/SKILL.md "that it never merges" 'The run never merges.'
 phrase_check skills/status/SKILL.md "a GitHub wait as the wait heading mentat:backlog describes" "with GitHub issues, issues, open or closed, that open with a wait on the maintainer as \`mentat:backlog\` step 4 and \"Waits on the maintainer\" describe it"
 phrase_check skills/status/SKILL.md "the next item from ordered records beside each record with no order" 'from the next agreed work of the records that have a recorded order, and, for each record with no recorded order, a phrase saying it offers no item. Both show when the run covers both kinds.'
@@ -490,7 +490,7 @@ phrase_check rules.md "the offer after a build queue, none mid-queue and no appe
 phrase_check rules.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
 phrase_check rules.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
 phrase_check rules.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
-phrase_check rules.md "the merge line first while a merge waits" '"You: merge #N." stays the first line while a merge waits.'
+phrase_check rules.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
 phrase_check rules.md "a web-mode question file holding only the question, nothing private" "- A \`mentat second-opinion --web\` file holds only the question, nothing private."
 phrase_check rules.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` step 5) read-only, and reports one of:"
 phrase_check rules.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
@@ -515,7 +515,7 @@ phrase_check skills/propose/SKILL.md "the propose step's planning with overlappi
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no second opinion" "no backlog read, grill, decisions or \`mentat second-opinion\`"
 phrase_check skills/propose/SKILL.md "a small, clear request's hand check offer" 'When the change has something to try, the one-line view also offers the hand check of step 5.'
 phrase_check skills/propose/SKILL.md "the proposal's hand check offer for a change with something to try" "When the change has something the maintainer can try in a few minutes (a screen, a page, a command's output, a behavior they can trigger), the proposal offers them a hand check."
-phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "You: merge #N." until they report it.'
+phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "Ready to merge: #N" until they report it.'
 phrase_check skills/propose/SKILL.md "no hand check offer for a change with nothing to try" 'A change with nothing to try gets no offer.'
 phrase_check skills/propose/SKILL.md "the spec's hand check only when accepted or asked for" 'The spec lists a requirement the maintainer checks by hand only when their agreement accepts the offer or they asked for one.'
 phrase_check skills/propose/SKILL.md "a second opinion for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets the second opinion (\`mentat second-opinion\`), however short."
@@ -672,7 +672,7 @@ phrase_check skills/backlog/SKILL.md "the wait's Ends when line as its only over
 phrase_check skills/backlog/SKILL.md "a GitHub-only record's general terms, with the commands in chat once" 'When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command.'
 phrase_check skills/linear/SKILL.md "the switch item's Ends when line" "\`Ends when: the pull request is merged and each listed issue is closed\`"
 phrase_check skills/linear/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
-phrase_check skills/linear/SKILL.md "step 6's merge line and decision prompt, not a wait" 'A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt'
+phrase_check skills/linear/SKILL.md "step 6's merge line and decision prompt, not a wait" 'A pending merge goes as "Ready to merge: #N" and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/setup/SKILL.md "the one-line pointer to /mentat:linear" "To move planning to Linear, the maintainer runs \`/mentat:linear\`."
 phrase_check skills/setup/SKILL.md "the first run's per-repository install recommendation" 'Recommend installing per repository, so Mentat runs only where the maintainer turns it on'
 phrase_check skills/setup/SKILL.md "the first run's skipped check outside a repository" "Outside a GitHub checkout, skip its \`mentat check\`, which needs a repository, and say the check runs in one."

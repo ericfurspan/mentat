@@ -41,4 +41,4 @@ The maintainer wants this repository's planning moved from GitHub issues to a Li
    gh issue close <N> --reason "not planned" --comment "Planning for this repository moved to its backlog outside GitHub on <date>; this issue's content lives there now. Pull requests stay on GitHub."
    ```
    The comment links nothing. Then set the switch item to Done, remove its wait block and label, and clear the assignee if it is still the project's lead. From then on a pull request body here writes no `Closes #`. The held-back issues stay as they are.
-6. End with one line to the maintainer saying what was set. A pending merge goes as "You: merge #N." and a decision about a listed issue goes in the decision prompt (`rules.md` "What goes to the maintainer").
+6. End with one line to the maintainer saying what was set. A pending merge goes as "Ready to merge: #N" and a decision about a listed issue goes in the decision prompt (`rules.md` "What goes to the maintainer").
