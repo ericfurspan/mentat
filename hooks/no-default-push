@@ -249,10 +249,11 @@ push_checks() {
 # The session's directory ($cwd, joined with any git -C) is checked too, unless
 # $chain says a cd that resolved led to the command through && alone, with no
 # group opened or closed between; only the quoted split sets it. A cd through
-# env, sudo, nohup or time, or after a pipe, does not.
+# env, sudo, nohup or time, or after a pipe, does not, nor any after a ( opens
+# inside a subshell ($nest), whose directory the walk does not track.
 for pass in plain quoted; do
   if [ "$pass" = plain ]; then text=$pieces; else text=$qpieces; fi
-  here=$cwd prev="" sub=0 ends=0 chain=0
+  here=$cwd prev="" sub=0 ends=0 chain=0 nest=0
   while IFS= read -r seg; do
     join=""
     if [ "$pass" = quoted ]; then
@@ -276,7 +277,7 @@ for pass in plain quoted; do
       w=${words[i]}
       while :; do
         case "$w" in
-          "("*) w=${w#"("}; chain=0; if [ "$sub" -eq 0 ]; then sub=1 saved=$here saved_prev=$prev; fi ;;
+          "("*) w=${w#"("}; chain=0; if [ "$sub" -eq 0 ]; then sub=1 saved=$here saved_prev=$prev; else nest=1; fi ;;
           "{"*) w=${w#"{"}; chain=0 ;;
           *) break ;;
         esac
@@ -304,7 +305,7 @@ for pass in plain quoted; do
         chain=0
         if [ -n "$to" ] && [ -d "$to" ]; then
           prev=$here here=$to
-          if [ "$pass" = quoted ] && [ "$via" -eq 0 ]; then
+          if [ "$pass" = quoted ] && [ "$via" -eq 0 ] && [ "$nest" -eq 0 ]; then
             case "$join" in "$pipe" | "$redir") ;; *) chain=1 ;; esac
           fi
         fi

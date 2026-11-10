@@ -285,6 +285,11 @@ check "a cd -- <dir> goes to the directory" '[ "$(decision "$tmp/feat" "cd -- ..
 check "a cd in a subshell applies inside it" '[ "$(decision "$tmp/feat" "(cd ../edited && git push)")" = ask ]'
 check "a cd joined by && in a subshell from a checkout with changes checks only its directory" '[ -z "$(decision "$tmp/edited" "(cd ../feat && git push)")" ]'
 check "a cd in a subshell ends with it" '[ "$(decision "$tmp/edited" "(cd ../feat) && git push")" = ask ]'
+mkdir "$tmp/repo/tests"
+check "from a checkout on main, a cd after a nested subshell still asks" \
+  '[ "$(decision "$tmp/repo" "(cd tests && (./run) && cd .. && git push)")" = ask ]'
+check "from a checkout on main, a cd after a spaced nested subshell still asks" \
+  '[ "$(decision "$tmp/repo" "(cd tests && ( ./run ) && cd .. && git push)")" = ask ]'
 # A cd the hook misreads still checks the session directory.
 check "a cd the hook misreads still checks the session directory: changes" \
   '[ "$(reason "$tmp/edited" "(cd ../feat && true) >log && git push")" = "$unclean_reason" ]'
