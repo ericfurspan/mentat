@@ -402,7 +402,7 @@ phrase_check skills/plan/SKILL.md "groups by predicted shared files" "two items 
 phrase_check skills/plan/SKILL.md "an unclear overlap kept in one group" 'When it is unclear whether two items share a file, they share a group.'
 phrase_check skills/plan/SKILL.md "transitive groups" 'Groups chain, so A with B and B with C is one group.'
 phrase_check skills/plan/SKILL.md "no file exempt from grouping" 'No file is exempt.'
-phrase_check skills/plan/SKILL.md "plan usage read before starting builds" "Read plan usage as the maintainer's own instructions say, and stop and ask at a limit they set; with no such instructions, read no plan limit."
+phrase_check skills/plan/SKILL.md "plan usage read before starting builds, only fitting groups started without a yes" "Read plan usage as the maintainer's own instructions say; at a limit they set, ask before starting any group that would pass it, and unless they say yes, start only the groups that fit, in the tracker's order. With no such instructions, read no plan limit."
 phrase_check skills/plan/SKILL.md "one build session per group, each in a fresh checkout" "Then start one build session per group, in the order of its first item, each in its own fresh checkout (worktree), running the full \`/mentat:work-tickets <ids>\` command"
 phrase_check skills/plan/SKILL.md "the paste line fallback, one per group in order" 'Where Claude Code cannot start a session, give each group, in the order of its first item, its own fenced line'
 phrase_check skills/plan/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, say each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
