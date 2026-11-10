@@ -8,9 +8,11 @@
 # push (--force, -f, --force-with-lease or a +refspec) on any branch, and a git
 # push or gh pr create while git status --porcelain in its directory prints
 # anything. A gh pr create whose branch changes an agent instruction file
-# against origin/<default> asks whether the change got a second opinion. This is a net
-# for mistakes, not a security boundary: other routes exist. When it cannot
-# read its input, it stays out of the way.
+# against origin/<default> asks whether the change got a second opinion. A cd
+# joined to the command by && alone moves these checks to its directory; any
+# other cd adds its directory to the session's. This is a net for mistakes, not
+# a security boundary: other routes exist. When it cannot read its input, it
+# stays out of the way.
 set -uo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0
@@ -123,18 +125,23 @@ tokenize() {
 }
 
 # split_quoted <text>: sets $qpieces, the text with each unquoted ;, |, & and
-# newline turned into a line break, each quoted newline into a space and each
-# backslash-newline outside single quotes dropped, quoting as in tokenize.
+# newline turned into a line break (one for && and ||), each quoted newline
+# into a tab and each backslash-newline outside single quotes dropped,
+# quoting as in tokenize. A piece after && starts with $and, unless an unquoted
+# ) came before it in its piece; after |, || or |& with $pipe; after the & of a
+# redirect (2>&1, &>file) with $redir.
+and=$'\002' pipe=$'\003' redir=$'\004'
 split_quoted() {
-  local s=$1 run c q=""
+  local s=$1 run c q="" last="" closed=0
   qpieces=""
   while [ -n "$s" ]; do
     case "$q" in
       \") run=${s%%[\"\\"$nl"]*} ;;
       \') run=${s%%[\'"$nl"]*} ;;
-      *) run=${s%%[\'\"\\\;\|\&]*} ;;
+      *) run=${s%%[\'\"\\\;\|\&\)"$nl"]*} ;;
     esac
     qpieces+=$run; s=${s:${#run}}
+    [ -z "$run" ] || last=${run: -1}
     [ -n "$s" ] || break
     c=${s:0:1}; s=${s:1}
     case "$q$c" in
@@ -143,18 +150,42 @@ split_quoted() {
       # A backslash, unquoted or inside double quotes, keeps the next character;
       # before a newline, both go (a line continuation).
       \\ | \"\\) c=${s:0:1}; s=${s:1}; case "$c" in "$nl") c="" ;; *) c="\\$c" ;; esac ;;
-      ?$nl) c=" " ;;
-      *) c=$nl ;;
+      ?$nl) c=$tab ;;
+      ")") closed=1 ;;
+      "&")
+        case "$last${s:0:1}" in
+          [\<\>]* | *\>) c=$nl$redir ;;
+          *\&) s=${s:1}; if [ "$closed" -eq 1 ]; then c=$nl; else c=$nl$and; fi; closed=0 ;;
+          *) c=$nl; closed=0 ;;
+        esac
+        ;;
+      "|") case "${s:0:1}" in "|" | "&") s=${s:1} ;; esac; c=$nl$pipe; closed=0 ;;
+      *) c=$nl; closed=0 ;;
     esac
     qpieces+=$c
+    [ -z "$c" ] || last=${c: -1}
   done
 }
 
-# The plain split also catches commands with an unmatched quote; the quoted
-# split catches separators inside quotes. Both are checked. The plain split
-# joins each line that ends in a backslash with the next.
+# The plain split also catches commands with an unmatched quote or inside a
+# quoted string; the quoted split reads separators inside quotes as text. Both
+# are checked, and the plain split leaves a piece the quoted split covers to
+# it. The plain split joins each line that ends in a backslash with the next.
 pieces=$(printf '%s' "$cmd" | LC_ALL=C awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' | LC_ALL=C tr ';|&' '\n')
 split_quoted "$cmd"
+qseen=$nl
+while IFS= read -r seg; do qseen+=${seg#["$and$pipe$redir"]}$nl; done <<<"$qpieces"
+# covered: the quoted split covers every plain piece with the text of $seg: it has
+# as many pieces that are that text, or start with it and go on with a quoted ;, |,
+# & or newline (a tab there).
+covered() {
+  local np nq
+  np=$(S=$seg LC_ALL=C awk '$0 == ENVIRON["S"] { c++ } END { print c + 0 }' <<<"$pieces")
+  nq=$(S=$seg LC_ALL=C awk 'BEGIN { s = ENVIRON["S"]; n = length(s) }
+    $0 == s || (substr($0, 1, n) == s && index(";|&\t", substr($0, n + 1, 1)) > 0) { c++ }
+    END { print c + 0 }' <<<"$qseen")
+  [ "$np" -le "$nq" ]
+}
 
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
 
@@ -215,11 +246,20 @@ push_checks() {
 # A command can chain several: look at each piece that starts with git ... push
 # or gh pr create. A cd piece sets the directory ($here) for the pieces after it,
 # up to the ) that closes a ( subshell it is in. $prev is the directory cd - uses.
-# Following a cd only adds prompts: the session's directory ($cwd, joined with
-# any git -C) is checked too.
-for pass in "$pieces" "$qpieces"; do
-  here=$cwd prev="" sub=0 ends=0
+# The session's directory ($cwd, joined with any git -C) is checked too, unless
+# $chain says a cd that resolved led to the command through && alone, with no
+# group opened or closed between; only the quoted split sets it. A cd through
+# env, sudo, nohup or time, or after a pipe, does not, nor any after a ( opens
+# inside a subshell ($nest), whose directory the walk does not track.
+for pass in plain quoted; do
+  if [ "$pass" = plain ]; then text=$pieces; else text=$qpieces; fi
+  here=$cwd prev="" sub=0 ends=0 chain=0 nest=0
   while IFS= read -r seg; do
+    join=""
+    if [ "$pass" = quoted ]; then
+      case "$seg" in ["$and$pipe$redir"]*) join=${seg:0:1} seg=${seg:1} ;; esac
+    fi
+    case "$join" in "$and" | "$redir") ;; *) chain=0 ;; esac
     if [ "$ends" -eq 1 ] && [ "$sub" -eq 1 ]; then here=$saved prev=$saved_prev sub=0; fi
     ends=0
     tokenize "$seg"
@@ -231,19 +271,23 @@ for pass in "$pieces" "$qpieces"; do
     words[n - 1]=$w
     case "$w" in "" | "}") unset "words[n - 1]"; n=$((n - 1)) ;; esac
 
-    i=0
+    i=0 via=0
     while [ "$i" -lt "$n" ]; do
       # A group starts with ( or { on the first word; ( starts a subshell.
       w=${words[i]}
       while :; do
         case "$w" in
-          "("*) w=${w#"("}; if [ "$sub" -eq 0 ]; then sub=1 saved=$here saved_prev=$prev; fi ;;
-          "{"*) w=${w#"{"} ;;
+          "("*) w=${w#"("}; chain=0; if [ "$sub" -eq 0 ]; then sub=1 saved=$here saved_prev=$prev; else nest=1; fi ;;
+          "{"*) w=${w#"{"}; chain=0 ;;
           *) break ;;
         esac
       done
       words[i]=$w
-      case "$w" in "" | *=* | env | command | sudo | nohup | time) i=$((i + 1)) ;; *) break ;; esac
+      case "$w" in
+        "" | *=* | command) i=$((i + 1)) ;;
+        env | sudo | nohup | time) via=1 i=$((i + 1)) ;;
+        *) break ;;
+      esac
     done
     [ "$i" -lt "$n" ] || continue
     case "${words[i]}" in
@@ -258,7 +302,13 @@ for pass in "$pieces" "$qpieces"; do
           -*) to="" ;;
           *) resolve "$to" ;;
         esac
-        if [ -n "$to" ] && [ -d "$to" ]; then prev=$here here=$to; fi
+        chain=0
+        if [ -n "$to" ] && [ -d "$to" ]; then
+          prev=$here here=$to
+          if [ "$pass" = quoted ] && [ "$via" -eq 0 ] && [ "$nest" -eq 0 ]; then
+            case "$join" in "$pipe" | "$redir") ;; *) chain=1 ;; esac
+          fi
+        fi
         continue
         ;;
       gh | */gh)
@@ -269,10 +319,13 @@ for pass in "$pieces" "$qpieces"; do
         i=$((i + 1))
         skip_flags
         case "${words[i]:-}" in create | new) ;; *) continue ;; esac
+        if [ "$pass" = plain ] && covered; then continue; fi
         unclean "$here"
         instructions "$here"
-        [ "$here" = "$cwd" ] || unclean "$cwd"
-        [ "$here" = "$cwd" ] || instructions "$cwd"
+        if [ "$chain" -eq 0 ] && [ "$here" != "$cwd" ]; then
+          unclean "$cwd"
+          instructions "$cwd"
+        fi
         continue
         ;;
       git | */git) ;;
@@ -289,16 +342,19 @@ for pass in "$pieces" "$qpieces"; do
       esac
     done
     [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
+    if [ "$pass" = plain ] && covered; then continue; fi
     start=$((i + 1))
 
     where=$here base=$cwd
     if [ -n "$dir" ]; then
       resolve "$dir"; where=${to:-$here/$dir}
       resolve "$dir" "$cwd"; base=${to:-$cwd/$dir}
+    elif [ "$chain" -eq 1 ]; then
+      base=$where
     fi
     push_checks "$where"
     [ "$base" = "$where" ] || push_checks "$base"
-  done <<<"$pass"
+  done <<<"$text"
 done
 
 [ -n "$reasons" ] || exit 0
