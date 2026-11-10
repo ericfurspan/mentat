@@ -16,7 +16,7 @@ cache=$(mktemp -d "$HOME/.cache/mentat-test.XXXXXX") || { echo "FAIL: second-opi
 cleanup() { rm -rf "$root" "$cache"; }
 trap cleanup EXIT
 export STUB="$root/stub" CALLS="$root/calls"
-mkdir -p "$STUB" "$CALLS" "$root/bin" "$root/tmp" "$root/plain folder"
+mkdir -p "$STUB" "$CALLS" "$root/tools/bin" "$root/tmp" "$root/plain folder"
 failures=0
 check() { if eval "$2"; then printf 'PASS: second-opinion --web %s\n' "$1"; else printf 'FAIL: second-opinion --web %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -37,18 +37,18 @@ GH_REAL=$(cd -P "$GH_USER" && pwd -P)
 export GROK_HOME="$GH_USER" XAI_API_KEY=fake-xai-key MENTAT_CANARY=fake-canary GROK_FOLDER_TRUST=0 GROK_WEB_FETCH=1
 
 # gh must never be called; git is the real one, except that a fetch is recorded.
-cat >"$root/bin/gh" <<'EOF'
+cat >"$root/tools/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "gh $*" >>"$CALLS/gh"
 exit 99
 EOF
-{ printf '#!/usr/bin/env bash\nREAL=%q\n' "$real_git"; cat; } >"$root/bin/git" <<'EOF'
+{ printf '#!/usr/bin/env bash\nREAL=%q\n' "$real_git"; cat; } >"$root/tools/bin/git" <<'EOF'
 for a in "$@"; do [ "$a" = fetch ] && echo "git $*" >>"$CALLS/fetch"; done
 exec "$REAL" "$@"
 EOF
 # codex: records how it was started and what it can see, then replies with
 # $STUB/codex_out. rendezvous: waits (bounded) until grok has started too.
-cat >"$root/bin/codex" <<'EOF'
+cat >"$root/tools/bin/codex" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = --version ]; then echo "codex-cli 0.0-stub"; exit 0; fi
 printf '%s\n' "$@" >"$STUB/args"
@@ -72,7 +72,7 @@ EOF
 # grok: records how it was started and what it can see, then replies with
 # $STUB/out_json (stdout) and $STUB/grok_exit. (mentat starts it with an empty
 # environment, so its own path is written in.)
-{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/grok" <<'EOF'
+{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/tools/bin/grok" <<'EOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
 if [ "${1:-}" = models ]; then
   printf '%s\n' "$@" >"$STUB/args_models"
@@ -112,8 +112,8 @@ cat "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
 exit "$(cat "$STUB/grok_exit")"
 EOF
-chmod +x "$root/bin/gh" "$root/bin/git" "$root/bin/codex" "$root/bin/grok"
-export PATH="$root/bin:$PATH"
+chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
+export PATH="$root/tools/bin:$PATH"
 
 # A folder that is in no git repository, and a local repository to run from in one case.
 plain="$root/plain folder"
@@ -181,6 +181,10 @@ check "Codex and Grok run at the same time" '[ "$rc" = 0 ] && [ -f "$STUB/codex_
 reset; echo 1 >"$STUB/codex_exit"; echo 'auth failed for token FAKE-TOKEN-123' >"$STUB/codex_log"; rc=$(run "$question")
 check "Codex exiting non-zero gives no second opinion (exit 0), Grok's view stays, and Codex's log is not printed" '[ "$rc" = 0 ] && views | grep -q "^- Codex ([0-9]* seconds): no second opinion (codex exited with status 1; its log may hold credentials" && views | grep -q "^- Grok ([0-9]* seconds): SECOND OPINION ANSWER: Grok says use a local cache\$" && ! grep -q FAKE-TOKEN-123 "$STUB/stdout" "$STUB/stderr"'
 check "that leaves nothing behind but Codex's private log" 'clean'
+mkdir -p "$HOME/.local/bin" && cp "$root/tools/bin/codex" "$HOME/.local/bin/codex"
+reset; rc=$(PATH="$HOME/.local/bin:$PATH" run "$question")
+rm -rf "$HOME/.local"
+check "a codex installed inside the home folder gives no second opinion (exit 0), says why and never starts" '[ "$rc" = 0 ] && views | grep -q "^- Codex ([0-9]* seconds): no second opinion (Codex is installed in or above the home folder, which the Codex profile never grants" && [ ! -e "$STUB/args" ] && views | grep -q "^- Grok ([0-9]* seconds): SECOND OPINION ANSWER: Grok says use a local cache\$" && clean'
 reset; touch "$STUB/codex_hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run "$question")
 check "a Codex timeout gives no second opinion (exit 0), Grok's view stays, and nothing is left behind" '[ "$rc" = 0 ] && views | grep -q "no second opinion (Codex did not finish within 1 seconds" && views | grep -q "^- Grok ([0-9]* seconds): SECOND OPINION ANSWER" && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && clean'
 

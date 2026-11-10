@@ -35,7 +35,7 @@ The maintainer's own instructions may choose how a finished piece of work ends. 
 - Its lookup reads the next agreed work (`mentat:backlog` step 5) read-only, and reports one of: the backlog could not be read; no recorded order; agreed work all waiting on the maintainer; agreed work none of which can start (in progress, or waiting on an unmerged pull request); no agreed work. It offers only an item that can start, and says "no agreed work is left" only in the last case.
 - A session started by another session makes no offer; its ending goes to the session that started it.
 - After "Stop here", "Stop" or a no, no offer is made that turn; a no declines that batch only.
-- A yes, forwarded word for word with the offered queue and its conditions, starts that build session. The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again only when its queue gains an item or an agreed condition changed.
+- A yes, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as `mentat:propose` "Starting a build" says. The build session still runs readiness, plan usage and the quick check, and sends its open questions through the session that started it.
 
 ## Approval
 - The maintainer merges every pull request.

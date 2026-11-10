@@ -12,7 +12,7 @@ mentat="$src/bin/mentat"
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 export STUB="$root/stub"
-mkdir -p "$STUB" "$root/bin" "$root/tmp" "$root/plain folder"
+mkdir -p "$STUB" "$root/tools/bin" "$root/tmp" "$root/plain folder"
 failures=0
 check() { if eval "$2"; then printf 'PASS: claude %s\n' "$1"; else printf 'FAIL: claude %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -24,7 +24,7 @@ mkdir -p "$CONF"
 # claude: records how it was started and what it can see, then replies with
 # $STUB/claude_out and exits with $STUB/claude_exit. mentat starts it with a rebuilt
 # environment, so its own folder is written in.
-{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/claude" <<'EOF'
+{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/tools/bin/claude" <<'EOF'
 [ "${1:-}" = --version ] && { echo "9.9.9 (Claude Code stub)"; exit 0; }
 [ "$*" = "plugin list --json" ] && { echo '[]'; exit 0; }
 printf '%s\n' "$@" >"$STUB/claude_args"
@@ -44,7 +44,7 @@ cat "$STUB/claude_out"
 exit "$(cat "$STUB/claude_exit" 2>/dev/null || echo 0)"
 EOF
 # codex: records that it ran and replies with $STUB/codex_out.
-cat >"$root/bin/codex" <<'EOF'
+cat >"$root/tools/bin/codex" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = --version ]; then echo "codex-cli 0.0-stub"; exit 0; fi
 printf '%s\n' "$@" >"$STUB/codex_args"
@@ -57,7 +57,7 @@ fi
 cp "$STUB/codex_out" "$out"
 EOF
 # gh: what mentat check reads; anything else fails.
-cat >"$root/bin/gh" <<'EOF'
+cat >"$root/tools/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   "auth status") exit 0 ;;
@@ -67,13 +67,13 @@ case "$*" in
   *) exit 99 ;;
 esac
 EOF
-chmod +x "$root/bin/claude" "$root/bin/codex" "$root/bin/gh"
-for t in git jq; do ln -s "$(command -v "$t")" "$root/bin/$t"; done
+chmod +x "$root/tools/bin/claude" "$root/tools/bin/codex" "$root/tools/bin/gh"
+for t in git jq; do ln -s "$(command -v "$t")" "$root/tools/bin/$t"; done
 # No grok anywhere, and folders that also lack claude or codex.
-export PATH="$root/bin:/usr/bin:/bin"
+export PATH="$root/tools/bin:/usr/bin:/bin"
 for d in noclaude nocodex; do
   mkdir "$root/$d"
-  for t in git jq gh claude codex; do [ "$d" = "no$t" ] || ln -s "$root/bin/$t" "$root/$d/$t"; done
+  for t in git jq gh claude codex; do [ "$d" = "no$t" ] || ln -s "$root/tools/bin/$t" "$root/$d/$t"; done
 done
 
 git init -q -b trunk "$root/my repo" && cd "$root/my repo" || exit 1

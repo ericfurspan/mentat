@@ -84,7 +84,7 @@ export STUB="$root/stub"
 # A temporary home: the publish check reads the home path and the word list from it.
 export HOME="$root/home"
 LIST="$HOME/.config/mentat/private-words"
-mkdir -p "$STUB" "$root/bin" "$(dirname "$LIST")"
+mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")"
 failures=0
 check() { if eval "$2"; then printf 'PASS: review --local %s\n' "$1"; else printf 'FAIL: review --local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -106,7 +106,7 @@ echo dirty >"$root/work/README"
 # read on), and a file named push_on_ci holds a head to switch to when CI is read;
 # pr comment records the body, or fails when comment_fails exists, and adds it to
 # the comments mentat status reads, as this account's.
-cat >"$root/bin/gh" <<'STUBEOF'
+cat >"$root/tools/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
 case "$1 $2" in
@@ -145,7 +145,7 @@ case "$1 $2" in
 esac
 STUBEOF
 # codex: records where it ran and what it read, and its run in the calls gh records, then replies with $STUB/reply.
-cat >"$root/bin/codex" <<'STUBEOF'
+cat >"$root/tools/bin/codex" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
 echo codex >>"$STUB/calls"
@@ -157,9 +157,9 @@ git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
 pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
 while [ $# -gt 0 ]; do [ "$1" = -o ] && sed -e "s|@TREE@|$(pwd)|g" -e "s|@TREEP@|$(pwd -P)|g" "$STUB/reply" >"$2"; shift; done
 STUBEOF
-chmod +x "$root/bin/gh" "$root/bin/codex"
+chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
-export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
+export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
 reset() {
   rm -f "$STUB"/*
@@ -253,6 +253,55 @@ check "the profile reads the main checkout's git directory, which a worktree's .
 check "denies /var/tmp and turns the apps feature off for reviews too" 'grep -qF "\"/var/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/var/tmp\"=\"deny\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args"'
 check "denies credential files inside the checkout for reviews too" 'grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
 check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ]'
+
+# Where codex is installed: the profile reads the install prefix of the codex that
+# runs, and of node for a script run by node, besides /opt/homebrew and /usr/local.
+# Each install runs the stub above.
+real() { (cd -P "$1" && pwd -P); }
+granted() { grep -qF "\"$1\"=\"read\"" "$STUB/args"; }
+fixed() { granted ":minimal" && granted /opt/homebrew && granted /usr/local; }
+check "the profile reads the stub's install prefix, the folder holding its bin folder, and the fixed system paths" '[ "$rc" = 0 ] && granted "$(real "$root/tools")" && fixed'
+inst="$root/installs"
+# Homebrew: bin/codex links into the keg.
+brew="$inst/brew prefix"
+mkdir -p "$brew/bin" "$brew/Cellar/codex/1.0/bin"
+cp "$root/tools/bin/codex" "$brew/Cellar/codex/1.0/bin/codex"
+ln -s ../Cellar/codex/1.0/bin/codex "$brew/bin/codex"
+reset; rc=$(PATH="$brew/bin:$PATH" run)
+check "a Homebrew-style codex: the profile reads its keg, the parent of the bin folder its link resolves into" '[ "$rc" = 0 ] && granted "$(real "$brew/Cellar/codex/1.0")" && fixed && ! granted "$(real "$brew")" && ! granted "$(real "$root/tools")"'
+# npm: bin/codex links to a node script in lib/node_modules, beside the native platform
+# package, and node is under another prefix. The stub node runs the script with bash.
+npm="$inst/npm prefix" nodep="$inst/node prefix"
+pkg="$npm/lib/node_modules/@openai/codex"
+mkdir -p "$npm/bin" "$pkg/bin" "$npm/lib/node_modules/@openai/codex-darwin-arm64/vendor" "$nodep/bin"
+{ echo '#!/usr/bin/env node'; tail -n +2 "$root/tools/bin/codex"; } >"$pkg/bin/codex.js"
+ln -s ../lib/node_modules/@openai/codex/bin/codex.js "$npm/bin/codex"
+printf '#!/usr/bin/env bash\nexec bash "$@"\n' >"$nodep/bin/node"
+chmod +x "$pkg/bin/codex.js" "$nodep/bin/node"
+reset; rc=$(PATH="$npm/bin:$nodep/bin:$PATH" run)
+check "an npm codex: the profile reads the npm prefix, which holds the Codex package and its platform package, and node's prefix" '[ "$rc" = 0 ] && [ -s "$STUB/args" ] && granted "$(real "$npm")" && granted "$(real "$nodep")" && fixed && ! granted "$(real "$pkg")" && ! granted "$(real "$root/tools")"'
+# Codex rejects a repeated key, so a prefix shared by codex and node is named once.
+cp "$nodep/bin/node" "$npm/bin/node"
+reset; rc=$(PATH="$npm/bin:$PATH" run)
+rm -f "$npm/bin/node"
+check "an npm codex with node in the same prefix: the profile names that prefix once" '[ "$rc" = 0 ] && [ "$(grep -oF "\"$(real "$npm")\"=\"read\"" "$STUB/args" | wc -l | tr -d " ")" = 1 ]'
+# Installs in, inside or above the home folder are refused before Codex starts.
+refused() { # $1 who is installed there
+  [ "$rc" = 1 ] && grep -qxF "mentat: not reviewed: $1 installed in or above the home folder, which the Codex profile never grants" "$STUB/out" && [ ! -e "$STUB/args" ] && ! posted
+}
+refuse_at() { # $1 the folder to hold bin/codex, $2 where that is
+  mkdir -p "$1/bin" && cp "$root/tools/bin/codex" "$1/bin/codex"
+  reset; rc=$(PATH="$1/bin:$PATH" run)
+  rm -rf "${1:?}/bin"
+  check "a codex installed $2 is not reviewed, and says why" 'refused "Codex is"'
+}
+refuse_at "$HOME" "in the home folder"
+refuse_at "$HOME/.local" "inside the home folder"
+refuse_at "$root" "in a folder holding the home folder"
+nvm="$HOME/.nvm/versions/node/v1"
+mkdir -p "$nvm/bin" && cp "$nodep/bin/node" "$nvm/bin/node"
+reset; rc=$(PATH="$npm/bin:$nvm/bin:$PATH" run)
+check "an npm codex whose node is inside the home folder is not reviewed, and says why" 'refused "node, which runs Codex, is"'
 
 # A later round's head: the range still starts at the merge base, not at the head reviewed before.
 (cd "$root/seed" && echo fix >>README && git commit -qam fix && git push -q "$root/origin.git" HEAD:refs/pull/8/head)
@@ -475,7 +524,7 @@ live_run() {
   local IFS=:
   # shellcheck disable=SC2086 # split PATH on colons
   for d in $PATH; do
-    [ "$d" != "$root/bin" ] && [ -x "$d/codex" ] && { real_codex="$d/codex"; break; }
+    [ "$d" != "$root/tools/bin" ] && [ -x "$d/codex" ] && { real_codex="$d/codex"; break; }
   done
   IFS=$' \t\n'
   [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
