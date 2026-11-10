@@ -867,10 +867,27 @@ done
 
 # mentat review, review --local, review --grok, second-opinion (both modes), the Claude review tool and check behave as
 # specified (stub gh, codex, grok and gitleaks), and so do the merge, push, private text and secret hooks.
+# They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  for t in tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; do
-    if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
+  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh)
+  outs=$(mktemp -d) || exit 1
+  pids=()
+  # Background jobs ignore Ctrl-C, so an interrupt stops them here.
+  trap 'kill ${pids[@]+"${pids[@]}"} 2>/dev/null; rm -rf "$outs"; exit 130' INT TERM
+  for t in "${behavior[@]}"; do
+    "$t" >"$outs/${t#tests/}" 2>&1 &
+    pids+=("$!")
   done
+  i=0
+  for t in "${behavior[@]}"; do
+    if wait "${pids[$i]}"; then rc=0; else rc=1; fi
+    out=$(cat "$outs/${t#tests/}")
+    printf '%s\n' "$out"
+    [ "$rc" = 0 ] || fail "$t"
+    i=$((i + 1))
+  done
+  trap - INT TERM
+  rm -rf "$outs"
 else
   fail "jq not installed, mentat review, check and the hooks not tested"
 fi
