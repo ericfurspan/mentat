@@ -385,6 +385,9 @@ else
   fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
 fi
 phrase_check skills/plan/SKILL.md "that it never briefs a builder" 'Never brief a builder, create a branch or edit a file of the repository'
+# Plan takes Backlog and Todo items, never the Inbox, which triage settles.
+phrase_check skills/plan/SKILL.md "the no-argument subject from Backlog and Todo, never the Inbox" "None: the subject is the project's open Backlog and Todo items and the decisions open on them, never the Inbox, which triage settles."
+phrase_check skills/plan/SKILL.md "an Inbox item id stopped and sent to triage" "one in the Inbox stops the session with nothing changed and names \`/mentat:triage\` for it."
 phrase_check skills/plan/SKILL.md "the freshness check before reading code or asking" "3. Before reading code or asking the maintainer anything, fetch origin's default branch and compare the checkout with it; if the fetch fails, compare with the local copy and say so. When the checkout lacks commits there, fast-forward it if it is a clean checkout of that branch; otherwise stop and say why. A checkout that lacks none goes on."
 phrase_check skills/plan/SKILL.md "the fast-forward allowed despite the no-edit rule" "edit a file of the repository, beyond step 3's fast-forward;"
 phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
