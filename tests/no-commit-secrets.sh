@@ -176,6 +176,14 @@ reset; stage_hit; fine "$repo/clean.txt"; run "$repo" 'git commit -i -m x clean.
 check "git commit -i with paths keeps the staged changes" 'names "dir one/file two.txt"'
 reset; hit "$repo/new.txt"; g -C "$repo" add new.txt; run "$repo" 'git commit -m x -- new.txt'
 check "a commit naming a newly staged file scans it" 'names new.txt'
+for c in 'git commit -m x "dir one"' 'git commit -i -m x "dir one"'; do
+  reset; hit "$repo/dir one/new.txt"; printf 'fine\n' >>"$repo/dir one/kept.txt"; run "$repo" "$c"
+  check "$c leaves an untracked file in the folder out" 'scanned && has "dir one/kept.txt" && ! has "dir one/new.txt"'
+done
+reset; hit "$repo/dir one/new.txt"; printf 'token = stubmatchedtext\n' >>"$repo/dir one/kept.txt"; run "$repo" 'git commit -m x "dir one"'
+check "a commit naming a folder scans a tracked change in it" 'names "dir one/kept.txt"'
+reset; rm "$repo/dir one/kept.txt"; fine "$repo/clean.txt"; run "$repo" 'git commit -m x "dir one" clean.txt'
+check "a commit naming a folder includes a deleted tracked file" 'scanned && grep -q "^--- a/dir one/kept.txt" "$STUB/stdin"'
 
 for c in 'git commit --amend -m x' 'git commit --allow-empty -m x' 'git commit --author "A <a@b>" -m x'; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
