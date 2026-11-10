@@ -301,7 +301,7 @@ phrase_check skills/triage/SKILL.md "scope merged into a Todo item not committed
 phrase_check skills/backlog/SKILL.md "scope merged into a Todo item not committed, kept out of its spec until agreed" "Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the section only once agreed through \`mentat:propose\`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, linking the item."
 phrase_check skills/backlog/github.md "scope still not agreed filed as its own issue when a GitHub issue closes" '- When an issue closes with scope triage merged into it still not agreed, file that scope as its own issue, in Backlog, linking the closed one.'
 phrase_check skills/backlog/SKILL.md "an item's title rewritten when its scope changes, with either tracker" "With either tracker, when an item's or issue's agreed spec, or a not-agreed item's current plan, changes so the title no longer says what the item does, the same write rewrites the item's title, keeping its identifier. Scope triage merged in but not yet agreed does not change the title until \`mentat:propose\` agrees it."
-phrase_check skills/propose/SKILL.md "scope merged into agreed work weighed and agreed when next planned" "Scope an Intake sitting merged into agreed work is taken on, not agreed: it is weighed and agreed when that work is next planned."
+phrase_check skills/propose/SKILL.md "scope merged into committed work not committed, reviewed and agreed when next planned" 'Scope that triage merged into committed work is not committed: it gets its design review and agreement when that work is next planned.'
 
 # The / menu shows descriptions as plain text: no skill's description holds <, > or a backtick, and a menu
 # skill's description value is one short line of at most 150 characters.
@@ -362,15 +362,22 @@ phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "on
 phrase_check skills/plan/SKILL.md "every agreement through mentat:propose" "Every agreement to build goes through \`mentat:propose\`"
 phrase_check skills/plan/SKILL.md "a read that refines no item and clears no wait" 'This read changes no item it does not record an answer on: it refines no hand-made item, clears no wait'
 phrase_check skills/plan/SKILL.md "the paste line as the work-tickets command" "the full \`/mentat:work-tickets <ids>\` command"
-# Plan splits its ready items into build groups by shared files, one paste line per group, a fresh checkout per build run.
+# Plan splits the items this session committed into build groups by shared files and starts one build session per group,
+# within plan usage, a fresh checkout each; where it cannot start one, it gives a paste line per group. Stop here starts nothing.
+phrase_check skills/plan/SKILL.md "only the items this session committed, in the tracker's order" "Then take only the items this session just committed, in the tracker's order (\`mentat:backlog\` step 5),"
 phrase_check skills/plan/SKILL.md "the readiness filter before grouping" 'Split the rest into build groups'
 phrase_check skills/plan/SKILL.md "groups by predicted shared files" "two items share a group when their changes would touch any file in common, as predicted from each item's spec and the code read in step 3."
 phrase_check skills/plan/SKILL.md "an unclear overlap kept in one group" 'When it is unclear whether two items share a file, they share a group.'
 phrase_check skills/plan/SKILL.md "transitive groups" 'Groups chain, so A with B and B with C is one group.'
 phrase_check skills/plan/SKILL.md "no file exempt from grouping" 'No file is exempt.'
-phrase_check skills/plan/SKILL.md "one paste line per group in order" 'Give each group, in the order of its first item, its own fenced line'
-phrase_check skills/plan/SKILL.md "a fresh checkout per build run" 'With more than one line, say each build run gets its own fresh checkout (worktree).'
+phrase_check skills/plan/SKILL.md "plan usage read before starting builds" "Read plan usage as the maintainer's own instructions say, and stop and ask at a limit they set; with no such instructions, read no plan limit."
+phrase_check skills/plan/SKILL.md "one build session per group, each in a fresh checkout" "Then start one build session per group, in the order of its first item, each in its own fresh checkout (worktree), running the full \`/mentat:work-tickets <ids>\` command"
+phrase_check skills/plan/SKILL.md "the paste line fallback, one per group in order" 'Where Claude Code cannot start a session, give each group, in the order of its first item, its own fenced line'
+phrase_check skills/plan/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, say each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
 phrase_check skills/plan/SKILL.md "the paste line that starts its build" 'its own fenced line the maintainer can paste to start its build: the full'
+phrase_check skills/plan/SKILL.md "no start for items not committed in this session" 'Items committed before this session, or not committed, are not started.'
+phrase_check skills/plan/SKILL.md "starting a build session is not briefing a builder" 'Starting a build session (step 8) is none of these: that session briefs its own builders.'
+phrase_check skills/plan/SKILL.md "Stop here starting nothing" 'nothing else runs, no build session starts, and the report follows.'
 if grep -qE 'not ready to build.*Split the rest into build groups' skills/plan/SKILL.md; then
   pass "skills/plan/SKILL.md applies the readiness filter before grouping"
 else
@@ -384,9 +391,8 @@ phrase_check skills/plan/SKILL.md "a big decision's dependents left open and ind
 phrase_check skills/plan/SKILL.md "the next step recorded in the current plan as a permitted write" "and to record that next step, \`/mentat:plan <id>\`, in the \`## Current plan\` section of an item with a decision step 4 sends to its own session. It makes no other backlog write."
 phrase_check skills/plan/SKILL.md "the report naming /mentat:plan for a big decision" "naming \`/mentat:plan <id>\` when step 4 sends a decision on it to its own session."
 
-# The agenda and a work-tickets run are started only by the maintainer and list their arguments; the agenda
-# writes nothing, and a work-tickets run sends an item that needs planning to /mentat:plan and treats its
-# opening yes as a session control.
+# The agenda and a work-tickets run are started by a command and list their arguments; the agenda writes and
+# starts nothing, and a work-tickets run sends an item that needs planning to /mentat:plan and asks no final yes.
 for k in agenda work-tickets; do
   f=skills/$k/SKILL.md
   for s in "name: $k" 'disable-model-invocation: true'; do
@@ -407,7 +413,13 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   fail "skills/work-tickets/SKILL.md's description must list its arguments (Arguments: backlog item ids.)"
 fi
-phrase_check skills/work-tickets/SKILL.md "the project's next agreed work with no ids" "With none: the project's next agreed work as the tracker's section reads it"
+phrase_check skills/work-tickets/SKILL.md "the committed Todo items in the tracker's order with no ids" "With none: the project's Todo items that have a spec, are not parked and do not wait on the maintainer, in the tracker's order (\`mentat:backlog\` step 5)."
+phrase_check skills/work-tickets/SKILL.md "a missing or changed spec fingerprint sent back to planning" "so does one whose recorded spec fingerprint (\`mentat:backlog\` step 6) is missing or differs from the fingerprint of its current spec, computed the same way, since a changed spec goes back to planning."
+phrase_check skills/work-tickets/SKILL.md "an item with a branch or pull request skipped with its status" 'An item with a branch or pull request (In Progress), waiting on the maintainer, or ended leaves the queue, named with its status.'
+phrase_check skills/work-tickets/SKILL.md "no final yes asked" "No final yes is asked: typing the command, a start by a plan session, or a forwarded yes (\`rules.md\` \"Ending finished work\") is the go."
+phrase_check skills/work-tickets/SKILL.md "asked again only for a new item or a changed condition" 'The run asks again only when its queue gains an item over the queue it was started with, or an agreed condition changed.'
+phrase_check skills/work-tickets/SKILL.md "status, blockers, branch and fingerprint re-read before each item" 'Right before each item starts, re-read its status, blockers, any branch or pull request and its fingerprint, and check its readiness again as step 3 says.'
+phrase_check skills/work-tickets/SKILL.md "the branch created before the builder, as the lock" 'Then create its branch, from the default branch, before briefing its builder: the branch is the lock, so a run that finds it skips the item.'
 phrase_check skills/agenda/SKILL.md "that it forbids writes and asks only step 2's question" "This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing but step 2's question on a run with no argument."
 phrase_check skills/agenda/SKILL.md "the one question on a run with no argument" "With no argument, before reading any record, ask once which projects to cover: the session's project first, then \`all\`, another through Other."
 phrase_check skills/agenda/SKILL.md "no question where no project list is named" 'With no such instructions, the run asks nothing and covers only the session'"'"'s repository'
@@ -415,7 +427,6 @@ phrase_check skills/agenda/SKILL.md "that the backlog's listing writes do not ru
 phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`../backlog/linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
 phrase_check skills/agenda/SKILL.md "a decision answered in chat recorded nowhere" 'record nothing and say in one line where the answer goes'
 phrase_check skills/work-tickets/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
-phrase_check skills/work-tickets/SKILL.md "the opening yes as a session control" 'That yes is a session control, not an agreement'
 phrase_check skills/work-tickets/SKILL.md "that it never plans scope" 'It builds and never plans scope'
 phrase_check skills/work-tickets/SKILL.md "the merge line kept for the final message" '"You: merge #N." goes into the final message instead of ending the run'
 phrase_check skills/work-tickets/SKILL.md "that it never merges" 'The run never merges.'
@@ -480,7 +491,6 @@ phrase_check rules.md "a forwarded yes starting the build session" 'A yes, forwa
 phrase_check rules.md "the build session's checks kept and asked again only for a new item or changed condition" 'The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again only when its queue gains an item or an agreed condition changed.'
 phrase_check skills/plan/SKILL.md "the pointer to the ending" "Then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
-phrase_check skills/work-tickets/SKILL.md "a forwarded yes replacing step 5's last prompt" "A yes forwarded as \`rules.md\` \"Ending finished work\" says replaces this last prompt."
 phrase_check skills/work-tickets/SKILL.md "the final message's pointer to the ending" "and each decision made without the maintainer. Then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/review/SKILL.md "the post-merge pointer to the ending" "and report in one line, then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
@@ -493,7 +503,7 @@ phrase_check skills/propose/SKILL.md "the proposal's hand check offer for a chan
 phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "You: merge #N." until they report it.'
 phrase_check skills/propose/SKILL.md "no hand check offer for a change with nothing to try" 'A change with nothing to try gets no offer.'
 phrase_check skills/propose/SKILL.md "the spec's hand check only when accepted or asked for" 'The spec lists a requirement the maintainer checks by hand only when their agreement accepts the offer or they asked for one.'
-phrase_check skills/propose/SKILL.md "a weigh for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets \`mentat weigh\`, however short."
+phrase_check skills/propose/SKILL.md "a design review for a change to what an agent is told, however short" "A request that changes the meaning of what an agent is told in Mentat's \`rules.md\`, skills or builder prompt, or in a repository's \`AGENTS.md\` or other standing agent instructions, is not small and gets the design review (\`mentat weigh\`), however short."
 phrase_check skills/propose/SKILL.md "a change Claude Code suggests itself taken as a request" 'A change Claude Code suggests itself counts as a request here.'
 # A spec says what a skill's run with no arguments does, and a skill that takes project names asks which, the same way everywhere.
 phrase_check skills/propose/SKILL.md "a spec's bare run for a skill that takes arguments" 'When the change adds a skill that takes arguments (text typed after its command) or changes what they do, the spec says what a run with no arguments does.'
@@ -585,7 +595,11 @@ phrase_check skills/triage/SKILL.md "readers run as with all after the opening q
 phrase_check skills/triage/SKILL.md "no opening question where no project list is named" "Where the maintainer's own instructions name no project list, ask nothing: the sitting covers the session's repository."
 phrase_check skills/triage/SKILL.md "brainstorm mode's own project question" 'Brainstorm mode keeps its own project question.'
 phrase_check skills/triage/SKILL.md "each answer recorded so the item is not found again" 'so step 2 does not find the item again'
-phrase_check skills/propose/SKILL.md "that taking an idea on is not agreement, and agreement moves it to Todo" "An Intake sitting's \"take on\" is not agreement to build; the maintainer's agreement here moves the item from Backlog to Todo."
+phrase_check skills/propose/SKILL.md "that accepting an item is no commitment, and the yes here commits it to Todo" "Accepting an Inbox item in triage is not a commitment; the maintainer's yes here commits the item from Backlog to Todo."
+# The agreement question says a yes commits the item and starts its build, and the agreement records the spec's fingerprint.
+phrase_check skills/propose/SKILL.md "the agreement question's commit and start" 'The question says that a yes commits the item to Todo and starts its build, checks and reviews.'
+phrase_check skills/propose/SKILL.md "the small request's yes committing and starting the build" "That yes, like step 4's, commits the item to Todo and starts its build, checks and reviews."
+phrase_check skills/propose/SKILL.md "the fingerprint recorded at agreement" "On the item it then records the spec's fingerprint, as \`mentat:backlog\` step 6 says, and again whenever an agreed change of scope rewrites the spec."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
 # and the Linear skill's migration carries the pinned issue's order by creation order.
@@ -665,10 +679,10 @@ done
 
 # The propose step's procedure is in mentat:propose, with its standing lines on agreement.
 phrase_check rules.md "the call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request or suggesting a change of its own, a fix to its own output included."
-phrase_check skills/propose/SKILL.md "that a weigh's DO IT is not agreement" "A weigh's \`DO IT\` is not the maintainer's agreement"
+phrase_check skills/propose/SKILL.md "that a design review's DO IT is not agreement" "A design review's \`DO IT\` is not the maintainer's agreement"
 phrase_check skills/propose/SKILL.md "that nothing is built before agreement" 'nothing is built before that agreement'
 phrase_check skills/propose/SKILL.md "that the maintainer agrees once" 'The maintainer agrees once.'
-phrase_check skills/propose/SKILL.md "that agreed work is not weighed again" 'Agreed work is not weighed again.'
+phrase_check skills/propose/SKILL.md "that agreed work gets no second design review" 'Agreed work gets no second design review.'
 phrase_check skills/propose/SKILL.md "that a batch needs agreement under one spec" 'A batch needs agreement under one spec whose numbered requirements cover each change.'
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
