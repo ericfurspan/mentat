@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 400" width="680" height="400" role="img" aria-label="Inside Claude Code: rules and skills loaded every session, the main session, a builder subagent, and merge, push and publish hooks that ask you first. The mentat command has weigh, challenge, review, consult, status and check, and runs Codex (OpenAI) and Grok (xAI).">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 400" width="680" height="400" role="img" aria-label="Inside Claude Code: rules and skills loaded every session, the main session, a builder subagent, and merge, push and publish hooks that ask you first. The mentat command has review, ci, status, second-opinion and check, and runs Codex (OpenAI) and Grok (xAI).">
   <style>
     .gb { fill: #F1EFE8; stroke: #888780; stroke-width: 1; }
     .gt { fill: #2C2C2A; }
@@ -58,8 +58,8 @@
     <path class="l" d="M 188 308 L 82 308 L 82 198" marker-end="url(#a)"/>
     <rect class="gb" x="480" y="135" width="160" height="66" rx="8"/>
     <text class="gt" x="560" y="152" font-size="14" font-weight="600">mentat command</text>
-    <text class="gs" x="560" y="171" font-size="12" font-weight="400">weigh, challenge, review,</text>
-    <text class="gs" x="560" y="186" font-size="12" font-weight="400">consult, status, check</text>
+    <text class="gs" x="560" y="171" font-size="12" font-weight="400">review, ci, status,</text>
+    <text class="gs" x="560" y="186" font-size="12" font-weight="400">second-opinion, check</text>
     <path class="l" d="M 432 168 L 478 168" marker-end="url(#a)"/>
     <rect class="tb" x="480" y="40" width="160" height="52" rx="8"/>
     <text class="tt" x="560" y="57" font-size="14" font-weight="600">Codex</text>

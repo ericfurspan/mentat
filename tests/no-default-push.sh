@@ -565,7 +565,7 @@ branch i-prompts 'printf "b\n" >>prompts/builder.md'
 branch i-rename 'g mv AGENTS.md notes.md'
 branch i-delete 'g rm -q rules.md'
 branch i-other 'printf "b\n" >>README.md; printf "b\n" >>docs/rules.md; printf "b\n" >>docs/prompts/x.md; printf "x\n" >AGENTS.txt'
-instr_reason="Mentat: this pull request changes agent instructions, and a change to what agents are told gets mentat weigh before the maintainer agrees to it. Approve if it was weighed, if Codex and Grok are off for this session, or if it changes no meaning."
+instr_reason="Mentat: this pull request changes agent instructions, and a change to what agents are told gets mentat second-opinion before the maintainer agrees to it. Approve if it got one, if Codex and Grok are off for this session, or if it changes no meaning."
 for d in i-agents i-new i-claude i-skill i-rules i-prompts i-rename i-delete; do
   while IFS= read -r cmd; do
     check "a branch changing instructions ($d) asks with that reason before: $cmd" '[ "$(reason "$tmp/$d" "$cmd")" = "$instr_reason" ]'

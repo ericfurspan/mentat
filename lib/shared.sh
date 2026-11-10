@@ -8,18 +8,17 @@ CI_GRACE_SECONDS="${MENTAT_CI_GRACE_SECONDS:-60}"
 
 die() { printf 'mentat: %s\n' "$1" >&2; exit "${2:-1}"; }
 not_reviewed() { die "not reviewed: $1" 1; }
-not_challenged() { die "not challenged: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
-# How many commits on origin's default branch HEAD lacks, so weigh and challenge never
-# judge a stale checkout. Sets the caller's fresh_def (the default branch), fresh_behind
+# How many commits on origin's default branch HEAD lacks, so a second opinion never
+# judges a stale checkout. Sets the caller's fresh_def (the default branch), fresh_behind
 # (the count, or empty when unknown) and fresh_note (why freshness could not be checked,
 # or empty). The default branch is the one the remote names, else the local origin/HEAD.
 # It is fetched into a ref of this run's own, as review --local does, so origin/<default>
 # and git's record of the last fetch stay as they are, and the ref is deleted once counted. When the fetch
 # fails or there is no origin remote, a local origin/<default> that HEAD is behind still
 # counts. Call it before setting an EXIT trap: it sets and clears its own.
-# shellcheck disable=SC2034 # fresh_note is the caller's, read by weigh and challenge
+# shellcheck disable=SC2034 # fresh_note is the caller's, read by opinion_repo
 fresh_check() { # $1 top level
   local top=$1 ref="refs/mentat/fresh-$$" why="" n
   fresh_def="" fresh_behind="" fresh_note=""
