@@ -375,7 +375,7 @@ phrase_check skills/plan/SKILL.md "an unclear overlap kept in one group" 'When i
 phrase_check skills/plan/SKILL.md "transitive groups" 'Groups chain, so A with B and B with C is one group.'
 phrase_check skills/plan/SKILL.md "no file exempt from grouping" 'No file is exempt.'
 phrase_check skills/plan/SKILL.md "plan usage read before starting builds, only fitting groups started without a yes" "Read plan usage as the maintainer's own instructions say; at a limit they set, ask before starting any group that would pass it, and unless they say yes, start only the groups that fit, in the tracker's order. With no such instructions, read no plan limit."
-phrase_check skills/plan/SKILL.md "one build session per group, each in a fresh checkout" "Then start one build session per group, in the order of its first item, each in its own fresh checkout (worktree), running the full \`/mentat:build <ids>\` command"
+phrase_check skills/plan/SKILL.md "one build session per group, each in a fresh checkout, briefed as mentat:propose says" "Then start one build session per group, in the order of its first item, each in its own fresh checkout (worktree), briefed as \`mentat:propose\` \"Starting a build\" says, its ids in that order and separated by spaces."
 phrase_check skills/plan/SKILL.md "the paste line fallback, one per group in order" 'Where Claude Code cannot start a session, give each group, in the order of its first item, its own fenced line'
 phrase_check skills/plan/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, say each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
 phrase_check skills/plan/SKILL.md "the paste line that starts its build" 'its own fenced line the maintainer can paste to start its build: the full'
@@ -502,8 +502,8 @@ phrase_check rules.md "no agreed work is left said only in the last case" 'It of
 phrase_check rules.md "no offer from a started session" 'A session started by another session makes no offer; its ending goes to the session that started it.'
 phrase_check rules.md "no offer after a stop" 'After "Stop here", "Stop" or a no, no offer is made that turn;'
 phrase_check rules.md "a no declining that batch only" 'a no declines that batch only.'
-phrase_check rules.md "a forwarded yes starting the build session" 'A yes, forwarded word for word with the offered queue and its conditions, starts that build session.'
-phrase_check rules.md "the build session's checks kept and asked again only for a new item or changed condition" 'The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again only when its queue gains an item or an agreed condition changed.'
+phrase_check rules.md "a forwarded yes starting the build session, briefed as mentat:propose says" "A yes, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as \`mentat:propose\` \"Starting a build\" says."
+phrase_check rules.md "the build session's checks kept and its questions sent through the starting session" 'The build session still runs readiness, plan usage and the quick check, and sends its open questions through the session that started it.'
 phrase_check skills/plan/SKILL.md "the pointer to the ending" "Then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
 phrase_check skills/build/SKILL.md "the final message's pointer to the ending" "and each decision made without the maintainer. Then end as \`rules.md\` \"Ending finished work\" says."
@@ -627,6 +627,20 @@ phrase_check skills/propose/SKILL.md "each answer's effect in a chat request" "I
 phrase_check skills/propose/SKILL.md "an item for later built only on the maintainer's command or offer yes" "An item committed for later is built only when the maintainer types \`/mentat:build\`, with or without its id, or says yes to a next-work offer naming it."
 phrase_check skills/propose/SKILL.md "the small request's agreement with step 4's three answers, recorded with the fingerprint" 'Its agreement offers step 4'"'"'s answers, "Agree and build now", "Agree, build later" and "Not now", with the same effects, and step 7 records the chosen answer with the fingerprint.'
 phrase_check skills/propose/SKILL.md "the fingerprint and answer recorded at agreement" "On the item it then records the spec's fingerprint and the chosen answer (build now or later), as \`mentat:backlog\` step 6 says, and again whenever an agreed change of scope rewrites the spec."
+# A session that starts a build session writes the build command bare in the brief, since Claude Code grants a
+# maintainer-only skill only for its slash name as a separate word, and the started session stops on a refusal.
+phrase_check skills/propose/SKILL.md "the part on starting a build" '## Starting a build'
+phrase_check skills/propose/SKILL.md "the build command as its own word after plain text, no mark touching it" 'writes the build command into the brief as its own word after plain text: a slash, the command name and the ids, with no backtick, quote or other mark touching it.'
+phrase_check skills/propose/SKILL.md "every other command name in the brief in backticks" 'Every other command name in the brief stays in backticks.'
+phrase_check skills/propose/SKILL.md "the started session calling the Skill tool with that command and ids" 'The brief tells the started session to call the Skill tool with that command and those ids,'
+phrase_check skills/propose/SKILL.md "a refused call stopping with nothing changed, not by hand, the typed command sent back" "if the Skill tool refuses the call, it stops with nothing changed, does not follow the skill's steps by hand, and sends the typed command \`/mentat:build <ids>\` to the starting session."
+# Instruction text loads into sessions, so it describes the build command's form and never writes a slash command bare.
+bare=$(grep -nE '(^|[^`])/mentat:' rules.md skills/*/SKILL.md | cut -d: -f1,2)
+if [ -n "$bare" ]; then
+  fail "rules.md and skills must keep every /mentat: command name in backticks (bare at: $bare)"
+else
+  pass "rules.md and skills keep every /mentat: command name in backticks"
+fi
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
 # and the Linear skill's migration carries the pinned issue's order by creation order.
