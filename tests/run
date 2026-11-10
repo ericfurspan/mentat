@@ -627,7 +627,9 @@ phrase_check skills/triage/SKILL.md "inbox ideas in no project read in a sitting
 phrase_check skills/triage/SKILL.md "every page of a list read" 'Read every page of a list.'
 phrase_check skills/triage/SKILL.md "the questions counted first" '4. Ask. Count the questions.'
 phrase_check skills/triage/SKILL.md "items with no project after the projects', oldest first by their own date" "then items by project, then items with no project, each oldest first by the item's own date where the maintainer's instructions give one;"
-phrase_check skills/linear/SKILL.md "the migration's undecided idea in the Inbox" "An undecided idea goes in the Inbox, the Triage status (\`../backlog/linear.md\` step 2), with no type label or item shape, and step 7's comment lists it as \"Inbox\" beside its id."
+phrase_check skills/linear/SKILL.md "the migration's Inbox only for an issue github.md maps there" "An issue \`../backlog/github.md\` maps to the Inbox (the \`idea\` label, or an opening sentence saying it waits in the Inbox) goes in the Inbox, the Triage status (\`../backlog/linear.md\` step 2), with no type label or item shape, and step 7's comment lists it as \"Inbox\" beside its id."
+phrase_check skills/linear/SKILL.md "the migration's other unplanned issue as a Backlog item" 'Any other issue becomes a Backlog item.'
+phrase_check skills/linear/SKILL.md "the migration's stage-label mapping" "With stage labels: \`idea\` is the Inbox (below), no stage label is a Backlog item, \`ready\` is Todo,"
 phrase_check skills/triage/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
 phrase_check skills/triage/SKILL.md "that all is every current project, not a name or option" "\`all\` means every current project and is neither a project name nor a reader option."
 # A sitting with neither project names nor `all` asks once which projects' ideas it settles, as a session control, unless no project list is named.
