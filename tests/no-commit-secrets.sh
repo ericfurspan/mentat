@@ -51,9 +51,10 @@ repo="$tmp/repo"
 g init -q "$repo"
 mkdir -p "$repo/dir one"
 printf 'one\ntoken = stubmatchedtext\n' >"$repo/dir one/kept.txt"
+printf 'clean\n' >"$repo/clean.txt"
 g -C "$repo" add -A
 g -C "$repo" commit -q -m first
-reset() { rm -f "$STUB"/*; g -C "$repo" reset -q --hard; g -C "$repo" clean -q -fd; }
+reset() { rm -f "$STUB"/*; g -C "$repo" reset -q --hard; g -C "$repo" clean -q -fdx; }
 
 # run <cwd> <command>: the hook's output in $STUB/out, its exit code in $rc
 run() {
@@ -97,6 +98,126 @@ reset; run "$repo" 'git commit -m "empty"'
 check "nothing staged passes without a scan" 'quiet && [ ! -f "$STUB/calls" ]'
 reset; stage_hit; run "$repo" 'git status && echo "no commit yet"'
 check "a command that is not a commit is left alone" 'quiet && [ ! -f "$STUB/calls" ]'
+
+# A command that stages in the same call is scanned for what its commit would include.
+hit() { printf 'a\ntoken = stubmatchedtext\n' >"$1"; }
+fine() { printf 'fine\n' >"$1"; }
+scanned() { quiet && [ -s "$STUB/calls" ]; }
+has() { grep -q "^+++ b/$1" "$STUB/stdin"; }
+names() { [ "$(decision)" = ask ] && reason | grep -qF "stub-rule in $1"; }
+sim_failed() { [ "$(decision)" = ask ] && reason | grep -q "could not be worked out" && ! reason | grep -q stub-rule && no_leak; }
+
+reset; hit "$repo/dir one/file two.txt"; run "$repo" 'git add "dir one/file two.txt" && git commit -m x'
+check "git add <path> then commit scans the path it stages" 'names "dir one/file two.txt" && reason | grep -q "changes this commit would include" && no_leak'
+reset; hit "$repo/new.txt"; run "$repo" 'git add -A && git commit -m x'
+check "git add -A then commit scans an untracked file" 'names new.txt'
+reset; printf 'secret.txt\n' >"$repo/.gitignore"; hit "$repo/secret.txt"; run "$repo" 'git add -A && git commit -m x'
+check "git add -A leaves an ignored file out" 'scanned && has .gitignore && ! has secret.txt'
+reset; fine "$repo/new.txt"; run "$repo" 'git add -A && git commit -m x && git push origin HEAD 2>&1 | tail -n 3'
+check "steps after the commit are not read as its paths" 'scanned && has new.txt'
+reset; hit "$repo/new.txt"; run "$base" "git -C '$repo' add -A && git -C '$repo' commit -m x"
+check "git -C add and commit scan the repository they name" 'names new.txt'
+
+reset; hit "$repo/top.txt"; fine "$repo/dir one/new.txt"
+run "$base" "cd '$repo/dir one' && git add . && git commit -m x"
+check "git add . from a subfolder leaves a change outside it out" 'scanned && has "dir one/new.txt" && ! has top.txt'
+run "$repo/dir one" 'git add . && git commit -m x'
+check "git add . with the session in a subfolder leaves a change outside it out" 'scanned && has "dir one/new.txt" && ! has top.txt'
+run "$repo" "git status && cd 'dir one' && git add . && git commit -m x"
+check "a cd between steps moves the folder of the add after it" 'scanned && has "dir one/new.txt" && ! has top.txt'
+run "$repo" "git -C 'dir one' add . && git commit -m x"
+check "git -C <dir> add . covers that folder only" 'scanned && has "dir one/new.txt" && ! has top.txt'
+run "$base" "cd '$repo/dir one' && git add -A && git commit -m x"
+check "git add -A from a subfolder covers the whole tree" 'names top.txt'
+reset; hit "$repo/dir one/new.txt"; run "$base" "cd '$repo/dir one' && git add . && git commit -m x"
+check "git add . from a subfolder scans that subfolder" 'names "dir one/new.txt"'
+reset; hit "$repo/dir one/new.txt"; run "$repo/dir one" 'git add new.txt && git commit -m x'
+check "a relative add path resolves from the session's folder" 'names "dir one/new.txt"'
+
+for c in 'git commit -am "msg"' 'git commit -a -m x' 'git commit --all -m x'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c scans a changed tracked file" 'names clean.txt'
+done
+reset; fine "$repo/clean.txt"; hit "$repo/new.txt"; run "$repo" 'git commit -a -m x'
+check "git commit -a leaves an untracked file out" 'scanned && has clean.txt && ! has new.txt'
+
+reset; fine "$repo/clean.txt"; g -C "$repo" add clean.txt; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"
+run "$repo" 'git commit -m x'
+check "a clean staged version passes while the working version has a hit" 'scanned && has clean.txt'
+run "$repo" 'git commit -a -m x'
+check "git commit -a scans the working version over the staged one" 'names clean.txt'
+reset; hit "$repo/clean.txt"; g -C "$repo" add clean.txt; fine "$repo/clean.txt"
+run "$repo" 'git commit -a -m x'
+check "git commit -a commits the clean working version over a staged hit" 'scanned && has clean.txt'
+
+reset; stage_hit; fine "$repo/clean.txt"; run "$repo" 'git commit -m x clean.txt'
+check "a commit naming paths leaves other staged changes out" 'scanned && has clean.txt && ! has "dir one/file two.txt"'
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -m x clean.txt'
+check "a commit naming paths scans their working versions" 'names clean.txt'
+reset; stage_hit; fine "$repo/clean.txt"; run "$repo" 'git commit -i -m x clean.txt'
+check "git commit -i with paths keeps the staged changes" 'names "dir one/file two.txt"'
+reset; hit "$repo/new.txt"; g -C "$repo" add new.txt; run "$repo" 'git commit -m x -- new.txt'
+check "a commit naming a newly staged file scans it" 'names new.txt'
+
+for c in 'git commit --amend -m x' 'git commit --allow-empty -m x' 'git commit --author "A <a@b>" -m x'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c is not read as -a" 'quiet && [ ! -f "$STUB/calls" ]'
+done
+
+IFS= read -r -d '' msg <<'MSGEOF' || true
+git commit -m "$(cat <<'EOF'
+fix: the -a flag (and clean.txt)
+
+Steps: 1) run "git commit -a" -- clean.txt, don't stage it
+EOF
+)"
+MSGEOF
+msg=${msg%$'\n'}
+reset; fine "$repo/new.txt"; run "$repo" "git add -A && $msg"
+check "git add -A then a heredoc message commit passes when clean" 'scanned && has new.txt'
+reset; hit "$repo/new.txt"; run "$repo" "git add -A && $msg"
+check "git add -A then a heredoc message commit scans what it stages" 'names new.txt'
+reset; fine "$repo/new.txt"; g -C "$repo" add new.txt; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$msg"
+check "words in a heredoc commit message are not read as flags or paths" 'scanned && has new.txt && ! has clean.txt'
+reset; fine "$repo/new.txt"; g -C "$repo" add new.txt; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -m "fix -a clean.txt" -n'
+check "a -m message is not read as flags or paths" 'scanned && has new.txt && ! has clean.txt'
+
+reset; hit "$repo/new.txt"; run "$repo" 'git add "$f" && git commit -m x'
+check "an add word that cannot be read asks as a failed simulation" 'sim_failed'
+reset; hit "$repo/new.txt"; run "$repo" 'git add nothere.txt && git commit -m x'
+check "an add that git rejects asks as a failed simulation" 'sim_failed'
+
+reset; hit "$repo/new.txt"; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"
+for c in 'git add -p && git commit -m x' 'git rm -q "dir one/kept.txt" && git commit -m x' 'git mv clean.txt moved.txt && git commit -m x'; do
+  rm -f "$STUB"/*; run "$repo" "$c"
+  check "$c keeps the staged-only scan" 'quiet && [ ! -f "$STUB/calls" ]'
+done
+
+fresh="$tmp/fresh repo"
+g init -q "$fresh"
+hit "$fresh/new.txt"; rm -f "$STUB"/*; run "$fresh" 'git add -A && git commit -m x'
+check "with no commits yet, git add -A then commit scans what it stages" 'names new.txt'
+fine "$fresh/new.txt"; rm -f "$STUB"/*; run "$fresh" 'git add -A && git commit -m x'
+check "with no commits yet, a clean add passes" 'scanned && has new.txt'
+hit "$fresh/new.txt"; g -C "$fresh" add new.txt; rm -f "$STUB"/*; run "$fresh" 'git commit -m x new.txt'
+check "with no commits yet, a commit naming paths scans them" 'names new.txt'
+
+# snap <git dir> <index>: the index checksum, any lock, and the object files. Each
+# case writes content no earlier case stored, so a write to the real store shows.
+snap() { shasum "$2"; ls "$2.lock" 2>&1; (cd "$1/objects" && find . -type f | sort); }
+reset; printf 'only here 1\ntoken = stubmatchedtext\n' >"$repo/new.txt"; printf 'only here 2\n' >>"$repo/clean.txt"
+before=$(snap "$repo/.git" "$repo/.git/index")
+run "$repo" 'git add -A && git commit -a -m x'
+after=$(snap "$repo/.git" "$repo/.git/index")
+check "a simulated run leaves the real index and object store unchanged" 'names new.txt && [ "$before" = "$after" ]'
+check "a simulated run leaves no temporary files" '[ -z "$(ls -A "$TMPDIR")" ]'
+reset; g -C "$repo" worktree add -q "$tmp/wt" -b wt
+printf 'only here 3\ntoken = stubmatchedtext\n' >"$tmp/wt/new.txt"; wtindex=$(g -C "$tmp/wt" rev-parse --path-format=absolute --git-path index)
+before=$(snap "$repo/.git" "$wtindex")
+run "$tmp/wt" 'git add -A && git commit -m x'
+after=$(snap "$repo/.git" "$wtindex")
+check "in a worktree it scans what the commit stages and changes no real index or object" 'names new.txt && [ "$before" = "$after" ]'
+g -C "$repo" worktree remove --force "$tmp/wt"
 
 # Without gitleaks the hook does nothing.
 mkdir "$tmp/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$tmp/nogitleaks/$t"; done
