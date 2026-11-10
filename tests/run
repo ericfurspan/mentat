@@ -491,6 +491,7 @@ phrase_check rules.md "the offer after a merge the maintainer reports, never fro
 phrase_check rules.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
 phrase_check rules.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
 phrase_check rules.md "the merge line first while a merge waits" '"You: merge #N." stays the first line while a merge waits.'
+phrase_check rules.md "a web-mode question file holding only the question, nothing private" "- A \`mentat second-opinion --web\` file holds only the question, nothing private."
 phrase_check rules.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` step 5) read-only, and reports one of:"
 phrase_check rules.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
 phrase_check rules.md "the lookup result for no recorded order" ' no recorded order;'
