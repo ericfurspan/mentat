@@ -150,6 +150,12 @@ for c in 'GIT_INDEX_FILE=other git add -A && git commit -m x' 'GIT_DIR=other git
 done
 reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'echo git commit -a -m x'
 check "echo git commit -a is not read as a commit that stages" 'quiet && [ ! -f "$STUB/calls" ]'
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -sam x'
+check "git commit -sam x reads -a after -s" 'names clean.txt'
+reset; stage_hit; run "$repo" 'git commit -sm x'
+check "git commit -sm x scans the staged changes" 'names "dir one/file two.txt"'
+reset; hit "$repo/new.txt"; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -sm x'
+check "git commit -sm x leaves unstaged changes out" 'quiet && [ ! -f "$STUB/calls" ]'
 reset; fine "$repo/clean.txt"; hit "$repo/new.txt"; run "$repo" 'git commit -a -m x'
 check "git commit -a leaves an untracked file out" 'scanned && has clean.txt && ! has new.txt'
 
