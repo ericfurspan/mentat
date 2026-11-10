@@ -35,6 +35,33 @@ else
   printf '%s\n' "$retired"
 fi
 
+# Maintainer-facing text names the stages (Inbox, Backlog, Todo), triage and the spec, never the older names
+# for them; only the thin intake alias under skills/intake/ may say its own name.
+stage_names=$( { printf '%s\n' rules.md README.md prompts/builder.md; git ls-files -- skills; } | grep -v '^skills/intake/' | tr '\n' '\0' |
+  xargs -0 grep -n -i -E \
+    -e '(^|[^[:alnum:]])(tak(e|es|en|ing)|took)[ -]([[:alpha:]]+ ){0,2}on([^[:alnum:]]|$)' \
+    -e '(^|[^[:alnum:]])intake([^[:alnum:]]|$)' \
+    -e 'agree the spec|build go-ahead|kept for reference|keep for reference')
+if [ -z "$stage_names" ]; then
+  pass "rules, skills, the builder prompt and README use the stage and triage names"
+else
+  fail "rules, skills, the builder prompt or README use an older name for a stage, triage or the spec:"
+  printf '%s\n' "$stage_names"
+fi
+
+# Outside the tracker adapters, rules, skills and the builder prompt name no tracker's own statuses, fields,
+# labels or buttons. The list is the Linear adapter's own words; the core writes "triage" in lowercase.
+linear_words="Waiting on you|Priority|No priority|Urgent|Mark as duplicate|Decline|Snooze|Linear's Accept|[a-z,;(] Triage|[(]Triage|Triage status"
+tracker_words=$( { printf '%s\n' rules.md prompts/builder.md; git ls-files -- skills; } |
+  grep -v -x -e skills/backlog/linear.md -e skills/backlog/github.md -e skills/linear/SKILL.md | tr '\n' '\0' |
+  xargs -0 grep -n -E -e "$linear_words")
+if [ -z "$tracker_words" ]; then
+  pass "no tracker's own words outside the tracker adapters"
+else
+  fail "rules, skills or the builder prompt name a tracker's own words outside the adapters:"
+  printf '%s\n' "$tracker_words"
+fi
+
 # The README stays short: at most 500 words by wc -w.
 readme_words=$(wc -w <README.md | tr -d ' ')
 if [ "$readme_words" -le 500 ]; then
