@@ -181,6 +181,75 @@ reset; fine "$repo/new.txt"; g -C "$repo" add new.txt; printf 'token = stubmatch
 check "words in a heredoc commit message are not read as flags or paths" 'scanned && has new.txt && ! has clean.txt'
 reset; fine "$repo/new.txt"; g -C "$repo" add new.txt; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -m "fix -a clean.txt" -n'
 check "a -m message is not read as flags or paths" 'scanned && has new.txt && ! has clean.txt'
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$msg"
+check "a heredoc message commit with nothing staged passes without a scan" 'quiet && [ ! -f "$STUB/calls" ]'
+
+# A heredoc body is skipped to its delimiter line, whatever it holds.
+IFS= read -r -d '' hmsg <<'MSGEOF' || true
+git commit -m "$(cat <<'EOF'
+fix: the -a flag (and "clean.txt") isn't `staged`
+a lone " and $( and ( here
+)
+EOF2
+EOF
+)"
+MSGEOF
+hmsg=${hmsg%$'\n'}
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$hmsg -a"
+check "a heredoc message then -a scans a changed tracked file" 'names clean.txt'
+reset; fine "$repo/clean.txt"; run "$repo" "$hmsg -a"
+check "a heredoc message then -a passes a clean change" 'scanned && has clean.txt'
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$hmsg clean.txt"
+check "a heredoc message then a path scans that path" 'names clean.txt'
+reset; fine "$repo/clean.txt"; run "$repo" "$hmsg -- clean.txt"
+check "a ) line or EOF2 in a heredoc body does not end it early" 'scanned && has clean.txt'
+reset; fine "$repo/new.txt"; run "$repo" "git add -A && $hmsg"
+check "git add -A then a heredoc message with quotes and parentheses passes when clean" 'scanned && has new.txt'
+reset; hit "$repo/new.txt"; run "$repo" "git add -A && $hmsg"
+check "git add -A then a heredoc message with quotes and parentheses scans what it stages" 'names new.txt'
+tmsg=$(printf 'git commit -m "$(cat <<-END\n\tfix ) `x` "\n\tEND\n)" clean.txt')
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$tmsg"
+check "a <<- heredoc with an unquoted delimiter ends at its tab-indented delimiter" 'names clean.txt'
+IFS= read -r -d '' fmsg <<'MSGEOF' || true
+git commit -a -F - <<'EOF'
+fix: don't ( stage "x
+)
+EOF
+MSGEOF
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$fmsg"
+check "git commit -a -F - with a heredoc scans a changed tracked file" 'names clean.txt'
+IFS= read -r -d '' fmsg <<'MSGEOF' || true
+git commit -F - <<'EOF' -a
+fix: -m x
+EOF
+MSGEOF
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$fmsg"
+check "git commit -F - with a heredoc then -a scans a changed tracked file" 'names clean.txt'
+for c in '(cd "dir one" && git commit -m x)' 'out=$(git commit -m x 2>&1)'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c with nothing staged passes without a scan" 'quiet && [ ! -f "$STUB/calls" ]'
+  reset; stage_hit; run "$repo" "$c"
+  check "$c scans the staged changes" 'names "dir one/file two.txt"'
+done
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -a -F - <<<"fix: it"'
+check "git commit -a with a here-string scans a changed tracked file" 'names clean.txt'
+IFS= read -r -d '' bmsg <<'MSGEOF' || true
+bash <<'EOF'
+git add -A
+EOF
+git commit -m x
+MSGEOF
+reset; hit "$repo/new.txt"; run "$repo" "$bmsg"
+check "a heredoc before the commit asks as a failed simulation" 'sim_failed'
+
+for c in 'git commit -m "`date`"' 'git commit -m "x' "git commit -m 'x"; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c asks as a failed simulation" 'sim_failed'
+done
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -m x && echo `date`'
+check "a backtick after the commit's step is left alone" 'quiet && [ ! -f "$STUB/calls" ]'
+reset; stage_hit; run "$repo" 'git commit -m x && echo `date`'
+check "a backtick after the commit's step keeps the staged scan" 'names "dir one/file two.txt"'
 
 reset; hit "$repo/new.txt"; run "$repo" 'git add "$f" && git commit -m x'
 check "an add word that cannot be read asks as a failed simulation" 'sim_failed'
