@@ -644,7 +644,8 @@ phrase_check skills/propose/SKILL.md "that accepting an item is no commitment, a
 # The agreement question offers build now or build later, both committing the item; the agreement records the
 # spec's fingerprint and the answer, and an item committed for later waits for the maintainer to start it.
 phrase_check skills/propose/SKILL.md "the agreement question's two answers" 'Its first two options are "Agree and build now", which commits the item to Todo and starts its build, checks and reviews, and "Agree, build later", which commits it to Todo and starts nothing;'
-phrase_check skills/propose/SKILL.md "build now recommended where wanted this session, other options kept" "the first is recommended where the maintainer wants it built in this session, and the question's other options stay."
+phrase_check skills/propose/SKILL.md "build now recommended where wanted this session" 'the first is recommended where the maintainer wants it built in this session.'
+phrase_check skills/propose/SKILL.md "a Not now option that commits and records nothing" 'Its last option, "Not now", commits nothing and records no fingerprint.'
 phrase_check skills/propose/SKILL.md "each answer's effect in a chat request" "In a chat request, \"Agree and build now\" goes on to build in this session through \`rules.md\` \"A change\" steps 2 to 5, and \"Agree, build later\" stops once step 7 is done."
 phrase_check skills/propose/SKILL.md "an item for later built only on the maintainer's command or offer yes" "An item committed for later is built only when the maintainer types \`/mentat:work-tickets\`, with or without its id, or says yes to a next-work offer naming it."
 phrase_check skills/propose/SKILL.md "the small request's yes as agreement to build now" 'That yes is agreement to build now: it commits the item to Todo and starts its build, checks and reviews.'
