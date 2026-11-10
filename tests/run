@@ -35,22 +35,6 @@ else
   printf '%s\n' "$retired"
 fi
 
-# Maintainer-facing text names the stages (Inbox, Backlog, Todo), triage and the spec, never the older names
-# for them; only the thin intake alias under skills/intake/ may say its own name.
-old_phrases=$( { printf '%s\n' rules.md README.md prompts/builder.md; git ls-files -- skills; } | tr '\n' '\0' |
-  xargs -0 grep -n -i -E \
-    -e '(^|[^[:alnum:]])(tak(e|es|en|ing)|took)[ -]([[:alpha:]]+ ){0,2}on([^[:alnum:]]|$)' \
-    -e 'agree the spec|build go-ahead|kept for reference|keep for reference')
-old_command=$( { printf '%s\n' rules.md README.md prompts/builder.md; git ls-files -- skills; } | grep -v '^skills/intake/' | tr '\n' '\0' |
-  xargs -0 grep -n -i -E -e '(^|[^[:alnum:]])intake([^[:alnum:]]|$)')
-stage_names=$(printf '%s\n%s\n' "$old_phrases" "$old_command" | sed '/^$/d')
-if [ -z "$stage_names" ]; then
-  pass "rules, skills, the builder prompt and README use the stage and triage names"
-else
-  fail "rules, skills, the builder prompt or README use an older name for a stage, triage or the spec:"
-  printf '%s\n' "$stage_names"
-fi
-
 # Outside the tracker adapters, rules, skills and the builder prompt name no tracker's own statuses, fields,
 # labels or buttons. The list is the Linear adapter's own words; the core writes "triage" in lowercase.
 linear_words="Waiting on you|Priority|No priority|Urgent|Mark as duplicate|Decline|Snooze|Linear's Accept|[a-z,;(] Triage|[(]Triage|Triage status"
@@ -186,9 +170,6 @@ phrase_check prompts/builder.md "the test command once, on the last commit" 'The
 phrase_check skills/pr/SKILL.md "a changed hook, CI workflow or instruction file, ranked right after a real blast radius" 'or a real blast radius (what breaks, for whom); a changed hook, CI workflow or agent instruction file whose behavior changes, named with the reason it deserves a look;'
 phrase_check skills/review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
 phrase_check skills/claude-review/SKILL.md "the final check's pointer to that definition" "a changed file as \`mentat:pr\` defines it for the note"
-# /mentat:consult weighs a plan at HEAD only in a repository without personal data, and sends only the text as given.
-phrase_check skills/consult/SKILL.md "that an AGENTS.md silent about personal data counts as none" 'an AGENTS.md that says nothing about it counts as none'
-phrase_check skills/consult/SKILL.md "that the file sent holds only the question or idea as given" 'The file holds only the maintainer'"'"'s question or idea as given, with nothing pasted from the working tree (file contents, diffs)'
 
 # Mentat neither turns on the desktop app's Auto-fix nor assumes it is on; its wake-ups,
 # a CI failure included, change neither whose comments are requests nor the hold after "You: merge #N.".
@@ -277,15 +258,6 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   fail "skills/triage/SKILL.md's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
 fi
-# The old command stays as a thin alias that runs triage during the rollout.
-for s in 'name: intake' 'disable-model-invocation: true'; do
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/intake/SKILL.md; then
-    pass "skills/intake/SKILL.md's frontmatter sets $s"
-  else
-    fail "skills/intake/SKILL.md's frontmatter must set $s"
-  fi
-done
-phrase_check skills/intake/SKILL.md "the alias's pointer to triage" "This command is now \`/mentat:triage\`. Read \`../triage/SKILL.md\` and follow it with the same arguments."
 phrase_check skills/triage/SKILL.md "one decision per prompt, marked N of M" "Then ask one decision per \`AskUserQuestion\` prompt, marked \"N of M\""
 phrase_check skills/triage/SKILL.md "the readers read again after a compaction" 'Read each reader fresh from its file when the sitting starts, and again after a compaction'
 phrase_check skills/triage/SKILL.md "nothing collected sent to Codex or Grok" "Nothing a sitting collects goes to Codex or Grok, and no \`mentat weigh\`, \`mentat challenge\` or \`mentat consult\` runs inside a sitting."
@@ -357,7 +329,7 @@ for f in skills/*/SKILL.md; do
 done
 
 # Skills only agents call stay out of the / menu and stay callable by the agent.
-for s in propose pr review backlog grill challenge; do
+for s in propose pr review backlog grill; do
   f=skills/$s/SKILL.md
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "user-invocable: false" { found = 1; exit 0 } END { exit !found }' "$f"; then
     pass "$f's frontmatter sets user-invocable: false"
@@ -460,7 +432,6 @@ phrase_check skills/agenda/SKILL.md "that the backlog's listing writes do not ru
 phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`../backlog/linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
 phrase_check skills/agenda/SKILL.md "a decision answered in chat recorded nowhere" 'record nothing and say in one line where the answer goes'
 phrase_check skills/agenda/SKILL.md "that it starts nothing" 'It starts nothing: no session, build or review.'
-phrase_check skills/consult/SKILL.md "that it starts no build session or pull-request review, only its own run" "and starts no build session and no pull-request review; it still runs its own \`mentat weigh\` or \`mentat consult\`."
 phrase_check skills/agenda/SKILL.md "waits as the tracker's adapter marks them" "items waiting on the maintainer, as the tracker's adapter marks them, merge waits included;"
 phrase_check skills/agenda/SKILL.md "Next from Todo in the tracker's order, never the Inbox" "Next: the project's Todo items in the tracker's order (\`mentat:backlog\` step 5), never the Inbox."
 phrase_check README.md "the triage command" "- \`/mentat:triage [project ... | all] | brainstorm <text or link>\`: go through the Inbox with you."
@@ -717,8 +688,6 @@ phrase_check skills/backlog/SKILL.md "an item created first on agreement with ei
 phrase_check skills/propose/SKILL.md "the spec written on an item created first, never chat only" "7. Once agreed, with either answer, it writes the spec (shape in \`mentat:pr\`) in the backlog item, creating the item first when the request has none (with GitHub issues, an issue), so the spec, the fingerprint comment and the Todo stage are recorded on it, and, unless the backlog is external, in the pull request once open. Committing to Todo always needs an item."
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
-phrase_check skills/challenge/SKILL.md "the challenge's replies block at hand-off" 'replies block'
-phrase_check skills/challenge/SKILL.md "exit 5 as a stale checkout to update, not a handoff" '   - 5: the checkout is behind the default branch. Do not hand off: fast-forward a clean checkout of the default branch, revise the plan if that changes it, and run the challenge again; otherwise stop and say why.'
 # Claude, as a review tool the setting lists, gets its own line and comment headings.
 phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <verdict> - <its main point>'
 phrase_check skills/backlog/SKILL.md "the design review and Claude comment headings" '("Codex: design review", "Grok: design review", "Claude: design review", "Codex: plan challenge", "Claude: plan challenge")'
@@ -888,14 +857,14 @@ for f in skills/*/SKILL.md; do
   done <<< "$(grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" "$f" | tr -d '\`' | sort -u)"
 done
 
-# mentat review, review --local, review --grok, challenge, weigh, consult, the Claude review tool and check behave as
+# mentat review, review --local, review --grok, weigh, consult, the Claude review tool and check behave as
 # specified (stub gh, codex, grok and gitleaks), and so do the merge, push, private text and secret hooks.
 if command -v jq >/dev/null 2>&1; then
-  for t in tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; do
+  for t in tests/review.sh tests/review-local.sh tests/review-grok.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; do
     if out=$("$t" 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail "$t"; fi
   done
 else
-  fail "jq not installed, mentat review, challenge, check and the hooks not tested"
+  fail "jq not installed, mentat review, check and the hooks not tested"
 fi
 
 # The plugin's manifests validate (warnings are fine, only a failure counts).
@@ -923,10 +892,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
+  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/challenge.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/weigh.sh tests/consult.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
   fi
 else
   fail "shellcheck not installed, shell scripts not checked"

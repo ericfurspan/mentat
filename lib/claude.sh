@@ -173,36 +173,3 @@ consult_claude() {
   run_claude "$tmp/dir" "$tmp/prompt" "$tmp/out" pair_fail WebSearch
   pair_keep "$tmp/out" consult_line_ok "CONSULT"
 }
-
-# mentat challenge with Claude: an export of HEAD, file tools only. The result is
-# printed, not posted.
-challenge_claude() {
-  local plan="$1" tool top head changes dirty=no tmp out verdict
-  for tool in git claude; do
-    command -v "$tool" >/dev/null 2>&1 || not_challenged "$tool is not installed"
-  done
-  top=$(git rev-parse --show-toplevel) || not_challenged "not inside a git repository"
-  head=$(git -C "$top" rev-parse HEAD) || not_challenged "could not read HEAD"
-  changes=$(git -C "$top" status --porcelain) || not_challenged "could not read git status"
-  [ -z "$changes" ] || dirty=yes
-  tmp=$(mktemp -d) || not_challenged "could not create a temporary directory"
-  # shellcheck disable=SC2064 # expand now, so the path is fixed when the trap is set
-  trap "rm -rf $(printf %q "$tmp")" EXIT
-  mkdir "$tmp/export" || not_challenged "could not create the export folder"
-  claude_export "$top" "$head" "$tmp/export" || not_challenged "could not export $head"
-  {
-    printf 'Challenge the plan below before it is built. The working directory is a plain export of the repository it is for, '
-    printf 'at commit %s, without git history or uncommitted changes, and you have only file tools: no shell and no web. Do not modify files.\n\n' "$head"
-    challenge_body "$plan" || not_challenged "could not read $plan"
-  } >"$tmp/prompt" || not_challenged "could not write the prompt"
-  out="$tmp/challenge.md"
-  run_claude "$tmp/export" "$tmp/prompt" "$out" not_challenged "Read,Grep,Glob"
-  verdict=$(last_line "$out")
-  challenge_verdict_ok "$verdict" || not_challenged "Claude's reply has no final CHALLENGE VERDICT line"
-  printf '## Plan challenge by local Claude, run by the agent\n\n'
-  printf -- '- Plan: %s\n- Started at commit: %s (uncommitted changes: %s; only the commit was read)\n' "$plan" "$head" "$dirty"
-  [ -z "${fresh_note:-}" ] || printf -- '- %s\n' "$fresh_note"
-  printf -- '- Claude Code: %s\n- Time: %s\n' "$(claude --version 2>/dev/null | head -n 1)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf -- '- This is a plan challenge, not a review.\n\n---\n\n'
-  cat "$out"
-}

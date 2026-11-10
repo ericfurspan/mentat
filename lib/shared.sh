@@ -8,7 +8,6 @@ CI_GRACE_SECONDS="${MENTAT_CI_GRACE_SECONDS:-60}"
 
 die() { printf 'mentat: %s\n' "$1" >&2; exit "${2:-1}"; }
 not_reviewed() { die "not reviewed: $1" 1; }
-not_challenged() { die "not challenged: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
 # How many commits on origin's default branch HEAD lacks, so weigh and challenge never

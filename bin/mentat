@@ -29,25 +29,21 @@
 #     is the last reviewed commit, the Grok state (none, running, done or did not finish) and
 #     the CI state (none, running, passed or failed). With --request, also whether the last
 #     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
-#   The review tools setting: ~/.config/mentat/reviewers lists the tools weigh, challenge
+#   The review tools setting: ~/.config/mentat/reviewers lists the tools weigh
 #     and consult run, any of claude, codex and grok; missing or empty runs Codex and Grok.
 #     Another word stops those commands (64). ~/.config/mentat/claude-model may name the
 #     Claude model; otherwise it is the most capable one in a family other than the
 #     builder's (prompts/builder.md). Claude runs headless in safe mode, with no settings
 #     files, no MCP servers and no saved session, in a rebuilt environment, and each of its
 #     replies names the builder and reviewer models.
-#   mentat challenge <plan-file>  Has Codex challenge a written plan and prints the result;
-#     Claude instead, on an export of HEAD with file tools only, when the setting does not
-#     list Codex. 0 challenge delivered (read the verdict), 1 not challenged, 5 the checkout
-#     is behind origin's default branch (not a tool failure: update it and run again), 64 usage.
-#     Weigh and challenge first fetch origin's default branch into a private ref, leaving
-#     origin/<default> and FETCH_HEAD as they are; when that fails or there is no origin,
-#     a local origin/<default> still counts, and the output says when freshness could
-#     not be checked.
 #   mentat weigh <idea file>  Has Codex and Grok (or the setting's tools) each judge an idea,
 #     at HEAD and in parallel, and prints each reply with its verdict line. Nothing is posted.
-#     0 at least one tool delivered a verdict, 1 none did, 5 the checkout is behind (as for
-#     challenge), 64 usage. Time limits:
+#     0 at least one tool delivered a verdict, 1 none did, 5 the checkout is behind origin's
+#     default branch (not a tool failure: update it and run again), 64 usage. It first
+#     fetches origin's default branch into a private ref, leaving origin/<default> and
+#     FETCH_HEAD as they are; when that fails or there is no origin, a local
+#     origin/<default> still counts, and the output says when freshness could not be
+#     checked. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex and Claude) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
 #     MENTAT_GROK_REASONING_EFFORT sets Grok's effort. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied. Claude reads an export with file tools only.
@@ -108,9 +104,8 @@ case "${1:-}" in
     case "$mode" in grok) review_grok "$@" ;; *) review_local "$@" ;; esac ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   status) shift; status "$@" ;;
-  challenge) shift; challenge "$@" ;;
   weigh) shift; weigh "$@" ;;
   consult) shift; consult "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat challenge <plan file> | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat weigh <idea file> | mentat consult <question file> | mentat check" 64 ;;
 esac
