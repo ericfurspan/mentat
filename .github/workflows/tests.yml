@@ -24,6 +24,5 @@ jobs:
           claude --version
           shellcheck --version
           jq --version
-          case "$(which codex)" in /opt/homebrew/*|/usr/local/*) ;; *) echo "codex must be under /opt/homebrew or /usr/local for the Codex profile (lib/codex.sh)"; exit 1 ;; esac
       - name: Run the test suite
         run: tests/run

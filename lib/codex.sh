@@ -9,14 +9,17 @@ REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory (outside the checkout for a
-# worktree) and the system paths. Codex must be installed under /opt/homebrew or
-# /usr/local (Homebrew, or npm with a system or Homebrew node); anywhere else it
-# cannot start inside the profile, so the run fails closed (not reviewed, no second
-# opinion). Nothing is derived from where codex is, so no install can widen it.
+# worktree), the system paths, /opt/homebrew, /usr/local and the install prefixes
+# in $2, one per line, so Codex can start.
 codex_filesystem() {
-  local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
+  local gitdir p table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
   gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
   [ -z "$gitdir" ] || table="$table, \"$gitdir\"=\"read\""
+  while IFS= read -r p; do
+    # Codex rejects a repeated key.
+    case "$table" in *"\"$p\"="*) continue ;; esac
+    [ -z "$p" ] || table="$table, \"$p\"=\"read\""
+  done <<<"${2:-}"
   printf '{%s, "/tmp"="deny", "/private/tmp"="deny", "/var/tmp"="deny", "/private/var/tmp"="deny", ":workspace_roots"={"."="read", %s}}' "$table" "$CREDENTIAL_DENY"
 }
 # Files inside the checkout that commonly hold credentials, denied to Codex even
@@ -27,6 +30,60 @@ codex_filesystem() {
 CREDENTIAL_DENY='"**/.env"="deny", "**/.env.*"="deny", "**/*.pem"="deny", "**/*.key"="deny", "**/*.p12"="deny", "**/*.pfx"="deny", "**/id_rsa*"="deny", "**/id_ecdsa*"="deny", "**/id_ed25519*"="deny", "**/.netrc"="deny", "**/.npmrc"="deny", "**/.pypirc"="deny"'
 GLOB_DEPTH=8
 
+# Prints file $1 with every symlink resolved.
+real_file() {
+  local f="$1" l n=0
+  while [ -L "$f" ]; do
+    n=$((n + 1))
+    [ "$n" -le 40 ] || return 1
+    l=$(readlink "$f") || return 1
+    case "$l" in /*) f=$l ;; *) f="${f%/*}/$l" ;; esac
+  done
+  l=$(cd -P "${f%/*}/" 2>/dev/null && pwd -P) || return 1
+  printf '%s/%s\n' "${l%/}" "${f##*/}"
+}
+
+# Prints the install prefix of the program at real path $1: the folder holding
+# lib/node_modules for an npm package, else the parent of the bin folder holding it.
+install_prefix() {
+  local p
+  case "$1" in
+    */lib/node_modules/*) p="${1%%/lib/node_modules/*}" ;;
+    *)
+      p="${1%/*}"
+      [ "${p##*/}" = bin ] || return 1
+      p="${p%/bin}"
+      ;;
+  esac
+  printf '%s\n' "${p:-/}"
+}
+
+# Sets the caller's prefixes to the install prefixes Codex needs, one per line:
+# codex's and, for a script run by node, node's. One that cannot be resolved is left
+# out. Calls $1 with the reason, which exits, when one is /, the home folder, in it
+# or holds it.
+codex_prefixes() {
+  local fail="$1" home f p first name who
+  prefixes=""
+  home=$(cd -P "$HOME" 2>/dev/null && pwd -P) || "$fail" "the home folder cannot be resolved, so the Codex profile cannot keep it out"
+  for name in codex node; do
+    if [ "$name" = codex ]; then
+      who="Codex is"
+    else
+      first=$(head -c 256 "$f" 2>/dev/null | tr -d '\000' | head -n 1)
+      case "$first" in '#!'*node*) who="node, which runs Codex, is" ;; *) return 0 ;; esac
+    fi
+    f=$(command -v "$name") && f=$(real_file "$f") || return 0
+    p=$(install_prefix "$f") || continue
+    who="$who installed in or above the home folder, which the Codex profile never grants"
+    # Inside the home folder, then the home folder or one holding it, / included.
+    case "$p/" in "$home"/*) "$fail" "$who" ;; esac
+    case "$home/" in "${p%/}"/*) "$fail" "$who" ;; esac
+    prefixes="$prefixes$p
+"
+  done
+}
+
 # Runs Codex in directory $1 on prompt file $2 and writes its final message to $3.
 # On any failure it calls $4 with the reason, which exits. $5 is Codex's web
 # search mode: "disabled" for reviews, which judge the diff; "cached" (OpenAI's
@@ -36,10 +93,11 @@ GLOB_DEPTH=8
 # "outside" adds --skip-git-repo-check, for the --web mode, which runs in an empty folder that is not a repository (Codex refuses
 # to start there otherwise). Every other caller passes nothing.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem outside=()
+  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes outside=()
   if [ "${6:-}" = outside ]; then outside=(--skip-git-repo-check); fi
   log="${out%/*}/codex.log"
-  filesystem=$(codex_filesystem "$dir")
+  codex_prefixes "$fail"
+  filesystem=$(codex_filesystem "$dir" "$prefixes")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
   # final reply, so it cannot end with the status line the callers check.
   # A permissions profile replaces `--sandbox read-only`, which reads the whole disk

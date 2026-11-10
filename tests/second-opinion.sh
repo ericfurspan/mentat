@@ -16,7 +16,7 @@ cache=$(mktemp -d "$HOME/.cache/mentat-test.XXXXXX") || { echo "FAIL: second-opi
 cleanup() { rm -rf "$root" "$cache"; }
 trap cleanup EXIT
 export STUB="$root/stub" CALLS="$root/calls"
-mkdir -p "$STUB" "$CALLS" "$root/bin" "$root/tmp"
+mkdir -p "$STUB" "$CALLS" "$root/tools/bin" "$root/tmp"
 failures=0
 check() { if eval "$2"; then printf 'PASS: second-opinion %s\n' "$1"; else printf 'FAIL: second-opinion %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -37,18 +37,18 @@ GH_REAL=$(cd -P "$GH_USER" && pwd -P)
 export GROK_HOME="$GH_USER" XAI_API_KEY=fake-xai-key MENTAT_CANARY=fake-canary GROK_FOLDER_TRUST=0
 
 # gh must never be called; git is the real one, except that a fetch is recorded.
-cat >"$root/bin/gh" <<'EOF'
+cat >"$root/tools/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "gh $*" >>"$CALLS/gh"
 exit 99
 EOF
-{ printf '#!/usr/bin/env bash\nREAL=%q\n' "$real_git"; cat; } >"$root/bin/git" <<'EOF'
+{ printf '#!/usr/bin/env bash\nREAL=%q\n' "$real_git"; cat; } >"$root/tools/bin/git" <<'EOF'
 for a in "$@"; do [ "$a" = fetch ] && echo "git $*" >>"$CALLS/fetch"; done
 exec "$REAL" "$@"
 EOF
 # codex: records how it was started and what it can see, then replies with
 # $STUB/codex_out. rendezvous: waits (bounded) until grok has started too.
-cat >"$root/bin/codex" <<'EOF'
+cat >"$root/tools/bin/codex" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = --version ]; then echo "codex-cli 0.0-stub"; exit 0; fi
 printf '%s\n' "$@" >"$STUB/args"
@@ -72,7 +72,7 @@ EOF
 # grok: records how it was started and what it can see, then replies with
 # $STUB/out_json (stdout) and $STUB/grok_exit. (mentat starts it with an empty
 # environment, so its own path is written in.)
-{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/bin/grok" <<'EOF'
+{ printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/tools/bin/grok" <<'EOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
 if [ "${1:-}" = models ]; then
   printf '%s\n' "$@" >"$STUB/args_models"
@@ -112,8 +112,8 @@ cat "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
 exit "$(cat "$STUB/grok_exit")"
 EOF
-chmod +x "$root/bin/gh" "$root/bin/git" "$root/bin/codex" "$root/bin/grok"
-export PATH="$root/bin:$PATH"
+chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
+export PATH="$root/tools/bin:$PATH"
 
 # A local repository with no remote, at a path with a space, and a subdirectory to run from.
 "$real_git" init -q -b trunk "$root/my repo" && cd "$root/my repo" || exit 1
@@ -203,9 +203,15 @@ reset; rm "$STUB/codex_out"; rc=$(run "$idea")
 check "Codex with no final message gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex returned no final message" "$STUB/stdout"'
 reset; touch "$STUB/codex_hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run "$idea")
 check "a Codex timeout gives no second opinion (exit 0), Grok's result stays, and nothing is left behind" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex did not finish within 1 seconds" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && clean'
-mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/grok" "$root/nocodex/grok"
+mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/tools/bin/grok" "$root/nocodex/grok"
 reset; rc=$(PATH="$root/nocodex:/usr/bin:/bin" run "$idea")
 check "a missing codex gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (codex is not installed" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && clean'
+mkdir -p "$HOME/bin" && cp "$root/tools/bin/codex" "$HOME/bin/codex"
+reset; rc=$(PATH="$HOME/bin:$PATH" run "$idea")
+rm -rf "${HOME:?}/bin"
+check "a codex installed in the home folder gives no second opinion (exit 0), says why and never starts" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (Codex is installed in or above the home folder, which the Codex profile never grants" "$STUB/stdout" && [ ! -e "$STUB/args" ] && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && clean'
+reset; rc=$(run "$idea")
+check "the profile reads the stub's install prefix, the folder holding its bin folder" '[ "$rc" = 0 ] && grep -qF "\"$(cd -P "$root/tools" && pwd -P)\"=\"read\"" "$STUB/args" && grep -qF "\"/opt/homebrew\"=\"read\", \"/usr/local\"=\"read\"" "$STUB/args"'
 
 # Grok fails in each way; Codex's result stays.
 grok_no_opinion() { # $1 description, $2 expected reason fragment
@@ -279,7 +285,7 @@ grok_no_opinion "a Grok home with no auth.json" "Grok is not signed in"
 check "no auth.json means Grok never started, without a refresh" '! grok_ran && [ ! -e "$STUB/args_models" ]'
 reset; rc=$(XDG_CACHE_HOME="$root/tmp/cache" run "$idea")
 grok_no_opinion "a cache folder inside a temporary folder" "is inside .*, which the Grok review denies"
-rm -rf "$root/nogrok"; mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/codex" "$root/nogrok/codex"
+rm -rf "$root/nogrok"; mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/tools/bin/codex" "$root/nogrok/codex"
 reset; rc=$(PATH="$root/nogrok:/usr/bin:/bin" run "$idea")
 grok_no_opinion "a missing grok" "grok is not installed"
 
