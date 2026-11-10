@@ -9,9 +9,9 @@
 REVIEWERS_FILE="$HOME/.config/mentat/reviewers"
 CLAUDE_MODEL_FILE="$HOME/.config/mentat/claude-model"
 
-# The Claude models, most capable first. Claude reviews with the first one in a
-# family other than the builder's (prompts/builder.md).
-CLAUDE_MODELS="claude-fable-5-1 claude-opus-5-5 claude-sonnet-5-5 claude-haiku-5-5"
+# Claude Code's model aliases, which follow each release, most capable first. Claude
+# reviews with the first one in a family other than the builder's (prompts/builder.md).
+CLAUDE_MODELS="fable opus sonnet haiku"
 
 # Credential files inside the export, denied to Claude's file tools, as CREDENTIAL_DENY
 # denies them to Codex. A Read rule also hides the matching files from Grep and Glob.
@@ -61,7 +61,7 @@ claude_family() {
 # Sets the caller's claude_builder (the builder's model, from prompts/builder.md),
 # claude_reviewer (the setting's model, else the first of CLAUDE_MODELS in another
 # family) and claude_same (yes when both are in one family). Returns 1 when
-# claude-model holds something that is not a model id.
+# claude-model holds something that is not a model id or alias.
 claude_pick_model() {
   local m
   claude_builder=$(sed -n '2,/^---$/s/^model:[[:space:]]*//p' "$root/prompts/builder.md" 2>/dev/null | head -n 1 | tr -cd 'A-Za-z0-9._-')
