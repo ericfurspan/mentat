@@ -565,7 +565,7 @@ branch i-prompts 'printf "b\n" >>prompts/builder.md'
 branch i-rename 'g mv AGENTS.md notes.md'
 branch i-delete 'g rm -q rules.md'
 branch i-other 'printf "b\n" >>README.md; printf "b\n" >>docs/rules.md; printf "b\n" >>docs/prompts/x.md; printf "x\n" >AGENTS.txt'
-instr_reason="Mentat: this pull request changes agent instructions, and a change to what agents are told gets mentat second-opinion before the maintainer agrees to it. Approve if it got one, if Codex and Grok are off for this session, or if it changes no meaning."
+instr_reason="Mentat: this pull request changes agent instructions, and no design review on record (mentat second-opinion --link) names this branch's item. Approve only if Codex and Grok are off for this session or the change alters no meaning."
 for d in i-agents i-new i-claude i-skill i-rules i-prompts i-rename i-delete; do
   while IFS= read -r cmd; do
     check "a branch changing instructions ($d) asks with that reason before: $cmd" '[ "$(reason "$tmp/$d" "$cmd")" = "$instr_reason" ]'
@@ -624,6 +624,53 @@ cp -R "$tmp/i-rules" "$tmp/i-relative"
 g -C "$tmp/i-relative" config diff.relative true
 check "a branch changing the root rules.md, from a subdirectory with diff.relative: asks with that reason" \
   '[ "$(reason "$tmp/i-relative/docs" "gh pr create --fill")" = "$instr_reason" ]'
+
+# A design review linked to the branch's item, in the record in the shared git folder, asks nothing for that reason.
+# on_branch <dir> <branch> [linked id]: a copy of i-agents on <branch>, whose record links the id.
+on_branch() {
+  cp -R "$tmp/i-agents" "$tmp/$1"
+  g -C "$tmp/$1" branch -q -m "$2"
+  [ -z "${3:-}" ] || { mkdir -p "$tmp/$1/.git/mentat" && printf 'link 2026-01-02 %s 0123456789ab\n' "$3" >>"$tmp/$1/.git/mentat/second-opinions"; }
+}
+# The link step writes the record: a review of the idea file's content, then the link.
+on_branch l-linked feat/abc-26-branch-key
+printf 'An idea.\n' >"$tmp/idea.md"
+mkdir -p "$tmp/l-linked/.git/mentat"
+printf 'review 2026-01-02 %s %s\n' "$(g -C "$tmp/l-linked" rev-parse HEAD)" "$(printf '%s' "$(cat "$tmp/idea.md")" | shasum -a 256 | cut -c1-12)" >"$tmp/l-linked/.git/mentat/second-opinions"
+(cd "$tmp/l-linked" && "$root/bin/mentat" second-opinion --link ABC-26 "$tmp/idea.md" >/dev/null)
+check "a branch changing instructions whose item the link step linked leaves alone: feat/abc-26-branch-key" '[ -z "$(decision "$tmp/l-linked" "gh pr create --fill")" ]'
+on_branch l-bare feat/abc-26 abc-26
+check "a branch changing instructions named by a linked id alone leaves alone: feat/abc-26" '[ -z "$(decision "$tmp/l-bare" "gh pr create --fill")" ]'
+on_branch l-case feat/ABC-26-Key abc-26
+check "a linked id matches the branch ignoring case: feat/ABC-26-Key" '[ -z "$(decision "$tmp/l-case" "gh pr create --fill")" ]'
+on_branch l-unlinked feat/abc-27-key abc-26
+check "a branch changing instructions with an unlinked id asks with that reason" '[ "$(reason "$tmp/l-unlinked" "gh pr create --fill")" = "$instr_reason" ]'
+on_branch l-longer feat/abc-260-key abc-26
+check "a branch id that only starts like a linked one asks: abc-260 for abc-26" '[ "$(reason "$tmp/l-longer" "gh pr create --fill")" = "$instr_reason" ]'
+on_branch l-shorter feat/abc-26-branch-key abc-2
+check "a linked id never matches the start of a longer number: abc-2 for abc-26" '[ "$(reason "$tmp/l-shorter" "gh pr create --fill")" = "$instr_reason" ]'
+on_branch l-inside feat/xabc-26-key abc-26
+check "a linked id inside a longer segment asks: xabc-26" '[ "$(reason "$tmp/l-inside" "gh pr create --fill")" = "$instr_reason" ]'
+on_branch l-noid feat/branch-key abc-26
+check "a branch with no item id asks with that reason" '[ "$(reason "$tmp/l-noid" "gh pr create --fill")" = "$instr_reason" ]'
+on_branch l-norecord feat/abc-26-branch-key
+check "a missing record asks with that reason" '[ "$(reason "$tmp/l-norecord" "gh pr create --fill")" = "$instr_reason" ]'
+on_branch l-unreadable feat/abc-26-branch-key abc-26
+chmod 000 "$tmp/l-unreadable/.git/mentat/second-opinions"
+check "an unreadable record asks with that reason" '[ "$(reason "$tmp/l-unreadable" "gh pr create --fill")" = "$instr_reason" ]'
+chmod 600 "$tmp/l-unreadable/.git/mentat/second-opinions"
+on_branch l-detached feat/abc-26-branch-key abc-26
+g -C "$tmp/l-detached" checkout -q --detach
+check "a detached HEAD asks with that reason" '[ "$(reason "$tmp/l-detached" "gh pr create --fill")" = "$instr_reason" ]'
+# Worktrees share the record: written from one worktree's git folder, read in another and in the main one.
+on_branch w-main feat/abc-26-main
+g -C "$tmp/w-main" worktree add -q -b feat/abc-30-a "$tmp/w-a"
+g -C "$tmp/w-main" worktree add -q -b feat/abc-26-b "$tmp/w-b"
+shared=$(g -C "$tmp/w-a" rev-parse --git-common-dir)
+mkdir -p "$shared/mentat" && printf 'link 2026-01-02 abc-26 0123456789ab\n' >"$shared/mentat/second-opinions"
+check "a record shared with a worktree: written from one worktree, a linked branch in another leaves alone" '[ -z "$(decision "$tmp/w-b" "gh pr create --fill")" ]'
+check "a record shared with a worktree: a linked branch in the main worktree, from a subdirectory, leaves alone" '[ -z "$(decision "$tmp/w-main/docs" "gh pr create --fill")" ]'
+check "a record shared with a worktree: an unlinked branch in the worktree that wrote it asks" '[ "$(reason "$tmp/w-a" "gh pr create --fill")" = "$instr_reason" ]'
 
 # Without a cwd in the input, the process directory is used.
 nocwd() { (cd "$tmp/repo" && jq -n '{tool_name: "Bash", tool_input: {command: "git push"}}' | "$hook" | jq -r '.hookSpecificOutput.permissionDecision // empty'); }

@@ -142,7 +142,15 @@ clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(le
 no_outside() { [ ! -e "$CALLS/gh" ] && [ ! -e "$CALLS/fetch" ]; }
 data() { sed -n "/^--- BEGIN IDEA DATA ---\$/,/^--- END IDEA DATA ---\$/p" "$1" | sed '1d;$d' | grep -v '^$'; }
 
+# The record of second opinions, in the shared git folder, and the fingerprint of the idea file's content.
+record="$top/.git/mentat/second-opinions"
+fp() { printf '%s' "$(cat "$1")" | shasum -a 256 | cut -c1-12; }
+lines() { if [ -f "$record" ]; then wc -l <"$record" | tr -d ' '; else echo 0; fi; }
+today=$(date +%Y-%m-%d)
+
 reset; rc=$(run "$idea")
+check "a run with a verdict records one review line in the shared git folder: the date, the commit and the idea's fingerprint" '[ "$rc" = 0 ] && [ "$(cat "$record")" = "review $today $H $(fp "$idea")" ]'
+check "the record holds no idea text" '[ -f "$record" ] && ! grep -q "smaller model" "$record"'
 check "both deliver (exit 0): a section for each in order, and a summary of both verdict lines" '[ "$rc" = 0 ] && c=$(grep -n "^## Codex$" "$STUB/stdout" | cut -d: -f1) && g=$(grep -n "^## Grok$" "$STUB/stdout" | cut -d: -f1) && [ "$c" -lt "$g" ] && grep -q "Codex thinks it is fine." "$STUB/stdout" && grep -q "Grok has a view." "$STUB/stdout" && grep -qE "^- Codex \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout" && grep -qE "^- Grok \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT DIFFERENTLY - fewer helpers$" "$STUB/stdout"'
 check "a delivered second opinion keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
 check "a delivered second opinion prints no such line on stderr" '! grep -q "no second opinion from any tool" "$STUB/stderr"'
@@ -293,7 +301,9 @@ reset; rc=$(PATH="$root/nogrok:/usr/bin:/bin" run "$idea")
 grok_no_opinion "a missing grok" "grok is not installed"
 
 # Neither delivers: exit 1, and both sections still say why.
+before=$(lines)
 reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
+check "a run with no verdict records nothing" '[ "$rc" = 1 ] && [ "$(lines)" = "$before" ]'
 check "neither delivering is exit 1, with both no-second-opinion lines on stdout" '[ "$rc" = 1 ] && grep -q "^## Codex$" "$STUB/stdout" && grep -q "^## Grok$" "$STUB/stdout" && [ "$(grep -c "no second opinion (" "$STUB/stdout")" = 4 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (codex exited with status 1" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): no second opinion (Grok exited with status 1" "$STUB/stdout"'
 check "neither delivering still posts and fetches nothing" 'no_outside'
 want_line="mentat: no second opinion from any tool; give Claude Code's view alone, say the second opinion did not happen, and ask the maintainer to agree"
@@ -363,5 +373,47 @@ check "a failed fetch with a local origin/<default> that HEAD is behind is refus
 "$real_git" -C "$F" update-ref refs/remotes/origin/trunk HEAD || exit 1
 reset; rc=$(run_in)
 check "a failed fetch with a local origin/<default> HEAD has runs, saying the freshness could not be checked" '[ "$rc" = 0 ] && codex_ran && grep -q "^- The checkout.s freshness could not be checked: origin.s default branch trunk could not be fetched\.$" "$STUB/stdout"'
+
+# A record that cannot be written: one note on stderr, the run's result as it was.
+chmod 400 "$record"; before=$(lines)
+reset; rc=$(run "$idea")
+check "a record that cannot be written gives one note on stderr and changes neither the exit status nor the output" '[ "$rc" = 0 ] && grep -q "^## Verdicts$" "$STUB/stdout" && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ] && grep -q "^mentat: could not write the second-opinion record" "$STUB/stderr" && [ "$(lines)" = "$before" ]'
+chmod 600 "$record"
+
+# The link step ties an item id to a reviewed idea, only for a review of the idea file's current content.
+nothing_ran() { ! codex_ran && ! grok_ran && no_outside; }
+link_idea="$root/link idea.md"
+printf 'Link this idea.\n' >"$link_idea"
+reset; before=$(lines); rc=$(run --link WRK-9 "$link_idea")
+check "an idea file with no review on record is not linked (exit 1): nothing written, and it says why" '[ "$rc" = 1 ] && [ "$(lines)" = "$before" ] && grep -q "no design review on record of this idea file.s current content" "$STUB/stderr" && nothing_ran'
+reset; rc=$(run "$link_idea")
+reset; before=$(lines); rc=$(run --link WRK-9 "$link_idea")
+check "a reviewed idea file is linked (exit 0): one link line, the id lowercased, and no model or network call" '[ "$rc" = 0 ] && [ "$(lines)" = $((before + 1)) ] && [ "$(tail -n 1 "$record")" = "link $today wrk-9 $(fp "$link_idea")" ] && grep -q "WRK-9" "$STUB/stdout" && nothing_ran'
+printf 'Changed after the review.\n' >>"$link_idea"
+reset; before=$(lines); rc=$(run --link WRK-9 "$link_idea")
+check "an idea file changed since its review is not linked (exit 1): nothing written" '[ "$rc" = 1 ] && [ "$(lines)" = "$before" ] && grep -q "no design review on record of this idea file.s current content" "$STUB/stderr" && nothing_ran'
+"$real_git" -C "$top" worktree add -q --detach "$root/link tree" || exit 1
+reset; before=$(lines); rc=$( (cd "$root/link tree" && "$mentat" second-opinion --link wrk-10 "$idea" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); echo $?)
+check "a worktree shares the record: a review from the main checkout links from a worktree, into the same record" '[ "$rc" = 0 ] && [ "$(lines)" = $((before + 1)) ] && [ "$(tail -n 1 "$record")" = "link $today wrk-10 $(fp "$idea")" ]'
+"$real_git" -C "$top" worktree remove --force "$root/link tree"
+chmod 400 "$record"; before=$(lines)
+reset; rc=$(run --link WRK-11 "$idea")
+check "a link that cannot be written is not linked (exit 1), with one note" '[ "$rc" = 1 ] && [ "$(lines)" = "$before" ] && grep -q "^mentat: could not write the second-opinion record" "$STUB/stderr"'
+chmod 600 "$record"
+link_usage() {
+  reset; before=$(lines); rc=$(run "$@")
+  check "a usage error (exit 64), nothing written: second-opinion $*" '[ "$rc" = 64 ] && [ "$(lines)" = "$before" ] && nothing_ran'
+}
+link_usage --link
+link_usage --link WRK-9
+link_usage --link WRK-9 "$idea" "$idea"
+link_usage --link wrk_9 "$idea"
+link_usage --link 9-WRK "$idea"
+link_usage --link WRK-9x "$idea"
+link_usage --link -9 "$idea"
+link_usage --web --link WRK-9 "$idea"
+link_usage --link WRK-9 "$root/missing idea.md"
+rc=$(cd "$root" && "$mentat" second-opinion --link WRK-9 "$idea" >/dev/null 2>&1; echo $?)
+check "the link step outside a git repository links nothing (exit 1)" '[ "$rc" = 1 ]'
 
 [ "$failures" -eq 0 ]

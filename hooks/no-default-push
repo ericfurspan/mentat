@@ -8,7 +8,8 @@
 # push (--force, -f, --force-with-lease or a +refspec) on any branch, and a git
 # push or gh pr create while git status --porcelain in its directory prints
 # anything. A gh pr create whose branch changes an agent instruction file
-# against origin/<default> asks whether the change got a second opinion. A cd
+# against origin/<default> asks, unless the branch name holds an item id that
+# mentat second-opinion --link recorded as reviewed in the shared git folder. A cd
 # joined to the command by && alone moves these checks to its directory; any
 # other cd adds its directory to the session's. This is a net for mistakes, not
 # a security boundary: other routes exist. When it cannot read its input, it
@@ -48,10 +49,27 @@ load() {
     defaults="main master"
   fi
 }
+# linked <dir>: the branch in <dir> has a segment (split on /) that is, ignoring
+# case, an item id a link line of the second-opinion record names, alone or
+# followed by -. The record is only read, never run.
+linked() {
+  local rec kind id found=1
+  [ -n "$current" ] || return 1
+  rec=$(git -C "$1" rev-parse --git-common-dir 2>/dev/null) && [ -n "$rec" ] || return 1
+  case "$rec" in /*) ;; *) rec=$1/$rec ;; esac
+  shopt -s nocasematch
+  # A missing or unreadable record reads as empty.
+  while read -r kind _ id _; do
+    [ "$kind" = link ] && [ -n "$id" ] || continue
+    case "/$current/" in */"$id"/* | */"$id"-*) found=0; break ;; esac
+  done 2>/dev/null <"$rec/mentat/second-opinions"
+  shopt -u nocasematch
+  return "$found"
+}
 # instructions <dir>: notes a branch whose change from its merge base with
 # origin/<default> adds, changes, deletes or renames an AGENTS.md,
-# AGENTS.override.md, CLAUDE.md or SKILL.md, or the root rules.md or prompts/.
-# No default-branch ref, or a git error, notes nothing.
+# AGENTS.override.md, CLAUDE.md or SKILL.md, or the root rules.md or prompts/,
+# unless linked. No default-branch ref, or a git error, notes nothing.
 instructions() {
   local d paths p
   load "$1"
@@ -61,7 +79,8 @@ instructions() {
     while IFS= read -r p; do
       case "/$p" in
         */AGENTS.md | */AGENTS.override.md | */CLAUDE.md | */SKILL.md | /rules.md | /prompts/*)
-          note "Mentat: this pull request changes agent instructions, and a change to what agents are told gets mentat second-opinion before the maintainer agrees to it. Approve if it got one, if Codex and Grok are off for this session, or if it changes no meaning."
+          linked "$1" ||
+            note "Mentat: this pull request changes agent instructions, and no design review on record (mentat second-opinion --link) names this branch's item. Approve only if Codex and Grok are off for this session or the change alters no meaning."
           return
           ;;
       esac
