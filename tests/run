@@ -225,12 +225,12 @@ phrase_check skills/propose/SKILL.md "the agreement question's note of an unweig
 # A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
 phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
 phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
-# A lasting lesson from a correction is followed at once and filed for Intake only on a yes asked in the reply to it, never with another question.
+# A lasting lesson from a correction is followed at once and filed in Backlog only on a yes asked in the reply to it, never with another question.
 phrase_check rules.md "a correction within the agreed scope followed at once" 'Claude Code follows any correction within the agreed scope at once.'
 phrase_check rules.md "the triggers for asking to file a lesson" 'When the maintainer corrected the same point twice, said it should hold in later work, or stated a preference about how agents work in general,'
 phrase_check rules.md "the lesson asked once in the reply to the correction" "its reply to that correction asks once, in one \`AskUserQuestion\` prompt, whether to file it;"
 phrase_check rules.md "what does not trigger the lesson ask, and once per point" 'never for a one-off instruction for this task, a reversal already asked as a scope question or a failed check inside the review loop, and at most once per point per session.'
-phrase_check rules.md "a yes files a lesson for Intake, naming what it would change" "A yes files a not-agreed item, or an inbox idea where an inbox is named as above, for Intake, naming what it would change (for a working-style preference, the maintainer's own instructions);"
+phrase_check rules.md "a yes files a lesson as a Backlog item, naming what it would change" "A yes files a Backlog item naming what it would change (for a working-style preference, the maintainer's own instructions);"
 phrase_check rules.md "the lesson's yes agrees nothing else and is asked alone" 'it agrees nothing else and is never combined with another question, such as the next-work offer.'
 phrase_check rules.md "a lesson filed only on a yes, unlike other unasked follow-ups" 'Unlike other unasked follow-ups, a lesson is filed only on that yes.'
 
@@ -429,7 +429,7 @@ phrase_check skills/work-tickets/SKILL.md "no plan limit read without the mainta
 # A decision that does not block work reaches the maintainer as their own instructions say, else as rules.md says, and mentat:propose points there.
 phrase_check rules.md "the maintainer's own route for a decision that does not block" "Where the maintainer's own instructions say how a decision that does not block the work reaches them, those instructions apply."
 phrase_check rules.md "the default route for a decision that does not block" 'Otherwise it reaches them as the bullet above says.'
-phrase_check rules.md "what the maintainer's own instructions may change" "The maintainer's own instructions may set only the choices these rules and the skills name, and may add weighs or checks; \"Approval\" and \"What agents never do\" still hold."
+phrase_check rules.md "what the maintainer's own instructions may change" "The maintainer's own instructions may set only the choices these rules and the skills name, and may add design reviews or checks; \"Approval\" and \"What agents never do\" still hold."
 phrase_check skills/propose/SKILL.md "the route for a decision that does not block" "one it does not need in order to go on goes as \`rules.md\` \"What goes to the maintainer\" says"
 
 # The maintainer decides outcomes, cost and risk, and Claude Code settles the rest.
@@ -439,7 +439,9 @@ phrase_check rules.md "what Claude Code settles without asking" 'Claude Code set
 # mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
 phrase_check rules.md "a decision as one question about outcomes, never the mechanism" 'A decision reaches them as one question about what they get, pay or risk, never about the mechanism'
 phrase_check rules.md "what each option authorizes and gets, with only the costs that differ" 'each option saying what it authorizes and gets, and naming only the costs that differ between the options (a cost every option shares is not repeated)'
-phrase_check rules.md "unasked follow-ups settled in an Intake sitting" "such items are settled in an Intake sitting (\`/mentat:intake\`)."
+phrase_check rules.md "unasked work and mid-task ideas routed to the Inbox, settled in triage" "Work they did not ask for (shared links, project comments, anything an agent finds or proposes, bugs included) and an idea they raise mid-task go to the Inbox, settled in triage (\`/mentat:triage\`);"
+phrase_check rules.md "an explicit request to file work routed to Backlog" 'an explicit request to file something as work goes to Backlog;'
+phrase_check rules.md "the request in hand still through mentat:propose" "the request the session is carrying out still goes through \`mentat:propose\`."
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question saying why the first is recommended, so the prompt alone suffices'
@@ -453,15 +455,15 @@ else
 fi
 phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
-# An opt-in ending offers the next agreed work (rules.md "Ending finished work"), and plan, Intake, work-tickets and review point to it.
+# An opt-in ending offers the next agreed work (rules.md "Ending finished work"), and plan, triage, work-tickets and review point to it.
 phrase_check rules.md "the ending finished work section" '## Ending finished work'
 phrase_check rules.md "the maintainer's choice of ending, its default and the opt-in condition" "The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says. When they choose \"offer the next work\":"
 phrase_check rules.md "never suggesting an end unless the maintainer said so" 'Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.'
 phrase_check rules.md "the offer made only by the session the maintainer is talking to, in one prompt" "Only the session the maintainer is talking to offers, in one \`AskUserQuestion\` prompt, when its own work has just finished:"
-phrase_check rules.md "the offer after a plan" "after a plan, the first build group \`mentat:plan\` step 8 gave;"
+phrase_check rules.md "the offer after a plan naming no item it started" 'after a plan, only next work it did not start;'
 phrase_check rules.md "the offer after a work-tickets queue, none mid-queue and no appending" 'after a work-tickets queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue;'
 phrase_check rules.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
-phrase_check rules.md "the offer after Intake, taken-on items for propose only" "after an Intake sitting that ends with no question, where an item only taken on is offered for \`mentat:propose\`, never for building."
+phrase_check rules.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
 phrase_check rules.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
 phrase_check rules.md "the merge line first while a merge waits" '"You: merge #N." stays the first line while a merge waits.'
 phrase_check rules.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` step 5) read-only, as \`mentat:agenda\` does,"
@@ -472,11 +474,10 @@ phrase_check rules.md "the lookup result for agreed work none of which can start
 phrase_check rules.md "the lookup result for no agreed work" ' no agreed work. It offers only an item that can start,'
 phrase_check rules.md "no agreed work is left said only in the last case" 'It offers only an item that can start, and says "no agreed work is left" only in the last case.'
 phrase_check rules.md "no offer from a started session" 'A session started by another session makes no offer; its ending goes to the session that started it.'
-phrase_check rules.md "no offer after a stop" 'After "Stop here", "Later" or a no, no offer is made that turn;'
+phrase_check rules.md "no offer after a stop" 'After "Stop here", "Stop" or a no, no offer is made that turn;'
 phrase_check rules.md "a no declining that batch only" 'a no declines that batch only.'
-phrase_check rules.md "a forwarded yes replacing step 5's build yes" "A yes, forwarded word for word with the offered queue and its conditions, replaces \`mentat:work-tickets\` step 5's final build yes."
-phrase_check rules.md "the build session's checks kept and a differing queue asked again" 'The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again when its queue differs from the one offered.'
-phrase_check rules.md "step 5 asking as it says without a forwarded yes" 'With no forwarded yes, step 5 asks as it says.'
+phrase_check rules.md "a forwarded yes starting the build session" 'A yes, forwarded word for word with the offered queue and its conditions, starts that build session.'
+phrase_check rules.md "the build session's checks kept and asked again only for a new item or changed condition" 'The build session still runs readiness, plan usage and the quick check, sends its open questions through the session that started it, and asks again only when its queue gains an item or an agreed condition changed.'
 phrase_check skills/plan/SKILL.md "the pointer to the ending" "Then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
 phrase_check skills/work-tickets/SKILL.md "a forwarded yes replacing step 5's last prompt" "A yes forwarded as \`rules.md\` \"Ending finished work\" says replaces this last prompt."
@@ -499,8 +500,8 @@ phrase_check skills/propose/SKILL.md "a spec's bare run for a skill that takes a
 phrase_check skills/propose/SKILL.md "the bare-run question for a skill that takes project names" "A skill that takes project names, run with none, asks once which projects to cover before it reads or writes anything else: the session's project first, then \`all\`, another through Other."
 phrase_check skills/propose/SKILL.md "no bare-run question where no project list is named" "Where the maintainer's own instructions name no project list, it asks nothing and covers the session's repository."
 phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
-# An unasked follow-up is filed in the record, not left in chat.
-phrase_check rules.md "an unasked follow-up filed as a not-agreed backlog item" 'A follow-up worth doing that they did not ask for is filed as a not-agreed backlog item'
+# An unasked follow-up is filed in the record (the Inbox), not left in chat.
+phrase_check rules.md "an unasked follow-up filed in the Inbox" 'Work they did not ask for (shared links, project comments, anything an agent finds or proposes, bugs included) and an idea they raise mid-task go to the Inbox'
 if grep -q -F 'not filed' rules.md; then
   fail "rules.md must not leave a follow-up unfiled (found: not filed)"
 else
