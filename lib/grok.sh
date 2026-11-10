@@ -156,15 +156,16 @@ grok_refresh() {
     GROK_AUTH_EARLY_INVALIDATION_SECS=$((10#$GROK_TIMEOUT_SECONDS + 360)) "${GROK_RUN_ENV[@]}" \
     "$grok_bin" models) >/dev/null 2>&1 </dev/null &
   pid=$!
+  # $SECONDS counts whole seconds, so the limit ends up to a second late, never early.
+  secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$secs" -ge 30 ]; then
+    if [ $((SECONDS - secs)) -gt 30 ]; then
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
       break
     fi
-    sleep 1
-    secs=$((secs + 1))
+    sleep 0.1
   done
   wait "$pid" 2>/dev/null || true
 }
@@ -335,15 +336,16 @@ grok_exec() {
   (cd "$run/export" && exec env -i PATH="$PATH" HOME="$HOME" GROK_HOME="$ghome" TMPDIR="$run/tmp" LANG="${LANG:-en_US.UTF-8}" \
     "${GROK_RUN_ENV[@]}" "$grok_bin" "${args[@]}") >"$out" 2>"$err" </dev/null &
   pid=$!
+  # $SECONDS counts whole seconds, so a limit stops Grok up to a second late, never early.
+  secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$secs" -ge "$GROK_TIMEOUT_SECONDS" ]; then
+    if [ "$GROK_TIMEOUT_SECONDS" -eq 0 ] || [ $((SECONDS - secs)) -gt "$GROK_TIMEOUT_SECONDS" ]; then
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
       "$fail" "Grok did not finish within $GROK_TIMEOUT_SECONDS seconds"
     fi
-    sleep 1
-    secs=$((secs + 1))
+    sleep 0.1
   done
   wait "$pid"
   rc=$?

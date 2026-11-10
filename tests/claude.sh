@@ -131,8 +131,10 @@ reset; set_reviewers claude; printf 'Looks fine.\n' >"$STUB/claude_out"; rc=$(ru
 check "a reply without the verdict line is no answer (exit 1 when Claude is the only tool)" '[ "$rc" = 1 ] && grep -q "^- Claude ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line)$" "$STUB/stdout"'
 reset; set_reviewers claude; echo 3 >"$STUB/claude_exit"; rc=$(run_opinion)
 check "claude exiting non-zero is no answer, and its log is kept, not printed" '[ "$rc" = 1 ] && grep -q "no second opinion (claude exited with status 3" "$STUB/stdout" && ! grep -q SECRET-CLAUDE-LOG "$STUB/stdout" "$STUB/stderr" && p=$(sed -n "s/.*can read it at \(.*\))\$/\1/p" "$STUB/stdout" | head -n 1) && grep -q SECRET-CLAUDE-LOG "$p" && clean'
-reset; set_reviewers claude; touch "$STUB/claude_hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run_opinion)
-check "a Claude timeout (MENTAT_REVIEW_TIMEOUT_SECONDS) is no answer, and Claude is stopped" '[ "$rc" = 1 ] && grep -q "no second opinion (Claude did not finish within 1 seconds" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/claude_pid")" 2>/dev/null && clean'
+reset; set_reviewers claude; touch "$STUB/claude_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run_opinion); took=$((SECONDS - took))
+# More than the 3-second limit, then the 2 seconds between TERM and KILL.
+check "a Claude timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
+check "a Claude timeout (MENTAT_REVIEW_TIMEOUT_SECONDS) is no answer, and Claude is stopped" '[ "$rc" = 1 ] && grep -q "no second opinion (Claude did not finish within 3 seconds" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/claude_pid")" 2>/dev/null && clean'
 reset; set_reviewers "claude codex"; rc=$(PATH="$root/noclaude:/usr/bin:/bin" run_opinion)
 check "a listed claude that is not installed is reported, and Codex still counts" '[ "$rc" = 0 ] && grep -q "^- Claude ([0-9]* seconds): no second opinion (claude is not installed)$" "$STUB/stdout" && grep -q "^- Codex ([0-9]* seconds): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout"'
 

@@ -79,7 +79,7 @@ pair_run() { # $1 runner prefix, $2... tools
       i=$((i + 1))
     done
     [ "$alive" = yes ] || break
-    sleep 1
+    sleep 0.1
   done
   for t in "${pids[@]}"; do wait "$t"; done
 }

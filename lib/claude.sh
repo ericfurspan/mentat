@@ -115,15 +115,16 @@ run_claude() {
     --permission-mode dontAsk --model "$claude_reviewer" --tools "$tools" ${allow[@]+"${allow[@]}"} \
     --disallowed-tools "${CLAUDE_CREDENTIAL_DENY[@]}" <"$prompt") >"$out.raw" 2>"$log" &
   pid=$!
+  # $SECONDS counts whole seconds, so a limit stops Claude up to a second late, never early.
+  secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$secs" -ge "$REVIEW_TIMEOUT_SECONDS" ]; then
+    if [ "$REVIEW_TIMEOUT_SECONDS" -eq 0 ] || [ $((SECONDS - secs)) -gt "$REVIEW_TIMEOUT_SECONDS" ]; then
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
       "$fail" "Claude did not finish within $REVIEW_TIMEOUT_SECONDS seconds"
     fi
-    sleep 1
-    secs=$((secs + 1))
+    sleep 0.1
   done
   wait "$pid"
   rc=$?
