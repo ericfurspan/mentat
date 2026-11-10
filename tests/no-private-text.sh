@@ -412,6 +412,7 @@ S=$tdir; cat \$S/x; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; echo \$S; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; x=\$(cat \$S/pr.md); gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; sed -i '' "s|x|\$S|" \$S/pr.md; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; printf x > "\$(echo \$S)"; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; sed 's/a/b/' \$S/pr.md >/dev/null; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; S=/Users/stub/StubCodename; gh pr edit 1 --body-file \$S/pr.md
@@ -469,7 +470,7 @@ S=$TMPDIR/plain; S=\$(mktemp -d); gh pr edit 1 --body-file \$S/word.md
 S=$TMPDIR/plain; S="\$(mktemp -d)"; gh pr edit 1 --body-file \$S/word.md
 S=$TMPDIR/plain; S=\$X; gh pr edit 1 --body-file \$S/word.md
 S=$TMPDIR/plain gh pr edit 1 --body-file \$S/word.md
-gh pr edit 1 --body-file \$SX/word.md
+S=$TMPDIR/plain; gh pr edit 1 --body-file \$SX/word.md
 EOF
 
 # What the prompt says.
