@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only step 2's stages, step 6's item creation and fingerprint comment, "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the item shape or the rest of steps 1 to 8.
+With no external backlog, the backlog is GitHub issues: only step 2's stages, step 6's item creation, stage moves and fingerprint comment, the item shape's opening sentence, "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of steps 1 to 8.
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
