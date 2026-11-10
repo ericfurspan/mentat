@@ -62,8 +62,7 @@ c_plugin_copies() {
   fi
 }
 # The review tools in effect. With no setting: Codex, and Grok where installed (it is
-# optional then). With one: each listed tool, and Claude when Codex is not listed,
-# since mentat challenge then runs Claude. A listed tool that is missing is a problem;
+# optional then). With one: each listed tool. A listed tool that is missing is a problem;
 # a missing Codex that is not in effect is a note, since mentat review still needs it.
 c_review_tools() {
   # shellcheck disable=SC2034 # claude_same is set by claude_pick_model
@@ -73,9 +72,9 @@ c_review_tools() {
     if command -v codex >/dev/null 2>&1; then
       v=$(codex --version 2>/dev/null | head -n 1)
       c_ok "codex is installed (${v:-version unknown})"
-    else c_problem "codex is not installed: mentat review, mentat challenge and mentat weigh need it; mentat ci and mentat review --grok still run without it"; fi
+    else c_problem "codex is not installed: mentat review and mentat second-opinion need it; mentat ci and mentat review --grok still run without it"; fi
   elif ! command -v codex >/dev/null 2>&1; then
-    printf 'NOTE: codex is not installed: mentat review needs it; the review tools setting does not use it for weigh, challenge or consult\n'
+    printf 'NOTE: codex is not installed: mentat review needs it; the review tools setting does not use it for mentat second-opinion\n'
   fi
   if command -v grok >/dev/null 2>&1 && { [ -z "$reviewers" ] || [ "${reviewers#*grok}" != "$reviewers" ]; }; then
     v=$(grok --version 2>/dev/null | head -n 1)
@@ -83,7 +82,7 @@ c_review_tools() {
   elif [ "${reviewers#*grok}" != "$reviewers" ]; then
     c_problem "grok is not installed: ~/.config/mentat/reviewers lists it"
   fi
-  [ -n "$reviewers" ] && { [ "${reviewers#*claude}" != "$reviewers" ] || [ "${reviewers#*codex}" = "$reviewers" ]; } || return 0
+  [ "${reviewers#*claude}" != "$reviewers" ] || return 0
   if ! command -v claude >/dev/null 2>&1; then
     c_problem "claude is not installed: the review tools setting runs it"
   elif ! claude_pick_model; then

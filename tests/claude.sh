@@ -165,7 +165,7 @@ check "check with codex listed and missing is a problem" '[ "$rc" = 1 ] && grep 
 reset; set_reviewers "claude codex"; rc=$(cd "$top" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/stdout" 2>&1; echo $?)
 check "check with claude listed and missing is a problem" '[ "$rc" = 1 ] && grep -qx "PROBLEM: claude is not installed: the review tools setting runs it" "$STUB/stdout" && grep -q "^OK: codex is installed" "$STUB/stdout"'
 reset; set_reviewers grok; rc=$(run_check)
-check "check with grok listed and missing is a problem, and Claude, which challenge then runs, is reported" '[ "$rc" = 1 ] && grep -qx "PROBLEM: grok is not installed: ~/.config/mentat/reviewers lists it" "$STUB/stdout" && grep -q "^OK: claude is installed" "$STUB/stdout"'
+check "check with grok listed and missing is a problem, and Claude, which it does not list, is not reported" '[ "$rc" = 1 ] && grep -qx "PROBLEM: grok is not installed: ~/.config/mentat/reviewers lists it" "$STUB/stdout" && ! grep -q "^OK: claude" "$STUB/stdout" && ! grep -q "^PROBLEM: claude" "$STUB/stdout"'
 reset; set_reviewers "claude gemini"; rc=$(run_check)
 check "check reports an unknown word in the setting as a problem" '[ "$rc" = 1 ] && grep -q "^PROBLEM: the review tools setting ~/.config/mentat/reviewers holds an unknown word (gemini)" "$STUB/stdout"'
 reset; set_reviewers claude; echo "bad;model" >"$CONF/claude-model"; rc=$(run_check)

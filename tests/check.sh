@@ -106,10 +106,10 @@ check "a grok with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: grok 
 mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/gitleaks" "$root/nogrok/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogrok:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a missing grok prints nothing and warns of nothing" '[ "$rc" = 0 ] && ! grep -qi grok "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-# Codex is needed for mentat review, challenge and weigh: without it, check fails.
+# Codex is needed for mentat review and mentat second-opinion: without it, check fails.
 mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/gh" "$root/bin/grok" "$root/bin/gitleaks" "$root/nocodex/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nocodex:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "a missing codex is a problem (exit 1) that says what still runs without it" '[ "$rc" = 1 ] && grep -qx "PROBLEM: codex is not installed: mentat review, mentat challenge and mentat weigh need it; mentat ci and mentat review --grok still run without it" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+check "a missing codex is a problem (exit 1) that says what still runs without it" '[ "$rc" = 1 ] && grep -qx "PROBLEM: codex is not installed: mentat review and mentat second-opinion need it; mentat ci and mentat review --grok still run without it" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 reset; rc=$(run)
 check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
 # Without gitleaks, the commit hook does not scan: check warns and still passes.
