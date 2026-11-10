@@ -396,7 +396,7 @@ phrase_check skills/plan/SKILL.md "a read that refines no item and clears no wai
 phrase_check skills/plan/SKILL.md "the paste line as the work-tickets command" "the full \`/mentat:work-tickets <ids>\` command"
 # Plan splits the items this session committed into build groups by shared files and starts one build session per group,
 # within plan usage, a fresh checkout each; where it cannot start one, it gives a paste line per group. Stop here starts nothing.
-phrase_check skills/plan/SKILL.md "only the items this session committed, in the tracker's order" "Then take only the items this session just committed, in the tracker's order (\`mentat:backlog\` step 5),"
+phrase_check skills/plan/SKILL.md "only the items this session committed to build now, in the tracker's order" "Then take only the items this session just committed with \"Agree and build now\", in the tracker's order (\`mentat:backlog\` step 5),"
 phrase_check skills/plan/SKILL.md "the readiness filter before grouping" 'Split the rest into build groups'
 phrase_check skills/plan/SKILL.md "groups by predicted shared files" "two items share a group when their changes would touch any file in common, as predicted from each item's spec and the code read in step 3."
 phrase_check skills/plan/SKILL.md "an unclear overlap kept in one group" 'When it is unclear whether two items share a file, they share a group.'
@@ -407,7 +407,7 @@ phrase_check skills/plan/SKILL.md "one build session per group, each in a fresh 
 phrase_check skills/plan/SKILL.md "the paste line fallback, one per group in order" 'Where Claude Code cannot start a session, give each group, in the order of its first item, its own fenced line'
 phrase_check skills/plan/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, say each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
 phrase_check skills/plan/SKILL.md "the paste line that starts its build" 'its own fenced line the maintainer can paste to start its build: the full'
-phrase_check skills/plan/SKILL.md "no start for items not committed in this session" 'Items committed before this session, or not committed, are not started.'
+phrase_check skills/plan/SKILL.md "no start for items committed for later, before this session, or not committed" 'Items committed with "Agree, build later" or before this session, or not committed, are not started.'
 phrase_check skills/plan/SKILL.md "starting a build session is not briefing a builder" 'Starting a build session (step 8) is none of these: that session briefs its own builders.'
 phrase_check skills/plan/SKILL.md "Stop here starting nothing" 'nothing else runs, no build session starts, and the report follows.'
 if grep -qE 'not ready to build.*Split the rest into build groups' skills/plan/SKILL.md; then
@@ -448,7 +448,7 @@ fi
 phrase_check skills/work-tickets/SKILL.md "the committed Todo items in the tracker's order with no ids" "With none: the project's Todo items that have a spec, are not parked and do not wait on the maintainer, in the tracker's order (\`mentat:backlog\` step 5)."
 phrase_check skills/work-tickets/SKILL.md "a missing or changed spec fingerprint sent back to planning" "so does one whose recorded spec fingerprint (\`mentat:backlog\` step 6) is missing or differs from the fingerprint of its current spec, computed the same way, since a changed spec goes back to planning."
 phrase_check skills/work-tickets/SKILL.md "an item with a branch or pull request skipped with its status" 'An item with a branch or pull request (In Progress), waiting on the maintainer, or ended leaves the queue, named with its status.'
-phrase_check skills/work-tickets/SKILL.md "no final yes asked" "No final yes is asked: typing the command, a start by a plan session, or a forwarded yes (\`rules.md\` \"Ending finished work\") is the go."
+phrase_check skills/work-tickets/SKILL.md "no final yes, the typed command as the go-ahead" "No final yes is asked: the maintainer typing the command is the go-ahead for the items it takes, as are \"Agree and build now\" for a plan session's start and a forwarded yes (\`rules.md\` \"Ending finished work\")."
 phrase_check skills/work-tickets/SKILL.md "asked again only for a new item or a changed condition" 'The run asks again only when its queue gains an item over the queue it was started with, or an agreed condition changed.'
 phrase_check skills/work-tickets/SKILL.md "status, blockers, branch and fingerprint re-read before each item" 'Right before each item starts, re-read its status, blockers, any branch or pull request and its fingerprint, and check its readiness again as step 3 says.'
 phrase_check skills/work-tickets/SKILL.md "the branch created before the builder, as the lock" 'Then create its branch, from the default branch, before briefing its builder: the branch is the lock, so a run that finds it skips the item.'
@@ -463,7 +463,7 @@ phrase_check skills/consult/SKILL.md "that it starts nothing" 'and starts nothin
 phrase_check skills/agenda/SKILL.md "waits as the tracker's adapter marks them" "items waiting on the maintainer, as the tracker's adapter marks them, merge waits included;"
 phrase_check skills/agenda/SKILL.md "Next from Todo in the tracker's order, never the Inbox" "Next: the project's Todo items in the tracker's order (\`mentat:backlog\` step 5), never the Inbox."
 phrase_check README.md "the triage command" "- \`/mentat:triage [project ... | all] | brainstorm <text or link>\`: go through the Inbox with you."
-phrase_check README.md "the stages and the yes that commits and starts a build" "Work goes Inbox, Backlog, Todo; your yes on an item's spec commits it and starts its build."
+phrase_check README.md "the stages and the agreement that commits an item to build now or later" "Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later."
 phrase_check skills/work-tickets/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
 phrase_check skills/work-tickets/SKILL.md "that it never plans scope" 'It builds and never plans scope'
 phrase_check skills/work-tickets/SKILL.md "the merge line kept for the final message" '"You: merge #N." goes into the final message instead of ending the run'
@@ -611,9 +611,9 @@ phrase_check skills/backlog/github.md "GitHub's stage mapping without stage labe
 phrase_check skills/backlog/github.md "GitHub's triage outcomes" "Close: \`gh issue close <N> --reason \"not planned\"\`, with the reason in a comment. Merge: \`gh issue close <N> --reason duplicate\`, with a comment naming the target. Later: a dated comment; the issue stays open."
 phrase_check skills/backlog/github.md "the GitHub type label" 'Each issue gets one label for what it is, from the repository'"'"'s own'
 phrase_check skills/backlog/github.md "a GitHub issue's opening sentence on where the work came from" 'An issue Claude Code files or the maintainer agrees opens with one sentence saying where the work came from'
-# At agreement the spec's fingerprint is recorded on the item, from the tracker's read-back.
-phrase_check skills/backlog/SKILL.md "the fingerprint comment from the read-back body" "Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as \`mentat:review\` \"Spec\" computes it (the same span, the same command), never from the text written, and post one comment on the item: \`Spec fingerprint: <12 hex>\`, citing the agreement."
-phrase_check skills/backlog/SKILL.md "the latest fingerprint comment as the record" 'Do it again whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint.'
+# At agreement the spec's fingerprint, from the tracker's read-back, and the build-now-or-later answer are recorded on the item.
+phrase_check skills/backlog/SKILL.md "the fingerprint and answer comment from the read-back body" "Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as \`mentat:review\` \"Spec\" computes it (the same span, the same command), never from the text written, and post one comment on the item: \`Spec fingerprint: <12 hex>; build: now\` or \`Spec fingerprint: <12 hex>; build: later\`, after the answer to \`mentat:propose\`'s agreement question, citing the agreement."
+phrase_check skills/backlog/SKILL.md "the latest fingerprint comment, re-recorded on a scope change, as the record" 'Do it again, with that agreement'"'"'s answer, whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint and answer.'
 # Triage reads the Inbox as the tracker's adapter maps it, plus further inboxes, and skips an item with a Later note.
 phrase_check skills/triage/SKILL.md "the Inbox read through the tracker's adapter, plus further inboxes" "its Inbox items (\`mentat:backlog\` step 2, as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say)."
 phrase_check skills/triage/SKILL.md "an item with a Later note left out until a fact changes" 'Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.'
@@ -634,10 +634,14 @@ phrase_check skills/triage/SKILL.md "no opening question where no project list i
 phrase_check skills/triage/SKILL.md "brainstorm mode's own project question" 'Brainstorm mode keeps its own project question.'
 phrase_check skills/triage/SKILL.md "each answer recorded so the item is not found again" 'so step 2 does not find the item again'
 phrase_check skills/propose/SKILL.md "that accepting an item is no commitment, and the yes here commits it to Todo" "Accepting an Inbox item in triage is not a commitment; the maintainer's yes here commits the item from Backlog to Todo."
-# The agreement question says a yes commits the item and starts its build, and the agreement records the spec's fingerprint.
-phrase_check skills/propose/SKILL.md "the agreement question's commit and start" 'The question says that a yes commits the item to Todo and starts its build, checks and reviews.'
-phrase_check skills/propose/SKILL.md "the small request's yes committing and starting the build" "That yes, like step 4's, commits the item to Todo and starts its build, checks and reviews."
-phrase_check skills/propose/SKILL.md "the fingerprint recorded at agreement" "On the item it then records the spec's fingerprint, as \`mentat:backlog\` step 6 says, and again whenever an agreed change of scope rewrites the spec."
+# The agreement question offers build now or build later, both committing the item; the agreement records the
+# spec's fingerprint and the answer, and an item committed for later waits for the maintainer to start it.
+phrase_check skills/propose/SKILL.md "the agreement question's two answers" 'Its first two options are "Agree and build now", which commits the item to Todo and starts its build, checks and reviews, and "Agree, build later", which commits it to Todo and starts nothing;'
+phrase_check skills/propose/SKILL.md "build now recommended where wanted this session, other options kept" "the first is recommended where the maintainer wants it built in this session, and the question's other options stay."
+phrase_check skills/propose/SKILL.md "each answer's effect in a chat request" "In a chat request, \"Agree and build now\" goes on to build in this session through \`rules.md\` \"A change\" steps 2 to 5, and \"Agree, build later\" stops once step 7 is done."
+phrase_check skills/propose/SKILL.md "an item for later built only on the maintainer's command or offer yes" "An item committed for later is built only when the maintainer types \`/mentat:work-tickets\`, with or without its id, or says yes to a next-work offer naming it."
+phrase_check skills/propose/SKILL.md "the small request's yes as agreement to build now" 'That yes is agreement to build now: it commits the item to Todo and starts its build, checks and reviews.'
+phrase_check skills/propose/SKILL.md "the fingerprint and answer recorded at agreement" "On the item it then records the spec's fingerprint and the chosen answer (build now or later), as \`mentat:backlog\` step 6 says, and again whenever an agreed change of scope rewrites the spec."
 
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
 # and the Linear skill's migration carries the pinned issue's order by creation order.

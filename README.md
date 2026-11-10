@@ -47,7 +47,7 @@ Where pull requests need approval, give the agent its own GitHub account.
 
 ## Usage
 
-Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; your yes on an item's spec commits it and starts its build. Commands:
+Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
 
 - `/mentat:agenda [project ... | all]`: what waits on you and what to do next.
 - `/mentat:triage [project ... | all] | brainstorm <text or link>`: go through the Inbox with you.
