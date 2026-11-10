@@ -23,20 +23,24 @@ c_finish() {
   printf 'Check OK (%d warning(s))\n' "$check_warnings"; exit 0
 }
 # Warns with a count, never a name, for each private repository that is not a whole
-# line of the word list, ignoring case. Blank lines and # lines match no repository
-# name. Success with no output means no private repositories, not a failed lookup.
-# A pipe, not a here-string: bash 3.2 writes a here-string to a temporary file. grep
-# exits 1 when none are missing and above 1 on an error.
+# line of the word list with a leading exact: removed, ignoring case. Blank lines and
+# # lines match no repository name. Success with no output means no private
+# repositories, not a failed lookup. A pipe, not a here-string: bash 3.2 writes a
+# here-string to a temporary file. grep exits 1 when none are missing and above 1 on
+# an error.
 c_word_list_covers_repos() {
-  local names missing=0 rc=0
+  local names list missing=0 rc=0
   names=$(gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' 2>/dev/null) || rc=2
   if [ "$rc" = 0 ] && [ -n "$names" ]; then
-    missing=$(printf '%s\n' "$names" | grep -vixF -c -f "$PRIVATE_WORDS" 2>/dev/null) || rc=$?
+    list=$(sed 's/^exact://' "$PRIVATE_WORDS" 2>/dev/null) || rc=2
+  fi
+  if [ "$rc" = 0 ] && [ -n "$names" ]; then
+    missing=$(printf '%s\n' "$names" | grep -vixF -c -e "$list" 2>/dev/null) || rc=$?
   fi
   if [ "$rc" -gt 1 ]; then
     c_warn "could not compare the private word list with your private repositories"
   elif [ "$missing" -gt 0 ]; then
-    c_warn "$missing private repository name(s) are not whole lines of the private word list; to list them, run: gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' | grep -vixF -f ~/.config/mentat/private-words"
+    c_warn "$missing private repository name(s) are not whole lines of the private word list; to list them, run: gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' | grep -vixF -f <(sed 's/^exact://' ~/.config/mentat/private-words)"
   else
     c_ok "the private word list has every private repository this account can reach"
   fi

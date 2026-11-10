@@ -537,4 +537,23 @@ reset
 held=$(held_comment "about StubCodename" owner/repo); kept=${held##* }
 check "held_comment keeps the comment and names the file and the category, not the match" 'case "$held" in *"holds a configured private name"*) true ;; *) false ;; esac && [ "$(cat "$kept")" = "about StubCodename" ] && ! grep -qiF stubcodename <<<"$held" && [ "$(stat -f "%Lp" "$kept")" = 600 ]'
 
+# Entries marked exact: match only in their case, as a whole word.
+hits() { [ "$(private_text "$1")" = "a configured private name" ]; }
+misses() { ! private_text "$1" >/dev/null; }
+printf 'exact:StubExact\nexact:a.b' >"$LIST"
+check "a marked entry hits in its case as a whole word, also next to punctuation and at the text's edges" 'hits "about StubExact here" && hits "(StubExact)" && hits "StubExact." && hits "StubExact-client" && hits "StubExact" && hits "StubExact at start" && hits "at end StubExact"'
+check "a marked entry misses in another case and inside a longer word" 'misses stubexact && misses STUBEXACT && misses "exact:stubexact" && misses StubExacts && misses preStubExact && misses StubExact_2'
+check "a dot in a marked entry stays literal" 'misses "about aXb here" && hits "about a.b here"'
+long_exact=$(printf 'StubExact\n%0100000d\n%0100000d' 0 0)
+check "a marked entry hit early in long text is found under pipefail" 'hits "$long_exact"'
+printf 'exact:StubExact\nStubCodename\n-dashword' >"$LIST"
+check "unmarked entries still match in any case and inside a word beside a marked one" 'hits "about stubcodename" && hits "xSTUBCODENAMEx" && hits "a -DASHWORD b" && hits "StubExact" && misses stubexact'
+printf 'exact:' >"$LIST"
+check "a list that is only exact: matches nothing" 'misses "exact: anything" && misses "exact:" && misses "nothing here"'
+printf '\nexact:\n\n   \n' >"$LIST"
+check "a list of exact: and blank lines matches nothing" 'misses "exact: anything" && misses "a b"'
+printf 'exact:StubExact\n' >"$LIST"
+check "the hook asks for a marked entry only in its case" '[ "$(decision "gh pr comment 7 --body \"about StubExact\"")" = ask ] && [ -z "$(decision "gh pr comment 7 --body \"about stubexact\"")" ]'
+reset
+
 [ "$failures" -eq 0 ]

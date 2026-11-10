@@ -6,14 +6,22 @@
 PRIVATE_WORDS="$HOME/.config/mentat/private-words"
 
 # Prints the category of the first hit in text $1, or returns 1 with none. Each line
-# of the word list is a fixed string, ignoring case; blank lines and lines starting
-# with # are skipped. A missing or unreadable list counts as empty. Here-strings, not
-# pipes: under pipefail, grep -q stopping early on long text would read as no hit.
+# of the word list is a fixed string, ignoring case. A line starting with exact:
+# matches the rest only in that case and as a whole word, bounded by a character
+# that is not a letter, digit or underscore or by the text's edge, so one whose
+# first or last character is not a letter, digit or underscore can miss. Blank
+# lines, lines starting with # and a line that is only exact: are skipped. A missing
+# or unreadable list counts as empty. Here-strings, not pipes: under pipefail,
+# grep -q stopping early on long text would read as no hit.
 private_text() {
-  local words
+  local words exact
   if grep -aiqF -e "$HOME" <<<"$1"; then printf 'a local path'; return 0; fi
-  words=$(grep -v -e '^[[:space:]]*$' -e '^#' "$PRIVATE_WORDS" 2>/dev/null)
-  if [ -n "$words" ] && grep -aiqF -e "$words" <<<"$1"; then printf 'a configured private name'; return 0; fi
+  words=$(grep -v -e '^[[:space:]]*$' -e '^#' -e '^exact:' "$PRIVATE_WORDS" 2>/dev/null)
+  exact=$(sed -n 's/^exact:\(..*\)$/\1/p' "$PRIVATE_WORDS" 2>/dev/null)
+  if { [ -n "$words" ] && grep -aiqF -e "$words" <<<"$1"; } ||
+    { [ -n "$exact" ] && grep -aqFw -e "$exact" <<<"$1"; }; then
+    printf 'a configured private name'; return 0
+  fi
   return 1
 }
 
