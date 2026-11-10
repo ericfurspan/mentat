@@ -37,11 +37,13 @@ fi
 
 # Maintainer-facing text names the stages (Inbox, Backlog, Todo), triage and the spec, never the older names
 # for them; only the thin intake alias under skills/intake/ may say its own name.
-stage_names=$( { printf '%s\n' rules.md README.md prompts/builder.md; git ls-files -- skills; } | grep -v '^skills/intake/' | tr '\n' '\0' |
+old_phrases=$( { printf '%s\n' rules.md README.md prompts/builder.md; git ls-files -- skills; } | tr '\n' '\0' |
   xargs -0 grep -n -i -E \
     -e '(^|[^[:alnum:]])(tak(e|es|en|ing)|took)[ -]([[:alpha:]]+ ){0,2}on([^[:alnum:]]|$)' \
-    -e '(^|[^[:alnum:]])intake([^[:alnum:]]|$)' \
     -e 'agree the spec|build go-ahead|kept for reference|keep for reference')
+old_command=$( { printf '%s\n' rules.md README.md prompts/builder.md; git ls-files -- skills; } | grep -v '^skills/intake/' | tr '\n' '\0' |
+  xargs -0 grep -n -i -E -e '(^|[^[:alnum:]])intake([^[:alnum:]]|$)')
+stage_names=$(printf '%s\n%s\n' "$old_phrases" "$old_command" | sed '/^$/d')
 if [ -z "$stage_names" ]; then
   pass "rules, skills, the builder prompt and README use the stage and triage names"
 else
