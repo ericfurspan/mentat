@@ -1,5 +1,5 @@
 ---
-name: work-tickets
+name: build
 description: "Builds committed backlog items in a row, one pull request each. Arguments: backlog item ids."
 argument-hint: "[item id ...]"
 disable-model-invocation: true

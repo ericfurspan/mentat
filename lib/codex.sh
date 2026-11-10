@@ -1,9 +1,9 @@
 # shellcheck shell=bash
-# The Codex side of mentat: the Codex sandbox profile, run_codex, the local review
-# and challenge. Sourced by bin/mentat.
+# The Codex side of mentat: the Codex sandbox profile, run_codex and the local
+# review. Sourced by bin/mentat.
 
-# mentat challenge runs Codex's own default model, so no model name lives here and a
-# new release needs no change. Effort is pinned.
+# Codex runs its own default model, so no model name lives here and a new release
+# needs no change. Effort is pinned.
 CODEX_EFFORT="high"
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 
@@ -11,8 +11,8 @@ REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 # directory $1: the checkout, its git directory (outside the checkout for a
 # worktree) and the system paths. Codex must be installed under /opt/homebrew or
 # /usr/local (Homebrew, or npm with a system or Homebrew node); anywhere else it
-# cannot start inside the profile, so the run fails closed (not reviewed, not
-# challenged). Nothing is derived from where codex is, so no install can widen it.
+# cannot start inside the profile, so the run fails closed (not reviewed, no second
+# opinion). Nothing is derived from where codex is, so no install can widen it.
 codex_filesystem() {
   local gitdir table='":minimal"="read", "/opt/homebrew"="read", "/usr/local"="read"'
   gitdir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gitdir=""
@@ -30,10 +30,10 @@ GLOB_DEPTH=8
 # Runs Codex in directory $1 on prompt file $2 and writes its final message to $3.
 # On any failure it calls $4 with the reason, which exits. $5 is Codex's web
 # search mode: "disabled" for reviews, which judge the diff; "cached" (OpenAI's
-# index, no live fetches) for plan challenges, which check current practice; "live"
-# for consult, which asks any question. Search runs on OpenAI's side, outside the
-# permissions profile below. $6 is optional: "outside" adds --skip-git-repo-check,
-# for consult, which runs in an empty folder that is not a repository (Codex refuses
+# index, no live fetches) for a second opinion on an idea, which checks current
+# practice; "live" for a second opinion with --web, which asks any question. Search
+# runs on OpenAI's side, outside the permissions profile below. $6 is optional:
+# "outside" adds --skip-git-repo-check, for the --web mode, which runs in an empty folder that is not a repository (Codex refuses
 # to start there otherwise). Every other caller passes nothing.
 run_codex() {
   local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem outside=()

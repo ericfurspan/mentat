@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# The Grok side of mentat: review --grok and the Grok run shared with weigh, with
-# its sandbox profile and its isolated home. Sourced by bin/mentat.
+# The Grok side of mentat: review --grok and the Grok run shared with
+# second-opinion, with its sandbox profile and its isolated home. Sourced by bin/mentat.
 
 # A Grok review (`mentat review --grok`) runs beside the main review, once per
 # pull request. Grok runs at once; the review waits for CI on the same head after
@@ -18,18 +18,18 @@
 # home (outside the run, where Grok can write it) and is refused before the copy only
 # if that did not extend it, since Grok cannot refresh it inside the run.
 #
-# `mentat weigh` runs Grok the same way on an idea, with no pull request, except that
-# it may use Grok's backend web search (the local fetch tool stays denied).
-# `mentat consult` runs it on any question with web search alone: no file tools and
+# `mentat second-opinion` runs Grok the same way on an idea, with no pull request,
+# except that it may use Grok's backend web search (the local fetch tool stays denied).
+# `mentat second-opinion --web` runs it on any question with web search alone: no file tools and
 # an empty export. The functions below that they share (grok_signin, grok_run_folder,
 # grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
 # function named in `fail`: not_reviewed before Grok runs, grok_fail from then on.
 # The pull-request steps (reading it, the diff prompt, the start comment, the
 # did-not-finish comment and posting) stay in review_grok's own functions.
 # Convention: these functions set the caller's variables by name and never return
-# values; that keeps the pull-request path and the weigh path on one set of steps
+# values; that keeps the pull-request path and the second-opinion paths on one set of steps
 # without passing a dozen arguments. A reader tracing a variable should start from
-# review_grok, weigh_grok and consult_grok, which declare them.
+# review_grok, opinion_grok and opinion_web_grok, which declare them.
 GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
@@ -273,11 +273,11 @@ grok_args() {
   # profile keeps the rest of the user's folders out of reach. The debug file is the
   # record of a run that never finishes (the JSON arrives only at the end): it goes
   # in the sessions folder, which Grok may write and its tools may not read.
-  # Web search is a backend search on xAI's side, on only for weigh and consult (the
+  # Web search is a backend search on xAI's side, on only for a second opinion (the
   # caller's web_search); the local fetch tool is denied in every path and web_fetch
   # is never in the allowlist. A review has no web at all. The file tools come from
-  # the caller's grok_tools; review and weigh set nothing and get the three file
-  # tools. Consult sets grok_tools="" and web_search=1, so Grok gets web search alone.
+  # the caller's grok_tools; review and the repository mode set nothing and get the
+  # three file tools. The web mode sets grok_tools="" and web_search=1, so Grok gets web search alone.
   local tools="${grok_tools-read_file,grep,list_dir}" search=(--disable-web-search)
   if [ -n "${web_search:-}" ]; then tools="${tools:+$tools,}web_search" search=(); fi
   args=(--cwd "$run/export" --prompt-file "$run/in/prompt" --output-format json

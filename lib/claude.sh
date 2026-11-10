@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2154 # root is set by bin/mentat; res, top and head are the caller's
 # The Claude side of mentat: the review tools setting, the Claude model choice and
-# the Claude runner for weigh, challenge and consult. Sourced by bin/mentat.
+# the Claude runners for both modes of mentat second-opinion. Sourced by bin/mentat.
 
 # The per-user setting, beside the private word list. `reviewers` lists the tools that
 # run, any of claude, codex and grok; missing or empty means no setting. `claude-model`
@@ -42,7 +42,7 @@ reviewers_read() {
   reviewers=${reviewers# }
 }
 
-# The tools mentat weigh and mentat consult run: the setting's, else Codex and Grok.
+# The tools mentat second-opinion runs: the setting's, else Codex and Grok.
 review_tools() {
   reviewers_read || die "$reviewers_why" 64
   tools=${reviewers:-codex grok}
@@ -90,8 +90,8 @@ claude_export() {
 
 # Runs headless Claude in directory $1 on prompt file $2 and writes its reply, after
 # a line naming the builder and reviewer models, to $3. On any failure it calls
-# $4 with the reason, which exits. $5 is the tool list: "Read,Grep,Glob" for weigh
-# and challenge, "WebSearch" for consult.
+# $4 with the reason, which exits. $5 is the tool list: "Read,Grep,Glob" for the
+# repository mode, "WebSearch" for the web mode.
 run_claude() {
   local dir="$1" prompt="$2" out="$3" fail="$4" tools="$5" bin log rc secs=0 pid kept allow=()
   local claude_builder claude_reviewer claude_same
@@ -99,7 +99,7 @@ run_claude() {
   claude_pick_model || "$fail" "the Claude model setting ~/.config/mentat/claude-model does not hold a model id"
   log="${out%/*}/claude.log"
   mkdir -p "${out%/*}/claude-tmp" || "$fail" "could not create Claude's temporary folder"
-  # Web search asks for permission, which dontAsk denies, so consult allows it by name.
+  # Web search asks for permission, which dontAsk denies, so the web mode allows it by name.
   [ "$tools" != WebSearch ] || allow=(--allowed-tools WebSearch)
   # --safe-mode drops CLAUDE.md, skills, plugins, hooks and MCP servers;
   # --setting-sources "" drops the user, project and local settings files, so none can
@@ -141,8 +141,8 @@ run_claude() {
   } >"$out" || "$fail" "could not keep Claude's reply"
 }
 
-# The weigh runner: an export of the weighed commit, file tools only.
-weigh_claude() {
+# The repository mode's runner: an export of the commit, file tools only.
+opinion_claude() {
   local tmp
   command -v claude >/dev/null 2>&1 || pair_fail "claude is not installed"
   tmp=$(mktemp -d) || pair_fail "could not create a temporary directory"
@@ -155,11 +155,11 @@ weigh_claude() {
     cat "$res/body"
   } >"$tmp/prompt" || pair_fail "could not write the prompt"
   run_claude "$tmp/export" "$tmp/prompt" "$tmp/out" pair_fail "Read,Grep,Glob"
-  pair_keep "$tmp/out" weigh_verdict_ok "WEIGH VERDICT"
+  pair_keep "$tmp/out" opinion_verdict_ok "SECOND OPINION VERDICT"
 }
 
-# The consult runner: an empty folder, web search alone.
-consult_claude() {
+# The web mode's runner: an empty folder, web search alone.
+opinion_web_claude() {
   local tmp
   command -v claude >/dev/null 2>&1 || pair_fail "claude is not installed"
   tmp=$(mktemp -d) || pair_fail "could not create a temporary directory"
@@ -171,5 +171,5 @@ consult_claude() {
     cat "$res/body"
   } >"$tmp/prompt" || pair_fail "could not write the prompt"
   run_claude "$tmp/dir" "$tmp/prompt" "$tmp/out" pair_fail WebSearch
-  pair_keep "$tmp/out" consult_line_ok "CONSULT"
+  pair_keep "$tmp/out" opinion_web_line_ok "SECOND OPINION ANSWER"
 }

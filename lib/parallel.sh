@@ -1,8 +1,8 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2154 # res, tool and run_pids are the caller's variables
-# The plumbing mentat weigh and mentat consult share: each review tool (Codex, Grok,
-# Claude) runs in a background subshell, in parallel, and the result is printed for
-# the maintainer. Sourced by bin/mentat.
+# The plumbing both modes of mentat second-opinion share: each review tool (Codex,
+# Grok, Claude) runs in a background subshell, in parallel, and the result is printed
+# for the maintainer. Sourced by bin/mentat.
 
 # Each tool runs in its own background subshell, so a failure (which exits) and the
 # EXIT trap that cleans up its folder stay inside it. A runner leaves its result in
@@ -56,7 +56,7 @@ pair_cancel() {
   exit 143
 }
 
-# Starts each tool's runner, named <$1>_<tool> (weigh_codex, consult_claude), each in
+# Starts each tool's runner, named <$1>_<tool> (opinion_codex, opinion_web_claude), each in
 # its own subshell, and waits for all, writing how long each took to $res/<tool>.secs.
 # Sets the caller's run_pids.
 pair_run() { # $1 runner prefix, $2... tools
@@ -84,27 +84,26 @@ pair_run() { # $1 runner prefix, $2... tools
   for t in "${pids[@]}"; do wait "$t"; done
 }
 
-# The printers take the caller's word for a tool that did not deliver ("not weighed",
-# "not consulted").
+# The printers say "no second opinion" and why for a tool that did not deliver.
 pair_name() { # $1 tool key
   case "$1" in codex) printf Codex ;; grok) printf Grok ;; claude) printf Claude ;; esac
 }
-pair_report() { # $1 tool key, $2 word
+pair_report() { # $1 tool key
   printf '## %s\n\n' "$(pair_name "$1")"
   if [ -s "$res/$1.final" ]; then
     cat "$res/$1.reply"
   else
-    printf '%s: %s\n' "$2" "$(pair_why "$1")"
+    printf 'no second opinion (%s)\n' "$(pair_why "$1")"
   fi
   printf '\n(%s seconds)\n\n' "$(cat "$res/$1.secs" 2>/dev/null)"
 }
 pair_why() { # $1 tool key
   if [ -s "$res/$1.why" ]; then cat "$res/$1.why"; else printf 'it ended without a result'; fi
 }
-pair_line() { # $1 tool key, $2 word
+pair_line() { # $1 tool key
   if [ -s "$res/$1.final" ]; then
     printf -- '- %s (%s seconds): %s\n' "$(pair_name "$1")" "$(cat "$res/$1.secs" 2>/dev/null)" "$(cat "$res/$1.final")"
   else
-    printf -- '- %s (%s seconds): %s: %s\n' "$(pair_name "$1")" "$(cat "$res/$1.secs" 2>/dev/null)" "$2" "$(pair_why "$1")"
+    printf -- '- %s (%s seconds): no second opinion (%s)\n' "$(pair_name "$1")" "$(cat "$res/$1.secs" 2>/dev/null)" "$(pair_why "$1")"
   fi
 }
