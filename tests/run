@@ -221,7 +221,7 @@ phrase_check skills/propose/SKILL.md "another weigh round only for an adopted ch
 phrase_check skills/propose/SKILL.md "when the weigh rounds stop" 'The rounds stop when a settlement adopts no such change, or after three rounds in all.'
 phrase_check skills/propose/SKILL.md "a later round's file with the whole revised idea and no earlier replies" "Each later round's file holds the whole revised idea, with its answers and deferred choices, and no earlier replies or summary of them."
 phrase_check skills/propose/SKILL.md "one agreement question after the last round" 'It asks the maintainer to agree once, after the last round,'
-phrase_check skills/propose/SKILL.md "the agreement question's note of an unweighed last change" 'says when the last adopted change was not weighed'
+phrase_check skills/propose/SKILL.md "the agreement question's note of a last change with no design review" 'says when the last adopted change had no design review'
 # A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
 phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
 phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
@@ -426,6 +426,12 @@ phrase_check skills/agenda/SKILL.md "no question where no project list is named"
 phrase_check skills/agenda/SKILL.md "that the backlog's listing writes do not run" 'Its listing writes do not run'
 phrase_check skills/agenda/SKILL.md "waits read as linear.md says for a skill that forbids writes" "Read waits as \`../backlog/linear.md\` says for a skill that forbids writes: change nothing, and name each item that looks done as \"may be done\"."
 phrase_check skills/agenda/SKILL.md "a decision answered in chat recorded nowhere" 'record nothing and say in one line where the answer goes'
+phrase_check skills/agenda/SKILL.md "that it starts nothing" 'It starts nothing: no session, build or review.'
+phrase_check skills/consult/SKILL.md "that it starts nothing" 'and starts nothing: no session, build or review.'
+phrase_check skills/agenda/SKILL.md "waits as the tracker's adapter marks them" "items waiting on the maintainer, as the tracker's adapter marks them, merge waits included;"
+phrase_check skills/agenda/SKILL.md "Next from Todo in the tracker's order, never the Inbox" "Next: the project's Todo items in the tracker's order (\`mentat:backlog\` step 5), never the Inbox."
+phrase_check README.md "the triage command" "- \`/mentat:triage [project ... | all] | brainstorm <text or link>\`: go through the Inbox with you."
+phrase_check README.md "the stages and the yes that commits and starts a build" "Work goes Inbox, Backlog, Todo; your yes on an item's spec commits it and starts its build."
 phrase_check skills/work-tickets/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
 phrase_check skills/work-tickets/SKILL.md "that it never plans scope" 'It builds and never plans scope'
 phrase_check skills/work-tickets/SKILL.md "the merge line kept for the final message" '"You: merge #N." goes into the final message instead of ending the run'

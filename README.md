@@ -28,7 +28,7 @@ Claude Code plans and builds each change, Codex and Grok give second opinions an
 - Optional: Grok Build (`grok`), signed in with `grok login`, for a second review.
 - Optional: `gitleaks`, to catch secrets before a commit.
 
-The builder subagent runs on Opus, which costs more than other models.
+The builder subagent runs on Opus, which costs more.
 
 ## Install
 
@@ -38,7 +38,7 @@ In each repository:
 claude plugin install mentat --marketplace ericfurspan/mentat --scope project
 ```
 
-This writes the repository's `.claude/settings.json`, so Mentat is on for everyone using Claude Code there. Use `--scope local` for only you, or `--scope user` for every folder.
+This writes `.claude/settings.json`, turning Mentat on for everyone there. Use `--scope local` for only you, or `--scope user` for every folder.
 
 - Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>`.
 - Remove: `claude plugin uninstall mentat@mentat --scope <install scope>`.
@@ -47,12 +47,12 @@ Where pull requests need approval, give the agent its own GitHub account.
 
 ## Usage
 
-Ask for a change in chat and Mentat runs the workflow. Commands:
+Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; your yes on an item's spec commits it and starts its build. Commands:
 
 - `/mentat:agenda [project ... | all]`: what waits on you and what to do next.
-- `/mentat:intake [project ... | all] | brainstorm <text or link>`: settle ideas with you.
-- `/mentat:plan [item id]`: plan one item, or the whole backlog, without building.
-- `/mentat:work-tickets [item id ...]`: build agreed items in a row, one pull request each.
+- `/mentat:triage [project ... | all] | brainstorm <text or link>`: go through the Inbox with you.
+- `/mentat:plan [item id]`: plan with you and start building what you commit.
+- `/mentat:work-tickets [item id ...]`: build committed items, one pull request each.
 - `/mentat:zoom-out`: summarize the goal, progress and next step.
 - `/mentat:retro`: propose improvements from a session.
 - `/mentat:setup [first-run]`: show and change settings; start with `first-run`.
@@ -64,7 +64,7 @@ Ask for a change in chat and Mentat runs the workflow. Commands:
 
 ## Review tools
 
-Weigh and consult run Codex and Grok; challenge runs Codex. If `~/.config/mentat/reviewers` lists tools (`claude`, `codex`, `grok`), weigh and consult run those; challenge runs Claude unless `codex` is listed. Claude gets only read-only file tools in weigh and challenge, and only web search in consult. It uses the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
+The design review (weigh) and consult run Codex and Grok; challenge runs Codex. A `~/.config/mentat/reviewers` list (`claude`, `codex`, `grok`) replaces those; challenge then runs Claude unless `codex` is listed. Claude gets read-only file tools in weigh and challenge, web search only in consult, and the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
 
 ## Credits
 
