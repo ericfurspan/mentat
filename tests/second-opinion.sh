@@ -201,8 +201,10 @@ check "Codex exiting non-zero gives no second opinion (exit 0), and its log is n
 check "that leaves nothing behind but Codex's private log" 'clean'
 reset; rm "$STUB/codex_out"; rc=$(run "$idea")
 check "Codex with no final message gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex returned no final message" "$STUB/stdout"'
-reset; touch "$STUB/codex_hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run "$idea")
-check "a Codex timeout gives no second opinion (exit 0), Grok's result stays, and nothing is left behind" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex did not finish within 1 seconds" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && clean'
+reset; touch "$STUB/codex_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
+# More than the 3-second limit, then the 2 seconds between TERM and KILL.
+check "a Codex timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
+check "a Codex timeout gives no second opinion (exit 0), Grok's result stays, and nothing is left behind" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex did not finish within 3 seconds" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && clean'
 mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/grok" "$root/nocodex/grok"
 reset; rc=$(PATH="$root/nocodex:/usr/bin:/bin" run "$idea")
 check "a missing codex gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (codex is not installed" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && clean'
@@ -233,8 +235,9 @@ reset; reply $'Looks fine to me.'; rc=$(run "$idea")
 grok_no_opinion "a reply without a verdict line" "no final SECOND OPINION VERDICT line"
 reset; reply $'SECOND OPINION VERDICT: DON'"'"'T - nope'; rc=$(run "$idea")
 check "a Grok reply that is only a verdict line counts" '[ "$rc" = 0 ] && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT: DON.T - nope$" "$STUB/stdout"'
-reset; touch "$STUB/grok_hang"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1 run "$idea")
-grok_no_opinion "a Grok timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "Grok did not finish within 1 seconds"
+reset; touch "$STUB/grok_hang"; took=$SECONDS; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
+check "a Grok timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
+grok_no_opinion "a Grok timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "Grok did not finish within 3 seconds"
 check "a Grok timeout keeps its debug log for the maintainer" 'grok_log_kept DEBUG-LOG-TEXT'
 reset; rc=$(MENTAT_GROK_REASONING_EFFORT=high run "$idea")
 check "MENTAT_GROK_REASONING_EFFORT=high passes --reasoning-effort high to Grok" '[ "$rc" = 0 ] && [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args_grok" | tail -n 1)" = high ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args_grok")" = 1 ]'
