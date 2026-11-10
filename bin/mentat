@@ -40,13 +40,18 @@
 #     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
 #     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
 #     is behind origin's default branch (not a tool failure: update it and run again),
-#     64 usage. It first fetches origin's default branch into a private ref, leaving
-#     origin/<default> and FETCH_HEAD as they are; when that fails or there is no origin,
+#     64 usage. A run with a verdict appends the date, commit and idea file fingerprint to
+#     <git common dir>/mentat/second-opinions, which stays on this machine. It first
+#     fetches origin's default branch into a private ref, leaving origin/<default> and
+#     FETCH_HEAD as they are; when that fails or there is no origin,
 #     a local origin/<default> still counts, and the output says when freshness could not
 #     be checked. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex and Claude) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
 #     MENTAT_GROK_REASONING_EFFORT sets Grok's effort. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied. Claude reads an export with file tools only.
+#   mentat second-opinion --link <item id> <idea file>  Records the item as reviewed when
+#     that record holds a run with a verdict on the idea file's current content. Calls no
+#     model. 0 linked, 1 not (no such run, or not in a repository), 64 usage.
 #   mentat second-opinion --web <question file>  Has Codex and Grok (or the setting's tools)
 #     each answer any question, in parallel, each in an empty folder with no files and no
 #     repository (it works outside git), with web search on. Prints each reply with its
@@ -107,5 +112,5 @@ case "${1:-}" in
   status) shift; status "$@" ;;
   second-opinion) shift; second_opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
 esac

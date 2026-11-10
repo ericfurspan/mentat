@@ -62,7 +62,7 @@ Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog,
 
 ## Review tools
 
-`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. A `~/.config/mentat/reviewers` list (`claude`, `codex`, `grok`) replaces them. Claude gets read-only file tools on an idea, web search only with `--web`, and the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
+`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt. A `~/.config/mentat/reviewers` list (`claude`, `codex`, `grok`) replaces them. Claude gets read-only file tools on an idea, web search only with `--web`, and the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
 
 ## Credits
 
