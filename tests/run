@@ -490,7 +490,7 @@ phrase_check rules.md "a decision as one question about outcomes, never the mech
 phrase_check rules.md "what each option authorizes and gets, with only the costs that differ" 'each option saying what it authorizes and gets, and naming only the costs that differ between the options (a cost every option shares is not repeated)'
 phrase_check rules.md "unasked work and mid-task ideas routed to the Inbox, settled in triage" "Work they did not ask for (shared links, project comments, improvements or features an agent proposes) and an idea they raise mid-task go to the Inbox, settled in triage (\`/mentat:triage\`);"
 phrase_check rules.md "a found defect and an explicit request to file work routed to Backlog" 'a defect an agent finds and an explicit request to file something as work go to Backlog;'
-phrase_check rules.md "the request in hand still through mentat:propose" "the request the session is carrying out still goes through \`mentat:propose\`."
+phrase_check rules.md "the request in hand still through step 1" 'the request in hand goes through step 1.'
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question saying why the first is recommended, so the prompt alone suffices'
@@ -725,7 +725,8 @@ for f in rules.md skills/propose/SKILL.md; do
 done
 
 # The propose step's procedure is in mentat:propose, with its standing lines on agreement.
-phrase_check rules.md "the call of mentat:propose" "calls the Skill tool with \`mentat:propose\` before giving a view on any request or suggesting a change of its own, a fix to its own output included."
+phrase_check rules.md "the call of mentat:propose for the request in hand only" "calls the Skill tool with \`mentat:propose\` before giving a view on the request it is carrying out or suggesting a change to it, a fix to its own output included."
+phrase_check rules.md "an unasked proposal to the Inbox and a found defect to Backlog, without mentat:propose" 'An unasked proposal or idea goes to the Inbox, a found defect to Backlog, without it.'
 phrase_check skills/propose/SKILL.md "that a design review's DO IT is not agreement" "A design review's \`DO IT\` is not the maintainer's agreement"
 phrase_check skills/propose/SKILL.md "that nothing is built before agreement" 'nothing is built before that agreement'
 phrase_check skills/propose/SKILL.md "that the maintainer agrees once" 'The maintainer agrees once.'
