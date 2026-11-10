@@ -175,9 +175,17 @@ pieces=$(printf '%s' "$cmd" | LC_ALL=C awk '{ if (sub(/\\$/, "")) printf "%s", $
 split_quoted "$cmd"
 qseen=$nl
 while IFS= read -r seg; do qseen+=${seg#["$and$pipe$redir"]}$nl; done <<<"$qpieces"
-# covered: the plain piece $seg is a quoted-split piece, or the start of one that
-# the plain split broke at a quoted ;, |, & or newline (a tab there).
-covered() { case "$qseen" in *"$nl$seg$nl"* | *"$nl$seg"[\;\|\&"$tab"]*) return 0 ;; esac; return 1; }
+# covered: the quoted split covers every plain piece with the text of $seg: it has
+# as many pieces that are that text, or start with it and go on with a quoted ;, |,
+# & or newline (a tab there).
+covered() {
+  local np nq
+  np=$(S=$seg LC_ALL=C awk '$0 == ENVIRON["S"] { c++ } END { print c + 0 }' <<<"$pieces")
+  nq=$(S=$seg LC_ALL=C awk 'BEGIN { s = ENVIRON["S"]; n = length(s) }
+    $0 == s || (substr($0, 1, n) == s && index(";|&\t", substr($0, n + 1, 1)) > 0) { c++ }
+    END { print c + 0 }' <<<"$qseen")
+  [ "$np" -le "$nq" ]
+}
 
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
 

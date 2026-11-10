@@ -354,9 +354,9 @@ check "a file named in a heredoc is read too" '[ "$(decision "$c")" = ask ]'
 reset
 tdir="$TMPDIR/StubCodename"
 scratch="$TMPDIR/claude-501/-Users-stubcodename-Work-proj/abc/scratchpad"
-mkdir -p "$tdir" "$scratch" "$TMPDIR/plain" "$TMPDIR/a dir"
-for f in "$tdir/pr.md" "$scratch/pr.md" "$scratch/body.md"; do cp "$root/work/clean.md" "$f"; done
-for f in "$TMPDIR/plain/word.md" "$TMPDIR/word.md" "$TMPDIR/a dir/word.md"; do cp "$root/work/word.md" "$f"; done
+mkdir -p "$tdir" "$scratch" "$TMPDIR/plain" "$TMPDIR/a dir" "$TMPDIR/first" "$TMPDIR/second"
+for f in "$tdir/pr.md" "$scratch/pr.md" "$scratch/body.md" "$TMPDIR/second/body.md"; do cp "$root/work/clean.md" "$f"; done
+for f in "$TMPDIR/plain/word.md" "$TMPDIR/word.md" "$TMPDIR/a dir/word.md" "$TMPDIR/first/body.md"; do cp "$root/work/word.md" "$f"; done
 while IFS= read -r c; do
   check "leaves alone a temp path that only locates a file: $c" '[ -z "$(decision "$c")" ]'
 done <<EOF
@@ -391,6 +391,8 @@ sed -i.bak 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 sed --in-place 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 sed -i '' -e 's/a/b/' -e 's/c/d/' $tdir/pr.md $scratch/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 sed -E -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed --regexp-extended -n -s -u -z -r -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+S=$TMPDIR/second; (gh pr edit 1 --body-file "\$S/body.md"); S=$TMPDIR/first
 sed -i '' 's/a/b/' "\$TMPDIR/StubCodename/pr.md"; gh pr edit 1 --body-file "\$TMPDIR/StubCodename/pr.md"
 printf x > $tdir/pr.md && gh pr edit 1 --body-file $tdir/pr.md
 printf x >$tdir/pr.md && gh pr edit 1 --body-file $tdir/pr.md
@@ -419,6 +421,8 @@ sed -i 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 body=\$(printf 'Use %s %s' --body-file $tdir/pr.md); gh pr edit 1 --body "\$body"
 x=\`echo hi\`; printf x > $tdir/pr.md; gh pr edit 1 --body ok
 S=$tdir; n=\$(date); gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; sed -i -l 80 "s|TOKEN|\$S|" "\$S/body.md"; gh pr edit 1 --body-file "\$S/body.md"
+S=$TMPDIR/first; (gh pr edit 1 --body-file "\$S/body.md"); S=$TMPDIR/second
 S=$tdir; sed 's/a/b/' \$S/pr.md >/dev/null; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; S=/Users/stub/StubCodename; gh pr edit 1 --body-file \$S/pr.md
@@ -444,6 +448,11 @@ c="S=$tdir; gh pr edit 1 --body-file - <<X
 see \$S
 X"
 check "asks for a temp path assigned before a heredoc body that uses it" '[ "$(decision "$c")" = ask ]'
+c="S=$TMPDIR/first; cat > x.md <<X
+hi
+X
+S=$TMPDIR/second; gh pr edit 1 --body-file \"\$S/body.md\""
+check "does not read past a heredoc through a name assigned again there" '[ -z "$(decision "$c")" ]'
 
 # A body file named through a variable is read: a plain value assigned earlier in the
 # command, else TMPDIR or HOME from the environment.

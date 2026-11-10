@@ -119,7 +119,20 @@ expand() {
     *) return ;;
   esac
   case "$name" in "" | [0-9]* | *[!A-Za-z0-9_]*) return ;; esac
+  if [ -n "$late" ] && ! assigned_once "$name"; then return; fi
   if lookup "$name"; then v=$val/$rest; fi
+}
+# assigned_once <name>: the command text holds no NAME= for the name, or one that
+# the walk saw.
+assigned_once() {
+  local k=0 seen=0 written
+  written=$(awk -v n="$1" '{ s = $0; while (match(s, "(^|[^A-Za-z0-9_])" n "=")) { c++; s = substr(s, RSTART + RLENGTH) } }
+    END { print c + 0 }' <<<"$cmd")
+  while [ "$k" -lt "${#a_name[@]}" ]; do
+    [ "${a_name[k]}" != "$1" ] || seen=$((seen + 1))
+    k=$((k + 1))
+  done
+  [ "$written" -eq 0 ] || { [ "$written" -eq 1 ] && [ "$seen" -eq 1 ]; }
 }
 
 # is_temp <path>: the path is under /tmp, /private/tmp, /var/folders,
@@ -157,7 +170,7 @@ end_command() {
     while [ "$k" -lt "${#a_name[@]}" ]; do a_alone[k]=1; k=$((k + 1)); done
   fi
   prev="" in_gh="" in_api="" api="" is_get="" next="" repo=""
-  o_cmd="" o_next="" o_first=${#a_name[@]} sed_i="" sed_script="" sed_amb=""
+  o_cmd="" o_next="" o_first=${#a_name[@]} sed_i="" sed_script="" sed_amb="" sed_unk=""
 }
 
 # located holds each word that locates a file, so an assignment's uses can be matched
@@ -197,7 +210,8 @@ assign() {
 # sed_word <word>: a word of a sed command. After -i, an empty word or one starting
 # with . is the suffix; the first word that is no option is the script, unless -e or -f
 # gave it, and the words after it are files. After -i and another word ($sed_amb), the
-# next one may be the script, so it locates nothing.
+# next one may be the script, so it locates nothing. After an option it does not know
+# ($sed_unk), no word of the command locates a file.
 sed_word() {
   unquote "$1"
   case "$v" in
@@ -205,13 +219,14 @@ sed_word() {
     -i* | --in-place | --in-place=*) sed_i=1 ;;
     -e | -f | --expression | --file) o_next=sedarg ;;
     -e* | -f* | --expression=* | --file=*) sed_script=1 ;;
-    -*) ;;
+    -[Ernsuz] | --regexp-extended | --quiet | --silent | --null-data | --separate | --unbuffered) ;;
+    -*) sed_unk=1 ;;
     *)
       if [ -z "$sed_script" ]; then
         sed_script=1
       elif [ -n "$sed_amb" ]; then
         sed_amb=""
-      elif [ -n "$sed_i" ]; then
+      elif [ -n "$sed_i" ] && [ -z "$sed_unk" ]; then
         locate "$1" "$1"
         return
       fi
@@ -225,8 +240,9 @@ outside() {
   local w=$1 p
   case "$w" in *'$('* | *'`'*) subst=1 ;; esac
   case "$o_next" in
-    redir | file) o_next=""; locate "$w" "$w"; return ;;
-    field) o_next=""; case "$w" in *=@*) locate "$w" "${w#*=@}" ;; *) keep ;; esac; return ;;
+    redir) o_next=""; locate "$w" "$w"; return ;;
+    file) o_next=""; read_file "$w"; locate "$w" "$w"; return ;;
+    field) o_next=""; read_file "$w"; case "$w" in *=@*) locate "$w" "${w#*=@}" ;; *) keep ;; esac; return ;;
     sedarg) o_next="" sed_script=1; keep; return ;;
     sedi)
       o_next=""
@@ -250,8 +266,9 @@ outside() {
   case "$w" in
     --body-file | --notes-file) o_next="file" ;;
     -F | --field) o_next=field ;;
-    --body-file=* | --notes-file=*) locate "$w" "${w#*=}"; return ;;
-    -F=*=@* | --field=*=@*) p=${w#*=}; locate "$w" "${p#*=@}"; return ;;
+    --body-file=* | --notes-file=*) read_file "${w#*=}"; locate "$w" "${w#*=}"; return ;;
+    -F=*=@* | --field=*=@*) p=${w#*=}; read_file "$p"; locate "$w" "${p#*=@}"; return ;;
+    -F=* | --field=*) read_file "${w#*=}" ;;
   esac
   keep
 }
@@ -261,7 +278,7 @@ outside() {
 # reads, which replace their names in the checked text. Words cannot be told apart past
 # $( or <<, or a << before gh; that text goes to past, with any word outside a gh command.
 repo="" targets=$'\n' unread_api="" kept="" past="" held=""
-o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" subst=""
+o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" sed_unk="" subst="" late=""
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
@@ -345,7 +362,10 @@ done
 # Fields go out as a POST unless each gh api command has a real GET.
 if [ -n "$fields_only" ] && [ -z "$unread_api" ] && ! grep -Eq "$gh_api" <<<"$past"; then exit 0; fi
 
-# A real flag may sit in past: its file is read too, and nothing leaves the text.
+# A real flag may sit in past: its file is read too, and nothing leaves the text. A
+# flag outside gh was read where it stood; read here, a name assigned more than once,
+# or where the walk did not reach, could name another file, so it is not expanded.
+late=1
 re="(--body-file|--notes-file|--field|-F)(=|[[:space:]]+)$word"
 while IFS= read -r flag; do
   if [[ $flag =~ $re ]]; then read_file "${BASH_REMATCH[3]}"; fi

@@ -333,6 +333,8 @@ check "from a checkout with changes, a quoted newline in a pull request body lea
 check "from a checkout on main, a quoted newline in the push arguments leaves alone" '[ -z "$(decision "$tmp/repo" "$multi_push")" ]'
 check "from a checkout on main, a push inside a quoted command before another push still asks" \
   '[ "$(decision "$tmp/repo" "sh -c \"a; git push; b\"; git push origin feat/x")" = ask ]'
+check "from a checkout on main, a push inside a quoted command with the same text as a later push still asks" \
+  '[ "$(decision "$tmp/repo" "sh -c \"git fetch; git push; true\"; cd ../feat && git push")" = ask ]'
 check "from a checkout on main, a push inside a quoted command after a cd still asks" \
   '[ "$(decision "$tmp/repo" "cd ../feat && sh -c \"git fetch; git push origin main\"")" = ask ]'
 cont_cd=$'cd ../feat && \\\n  git push -q'
