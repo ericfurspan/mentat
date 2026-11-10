@@ -317,6 +317,24 @@ A=1 cd ../feat && git push
 true; cd ../feat && git push
 git status && cd ../feat && git push
 PASS
+while IFS= read -r cmd; do
+  check "from a checkout on main, a quoted separator in the push arguments leaves alone: $cmd" '[ -z "$(decision "$tmp/repo" "$cmd")" ]'
+done <<'PASS'
+cd ../feat && git push -o "merge_request.title=fix: x & y" origin HEAD
+cd ../feat && git push -o "title=a; b" origin HEAD
+cd ../feat && git push -o 'title=a | b' -q
+cd ../feat && git push -o "a && b || c" -q
+PASS
+check "from a checkout with changes, a quoted separator in a pull request title leaves alone" \
+  '[ -z "$(decision "$tmp/edited" "cd ../feat && gh pr create --title \"a; b & c | d\" --fill")" ]'
+multi_pr=$'cd ../feat && gh pr create --title t --body "line one\nline two"'
+multi_push=$'cd ../feat && git push -o "line one\nline two" origin HEAD'
+check "from a checkout with changes, a quoted newline in a pull request body leaves alone" '[ -z "$(decision "$tmp/edited" "$multi_pr")" ]'
+check "from a checkout on main, a quoted newline in the push arguments leaves alone" '[ -z "$(decision "$tmp/repo" "$multi_push")" ]'
+check "from a checkout on main, a push inside a quoted command before another push still asks" \
+  '[ "$(decision "$tmp/repo" "sh -c \"a; git push; b\"; git push origin feat/x")" = ask ]'
+check "from a checkout on main, a push inside a quoted command after a cd still asks" \
+  '[ "$(decision "$tmp/repo" "cd ../feat && sh -c \"git fetch; git push origin main\"")" = ask ]'
 cont_cd=$'cd ../feat && \\\n  git push -q'
 check "from a checkout on main, a cd joined by && across a continued line leaves alone" '[ -z "$(decision "$tmp/repo" "$cont_cd")" ]'
 while IFS= read -r cmd; do

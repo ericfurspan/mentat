@@ -385,7 +385,8 @@ S=/private/var/folders/no-such/StubCodename; gh pr edit 1 --body-file \$S/pr.md
 S=\$TMPDIR/StubCodename; gh pr edit 1 --body-file \$S/pr.md
 S=\${TMPDIR}/StubCodename; gh pr edit 1 --body-file \$S/pr.md
 sed -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
-sed -i 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -i .bak 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+sed -i 's/a/b/' $TMPDIR/plain/x.md $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 sed -i.bak 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 sed --in-place 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 sed -i '' -e 's/a/b/' -e 's/c/d/' $tdir/pr.md $scratch/pr.md; gh pr edit 1 --body-file $tdir/pr.md
@@ -413,6 +414,11 @@ S=$tdir; echo \$S; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; x=\$(cat \$S/pr.md); gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; sed -i '' "s|x|\$S|" \$S/pr.md; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; printf x > "\$(echo \$S)"; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; sed -i .bak "s|x|\$S|" "\$S/pr.md"; gh pr edit 1 --body-file "\$S/pr.md"
+sed -i 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+body=\$(printf 'Use %s %s' --body-file $tdir/pr.md); gh pr edit 1 --body "\$body"
+x=\`echo hi\`; printf x > $tdir/pr.md; gh pr edit 1 --body ok
+S=$tdir; n=\$(date); gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; sed 's/a/b/' \$S/pr.md >/dev/null; gh pr edit 1 --body-file \$S/pr.md
 S=$tdir gh pr edit 1 --body-file \$S/pr.md
 S=$tdir; S=/Users/stub/StubCodename; gh pr edit 1 --body-file \$S/pr.md

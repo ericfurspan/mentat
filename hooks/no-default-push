@@ -126,7 +126,7 @@ tokenize() {
 
 # split_quoted <text>: sets $qpieces, the text with each unquoted ;, |, & and
 # newline turned into a line break (one for && and ||), each quoted newline
-# into a space and each backslash-newline outside single quotes dropped,
+# into a tab and each backslash-newline outside single quotes dropped,
 # quoting as in tokenize. A piece after && starts with $and, unless an unquoted
 # ) came before it in its piece; after |, || or |& with $pipe; after the & of a
 # redirect (2>&1, &>file) with $redir.
@@ -150,7 +150,7 @@ split_quoted() {
       # A backslash, unquoted or inside double quotes, keeps the next character;
       # before a newline, both go (a line continuation).
       \\ | \"\\) c=${s:0:1}; s=${s:1}; case "$c" in "$nl") c="" ;; *) c="\\$c" ;; esac ;;
-      ?$nl) c=" " ;;
+      ?$nl) c=$tab ;;
       ")") closed=1 ;;
       "&")
         case "$last${s:0:1}" in
@@ -169,12 +169,15 @@ split_quoted() {
 
 # The plain split also catches commands with an unmatched quote or inside a
 # quoted string; the quoted split reads separators inside quotes as text. Both
-# are checked, and the plain split leaves a piece the quoted split also has to
+# are checked, and the plain split leaves a piece the quoted split covers to
 # it. The plain split joins each line that ends in a backslash with the next.
 pieces=$(printf '%s' "$cmd" | LC_ALL=C awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' | LC_ALL=C tr ';|&' '\n')
 split_quoted "$cmd"
 qseen=$nl
 while IFS= read -r seg; do qseen+=${seg#["$and$pipe$redir"]}$nl; done <<<"$qpieces"
+# covered: the plain piece $seg is a quoted-split piece, or the start of one that
+# the plain split broke at a quoted ;, |, & or newline (a tab there).
+covered() { case "$qseen" in *"$nl$seg$nl"* | *"$nl$seg"[\;\|\&"$tab"]*) return 0 ;; esac; return 1; }
 
 force="Mentat: agents do not force push (--force, -f, --force-with-lease or a +refspec). Approve only if you want this push to replace commits on the remote branch."
 
@@ -307,7 +310,7 @@ for pass in plain quoted; do
         i=$((i + 1))
         skip_flags
         case "${words[i]:-}" in create | new) ;; *) continue ;; esac
-        if [ "$pass" = plain ]; then case "$qseen" in *"$nl$seg$nl"*) continue ;; esac; fi
+        if [ "$pass" = plain ] && covered; then continue; fi
         unclean "$here"
         instructions "$here"
         if [ "$chain" -eq 0 ] && [ "$here" != "$cwd" ]; then
@@ -330,7 +333,7 @@ for pass in plain quoted; do
       esac
     done
     [ "$i" -lt "$n" ] && [ "${words[i]}" = push ] || continue
-    if [ "$pass" = plain ]; then case "$qseen" in *"$nl$seg$nl"*) continue ;; esac; fi
+    if [ "$pass" = plain ] && covered; then continue; fi
     start=$((i + 1))
 
     where=$here base=$cwd

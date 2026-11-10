@@ -5,10 +5,10 @@
 # create, issue edit, issue comment and gh api writes: the command text, and files
 # named by --body-file, -F, --field or --notes-file, through a leading $NAME/ too. A
 # leading cd and the name of a file it reads are not published, so they are not looked
-# at, except a name past $( or <<. Outside a gh command, a temp path that only locates a
-# file is not looked at either: a redirect target, a sed -i file, a file flag's value, or
-# an assignment whose variable is used only there. With several gh commands, it asks if
-# any target is public.
+# at, except a name past $( or <<. Outside a gh command and before any $(, backtick or
+# <<, a temp path that only locates a file is not looked at either: a redirect target, a
+# sed -i file, a file flag's value, or an assignment whose variable is used only there.
+# With several gh commands, it asks if any target is public.
 # The prompt gives the category, never the match, and approving it clears a false
 # alarm. This is a net for mistakes, not a security boundary: other routes exist. When
 # it cannot read its input or its tools are missing, it stays out of the way.
@@ -157,19 +157,23 @@ end_command() {
     while [ "$k" -lt "${#a_name[@]}" ]; do a_alone[k]=1; k=$((k + 1)); done
   fi
   prev="" in_gh="" in_api="" api="" is_get="" next="" repo=""
-  o_cmd="" o_next="" o_first=${#a_name[@]} sed_i="" sed_script=""
+  o_cmd="" o_next="" o_first=${#a_name[@]} sed_i="" sed_script="" sed_amb=""
 }
 
 # located holds each word that locates a file, so an assignment's uses can be matched
-# against it. A word with $( or a backtick runs something, so it locates nothing.
+# against it. A word with $( or a backtick runs something, so it locates nothing, and
+# from the first such word outside gh on ($subst) no word locates a file.
 located=""
-note_located() { case "$1" in *'$('* | *'`'*) ;; *) located+=$'\n'$1 ;; esac; }
+note_located() {
+  [ -z "$subst" ] || return 0
+  case "$1" in *'$('* | *'`'*) ;; *) located+=$'\n'$1 ;; esac
+}
 # locate <word> <path part>: keeps the word, unless it is outside a gh command and
 # its path is a temp path.
 locate() {
   note_located "$2"
   unquote "$2"
-  if [ -z "$in_gh" ] && is_temp "$v"; then
+  if [ -z "$in_gh" ] && [ -z "$subst" ] && is_temp "$v"; then
     kept+="$held "; held=""
   else
     keep
@@ -183,16 +187,17 @@ assign() {
   unquote "${1#*=}"
   a_name[k]=${1%%=*} a_val[k]=$v a_word[k]=$1 a_alone[k]="" a_temp[k]=""
   case "$v" in *'$'* | *'`'*) a_plain[k]="" ;; *) a_plain[k]=1 ;; esac
-  if is_temp "$v"; then
+  if [ -z "$subst" ] && is_temp "$v"; then
     a_temp[k]=1
     kept+=$held${m%"$1"}$mark$k$mark; held=""
   else
     keep
   fi
 }
-# sed_word <word>: a word of a sed command. After -i, an empty word is the suffix; the
-# first word that is no option is the script, unless -e or -f gave it, and the words
-# after it are files.
+# sed_word <word>: a word of a sed command. After -i, an empty word or one starting
+# with . is the suffix; the first word that is no option is the script, unless -e or -f
+# gave it, and the words after it are files. After -i and another word ($sed_amb), the
+# next one may be the script, so it locates nothing.
 sed_word() {
   unquote "$1"
   case "$v" in
@@ -204,6 +209,8 @@ sed_word() {
     *)
       if [ -z "$sed_script" ]; then
         sed_script=1
+      elif [ -n "$sed_amb" ]; then
+        sed_amb=""
       elif [ -n "$sed_i" ]; then
         locate "$1" "$1"
         return
@@ -216,11 +223,20 @@ sed_word() {
 # temp file; an assignment with a temp value waits for the end.
 outside() {
   local w=$1 p
+  case "$w" in *'$('* | *'`'*) subst=1 ;; esac
   case "$o_next" in
     redir | file) o_next=""; locate "$w" "$w"; return ;;
     field) o_next=""; case "$w" in *=@*) locate "$w" "${w#*=@}" ;; *) keep ;; esac; return ;;
     sedarg) o_next="" sed_script=1; keep; return ;;
-    sedi) o_next=""; unquote "$w"; if [ -z "$v" ]; then keep; return; fi ;;
+    sedi)
+      o_next=""
+      unquote "$w"
+      case "$v" in
+        "" | .*) keep; return ;;
+        -*) ;;
+        *) [ -n "$sed_script" ] || sed_amb=1 ;;
+      esac
+      ;;
   esac
   case "$w" in
     '>' | '>>' | [0-9]'>' | [0-9]'>>') o_next=redir; keep; return ;;
@@ -245,7 +261,7 @@ outside() {
 # reads, which replace their names in the checked text. Words cannot be told apart past
 # $( or <<, or a << before gh; that text goes to past, with any word outside a gh command.
 repo="" targets=$'\n' unread_api="" kept="" past="" held=""
-o_cmd="" o_next="" o_first=0 sed_i="" sed_script=""
+o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" subst=""
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
