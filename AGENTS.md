@@ -4,7 +4,7 @@
 
 This repository is Mentat itself: a Claude Code plugin (`.claude-plugin/`), its workflow rules (`rules.md`, loaded at session start by `hooks/session-start`), its skills (`skills/`, one per workflow step, named from `rules.md`), its builder subagent (`prompts/builder.md`) and the `mentat` command (`bin/mentat`, which loads `lib/*.sh`: `shared.sh`, `publish.sh`, `codex.sh`, `grok.sh`, `claude.sh`, `parallel.sh`, `second-opinion.sh`, `check.sh`, `status.sh`). Mentat is on here through the maintainer's user-scope install, so sessions in this repository follow `rules.md`.
 
-- The one test command is `tests/run`. CI runs the test command on every pull request (GitHub Actions, macOS). It takes about two minutes, so run it once with its output saved to a file and read the last line ("All checks passed" or "N check(s) failed"). It also runs locally on macOS.
+- The one test command is `tests/run`. CI runs the test command on every pull request (GitHub Actions, macOS). Run it once with its output saved to a file and read the last line ("All checks passed" or "N check(s) failed"). It also runs locally on macOS.
 - The external backlog is the Linear project `Mentat`, in team `Work`.
 - Working files (plans, audits, trial kits) go in `work/`, which git ignores; finished ones move to `work/done/`. Nothing there is part of the plugin.
 - Every file here is Mentat's own. This repository's own choices, which Mentat inherits like any other: the maintainer merges every pull request (the agent account cannot approve its own pull requests).
