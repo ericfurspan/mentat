@@ -872,10 +872,21 @@ if command -v jq >/dev/null 2>&1; then
   behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
-  # Background jobs ignore Ctrl-C, so an interrupt stops them here.
-  trap 'kill ${pids[@]+"${pids[@]}"} 2>/dev/null; rm -rf "$outs"; exit 130' INT TERM
+  # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
+  # process group, so an interrupt stops every group and waits until nothing in it runs.
+  stop_behavior() {
+    local p
+    for p in ${pids[@]+"${pids[@]}"}; do kill -TERM -- "-$p" 2>/dev/null || kill -TERM "$p" 2>/dev/null; done
+    wait
+    for p in ${pids[@]+"${pids[@]}"}; do
+      while kill -0 -- "-$p" 2>/dev/null; do sleep 0.1; done
+    done
+    rm -rf "$outs"
+    exit 130
+  }
+  trap stop_behavior INT TERM
   for t in "${behavior[@]}"; do
-    "$t" >"$outs/${t#tests/}" 2>&1 &
+    perl -e 'setpgrp(0, 0); exec @ARGV or exit 127' "$t" >"$outs/${t#tests/}" 2>&1 &
     pids+=("$!")
   done
   i=0
