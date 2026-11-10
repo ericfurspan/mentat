@@ -488,8 +488,8 @@ phrase_check rules.md "what Claude Code settles without asking" 'Claude Code set
 # mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
 phrase_check rules.md "a decision as one question about outcomes, never the mechanism" 'A decision reaches them as one question about what they get, pay or risk, never about the mechanism'
 phrase_check rules.md "what each option authorizes and gets, with only the costs that differ" 'each option saying what it authorizes and gets, and naming only the costs that differ between the options (a cost every option shares is not repeated)'
-phrase_check rules.md "unasked work and mid-task ideas routed to the Inbox, settled in triage" "Work they did not ask for (shared links, project comments, anything an agent finds or proposes, bugs included) and an idea they raise mid-task go to the Inbox, settled in triage (\`/mentat:triage\`);"
-phrase_check rules.md "an explicit request to file work routed to Backlog" 'an explicit request to file something as work goes to Backlog;'
+phrase_check rules.md "unasked work and mid-task ideas routed to the Inbox, settled in triage" "Work they did not ask for (shared links, project comments, improvements or features an agent proposes) and an idea they raise mid-task go to the Inbox, settled in triage (\`/mentat:triage\`);"
+phrase_check rules.md "a found defect and an explicit request to file work routed to Backlog" 'a defect an agent finds and an explicit request to file something as work go to Backlog;'
 phrase_check rules.md "the request in hand still through mentat:propose" "the request the session is carrying out still goes through \`mentat:propose\`."
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
@@ -549,7 +549,7 @@ phrase_check skills/propose/SKILL.md "the bare-run question for a skill that tak
 phrase_check skills/propose/SKILL.md "no bare-run question where no project list is named" "Where the maintainer's own instructions name no project list, it asks nothing and covers the session's repository."
 phrase_check rules.md "the re-read of a record before asking about it" 'a record is re-read right before asking about it.'
 # An unasked follow-up is filed in the record (the Inbox), not left in chat.
-phrase_check rules.md "an unasked follow-up filed in the Inbox" 'Work they did not ask for (shared links, project comments, anything an agent finds or proposes, bugs included) and an idea they raise mid-task go to the Inbox'
+phrase_check rules.md "an unasked follow-up filed in the Inbox" 'Work they did not ask for (shared links, project comments, improvements or features an agent proposes) and an idea they raise mid-task go to the Inbox'
 if grep -q -F 'not filed' rules.md; then
   fail "rules.md must not leave a follow-up unfiled (found: not filed)"
 else
