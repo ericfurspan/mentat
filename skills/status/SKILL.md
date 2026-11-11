@@ -16,7 +16,7 @@ The maintainer asked where things stand: what waits on them, what to do next, wh
    - Each further part the maintainer's own instructions name, read as they say.
 4. Answer in chat only, short, in this order, with `none` for an empty part:
    1. `Waits on you:` one line per item: project, item and what it needs in a few words. A finished item adds its ending (done, canceled, duplicate or closed), so it reads as a leftover; one that looks done says "may be done".
-   2. `Next:` one item, with a one-line reason, from the next agreed work of the records that have a recorded order, and, for each record with no recorded order, a phrase saying it offers no item. Both show when the run covers both kinds.
+   2. `Next:` one item that can start under `mentat:backlog` "Start waits", with a one-line reason and each earlier item it passed with its wait, from the next agreed work of the records that have a recorded order, and, for each record with no recorded order, a phrase saying it offers no item. Both show when the run covers both kinds.
    3. `Unanswered:` one line per ask. If the session was compacted and early messages survive only as a summary, say so here: asks from before it may be missing. Never shorten this part to fit.
    4. `Plan:` one line saying plainly whether the goal or the plan itself should change, not only the next step.
    5. Each further part the maintainer's own instructions name, in their order. A part they do not supply is left out.
