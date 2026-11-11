@@ -15,4 +15,4 @@ Not adopting: <what> (<why>)
 - Plain words, about 25 a line. Leave out an empty line; add nothing else.
 - The block never goes in a decision prompt. In `mentat:propose` step 4 it is shown in chat only when the maintainer picks "Show the full proposal"; elsewhere it goes in the message.
 - Each line of the block stays on its own line wherever the block is shown.
-- A round that ends during `mentat:propose` step 4 does not print its block. With more than one round, when the blocks are printed for "Show the full proposal", each round's block gets a first line `Round <n>` as its one addition.
+- A round that ends during `mentat:propose` step 4 prints nothing as it ends. "Show the full proposal" prints every round's block; with more than one round, each block gets a first line `Round <n>` as its one addition.
