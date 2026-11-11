@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat second-opinion, to show the replies (and, with an external backlog, post them)."
+description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat second-opinion, to record the replies (with an external backlog, post them), shown only when the maintainer asks."
 user-invocable: false
 ---
 

@@ -649,6 +649,7 @@ phrase_check skills/propose/SKILL.md "a Not now option that commits and records 
 # The agreement question is short: the replies and the full proposal are shown only when the maintainer asks.
 phrase_check skills/propose/SKILL.md "the agreement question asked without showing the replies first" 'only after every reply is in, without showing the replies first.'
 phrase_check skills/propose/SKILL.md "the agreement question's short content" "That question holds only what the maintainer gets; what it costs, naming any hand check offered (which holds back \"Ready to merge: #N\" until they report it, step 5) and any fast track proposed (step 6); each tool that disagreed (\`DO IT DIFFERENTLY\` or \`DON'T\`), with why in a few words; and these facts:"
+phrase_check skills/propose/SKILL.md "the agreement question's reason for its first option, without the replies or the proposal" "It also says why the first option is recommended, as \`rules.md\` \"What goes to the maintainer\" requires; the replies blocks and the full proposal stay out of it."
 phrase_check skills/propose/SKILL.md "the Show option printing every round's block and the proposal, never the saved output" "Its third, \"Show the full proposal\", prints in chat every round's replies block as \`mentat:backlog\` \"Replies in chat\" says, never the saved command output, and the full proposal (step 5);"
 phrase_check skills/propose/SKILL.md "the Show option changing nothing and asking again" 'it records nothing, commits nothing and runs no round, then asks the same agreement question again.'
 phrase_check skills/propose/SKILL.md "only an Agree answer writing the spec, the fingerprint or the stage" 'Only an Agree answer writes the spec, records the fingerprint or moves the item.'
@@ -771,7 +772,8 @@ phrase_check skills/backlog/SKILL.md "the wait marking for agreed work only" 'fo
 phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
 phrase_check skills/backlog/SKILL.md "the pointer to replies.md" "the replies go in a block. Before showing it, read \`replies.md\` in this skill's folder, and again after a compaction."
 phrase_check skills/backlog/SKILL.md "the round in each reply's heading" "such as \"Codex: second opinion\", or \"Codex: second opinion, round 2\" with more than one round (\`mentat:propose\` step 4), and the commit it read"
-phrase_check skills/backlog/replies.md "each round's replies block with its round line" "each round's block is shown, with a first line \`Round <n>\` as its one addition."
+phrase_check skills/backlog/replies.md "no block printed as a round ends, each round's block with its round line on Show" "A round that ends during \`mentat:propose\` step 4 does not print its block. With more than one round, when the blocks are printed for \"Show the full proposal\", each round's block gets a first line \`Round <n>\` as its one addition."
+phrase_check skills/backlog/SKILL.md "the description's replies recorded after a round, shown only on request" 'right after mentat second-opinion, to record the replies (with an external backlog, post them), shown only when the maintainer asks.'
 phrase_check skills/backlog/replies.md "the replies block's Adopting line" 'Adopting: <'
 phrase_check skills/backlog/replies.md "the replies block's Not adopting line" 'Not adopting: <'
 phrase_check skills/backlog/replies.md "the replies block's line for a tool with no answer" "A tool with no answer gets \`no second opinion\` and why, in public-safe words, never a log path."
