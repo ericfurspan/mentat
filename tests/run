@@ -99,7 +99,7 @@ phrase_check() {
   fi
 }
 phrase_check skills/review/SKILL.md "the pointer to after-ready.md" "Read \`after-ready.md\` in this skill's folder then, before acting on anything for #N, and again after a compaction."
-phrase_check skills/review/SKILL.md "the pointer to ready-gate.md" "Then apply \`ready-gate.md\` in this skill's folder."
+phrase_check skills/review/SKILL.md "the pointer to ready-gate.md" "Then apply \`ready-gate.md\` in this skill's folder, and again after a compaction. With no open hand check, tell the maintainer in chat:"
 phrase_check skills/review/ready-gate.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/review/ready-gate.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence'
 phrase_check skills/review/ready-gate.md "the open hand check's no merge line" 'Then say no "Ready to merge: #N"'
