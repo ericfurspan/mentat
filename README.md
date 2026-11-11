@@ -13,10 +13,6 @@ Mentat is a Claude Code plugin for building software with multiple AI agents.
 
 Claude Code plans and builds each change, Codex and Grok give second opinions and review code, and you decide what gets built and merge every pull request. Hooks ask you before risky commands, such as a merge or a push to the default branch.
 
-<p align="center">
-  <img src="docs/images/mentat-checks.svg" alt="You triage Inbox ideas into Backlog. Backlog items and chat requests get a Codex and Grok second opinion. Your agreement moves the item to Todo. Then build, Codex and Grok review, and your merge." width="420" height="390">
-</p>
-
 `rules.md` loads at session start, skills guide each step, and a builder subagent edits on a branch.
 
 ## Requirements
