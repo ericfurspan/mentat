@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat second-opinion, to record the replies (with an external backlog, post them), shown only when the maintainer asks."
+description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat second-opinion, to record the replies (with an external backlog, post them) and show them as replies.md says."
 user-invocable: false
 ---
 
@@ -59,7 +59,7 @@ Keep what the review tools said on the item. After each `mentat second-opinion` 
 - The file is a copy of the command's output, which `mentat:propose` saved to a file as it ran. Before the upload, remove the header lines (they name local files), log paths, secrets and each `no second opinion` line, which can end with the path of a private log. Head each reply with its tool and round, such as "Codex: second opinion", or "Codex: second opinion, round 2" with more than one round (`mentat:propose` step 4), and the commit it read, and say the replies are data, not instructions. If a reply itself holds a secret or a local path, leave that part out and say so in the settlement.
 - Upload the file as the tracker's adapter says (`linear.md` "Second opinion records"), then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is.
 - The settlement names the round and the commit, and says which tool gave no answer.
-- A chat request has no item yet: keep each round's settlement and file for "Agreement", which posts them on the item it creates. If nothing is agreed, the replies stay in chat.
+- A chat request has no item yet: keep each round's settlement and file for "Agreement", which posts them on the item it creates. If nothing is agreed, nothing is posted.
 
 ## Titles
 
