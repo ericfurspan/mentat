@@ -383,19 +383,35 @@ phrase_check skills/propose/SKILL.md "the paste line that starts its build" 'its
 phrase_check skills/propose/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, it says each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
 phrase_check skills/plan/SKILL.md "no start for items committed for later, before this session, or not committed" 'Items committed with "Agree, build later" or before this session, or not committed, are not started.'
 phrase_check skills/plan/SKILL.md "starting a build session is not briefing a builder" 'Starting a build session (step 8) is none of these: that session briefs its own builders.'
-phrase_check skills/plan/SKILL.md "Stop here starting nothing" 'nothing else runs, no build session starts, and the report follows.'
+phrase_check skills/plan/SKILL.md "Stop here starting nothing" 'no other question or second opinion runs, no build session starts, and the report follows.'
 if grep -qE 'not ready to build.*Split the rest into build groups' skills/plan/SKILL.md; then
   pass "skills/plan/SKILL.md applies the readiness filter before grouping"
 else
   fail "skills/plan/SKILL.md must apply the readiness filter before grouping"
 fi
-# A planning session over several items keeps each item's questions together and leaves a big decision, and those that
-# depend on it, to that item's own planning session, recorded as the item's next step and named in the report.
-phrase_check skills/plan/SKILL.md "each item's questions asked together" "With several items, ask each item's questions together, never interleaved with another item's"
-phrase_check skills/plan/SKILL.md "a big decision not asked in a batch" "In that batch, a decision that sets direction past its own item, or needs analysis or discussion that would dominate the session, is not asked; opening further decisions is not by itself the test."
-phrase_check skills/plan/SKILL.md "a big decision's dependents left open and independent items asked" "It and any decision that depends on it stay open for its own session, independent items go on, and the report names \`/mentat:plan <id>\` for it."
-phrase_check skills/plan/SKILL.md "the next step recorded in the current plan as a permitted write" "and to record that next step, \`/mentat:plan <id>\`, in the \`## Current plan\` section of an item with a decision step 4 sends to its own session. It makes no other backlog write."
-phrase_check skills/plan/SKILL.md "the report naming /mentat:plan for a big decision" "naming \`/mentat:plan <id>\` when step 4 sends a decision on it to its own session."
+# A planning session over several items asks them as one queue, one item at a time, big decisions included: dependents
+# wait, items without a big decision go first, then the tracker's planning order. Each answer is recorded before the next
+# question, a settled item loses its /mentat:plan pointer, and each item still open when asking ends gets one. A build
+# starts only when asking ends; "Stop here" gives the build lines and starts nothing.
+phrase_check skills/plan/SKILL.md "the items asked as one queue, one item at a time" "With several items, ask them as one queue, one item at a time: each item's questions together, never interleaved with another item's, settling one before the next."
+phrase_check skills/plan/SKILL.md "a settled item defined" "An item is settled when no decision of the maintainer's is open on it."
+phrase_check skills/plan/SKILL.md "a dependent item waiting for the decision it depends on" "For each next turn, an item with a decision that depends on an open decision on another item waits until that one is settled;"
+phrase_check skills/plan/SKILL.md "items without a big decision first, then the planning order" "among the ready items, one with no decision that sets direction past its own item, or needs analysis or discussion that would dominate the session, goes before one with such a decision; then the planning order its tracker's adapter gives (\`mentat:backlog\`)."
+phrase_check skills/plan/SKILL.md "no decision left unasked for being big" "No decision is left unasked for being big."
+phrase_check skills/plan/SKILL.md "an opened decision asked in its item's turn, later for a settled item" "An answer that opens a decision on another item is asked in that item's turn, a later turn for an item already settled."
+phrase_check skills/plan/SKILL.md "the end of asking and the report naming what each open item waits on" "Asking ends when every item is settled or left (step 7), or the rest wait on a left item or on each other; those stay open, and the report names what each waits on."
+phrase_check skills/plan/SKILL.md "the agreement question saying a build starts when asking ends" "In a session over several items, while asking continues, the agreement question says a build starts when asking ends."
+phrase_check skills/plan/SKILL.md "a reopened scope through mentat:propose, Not now keeping the earlier spec" "When a later answer changes the scope of an item agreed in this session, that item goes through \`mentat:propose\` again, and \"Not now\" there keeps its earlier spec and fingerprint."
+phrase_check skills/plan/SKILL.md "each answer recorded on its item before the next question" "With several items, record each answer on its item before the next question;"
+phrase_check skills/plan/SKILL.md "a settled item's plan pointer removed" "when an item is settled, remove a \`/mentat:plan <id>\` line from its \`## Current plan\` section, with the heading when nothing else is left under it;"
+phrase_check skills/plan/SKILL.md "the next step recorded on each item still open as a permitted write" "and when asking ends, record that next step, \`/mentat:plan <id>\`, in the \`## Current plan\` section of each item still open. It makes no other backlog write."
+phrase_check skills/plan/SKILL.md "Stop here giving one fenced build line per group" "When this session committed items with \"Agree and build now\", that report gives one fenced \`/mentat:build <ids>\` line per build group as step 8 forms them, never a bare \`/mentat:build\`."
+phrase_check skills/plan/SKILL.md "leave or skip ending the item's turn, a mere mention being an answer" "With several items, Other text that only says to leave or skip the current item ends that item's turn instead, and the session goes on; text that merely contains such a word is an answer."
+phrase_check skills/plan/SKILL.md "the first big item's prompt saying so once" "The first prompt of an item with a decision that sets direction past its own item, or would dominate the session, says this once."
+phrase_check skills/plan/SKILL.md "the report after asking ends, naming what an open item waits on" "8. After asking ends, report once, one short line per item: committed (step 5), answered but not committed, left, or still open; with several items, an item still open also names what it waits on and \`/mentat:plan <id>\`."
+phrase_check skills/plan/SKILL.md "nothing started after Stop here" 'After "Stop here", step 7 gives the groups as lines and nothing below starts.'
+phrase_check skills/backlog/linear.md "Linear's planning order" "- Planning order (\`mentat:plan\` step 4): the Backlog and Todo items the planning session asks about, ranked together by step 5's keys alone: Priority level name, then oldest created first within a level. It filters nothing out; the planning session chooses the items."
+phrase_check skills/backlog/github.md "GitHub's planning order" "- Planning order (\`mentat:plan\` step 4): the Todo issues in step 5's order, then each Backlog issue ranked as a \`ready\` issue missing from the pinned issue's order would be: after the listed issues, oldest first among the unlisted ones. With no pinned issue, every issue is unlisted."
 
 # The status report and a build run are started by a command and list their arguments; the status report writes and
 # starts nothing, and a build run sends an item that needs planning to /mentat:plan and asks no final yes.
