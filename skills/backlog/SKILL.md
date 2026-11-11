@@ -82,14 +82,15 @@ With either tracker, agreed work that cannot start until another item is done, a
 After each `mentat second-opinion` round, with any backlog, the maintainer sees the replies in this block:
 
 ```
-Codex: <verdict> - <its main point>
-Grok: <verdict> - <its main point>
-Claude: <verdict> - <its main point>
+Codex: <label> - <reason>
+Grok: <label> - <reason>
+Claude: <label> - <reason>
 Adopting: <what Claude Code takes up>
 Not adopting: <what> (<why>)
 ```
 
 - One line per tool that ran or was due. With no review tools setting (`mentat:setup`), Codex, and a Grok line only where `grok` is installed; with one, each listed tool. A tool with no answer gets `no second opinion` and why, in public-safe words, never a log path.
+- The label is `worth doing` for `DO IT`, `another way` for `DO IT DIFFERENTLY` and `not worth doing` for `DON'T`. The reason is the tool's own, in about 10 words, keeping any condition or required change even if longer: the text after the dash for `DO IT DIFFERENTLY` and `DON'T`, the reply's main point for `DO IT`. With nothing to summarize, the reason is `no reason given`; a label is never shown alone.
 - Plain words, about 25 a line. Leave out an empty line; add nothing else.
 - When a decision prompt follows, the block opens its question, which then says why the first option is recommended; otherwise it goes in the message.
 - Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included.

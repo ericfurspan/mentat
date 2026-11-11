@@ -764,7 +764,13 @@ phrase_check skills/propose/SKILL.md "the spec written on an item created first,
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 # Claude, as a review tool the setting lists, gets its own line and comment headings.
-phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <verdict> - <its main point>'
+phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <label> - <reason>'
+# Each tool's line gives a plain label for its verdict and the tool's own reason.
+phrase_check skills/backlog/SKILL.md "the label for DO IT" "\`worth doing\` for \`DO IT\`"
+phrase_check skills/backlog/SKILL.md "the label for DO IT DIFFERENTLY" "\`another way\` for \`DO IT DIFFERENTLY\`"
+phrase_check skills/backlog/SKILL.md "the label for DON'T" "\`not worth doing\` for \`DON'T\`"
+phrase_check skills/backlog/SKILL.md "the reason from the tool's own reply" "The reason is the tool's own, in about 10 words, keeping any condition or required change even if longer: the text after the dash for \`DO IT DIFFERENTLY\` and \`DON'T\`, the reply's main point for \`DO IT\`."
+phrase_check skills/backlog/SKILL.md "the fallback reason, never a label alone" "With nothing to summarize, the reason is \`no reason given\`; a label is never shown alone."
 phrase_check skills/backlog/SKILL.md "one settlement comment and the replies as one file uploaded from disk" "Claude Code posts one comment with its settlement, the block's Adopting and Not adopting lines (\"Replies in chat\"), with any detail agents need, and attaches the tools' replies as one file uploaded from disk."
 phrase_check skills/backlog/SKILL.md "the replies file cleaned before the upload" "remove the header lines (they name local files), log paths, secrets and each \`no second opinion\` line, which can end with the path of a private log."
 phrase_check skills/backlog/SKILL.md "the attachment read back, and the fallback when the upload fails" "then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is."
