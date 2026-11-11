@@ -365,9 +365,10 @@ phrase_check skills/plan/SKILL.md "the fast-forward allowed despite the no-edit 
 phrase_check skills/plan/SKILL.md "one decision per prompt, as a grill asks" "one decision per \`AskUserQuestion\` prompt"
 phrase_check skills/plan/SKILL.md "every agreement through mentat:propose" "Every agreement to build goes through \`mentat:propose\`"
 phrase_check skills/plan/SKILL.md "a read that refines no item and clears no wait" 'This read changes no item it does not record an answer on: it refines no hand-made item, clears no wait'
-phrase_check skills/plan/SKILL.md "the paste line as the build command" "the full \`/mentat:build <ids>\` command"
+phrase_check skills/propose/SKILL.md "the paste line as the build command" "the full \`/mentat:build <ids>\` command"
 # Plan splits the items this session committed into build groups by shared files and starts one build session per group,
-# within plan usage, a fresh checkout each; where it cannot start one, it gives a paste line per group. Stop here starts nothing.
+# within plan usage, a fresh checkout each; where a session cannot be started, it follows mentat:propose "Starting a build"
+# in group order. Stop here starts nothing.
 phrase_check skills/plan/SKILL.md "only the items this session committed to build now, in the tracker's order" "Then take only the items this session just committed with \"Agree and build now\", in the tracker's order (\`mentat:backlog\` step 5),"
 phrase_check skills/plan/SKILL.md "the readiness filter before grouping" 'Split the rest into build groups'
 phrase_check skills/plan/SKILL.md "groups by predicted shared files" "two items share a group when their changes would touch any file in common, as predicted from each item's spec and the code read in step 3."
@@ -376,9 +377,10 @@ phrase_check skills/plan/SKILL.md "transitive groups" 'Groups chain, so A with B
 phrase_check skills/plan/SKILL.md "no file exempt from grouping" 'No file is exempt.'
 phrase_check skills/plan/SKILL.md "plan usage read before starting builds, only fitting groups started without a yes" "Read plan usage as the maintainer's own instructions say; at a limit they set, ask before starting any group that would pass it, and unless they say yes, start only the groups that fit, in the tracker's order. With no such instructions, read no plan limit."
 phrase_check skills/plan/SKILL.md "one build session per group, each in a fresh checkout, briefed as mentat:propose says" "Then start one build session per group, in the order of its first item, each in its own fresh checkout (worktree), briefed as \`mentat:propose\` \"Starting a build\" says, its ids in that order and separated by spaces."
-phrase_check skills/plan/SKILL.md "the paste line fallback, one per group in order" 'Where Claude Code cannot start a session, give each group, in the order of its first item, its own fenced line'
-phrase_check skills/plan/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, say each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
-phrase_check skills/plan/SKILL.md "the paste line that starts its build" 'its own fenced line the maintainer can paste to start its build: the full'
+phrase_check skills/plan/SKILL.md "an unstartable build handled as mentat:propose says, in group order" "Where a build session cannot be started in this turn, \`mentat:propose\` \"Starting a build\" says what to do instead, for each group in the order of its first item."
+phrase_check skills/plan/SKILL.md "nothing started, proposed or given with none left, then the ending" 'With none left, start nothing, propose nothing and give no line. Once the build sessions are started or given as lines, or none is left, end as'
+phrase_check skills/propose/SKILL.md "the paste line that starts its build" 'its own fenced line the maintainer can paste to start its build: the full'
+phrase_check skills/propose/SKILL.md "a fresh checkout per pasted build run" 'with more than one line, it says each build run gets its own fresh checkout (worktree). Running it asks no further yes.'
 phrase_check skills/plan/SKILL.md "no start for items committed for later, before this session, or not committed" 'Items committed with "Agree, build later" or before this session, or not committed, are not started.'
 phrase_check skills/plan/SKILL.md "starting a build session is not briefing a builder" 'Starting a build session (step 8) is none of these: that session briefs its own builders.'
 phrase_check skills/plan/SKILL.md "Stop here starting nothing" 'nothing else runs, no build session starts, and the report follows.'
@@ -504,7 +506,7 @@ phrase_check rules.md "no offer after a stop" 'After "Stop here", "Stop" or a no
 phrase_check rules.md "a no declining that batch only" 'a no declines that batch only.'
 phrase_check rules.md "a forwarded yes starting the build session, briefed as mentat:propose says" "A yes, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as \`mentat:propose\` \"Starting a build\" says."
 phrase_check rules.md "the build session's checks kept and its questions sent through the starting session" 'The build session still runs readiness, plan usage and the quick check, and sends its open questions through the session that started it.'
-phrase_check skills/plan/SKILL.md "the pointer to the ending" "Then end as \`rules.md\` \"Ending finished work\" says."
+phrase_check skills/plan/SKILL.md "the pointer to the ending" "or none is left, end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
 phrase_check skills/build/SKILL.md "the final message's pointer to the ending" "and each decision made without the maintainer. Then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/review/SKILL.md "the post-merge pointer to the ending" "and report in one line, then end as \`rules.md\` \"Ending finished work\" says."
@@ -630,11 +632,18 @@ phrase_check skills/propose/SKILL.md "the fingerprint and answer recorded at agr
 phrase_check skills/propose/SKILL.md "each committed item linked to the last round's review" "For each item the agreement commits, when a second opinion round ran, it runs \`mentat second-opinion --link <item id> <idea file>\` with the last round's idea file; the link calls no model and is not another second opinion. When it links nothing, the agreement stands and step 7 goes on."
 # A session that starts a build session writes the build command bare in the brief, since Claude Code grants a
 # maintainer-only skill only for its slash name as a separate word, and the started session stops on a refusal.
+# A refused start falls back to a proposal the maintainer starts in one step, then to paste lines.
 phrase_check skills/propose/SKILL.md "the part on starting a build" '## Starting a build'
 phrase_check skills/propose/SKILL.md "the build command as its own word after plain text, no mark touching it" 'writes the build command into the brief as its own word after plain text: a slash, the command name and the ids, with no backtick, quote or other mark touching it.'
 phrase_check skills/propose/SKILL.md "every other command name in the brief in backticks" 'Every other command name in the brief stays in backticks.'
 phrase_check skills/propose/SKILL.md "the started session calling the Skill tool with that command and ids" 'The brief tells the started session to call the Skill tool with that command and those ids,'
 phrase_check skills/propose/SKILL.md "a refused call stopping with nothing changed, not by hand, the typed command sent back" "if the Skill tool refuses the call, it stops with nothing changed, does not follow the skill's steps by hand, and sends the typed command \`/mentat:build <ids>\` to the starting session."
+phrase_check skills/propose/SKILL.md "a refused start proposing each build session, ending the turn with no next-work question" "When the host refuses to start a build session in this turn but can propose one that the maintainer starts in one step, the session instead proposes each build session its caller would start, in the caller's order and with the same brief, and ends the turn saying one step starts them, with no next-work question in that turn."
+phrase_check skills/propose/SKILL.md "a proposal counting only in its own fresh checkout" 'A proposal counts only when starting it opens a new session in its own fresh checkout (worktree); one that would run in this session or in this checkout does not.'
+phrase_check skills/propose/SKILL.md "each proposed build started once, after checking session state" "The maintainer's start of a proposal, or their next message telling this session to start them, starts each build session not yet started, once; before starting on a message, the session checks the host's session state, so a build already started is never started again."
+phrase_check skills/propose/SKILL.md "paste lines only where the host can do neither, in the caller's order" "Only where the host can do neither, it gives each build session, in the caller's order,"
+phrase_check skills/propose/SKILL.md "a forwarded yes starting one build session, plan one per group" "A forwarded yes starts its one build session; \`mentat:plan\` step 8 starts one per group."
+phrase_check skills/propose/SKILL.md "the Skill tool refusal separate, inside a started session" 'The Skill tool refusal above stays separate: it applies inside a started session.'
 # Instruction text loads into sessions, so it describes the build command's form and never writes a slash command bare.
 bare=$(grep -nE '(^|[^`])/mentat:' rules.md skills/*/SKILL.md | cut -d: -f1,2)
 if [ -n "$bare" ]; then
