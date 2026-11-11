@@ -269,20 +269,20 @@ phrase_check skills/triage/SKILL.md "all questions asked at 10 or fewer" 'With 1
 phrase_check skills/triage/SKILL.md "questions outside the chosen set left in the Inbox for a later sitting" 'Questions outside the chosen set stay as they are, in the Inbox, for a later sitting'
 phrase_check skills/triage/SKILL.md "the report's count of questions left" 'how many questions were left for a later sitting'
 phrase_check skills/triage/SKILL.md "the one-project option only when the sitting covers more than one" 'one project, only when the sitting covers more than one'
-phrase_check skills/triage/SKILL.md "brainstorm mode asking all its picked ideas" "then settle just those, from step 3 on, asking them all with no smaller set."
+phrase_check skills/triage/SKILL.md "brainstorm mode asking all its picked ideas" "then settle just those, from \"Search\" on, asking them all with no smaller set."
 # Each Inbox item gets one of four outcomes, recorded as the outcome says; Stop ends the asking and is not Later.
 phrase_check skills/triage/SKILL.md "the four options on an item's prompt, Stop last" 'An item'"'"'s prompt shows four options: the recommended outcome, two other outcomes, and "Stop" last.'
 phrase_check skills/triage/SKILL.md "the outcome not shown named in the question" 'Its question names the outcome not shown, and an Other answer naming one chooses it.'
 phrase_check skills/triage/SKILL.md "Stop as a session control distinct from Later" '"Stop" at any question ends the asking; what was not asked stays in the Inbox as it is. Stop is a session control, not the Later outcome: it records nothing on an item.'
-phrase_check skills/triage/SKILL.md "the Accept outcome" '   - Accept: to Backlog, an item accepted but not committed.'
-phrase_check skills/triage/SKILL.md "the Close outcome" '   - Close, with a reason.'
-phrase_check skills/triage/SKILL.md "the Merge outcome" '   - Merge into a named existing item.'
-phrase_check skills/triage/SKILL.md "the Later outcome" '   - Later: it stays in the Inbox, asked again only once a fact behind it changes or the maintainer raises it.'
-phrase_check skills/triage/SKILL.md "Accept recorded through the item shape, never the tracker's own triage actions" "   - Accept: Claude Code writes the item shape through \`mentat:backlog\`, moves it to Backlog and reads it back, never through the tracker's own triage actions."
-phrase_check skills/triage/SKILL.md "Close recorded as an opening outcome line and canceled" "   - Close: one update adds the first description line \`Closed <date>: <the maintainer's reason in their terms>.\` and ends the item as canceled. A retry adds no line the description already opens with."
-phrase_check skills/triage/SKILL.md "Merge recorded as a duplicate with a comment on the target" '   - Merge: mark it a duplicate of the named item, and comment on that item, citing the answer and naming the item merged.'
-phrase_check skills/triage/SKILL.md "Later recorded as a dated note" '   - Later: a dated note citing the answer, as a comment or on its inbox line.'
-phrase_check skills/triage/SKILL.md "the search reading the Close outcome lines" "and earlier decisions recorded for the project, such as the \`Closed <date>:\` lines step 5 writes."
+phrase_check skills/triage/SKILL.md "the Accept outcome" '- Accept: to Backlog, an item accepted but not committed.'
+phrase_check skills/triage/SKILL.md "the Close outcome" '- Close, with a reason.'
+phrase_check skills/triage/SKILL.md "the Merge outcome" '- Merge into a named existing item.'
+phrase_check skills/triage/SKILL.md "the Later outcome" '- Later: it stays in the Inbox, asked again only once a fact behind it changes or the maintainer raises it.'
+phrase_check skills/triage/SKILL.md "Accept recorded through the item shape, never the tracker's own triage actions" "- Accept: Claude Code writes the item shape through \`mentat:backlog\`, moves it to Backlog and reads it back, never through the tracker's own triage actions."
+phrase_check skills/triage/SKILL.md "Close recorded as an opening outcome line and canceled" "- Close: one update adds the first description line \`Closed <date>: <the maintainer's reason in their terms>.\` and ends the item as canceled. A retry adds no line the description already opens with."
+phrase_check skills/triage/SKILL.md "Merge recorded as a duplicate with a comment on the target" '- Merge: mark it a duplicate of the named item, and comment on that item, citing the answer and naming the item merged.'
+phrase_check skills/triage/SKILL.md "Later recorded as a dated note" '- Later: a dated note citing the answer, as a comment or on its inbox line.'
+phrase_check skills/triage/SKILL.md "the search reading the Close outcome lines" "and earlier decisions recorded for the project, such as the \`Closed <date>:\` lines that \"Record each answer\" writes."
 # A sitting keeps each item's questions together, a reader's question about an item just before it, still asks each
 # item's outcome, and leaves a big decision, and those that depend on it, to the item's own planning session, recorded
 # as its next step and reported; only an accepted item without one is offered for mentat:propose.
@@ -291,9 +291,9 @@ phrase_check skills/triage/SKILL.md "a reader's question about an item asked jus
 phrase_check skills/triage/SKILL.md "a big decision not asked in a sitting" "A decision that sets direction past its own item, or needs analysis or discussion that would dominate the sitting, is not asked; opening further decisions is not by itself the test."
 phrase_check skills/triage/SKILL.md "a big decision's dependents left open and independent questions asked" "It and any decision that depends on it stay open for its own planning session, independent questions go on, and the report names \`/mentat:plan <id>\` for it."
 phrase_check skills/triage/SKILL.md "each item's outcome still asked" "Each item's outcome is still asked; such a decision inside an accepted item goes to that planning session."
-phrase_check skills/triage/SKILL.md "the next step recorded in the current plan" "An item with a decision step 4 sends to its own planning session gets that next step, \`/mentat:plan <id>\`, in its \`## Current plan\` section."
-phrase_check skills/triage/SKILL.md "the report's line naming /mentat:plan for a big decision" "one line per decision step 4 sent to its own planning session, naming \`/mentat:plan <id>\`; one line per consequential call"
-phrase_check skills/triage/SKILL.md "mentat:propose offered only for an accepted item with no big decision" "An accepted item has no decision step 4 sent to its own planning session, whether or not questions are left: one \`AskUserQuestion\` asks which such item to plan first with \`mentat:propose\`"
+phrase_check skills/triage/SKILL.md "the next step recorded in the current plan" "An item with a decision that \"Ask\" sends to its own planning session gets that next step, \`/mentat:plan <id>\`, in its \`## Current plan\` section."
+phrase_check skills/triage/SKILL.md "the report's line naming /mentat:plan for a big decision" "one line per decision that \"Ask\" sent to its own planning session, naming \`/mentat:plan <id>\`; one line per consequential call"
+phrase_check skills/triage/SKILL.md "mentat:propose offered only for an accepted item with no big decision" "An accepted item has no decision that \"Ask\" sent to its own planning session, whether or not questions are left: one \`AskUserQuestion\` asks which such item to plan first with \`mentat:propose\`"
 phrase_check skills/triage/SKILL.md "an item with a big decision kept to its /mentat:plan step" "An item with such a decision is not offered; its next step stays \`/mentat:plan <id>\`."
 # An item that lands in the same change as an existing item is recommended as a Merge. Scope merged into a Todo item
 # is not committed: it is agreed through mentat:propose, after its second opinion, when the item is next planned.
@@ -369,7 +369,7 @@ phrase_check skills/propose/SKILL.md "the paste line as the build command" "the 
 # Plan splits the items this session committed into build groups by shared files and starts one build session per group,
 # within plan usage, a fresh checkout each; where a session cannot be started, it follows mentat:propose "Starting a build"
 # in group order. Stop here starts nothing.
-phrase_check skills/plan/SKILL.md "only the items this session committed to build now, in the tracker's order" "Then take only the items this session just committed with \"Agree and build now\", in the tracker's order (\`mentat:backlog\` step 5),"
+phrase_check skills/plan/SKILL.md "only the items this session committed to build now, in the tracker's order" "Then take only the items this session just committed with \"Agree and build now\", in the tracker's order (\`mentat:backlog\` \"The order of agreed work\"),"
 phrase_check skills/plan/SKILL.md "the readiness filter before grouping" 'Split the rest into build groups'
 phrase_check skills/plan/SKILL.md "groups by predicted shared files" "two items share a group when their changes would touch any file in common, as predicted from each item's spec and the code read in step 3."
 phrase_check skills/plan/SKILL.md "an unclear overlap kept in one group" 'When it is unclear whether two items share a file, they share a group.'
@@ -427,8 +427,8 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   fail "skills/build/SKILL.md's description must list its arguments (Arguments: backlog item ids.)"
 fi
-phrase_check skills/build/SKILL.md "the committed Todo items in the tracker's order with no ids" "With none: the project's Todo items that have a spec, are not parked and do not wait on the maintainer, in the tracker's order (\`mentat:backlog\` step 5)."
-phrase_check skills/build/SKILL.md "a missing or changed spec fingerprint sent back to planning" "so does one whose recorded spec fingerprint (\`mentat:backlog\` step 6) is missing or differs from the fingerprint of its current spec, computed the same way, since a changed spec goes back to planning."
+phrase_check skills/build/SKILL.md "the committed Todo items in the tracker's order with no ids" "With none: the project's Todo items that have a spec, are not parked and do not wait on the maintainer, in the tracker's order (\`mentat:backlog\` \"The order of agreed work\")."
+phrase_check skills/build/SKILL.md "a missing or changed spec fingerprint sent back to planning" "so does one whose recorded spec fingerprint (\`mentat:backlog\` \"Agreement\") is missing or differs from the fingerprint of its current spec, computed the same way, since a changed spec goes back to planning."
 phrase_check skills/build/SKILL.md "an item with a branch or pull request skipped with its status" 'An item with a branch or pull request (In Progress), waiting on the maintainer, or ended leaves the queue, named with its status.'
 phrase_check skills/build/SKILL.md "no final yes, the typed command as the go-ahead" "No final yes is asked: the maintainer typing the command is the go-ahead for the items it takes, as are \"Agree and build now\" for a plan session's start and a forwarded yes (\`rules.md\` \"Ending finished work\")."
 phrase_check skills/build/SKILL.md "asked again only for a new item or a changed condition" 'The run asks again only when its queue gains an item over the queue it was started with, or an agreed condition changed.'
@@ -436,7 +436,7 @@ phrase_check skills/build/SKILL.md "status, blockers, start wait, branch and fin
 phrase_check skills/build/SKILL.md "an item held by its start wait left out of the queue, by id or from the order" "An item held by its start wait leaves the queue, named as \`mentat:backlog\` \"Start waits\" says, whether given by id or taken from the order."
 phrase_check skills/build/SKILL.md "an item waiting on an unmerged earlier item deferred before any branch" 'An item that depends on, or touches the same lines as, an earlier item whose pull request is not merged is left for after that merge, with no branch and no pull request. Otherwise create its branch'
 phrase_check skills/build/SKILL.md "the branch created before the builder, as the lock" 'create its branch, from the default branch, before briefing its builder: the branch is the lock, so a run that finds it skips the item.'
-phrase_check skills/status/SKILL.md "that it forbids writes and asks only step 2's question" "This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing but step 2's question on a run with no argument."
+phrase_check skills/status/SKILL.md "that it forbids writes and asks only the question in Find the projects" "This skill forbids writes: it changes no backlog item, inbox or comment, and asks nothing but the question in \"Find the projects\" on a run with no argument."
 phrase_check skills/status/SKILL.md "the one question on a run with no argument" "With no argument, before reading any record, ask once which projects to cover: the session's project first, then \`all\`, another through Other."
 phrase_check skills/status/SKILL.md "no question where no project list is named" 'With no such instructions, the run asks nothing and covers only the session'"'"'s repository'
 phrase_check skills/status/SKILL.md "that the backlog's listing writes do not run" 'Its listing writes do not run'
@@ -448,14 +448,14 @@ phrase_check skills/status/SKILL.md "every maintainer message walked for unanswe
 phrase_check skills/status/SKILL.md "the compaction warning on unanswered asks" 'If the session was compacted and early messages survive only as a summary, say so here: asks from before it may be missing.'
 phrase_check skills/status/SKILL.md "the one line on whether the plan should change" "\`Plan:\` one line saying plainly whether the goal or the plan itself should change, not only the next step."
 phrase_check skills/status/SKILL.md "waits as the tracker's adapter marks them" "items waiting on the maintainer, as the tracker's adapter marks them, merge waits included;"
-phrase_check skills/status/SKILL.md "Next from Todo in the tracker's order, never the Inbox" "Next: the project's Todo items in the tracker's order (\`mentat:backlog\` step 5), never the Inbox."
+phrase_check skills/status/SKILL.md "Next from Todo in the tracker's order, never the Inbox" "Next: the project's Todo items in the tracker's order (\`mentat:backlog\` \"The order of agreed work\"), never the Inbox."
 phrase_check README.md "the triage command" "- \`/mentat:triage [project ... | all] | brainstorm <text or link>\`: go through the Inbox with you."
 phrase_check README.md "the stages and the agreement that commits an item to build now or later" "Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later."
 phrase_check skills/build/SKILL.md "an item that needs planning sent to /mentat:plan" "leaves the queue, named with the \`/mentat:plan <id>\` command to run"
 phrase_check skills/build/SKILL.md "that it never plans scope" 'It builds and never plans scope'
 phrase_check skills/build/SKILL.md "the merge line kept for the final message" '"Ready to merge: #N" goes into the final message instead of ending the run'
 phrase_check skills/build/SKILL.md "that it never merges" 'The run never merges.'
-phrase_check skills/status/SKILL.md "a GitHub wait as the wait heading mentat:backlog describes" "with GitHub issues, issues, open or closed, that open with a wait on the maintainer as \`mentat:backlog\` step 4 and \"Waits on the maintainer\" describe it"
+phrase_check skills/status/SKILL.md "a GitHub wait as the wait heading mentat:backlog describes" "with GitHub issues, issues, open or closed, that open with a wait on the maintainer as \`mentat:backlog\` \"Marking a wait\" and \"Waits on the maintainer\" describe it"
 phrase_check skills/status/SKILL.md "a next item that can start under the start wait rule, with each item passed" "\`Next:\` one item that can start under \`mentat:backlog\` \"Start waits\", with a one-line reason and each earlier item it passed with its wait,"
 phrase_check skills/status/SKILL.md "the next item from ordered records beside each record with no order" 'from the next agreed work of the records that have a recorded order, and, for each record with no recorded order, a phrase saying it offers no item. Both show when the run covers both kinds.'
 phrase_check skills/build/SKILL.md "each item built through A change steps 2 to 5" "through \`rules.md\` \"A change\" steps 2 to 5"
@@ -509,14 +509,14 @@ phrase_check rules.md "the offer after triage, accepted items for propose only" 
 phrase_check rules.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
 phrase_check rules.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
 phrase_check rules.md "a web-mode question file holding only the question, nothing private" "- A \`mentat second-opinion --web\` file holds only the question, nothing private."
-phrase_check rules.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` step 5) read-only, and reports one of:"
+phrase_check rules.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` \"The order of agreed work\") read-only, and reports one of:"
 phrase_check rules.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
 phrase_check rules.md "the lookup result for no recorded order" ' no recorded order;'
 phrase_check rules.md "the lookup result for agreed work all waiting on the maintainer" ' agreed work all waiting on the maintainer;'
 phrase_check rules.md "the lookup result for agreed work none of which can start, a start wait included" " agreed work none of which can start (in progress, waiting on an unmerged pull request, or held by its start wait, \`mentat:backlog\` \"Start waits\");"
 phrase_check rules.md "the lookup result for no agreed work" ' no agreed work. It offers only an item that can start,'
 phrase_check rules.md "each item the lookup passed named with its wait, and no agreed work is left said only in the last case" 'It offers only an item that can start, naming each one it passed with its wait, and says "no agreed work is left" only in the last case.'
-phrase_check rules.md "the Inbox count named after no agreed work, not a question" "There it also counts the Inbox items triage would ask (\`mentat:backlog\` step 2); above zero, the ending adds one line with the count and \`/mentat:triage\` to type, not a question."
+phrase_check rules.md "the Inbox count named after no agreed work, not a question" "There it also counts the Inbox items triage would ask (\`mentat:backlog\` \"Stages\"); above zero, the ending adds one line with the count and \`/mentat:triage\` to type, not a question."
 phrase_check skills/backlog/SKILL.md "the offer's read-only Inbox count with triage's Later filter" "count, read-only and running no reader, this session's project's Inbox entries, with any further inbox named for it, that triage would ask, reading every page: all but an entry with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed or the maintainer raised it again. An Inbox that cannot be read gives no count."
 phrase_check rules.md "no offer from a started session" 'A session started by another session makes no offer; its ending goes to the session that started it.'
 phrase_check rules.md "no offer after a stop" 'After "Stop here", "Stop" or a no, no offer is made that turn;'
@@ -562,19 +562,19 @@ if [ "$(grep -c -F "not for \`mentat:propose\`'s or \`mentat:plan\`'s read," ski
 else
   fail "skills/backlog/linear.md must exempt the propose step's and planning session's reads in both the hand-made items and waits left open bullets"
 fi
-# The lookup of the offer in rules.md "Ending finished work" neither refines hand-made items nor clears waits: both bullets exempt it.
+# The lookup of the offer in rules.md "Ending finished work" neither refines hand-made items nor clears waits: both sections exempt it.
 if [ "$(grep -c -F "not for the lookup of the offer in \`rules.md\` \"Ending finished work\"," skills/backlog/linear.md)" -eq 2 ]; then
   pass "skills/backlog/linear.md exempts the offer's lookup from refining items and clearing waits"
 else
-  fail "skills/backlog/linear.md must exempt the offer's lookup in both the hand-made items and waits left open bullets"
+  fail "skills/backlog/linear.md must exempt the offer's lookup in both the hand-made items and waits left open sections"
 fi
 # The listing session clears a hand wait from a comment reporting its Ends when result; an unclear case,
 # or any case read by a skill that forbids writes, is named as "may be done" and left unchanged.
-phrase_check skills/backlog/linear.md "the waits left open bullet" '- Waits left open. When a session lists this project to choose or plan work'
-phrase_check skills/backlog/linear.md "the waits left open bullet's exemptions" "(not for \`mentat:propose\`'s or \`mentat:plan\`'s read, not for the lookup of the offer in \`rules.md\` \"Ending finished work\", not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
+phrase_check skills/backlog/linear.md "the waits left open section" '## Waits left open'
+phrase_check skills/backlog/linear.md "the waits left open section's exemptions" "(not for \`mentat:propose\`'s or \`mentat:plan\`'s read, not for the lookup of the offer in \`rules.md\` \"Ending finished work\", not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
 phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits and open pull requests left to their own path" "Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments."
 phrase_check skills/backlog/linear.md "a hand wait with an open pull request left for review" "An item whose linked pull request is still open is left unchanged for \`mentat:review\`, and named \"may be done\" the same way when a comment may report its result."
-phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (step 4: the block, the label and the lead's assignment removed)."
+phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (\"Marking a wait\": the block, the label and the lead's assignment removed)."
 phrase_check skills/backlog/linear.md "an unclear hand wait named as may be done" "A comment that may report it, or a later report on a block with no \`Ends when\` line, leaves the item unchanged, and the item is named as \"may be done\" with the comment's date."
 phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits without changes" 'A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".'
 # A new Linear project's page holds one purpose line as its short summary, an empty description and the repository link;
@@ -582,31 +582,31 @@ phrase_check skills/backlog/linear.md "a skill that forbids writes reading waits
 phrase_check skills/backlog/linear.md "a new project's overview shape" "A new project's overview holds only what is unique to it: its short summary is one line saying what the project is for, its long description stays empty, and its repository, where there is one, is a link under Resources."
 phrase_check skills/linear/SKILL.md "the stop when the Linear tools cannot write the project's shape" "If the Linear tools cannot write a project's short summary on its own or add a link under its Resources, stop and say so; create no project in another shape."
 phrase_check skills/linear/SKILL.md "the purpose line asked, with a draft from the README" "ask the maintainer for the project's purpose line, one line saying what it is for, offering a draft from the README."
-phrase_check skills/backlog/linear.md "the GitHub integration warning for the maintainer" "- Warning for the maintainer: Linear's GitHub integration can post an item's description, a wait block included, to GitHub. The maintainer sets its \"Comments in GitHub\" to post without issue descriptions and turns it off for public repositories; agents do not change it."
+phrase_check skills/backlog/linear.md "the GitHub integration warning for the maintainer" "Warning for the maintainer: Linear's GitHub integration can post an item's description, a wait block included, to GitHub. The maintainer sets its \"Comments in GitHub\" to post without issue descriptions and turns it off for public repositories; agents do not change it."
 phrase_check skills/linear/SKILL.md "the GitHub integration warning said when it creates a Linear project" "Then, before writing any item to it, tell the maintainer that Linear's GitHub integration can post an item's description, a wait block included, to GitHub, so they should set its \"Comments in GitHub\" to post without issue descriptions and turn it off for public repositories; agents do not change it."
 phrase_check skills/linear/SKILL.md "the project created in the new project shape" "Create the project in the new project shape in \`../backlog/linear.md\`, with that line as its short summary, the repository's link under Resources and the maintainer as lead."
 
 # Work moves through five stages; an item that is not agreed waits on no one, and a parked one says so in its opening sentence.
-phrase_check skills/backlog/SKILL.md "step 2's stages, mapped by the tracker's adapter" "2. Stages say where an item stands. The tracker's adapter maps each to its own statuses or labels (\`linear.md\`, \`github.md\`):"
-phrase_check skills/backlog/SKILL.md "the Inbox stage, undecided and not an item yet" "   - Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work."
-phrase_check skills/backlog/SKILL.md "the Backlog stage, accepted, not committed" '   - Backlog: accepted, not committed.'
-phrase_check skills/backlog/SKILL.md "the Todo stage, committed only by the yes in mentat:propose" "   - Todo: committed, agreed with a spec. Only the maintainer's yes in \`mentat:propose\` commits an item and moves it from Backlog to Todo."
-phrase_check skills/backlog/SKILL.md "the In Progress and Done stages" '   - In Progress: a branch or pull request exists.'
-phrase_check skills/backlog/SKILL.md "the Done stage" '   - Done: ended, as done, canceled or duplicate.'
+phrase_check skills/backlog/SKILL.md "the stages, mapped by the tracker's adapter" "Stages say where an item stands. The tracker's adapter maps each to its own statuses or labels (\`linear.md\`, \`github.md\`):"
+phrase_check skills/backlog/SKILL.md "the Inbox stage, undecided and not an item yet" "- Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work."
+phrase_check skills/backlog/SKILL.md "the Backlog stage, accepted, not committed" '- Backlog: accepted, not committed.'
+phrase_check skills/backlog/SKILL.md "the Todo stage, committed only by the yes in mentat:propose" "- Todo: committed, agreed with a spec. Only the maintainer's yes in \`mentat:propose\` commits an item and moves it from Backlog to Todo."
+phrase_check skills/backlog/SKILL.md "the In Progress and Done stages" '- In Progress: a branch or pull request exists.'
+phrase_check skills/backlog/SKILL.md "the Done stage" '- Done: ended, as done, canceled or duplicate.'
 phrase_check skills/backlog/SKILL.md "further inboxes read as the maintainer's instructions say" "The maintainer's own instructions may name further inboxes, such as ideas kept in no project, read as they say."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'an item the maintainer set aside, which says "parked" in its opening sentence'
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
 phrase_check skills/backlog/SKILL.md "the GitHub tracker's pointer to its adapter" "read \`github.md\` in this skill's folder, and again after a compaction. It maps the stages and the tracker's order."
 # The adapters map the stages and triage outcomes; agents never use a tracker's own triage actions.
-phrase_check skills/backlog/linear.md "Linear's stage mapping" '- Step 2: the Inbox is the Triage status, every issue of the project in Triage, with no label needed; Backlog, Todo and In Progress are those statuses; Done is Done, Canceled or Duplicate.'
+phrase_check skills/backlog/linear.md "Linear's stage mapping" 'The Inbox is the Triage status, every issue of the project in Triage, with no label needed; Backlog, Todo and In Progress are those statuses; Done is Done, Canceled or Duplicate.'
 phrase_check skills/backlog/linear.md "Linear's Inbox issues as undecided, not items" 'Inbox issues are undecided, not items: no type label, no item shape, not in the order of agreed work.'
 phrase_check skills/backlog/linear.md "Linear's triage outcomes set explicitly" 'Triage outcomes set the status explicitly: Accept moves the issue to Backlog with a type label and the item shape; Close sets Canceled, with the reason; Merge sets Duplicate of the target; Later keeps it in Triage.'
 phrase_check skills/backlog/linear.md "Linear's own triage buttons never used" "Agents never use Linear's own Accept, Decline, Mark as duplicate or Snooze."
-phrase_check skills/backlog/linear.md "hand-made cleanup excluding the Inbox by status" "that has no \`## Spec\` or \`## Agreed request\` section and that is not in Triage: every item in Triage is the Inbox (step 2), settled in triage, so the cleanup skips it by status."
-phrase_check skills/backlog/github.md "GitHub's disjoint stage mapping with stage labels" "- Stages (step 2), each issue in exactly one. With stage labels (\`idea\`, \`ready\`, \`in progress\`, \`waiting\`): the Inbox is an open issue labeled \`idea\`, Todo one labeled \`ready\`, In Progress one labeled \`in progress\`, Backlog any other open issue, and Done a closed issue; \`waiting\` marks a wait on the maintainer and is added beside the stage label, never in place of it."
+phrase_check skills/backlog/linear.md "hand-made cleanup excluding the Inbox by status" "that has no \`## Spec\` or \`## Agreed request\` section and that is not in Triage: every item in Triage is the Inbox (\"Stages\"), settled in triage, so the cleanup skips it by status."
+phrase_check skills/backlog/github.md "GitHub's disjoint stage mapping with stage labels" "- Stages (\"Stages\"), each issue in exactly one. With stage labels (\`idea\`, \`ready\`, \`in progress\`, \`waiting\`): the Inbox is an open issue labeled \`idea\`, Todo one labeled \`ready\`, In Progress one labeled \`in progress\`, Backlog any other open issue, and Done a closed issue; \`waiting\` marks a wait on the maintainer and is added beside the stage label, never in place of it."
 phrase_check skills/backlog/github.md "GitHub's disjoint stage mapping without stage labels" "Without them: the Inbox is an open issue whose opening sentence says it waits in the Inbox, In Progress an open issue with a branch or pull request, Todo any other issue listed in the pinned issue's order, Backlog any other open issue, and Done a closed issue."
 phrase_check skills/backlog/github.md "GitHub's Accept write" "- Stage writes. Accept removes \`idea\`, or rewrites the opening sentence so it no longer says the issue waits in the Inbox, and writes the item shape's opening sentence (where the work came from)."
-phrase_check skills/backlog/github.md "GitHub's commit-to-Todo write: the label and the pinned order both" "Committing to Todo (step 6), a new issue included, adds \`ready\` where labels are used and appends the issue to the pinned issue's order wherever one exists, and clears any Inbox mark."
+phrase_check skills/backlog/github.md "GitHub's commit-to-Todo write: the label and the pinned order both" "Committing to Todo (\"Agreement\"), a new issue included, adds \`ready\` where labels are used and appends the issue to the pinned issue's order wherever one exists, and clears any Inbox mark."
 phrase_check skills/backlog/github.md "the label deciding the stage and the pinned issue the order" "With stage labels, the label decides the stage and the pinned issue the order: a \`ready\` issue missing from it ranks after the listed ones, oldest first."
 phrase_check skills/backlog/github.md "GitHub's branch and merge writes" "Creating its branch replaces \`ready\` with \`in progress\` where labels are used. When its pull request merges, close the issue and drop it from the pinned issue's order."
 phrase_check skills/backlog/github.md "GitHub's triage outcomes" "Close: \`gh issue close <N> --reason \"not planned\"\`, with the reason in a comment. Merge: \`gh issue close <N> --reason duplicate\`, with a comment naming the target. Later: a dated comment; the issue stays open."
@@ -616,14 +616,14 @@ phrase_check skills/backlog/github.md "a GitHub issue's opening sentence on wher
 phrase_check skills/backlog/SKILL.md "the fingerprint and answer comment from the read-back body" "Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as \`mentat:review\` \"Spec\" computes it (the same span, the same command), never from the text written, and post one comment on the item: \`Spec fingerprint: <12 hex>; build: now\` or \`Spec fingerprint: <12 hex>; build: later\`, after the answer to \`mentat:propose\`'s agreement question, citing the agreement."
 phrase_check skills/backlog/SKILL.md "the latest fingerprint comment, re-recorded on a scope change, as the record" 'Do it again, with that agreement'"'"'s answer, whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint and answer.'
 # Triage reads the Inbox as the tracker's adapter maps it, plus further inboxes, and skips an item with a Later note.
-phrase_check skills/triage/SKILL.md "the Inbox read through the tracker's adapter, plus further inboxes" "its Inbox items (\`mentat:backlog\` step 2, as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say)."
+phrase_check skills/triage/SKILL.md "the Inbox read through the tracker's adapter, plus further inboxes" "its Inbox items (\`mentat:backlog\` \"Stages\", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say)."
 phrase_check skills/triage/SKILL.md "an item with a Later note left out until a fact changes" 'Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.'
 # Triage reads ideas kept in no project and every page, and orders items by their own date.
 phrase_check skills/triage/SKILL.md "inbox ideas in no project read in a sitting covering every project" "A sitting covering every current project also reads the inbox ideas the maintainer's instructions keep in no project."
 phrase_check skills/triage/SKILL.md "every page of a list read" 'Read every page of a list.'
-phrase_check skills/triage/SKILL.md "the questions counted first" '4. Ask. Count the questions.'
+phrase_check skills/triage/SKILL.md "the questions counted first" 'Count the questions.'
 phrase_check skills/triage/SKILL.md "items with no project after the projects', oldest first by their own date" "then items by project, then items with no project, each oldest first by the item's own date where the maintainer's instructions give one;"
-phrase_check skills/linear/SKILL.md "the migration's Inbox only for an issue github.md maps there" "An issue \`../backlog/github.md\` maps to the Inbox (the \`idea\` label, or an opening sentence saying it waits in the Inbox) goes in the Inbox, the Triage status (\`../backlog/linear.md\` step 2), with no type label or item shape, and step 7's comment lists it as \"Inbox\" beside its id."
+phrase_check skills/linear/SKILL.md "the migration's Inbox only for an issue github.md maps there" "An issue \`../backlog/github.md\` maps to the Inbox (the \`idea\` label, or an opening sentence saying it waits in the Inbox) goes in the Inbox, the Triage status (\`../backlog/linear.md\` \"Stages\"), with no type label or item shape, and step 7's comment lists it as \"Inbox\" beside its id."
 phrase_check skills/linear/SKILL.md "the migration's other unplanned issue as a Backlog item" 'Any other issue becomes a Backlog item.'
 phrase_check skills/linear/SKILL.md "the migration's stage-label mapping" "With stage labels: \`idea\` is the Inbox (below), no stage label is a Backlog item, \`ready\` is Todo,"
 phrase_check skills/triage/SKILL.md "a reader that cannot limit itself run unscoped, not skipped" 'a reader that cannot limit itself to them still runs, for all projects'
@@ -631,11 +631,11 @@ phrase_check skills/triage/SKILL.md "that all is every current project, not a na
 # A sitting with neither project names nor `all` asks once which projects' ideas it settles, as a session control, unless no project list is named.
 phrase_check skills/triage/SKILL.md "the opening question on a run with neither project names nor all" "With neither project names nor \`all\`, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then \`all\`, another through Other."
 phrase_check skills/triage/SKILL.md "the opening question as a session control, not asked again" 'It is a session control, not a decision: it has no "N of M" and is not asked again after a compaction.'
-phrase_check skills/triage/SKILL.md "the opening question's answer not a limit on what readers file" 'The answer names the projects whose ideas the sitting settles, not a limit on what readers file (step 1).'
+phrase_check skills/triage/SKILL.md "the opening question's answer not a limit on what readers file" 'The answer names the projects whose ideas the sitting settles, not a limit on what readers file ("Readers").'
 phrase_check skills/triage/SKILL.md "readers run as with all after the opening question" "With projects chosen at the opening question, every reader runs as with \`all\`, and the sitting asks only about those projects' items and the readers' hand-offs for them."
 phrase_check skills/triage/SKILL.md "no opening question where no project list is named" "Where the maintainer's own instructions name no project list, ask nothing: the sitting covers the session's repository."
 phrase_check skills/triage/SKILL.md "brainstorm mode's own project question" 'Brainstorm mode keeps its own project question.'
-phrase_check skills/triage/SKILL.md "each answer recorded so the item is not found again" 'so step 2 does not find the item again'
+phrase_check skills/triage/SKILL.md "each answer recorded so the item is not found again" 'so "The Inbox" does not find the item again'
 phrase_check skills/propose/SKILL.md "that accepting an item is no commitment, and the yes here commits it to Todo" "Accepting an Inbox item in triage is not a commitment; the maintainer's yes here commits the item from Backlog to Todo."
 # The agreement question offers build now or build later, both committing the item; the agreement records the
 # spec's fingerprint and the answer, and an item committed for later waits for the maintainer to start it.
@@ -647,7 +647,7 @@ phrase_check skills/propose/SKILL.md "the start wait line added in the agreement
 phrase_check skills/propose/SKILL.md "each answer's effect in a chat request" "In a chat request, \"Agree and build now\" goes on to build in this session through \`rules.md\` \"A change\" steps 2 to 5, and \"Agree, build later\" stops once step 7 is done."
 phrase_check skills/propose/SKILL.md "an item for later built only on the maintainer's command or offer yes" "An item committed for later is built only when the maintainer types \`/mentat:build\`, with or without its id, or says yes to a next-work offer naming it."
 phrase_check skills/propose/SKILL.md "the small request's agreement with step 4's three answers, recorded with the fingerprint" 'Its agreement offers step 4'"'"'s answers, "Agree and build now", "Agree, build later" and "Not now", with the same effects, and step 7 records the chosen answer with the fingerprint.'
-phrase_check skills/propose/SKILL.md "the fingerprint and answer recorded at agreement" "On the item it then records the spec's fingerprint and the chosen answer (build now or later), as \`mentat:backlog\` step 6 says, and again whenever an agreed change of scope rewrites the spec."
+phrase_check skills/propose/SKILL.md "the fingerprint and answer recorded at agreement" "On the item it then records the spec's fingerprint and the chosen answer (build now or later), as \`mentat:backlog\` \"Agreement\" says, and again whenever an agreed change of scope rewrites the spec."
 phrase_check skills/propose/SKILL.md "each committed item linked to the last round's review" "For each item the agreement commits, when a second opinion round ran, it runs \`mentat second-opinion --link <item id> <idea file>\` with the last round's idea file; the link calls no model and is not another second opinion. When it links nothing, the agreement stands and step 7 goes on."
 # A session that starts a build session writes the build command bare in the brief, since Claude Code grants a
 # maintainer-only skill only for its slash name as a separate word, and the started session stops on a refusal.
@@ -674,8 +674,8 @@ fi
 # On Linear, the next agreed work is ranked from Todo items by Priority, set only as the maintainer gave it,
 # and the Linear skill's migration carries the pinned issue's order by creation order.
 phrase_check skills/backlog/github.md "the GitHub pinned issue's order" 'the pinned issue holds the order of agreed work, next first, without closed or parked issues.'
-phrase_check skills/backlog/SKILL.md "step 5's pointer to the tracker's order" "5. The tracker's order: the order of agreed work, next first, read as the tracker's adapter says (\`linear.md\` step 5, \`github.md\`). It leaves out parked items."
-phrase_check skills/backlog/linear.md "the next agreed work's rank" "Step 5: the next agreed work, the tracker's order, is the open Todo items without the \`Waiting on you\` label and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level."
+phrase_check skills/backlog/SKILL.md "the pointer to the tracker's order" "The tracker's order: the order of agreed work, next first, read as the tracker's adapter says (\`linear.md\` \"The order of agreed work\", \`github.md\`). It leaves out parked items."
+phrase_check skills/backlog/linear.md "the next agreed work's rank" "The next agreed work, the tracker's order, is the open Todo items without the \`Waiting on you\` label and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level."
 phrase_check skills/backlog/linear.md "every page read and waiting and In Progress items reported" 'Read every page of results before ranking, and report the waiting and In Progress items too.'
 phrase_check skills/backlog/linear.md "Priority only as the maintainer gave it" 'Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.'
 phrase_check skills/linear/SKILL.md "the migration's pinned order by creation order" 'only its order is carried to the project, by creation order'
@@ -686,8 +686,8 @@ phrase_check skills/linear/SKILL.md "the mapping comment's note on the order" 'm
 phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The opening sentence: one plain sentence, not a heading, of at most about 25 words.'
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item" 'It says what the item is (such as a bug, a proposal, a follow-up or a question)'
 phrase_check skills/backlog/SKILL.md "no status or wait restated in the opening sentence" 'It does not restate status or waits, which the tracker'"'"'s fields show, so a change of status does not rewrite it.'
-phrase_check skills/backlog/SKILL.md "the opening sentence's four exceptions" 'It names only four things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), during a merge wait, that it waits on the merge of #N (step 4), and anything the tracker'"'"'s adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.'
-if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The start wait/ { s = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
+phrase_check skills/backlog/SKILL.md "the opening sentence's four exceptions" 'It names only four things those fields cannot show: "parked" for an item set aside, that a parked item was agreed ("Stages"), during a merge wait, that it waits on the merge of #N ("Marking a wait"), and anything the tracker'"'"'s adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.'
+if awk '/^## Item shape$/ { h = NR } /^- The opening sentence:/ { a = NR } /^- The start wait/ { s = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
   /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < s && s < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
   pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the start wait, the wait block, the spec, then the current plan"
 else
@@ -712,7 +712,7 @@ phrase_check skills/backlog/start-waits.md "a dead wait and its report" "- dead 
 phrase_check skills/backlog/start-waits.md "a held item kept from starting, passed, and back once met" 'An unmet, unchecked or dead wait holds the item: it is not offered, built or named as next. A session walking the order passes it, reports it as above and goes on to the next item. Once the wait is met, the item can start again with no write.'
 phrase_check skills/backlog/github.md "an issue done only when closed as completed" "an \`<item id>\` is the issue's \`#<N>\`, done only when closed with the reason completed"
 phrase_check skills/backlog/github.md "an issue closed as not planned or duplicate making the wait dead" 'closed as not planned or duplicate, the wait is dead.'
-phrase_check skills/backlog/linear.md "a Linear item done only in Done, Canceled or Duplicate making the wait dead" "- Start waits (\`start-waits.md\`): an \`<item id>\` is done only in the Done status; Canceled or Duplicate makes the wait dead."
+phrase_check skills/backlog/linear.md "a Linear item done only in Done, Canceled or Duplicate making the wait dead" "In \`start-waits.md\`, an \`<item id>\` is done only in the Done status; Canceled or Duplicate makes the wait dead."
 phrase_check skills/backlog/linear.md "the hand-made refinement keeping a start wait line" 'and the original'"'"'s links, with any start wait line unchanged.'
 phrase_check skills/linear/SKILL.md "the migration copying a start wait line as it is" "the issue's \`Starts after:\` line as it is (step 8 rewrites it);"
 phrase_check skills/linear/SKILL.md "the rewrite pass after every item, before the wait block and the closes" "8. After every item is created, and before the switch item's wait block (step 3) and step 5's closes, rewrite each \`Starts after: #<N> done\` line in the items under \"Migrated\" in the mapping comment to the item id the comment gives for \`#<N>\`, and read each item back."
@@ -733,18 +733,18 @@ phrase_check skills/backlog/SKILL.md "a backlog item's wait kept only there, wit
 phrase_check skills/backlog/SKILL.md "each step's one line naming where it runs" 'Each step is one line naming where it runs: a website page, or an app and folder, the folder only in terms the record may hold'
 phrase_check skills/backlog/SKILL.md "what the maintainer should see before a dependent step" 'A step whose result a later step depends on says what the maintainer should see.'
 phrase_check skills/backlog/SKILL.md "each command in its own fenced block with real values" 'Each command or text to paste sits in its own fenced block under its step, complete with real, non-secret values and no placeholder the maintainer must look up; a step run N times keeps its one command.'
-phrase_check skills/backlog/SKILL.md "step 4's pointer to the wait's shape" 'then the steps ("Waits on the maintainer" gives the shape)'
+phrase_check skills/backlog/SKILL.md "the wait marking's pointer to the wait's shape" 'then the steps ("Waits on the maintainer" gives the shape)'
 phrase_check skills/backlog/SKILL.md "the wait's steps in full" 'The steps are written in full in the wait, never pointing to a comment or a document; long text to paste, such as a prompt, also sits in a fenced block under its step.'
 phrase_check skills/backlog/SKILL.md "an unchecked detail marked unverified" 'A detail the writer has not checked is marked unverified, never guessed.'
 phrase_check skills/backlog/SKILL.md "the wait's Ends when line as its only overall pass" "The wait's last line says what ends it, as \`Ends when: <the result that shows it is done>\`, and is its only overall pass."
 phrase_check skills/backlog/SKILL.md "a GitHub-only record's general terms, with the commands in chat once" 'When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command.'
 phrase_check skills/linear/SKILL.md "the switch item's Ends when line" "\`Ends when: the pull request is merged and each listed issue is closed\`"
-phrase_check skills/linear/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` step 4's merge exception does not remove it."
+phrase_check skills/linear/SKILL.md "the switch item's wait block kept despite the merge exception" "This block stays even though it opens with a merge: its later steps are setup steps a later session must run, so \`mentat:backlog\` \"Marking a wait\"'s merge exception does not remove it."
 phrase_check skills/linear/SKILL.md "step 6's merge line and decision prompt, not a wait" 'A pending merge goes as "Ready to merge: #N" and a decision about a listed issue goes in the decision prompt'
 phrase_check skills/setup/SKILL.md "the one-line pointer to /mentat:linear" "To move planning to Linear, the maintainer runs \`/mentat:linear\`."
 phrase_check skills/setup/SKILL.md "the first run's per-repository install recommendation" 'Recommend installing per repository, so Mentat runs only where the maintainer turns it on'
 phrase_check skills/setup/SKILL.md "the first run's skipped check outside a repository" "Outside a GitHub checkout, skip its \`mentat check\`, which needs a repository, and say the check runs in one."
-phrase_check skills/backlog/SKILL.md "step 4's wait for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
+phrase_check skills/backlog/SKILL.md "the wait marking for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 
 # After each second opinion round, the maintainer sees each tool's reply and what Claude Code did with it in one block.
 phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
@@ -755,9 +755,9 @@ phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'No
 phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "A tool with no answer gets \`no second opinion\` and why, in public-safe words, never a log path."
 phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
 phrase_check skills/backlog/SKILL.md "each line of the replies block on its own line" "Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included."
-phrase_check skills/backlog/SKILL.md "stages, step 6's creation and stage moves, the opening sentence, the start wait, titles, replies and waits with GitHub issues" 'only step 2'"'"'s stages, step 6'"'"'s item creation, stage moves and fingerprint comment, the item shape'"'"'s opening sentence and start wait, "Titles", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of steps 1 to 8.'
+phrase_check skills/backlog/SKILL.md "stages, item creation and stage moves, the opening sentence, the start wait, titles, replies and waits with GitHub issues" 'only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape'"'"'s opening sentence and start wait, "Titles", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".'
 # Committing to Todo, with either answer, always needs an item: one is created first, an issue with GitHub issues.
-phrase_check skills/backlog/SKILL.md "an item created first on agreement with either answer" "6. When the maintainer agrees to build something, with either answer to \`mentat:propose\`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item."
+phrase_check skills/backlog/SKILL.md "an item created first on agreement with either answer" "When the maintainer agrees to build something, with either answer to \`mentat:propose\`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item."
 phrase_check skills/propose/SKILL.md "the spec written on an item created first, never chat only" "7. Once agreed, with either answer, it writes the spec (shape in \`mentat:pr\`) in the backlog item, creating the item first when the request has none (with GitHub issues, an issue), so the spec, the fingerprint comment and the Todo stage are recorded on it, and, unless the backlog is external, in the pull request once open. Committing to Todo always needs an item."
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
