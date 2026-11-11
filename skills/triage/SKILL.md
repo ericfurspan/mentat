@@ -25,7 +25,7 @@ The maintainer's own instructions name channel readers for triage, in an order; 
 
 ## The Inbox
 
-For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say). A sitting covering every current project also reads the inbox ideas the maintainer's instructions keep in no project. Read every page of a list. Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.
+For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say). Read every page of a list. Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.
 
 ## Search
 

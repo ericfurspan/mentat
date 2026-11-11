@@ -593,7 +593,7 @@ phrase_check skills/backlog/SKILL.md "the Backlog stage, accepted, not committed
 phrase_check skills/backlog/SKILL.md "the Todo stage, committed only by the yes in mentat:propose" "- Todo: committed, agreed with a spec. Only the maintainer's yes in \`mentat:propose\` commits an item and moves it from Backlog to Todo."
 phrase_check skills/backlog/SKILL.md "the In Progress and Done stages" '- In Progress: a branch or pull request exists.'
 phrase_check skills/backlog/SKILL.md "the Done stage" '- Done: ended, as done, canceled or duplicate.'
-phrase_check skills/backlog/SKILL.md "further inboxes read as the maintainer's instructions say" "The maintainer's own instructions may name further inboxes, such as ideas kept in no project, read as they say."
+phrase_check skills/backlog/SKILL.md "further inboxes read as the maintainer's instructions say" "The maintainer's own instructions may name further inboxes, read as they say."
 phrase_check skills/backlog/SKILL.md "a parked item's opening sentence" 'an item the maintainer set aside, which says "parked" in its opening sentence'
 phrase_check skills/backlog/SKILL.md "a once-agreed item kept out of the order" 'one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work'
 phrase_check skills/backlog/SKILL.md "the GitHub tracker's pointer to its adapter" "read \`github.md\` in this skill's folder, and again after a compaction. It maps the stages and the tracker's order."
@@ -618,8 +618,7 @@ phrase_check skills/backlog/SKILL.md "the latest fingerprint comment, re-recorde
 # Triage reads the Inbox as the tracker's adapter maps it, plus further inboxes, and skips an item with a Later note.
 phrase_check skills/triage/SKILL.md "the Inbox read through the tracker's adapter, plus further inboxes" "its Inbox items (\`mentat:backlog\` \"Stages\", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say)."
 phrase_check skills/triage/SKILL.md "an item with a Later note left out until a fact changes" 'Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.'
-# Triage reads ideas kept in no project and every page, and orders items by their own date.
-phrase_check skills/triage/SKILL.md "inbox ideas in no project read in a sitting covering every project" "A sitting covering every current project also reads the inbox ideas the maintainer's instructions keep in no project."
+# Triage reads every page, and orders items by their own date.
 phrase_check skills/triage/SKILL.md "every page of a list read" 'Read every page of a list.'
 phrase_check skills/triage/SKILL.md "the questions counted first" 'Count the questions.'
 phrase_check skills/triage/SKILL.md "items with no project after the projects', oldest first by their own date" "then items by project, then items with no project, each oldest first by the item's own date where the maintainer's instructions give one;"
