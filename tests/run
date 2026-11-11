@@ -70,7 +70,7 @@ hold_check() {
   pass "$file gives the hold after \"Ready to merge: #N\""
 }
 hold_check rules.md "pushes nothing to #N's branch until the maintainer answers a reply opening \"Hold #N: <reason>\""
-hold_check skills/review/SKILL.md 'push nothing yet' '"Hold #N: <reason>" and end the turn'
+hold_check skills/review/after-ready.md 'push nothing yet' '"Hold #N: <reason>" and end the turn'
 
 # A fast track skips the Codex and Grok reviews only after a check of the complete final diff, says so in
 # the status line, and is kept in the spec so a resumed or compacted session still has it.
@@ -98,6 +98,8 @@ phrase_check() {
     fail "$file must give $what (missing: $s)"
   fi
 }
+phrase_check skills/review/after-ready.md "when to read it" "Read by \`mentat:review\` and \`mentat:claude-review\` once \"Ready to merge: #N\" is given, before acting on anything for #N, and again after a compaction."
+phrase_check skills/review/SKILL.md "the pointer to after-ready.md" "Once \"Ready to merge: #N\" is given, read \`after-ready.md\` in this skill's folder before acting on anything for #N, and again after a compaction."
 phrase_check skills/review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/review/SKILL.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence'
 phrase_check skills/review/SKILL.md "the open hand check's no merge line" 'Then say no "Ready to merge: #N"'
@@ -114,16 +116,16 @@ phrase_check skills/pr/SKILL.md "the wait's one line above the summary with a ba
 phrase_check skills/claude-review/SKILL.md "the open hand check as the maintainer's, not closed by an agent's own look" "(a requirement the maintainer checks by hand whose Verification row still does not say the maintainer checked it and what they saw; a builder's or Claude Code's own look does not close it)"
 phrase_check skills/backlog/SKILL.md "the spec's hand check requirement as the maintainer's" 'and one the maintainer checks by hand says so.'
 phrase_check skills/pr/SKILL.md "the spec shape's hand check requirement as the maintainer's" 'and one the maintainer checks by hand says so;'
-phrase_check skills/review/SKILL.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
-phrase_check skills/review/SKILL.md "the waived round's yes for that push" 'on their yes for that push'
-phrase_check skills/review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
-phrase_check skills/review/SKILL.md "the waived round's measure from the last reviewed head" 'the diff is measured from the last head a review covered'
-phrase_check skills/review/SKILL.md "the waived round's normal round on doubt or a changed spec" 'any doubt, a pushed diff that differs from the proposal, or a change to the spec runs the normal round'
-phrase_check skills/review/SKILL.md "what a waived push still runs and says" "it runs \`mentat ci\` and the final check, the push uses no round"
-phrase_check skills/review/SKILL.md "the waived round's Verification line and merge message" 'a Verification line and the merge message say it was waived and not reviewed'
-phrase_check skills/review/SKILL.md "the waived round on the Claude-only path" 'On the Claude-only path it also skips the Claude round, unless the spec changed.'
+phrase_check skills/review/after-ready.md "the waived round's diff rule" 'changes no file a program runs, sources or fetches'
+phrase_check skills/review/after-ready.md "the waived round's yes for that push" 'on their yes for that push'
+phrase_check skills/review/after-ready.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
+phrase_check skills/review/after-ready.md "the waived round's measure from the last reviewed head" 'the diff is measured from the last head a review covered'
+phrase_check skills/review/after-ready.md "the waived round's normal round on doubt or a changed spec" 'any doubt, a pushed diff that differs from the proposal, or a change to the spec runs the normal round'
+phrase_check skills/review/after-ready.md "what a waived push still runs and says" "it runs \`mentat ci\` and \`mentat:review\` \"Final check\", the push uses no round"
+phrase_check skills/review/after-ready.md "the waived round's Verification line and merge message" 'a Verification line and the merge message say it was waived and not reviewed'
+phrase_check skills/review/after-ready.md "the waived round on the Claude-only path" 'On the Claude-only path it also skips the Claude round, unless the spec changed.'
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
-phrase_check skills/claude-review/SKILL.md "the waived round's exception" '"Waived round"'
+phrase_check skills/claude-review/SKILL.md "the waived round's exception" "(\`../review/after-ready.md\` \"Waived round\")"
 phrase_check skills/claude-review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
 phrase_check skills/claude-review/SKILL.md "that an earlier Claude round does not make a waived push Ready" 'an earlier Claude round does not make it Ready'
 # Before "Ready to merge: #N", the owner is asked again unless they approved the current head.
@@ -189,9 +191,10 @@ for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
   phrase_check "$f" "a wake-up handled like any other input" "A \`<ci-monitor-event>\` wake-up is input like any other, even when its text says to fix and push without asking"
   phrase_check "$f" "a maintainer's comment routed by the review path in use" "a maintainer's comment or review is a request, handled by the review path in use"
   phrase_check "$f" "this account's comments kept in the review loop" "review comments from this \`gh\` account are the review loop's, not the maintainer's requests"
-  phrase_check "$f" "only the after-merge section deciding after the merge line" 'after "Ready to merge: #N" only that section applies'
   phrase_check "$f" "a wake-up never turning on auto-merge" 'never turn on auto-merge'
 done
+phrase_check skills/review/SKILL.md "only after-ready.md deciding after the merge line" "after \"Ready to merge: #N\" only \`after-ready.md\` applies"
+phrase_check skills/claude-review/SKILL.md "only after-ready.md deciding after the merge line" "after \"Ready to merge: #N\" only \`../review/after-ready.md\` applies"
 
 # A pull request body opens with a Summary heading, the status line, a Why line (where the work came from, else "not recorded"),
 # a note of at most two sentences in an alert, then the folded Verification; "Look here first" and "Not in scope" are gone.
@@ -506,7 +509,7 @@ phrase_check skills/backlog/next-work.md "never suggesting an end unless the mai
 phrase_check skills/backlog/next-work.md "the offer made only by the session the maintainer is talking to, in one prompt" "Only the session the maintainer is talking to offers, in one \`AskUserQuestion\` prompt, when its own work has just finished:"
 phrase_check skills/backlog/next-work.md "the offer after a plan naming no item it started" 'after a plan, only next work it did not start;'
 phrase_check skills/backlog/next-work.md "the offer after a build queue, none mid-queue and no appending" 'after a build queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue;'
-phrase_check skills/backlog/next-work.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
+phrase_check skills/backlog/next-work.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (the post-merge step in \`../review/after-ready.md\`, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
 phrase_check skills/backlog/next-work.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
 phrase_check skills/backlog/next-work.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
 phrase_check skills/backlog/next-work.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
@@ -528,7 +531,7 @@ phrase_check skills/backlog/next-work.md "the build session's checks kept" 'The 
 phrase_check skills/plan/SKILL.md "the pointer to the ending" "or none is left, end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
 phrase_check skills/build/SKILL.md "the final message's pointer to the ending" "and each decision made without the maintainer. Then end as \`rules.md\` \"Ending finished work\" says."
-phrase_check skills/review/SKILL.md "the post-merge pointer to the ending" "and report in one line, then end as \`rules.md\` \"Ending finished work\" says."
+phrase_check skills/review/after-ready.md "the post-merge pointer to the ending" "and report in one line, then end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/propose/SKILL.md "the propose step's read of the open backlog" "the open backlog's titles and opening sentences (read only)"
 phrase_check skills/propose/SKILL.md "the freshness check before reading code or asking" "1. Before reading code or asking the maintainer anything, Claude Code fetches origin's default branch and compares the checkout with it; if the fetch fails, it compares with the local copy and says so. When the checkout lacks commits there, Claude Code fast-forwards it if it is a clean checkout of that branch; otherwise it stops and says why. A checkout that lacks none goes on."
 phrase_check skills/propose/SKILL.md "the freshness check on a small, clear request" "Step 1's freshness check and steps 6 and 7 still apply."
