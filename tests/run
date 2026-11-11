@@ -98,14 +98,13 @@ phrase_check() {
     fail "$file must give $what (missing: $s)"
   fi
 }
-phrase_check skills/review/after-ready.md "when to read it" "Read by \`mentat:review\` and \`mentat:claude-review\` once \"Ready to merge: #N\" is given, before acting on anything for #N, and again after a compaction."
-phrase_check skills/review/SKILL.md "the pointer to after-ready.md" "Once \"Ready to merge: #N\" is given, read \`after-ready.md\` in this skill's folder before acting on anything for #N, and again after a compaction."
-phrase_check skills/review/ready-gate.md "when to read it" "Read by \`mentat:review\` and \`mentat:claude-review\` at their final check, and again after a compaction."
-phrase_check skills/review/SKILL.md "the pointer to ready-gate.md" "Read \`ready-gate.md\` in this skill's folder and apply its hand check gate; with no open hand check, take its draft, owner-review and merge-wait steps."
+phrase_check skills/review/SKILL.md "the pointer to after-ready.md" "Read \`after-ready.md\` in this skill's folder then, before acting on anything for #N, and again after a compaction."
+phrase_check skills/review/SKILL.md "the pointer to ready-gate.md" "Then apply \`ready-gate.md\` in this skill's folder."
 phrase_check skills/review/ready-gate.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/review/ready-gate.md "the open hand check's one sentence in chat" 'the chat reply names the hand check in one plain sentence'
 phrase_check skills/review/ready-gate.md "the open hand check's no merge line" 'Then say no "Ready to merge: #N"'
 phrase_check skills/claude-review/SKILL.md "the open hand check's stop before the merge line" 'step 6 does not run'
+phrase_check skills/claude-review/SKILL.md "step 6's pointer to the ready gate" "6. With no open hand check, follow \`../review/ready-gate.md\`."
 phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" "Then read \`../review/ready-gate.md\` and apply its hand check gate"
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
@@ -124,7 +123,6 @@ phrase_check skills/review/after-ready.md "the waived round's measure from the l
 phrase_check skills/review/after-ready.md "the waived round's normal round on doubt or a changed spec" 'any doubt, a pushed diff that differs from the proposal, or a change to the spec runs the normal round'
 phrase_check skills/review/after-ready.md "what a waived push still runs and says" "it runs \`mentat ci\` and \`mentat:review\` \"Final check\", the push uses no round"
 phrase_check skills/review/after-ready.md "the waived round's Verification line and merge message" 'a Verification line and the merge message say it was waived and not reviewed'
-phrase_check skills/review/after-ready.md "the waived round on the Claude-only path" 'On the Claude-only path it also skips the Claude round, unless the spec changed.'
 phrase_check skills/claude-review/SKILL.md "the open hand check's status line" 'Blocked: <the hand check>'
 phrase_check skills/claude-review/SKILL.md "the waived round's exception" "(\`../review/after-ready.md\` \"Waived round\")"
 phrase_check skills/claude-review/SKILL.md "the waived round's status line" "the status line is \`Not reviewed: last push waived by the maintainer\`"
