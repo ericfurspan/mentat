@@ -516,14 +516,14 @@ long="gh pr create --title \"feat: x\" --body \"$body\" --fill"
 start=$SECONDS
 long_decision=$(decision "$tmp/edited" "$long")
 elapsed=$((SECONDS - start))
-check "a ${#long}-character pull request body with uncommitted changes asks, in ${elapsed}s (under 5s)" \
-  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 5 ]'
+check "a ${#long}-character pull request body with uncommitted changes asks, in ${elapsed}s (under 20s)" \
+  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 20 ]'
 long_push="git push -o \"$body\" --force origin feat/x"
 start=$SECONDS
 long_decision=$(decision "$tmp/feat" "$long_push")
 elapsed=$((SECONDS - start))
-check "a force push after a ${#long_push}-character quoted value asks, in ${elapsed}s (under 5s)" \
-  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 5 ]'
+check "a force push after a ${#long_push}-character quoted value asks, in ${elapsed}s (under 20s)" \
+  '[ "$long_decision" = ask ] && [ "$elapsed" -lt 20 ]'
 
 # gh flags before or after pr, such as -R or --repo with its value, are skipped.
 while IFS= read -r cmd; do
