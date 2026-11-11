@@ -1,0 +1,11 @@
+# The next-work ending
+
+Read this when the maintainer's own instructions choose the "offer the next work" ending (`rules.md` "Ending finished work"), and again after a compaction.
+
+- Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.
+- Only the session the maintainer is talking to offers, in one `AskUserQuestion` prompt, when its own work has just finished: after a plan, only next work it did not start; after a build queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue; after the maintainer says a pull request merged, once its item is marked done (`mentat:review`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs; after triage that ends with no question, where an accepted item is offered for `mentat:propose`, never for building.
+- The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope. "Ready to merge: #N" stays the first line while a merge waits.
+- Its lookup reads the next agreed work (`mentat:backlog` "The order of agreed work") read-only, and reports one of: the backlog could not be read; no recorded order; agreed work all waiting on the maintainer; agreed work none of which can start (in progress, waiting on an unmerged pull request, or held by its start wait, `mentat:backlog` "Start waits"); no agreed work. It offers only an item that can start, naming each one it passed with its wait, and says "no agreed work is left" only in the last case. There it also counts the Inbox items triage would ask (`mentat:backlog` "Stages"); above zero, the ending adds one line with the count and `/mentat:triage` to type, not a question.
+- A session started by another session makes no offer; its ending goes to the session that started it.
+- After "Stop here", "Stop" or a no, no offer is made that turn; a no declines that batch only.
+- A yes, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as `mentat:propose` "Starting a build" says. The build session still runs readiness, plan usage and the quick check.

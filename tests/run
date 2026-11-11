@@ -430,7 +430,7 @@ fi
 phrase_check skills/build/SKILL.md "the committed Todo items in the tracker's order with no ids" "With none: the project's Todo items that have a spec, are not parked and do not wait on the maintainer, in the tracker's order (\`mentat:backlog\` \"The order of agreed work\")."
 phrase_check skills/build/SKILL.md "a missing or changed spec fingerprint sent back to planning" "so does one whose recorded spec fingerprint (\`mentat:backlog\` \"Agreement\") is missing or differs from the fingerprint of its current spec, computed the same way, since a changed spec goes back to planning."
 phrase_check skills/build/SKILL.md "an item with a branch or pull request skipped with its status" 'An item with a branch or pull request (In Progress), waiting on the maintainer, or ended leaves the queue, named with its status.'
-phrase_check skills/build/SKILL.md "no final yes, the typed command as the go-ahead" "No final yes is asked: the maintainer typing the command is the go-ahead for the items it takes, as are \"Agree and build now\" for a plan session's start and a forwarded yes (\`rules.md\` \"Ending finished work\")."
+phrase_check skills/build/SKILL.md "no final yes, the typed command as the go-ahead" "No final yes is asked: the maintainer typing the command is the go-ahead for the items it takes, as are \"Agree and build now\" for a plan session's start and a forwarded yes (\`../backlog/next-work.md\`)."
 phrase_check skills/build/SKILL.md "asked again only for a new item or a changed condition" 'The run asks again only when its queue gains an item over the queue it was started with, or an agreed condition changed.'
 phrase_check skills/build/SKILL.md "status, blockers, start wait, branch and fingerprint re-read before each item" 'Right before each item starts, re-read its status, blockers, start wait, any branch or pull request and its fingerprint, and check its readiness again as step 3 says.'
 phrase_check skills/build/SKILL.md "an item held by its start wait left out of the queue, by id or from the order" "An item held by its start wait leaves the queue, named as \`mentat:backlog\` \"Start waits\" says, whether given by id or taken from the order."
@@ -497,32 +497,34 @@ phrase_check skills/claude-review/SKILL.md "each call made without the maintaine
 phrase_check rules.md "the sessions section" '## Sessions'
 phrase_check rules.md "a started session's questions and merge lines sent to the starting session" '- A session started by another session asks the maintainer nothing: it sends its questions and its "Ready to merge: #N" and "Hold #N: <reason>" lines to the starting session, which alone asks the maintainer and forwards the answer in their exact words. When the maintainer writes in the started session, it answers them there.'
 phrase_check rules.md "no cloud session with a Mentat repository attached" "- Never start a cloud session, or hand work to one, with a Mentat repository attached: it would run without these rules and Mentat's hooks."
-# An opt-in ending offers the next agreed work (rules.md "Ending finished work"), and plan, triage, build and review point to it.
+# An opt-in ending offers the next agreed work (skills/backlog/next-work.md, which rules.md "Ending finished work" points to),
+# and plan, triage, build and review point to it.
 phrase_check rules.md "the ending finished work section" '## Ending finished work'
-phrase_check rules.md "the maintainer's choice of ending, its default and the opt-in condition" "The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says. When they choose \"offer the next work\":"
-phrase_check rules.md "never suggesting an end unless the maintainer said so" 'Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.'
-phrase_check rules.md "the offer made only by the session the maintainer is talking to, in one prompt" "Only the session the maintainer is talking to offers, in one \`AskUserQuestion\` prompt, when its own work has just finished:"
-phrase_check rules.md "the offer after a plan naming no item it started" 'after a plan, only next work it did not start;'
-phrase_check rules.md "the offer after a build queue, none mid-queue and no appending" 'after a build queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue;'
-phrase_check rules.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
-phrase_check rules.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
-phrase_check rules.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
-phrase_check rules.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
+phrase_check rules.md "the default ending and the pointer to the opt-in ending, read again after a compaction" "Finished work ends as its skill says, unless the maintainer's own instructions choose the \"offer the next work\" ending: then, before ending, read \`next-work.md\` in \`mentat:backlog\`'s folder, and again after a compaction."
+phrase_check skills/backlog/next-work.md "when to read it" "Read this when the maintainer's own instructions choose the \"offer the next work\" ending (\`rules.md\` \"Ending finished work\"), and again after a compaction."
+phrase_check skills/backlog/next-work.md "never suggesting an end unless the maintainer said so" 'Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.'
+phrase_check skills/backlog/next-work.md "the offer made only by the session the maintainer is talking to, in one prompt" "Only the session the maintainer is talking to offers, in one \`AskUserQuestion\` prompt, when its own work has just finished:"
+phrase_check skills/backlog/next-work.md "the offer after a plan naming no item it started" 'after a plan, only next work it did not start;'
+phrase_check skills/backlog/next-work.md "the offer after a build queue, none mid-queue and no appending" 'after a build queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue;'
+phrase_check skills/backlog/next-work.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (\`mentat:review\`'s post-merge step, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
+phrase_check skills/backlog/next-work.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
+phrase_check skills/backlog/next-work.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
+phrase_check skills/backlog/next-work.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
 phrase_check rules.md "a web-mode question file holding only the question, nothing private" "- A \`mentat second-opinion --web\` file holds only the question, nothing private."
-phrase_check rules.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` \"The order of agreed work\") read-only, and reports one of:"
-phrase_check rules.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
-phrase_check rules.md "the lookup result for no recorded order" ' no recorded order;'
-phrase_check rules.md "the lookup result for agreed work all waiting on the maintainer" ' agreed work all waiting on the maintainer;'
-phrase_check rules.md "the lookup result for agreed work none of which can start, a start wait included" " agreed work none of which can start (in progress, waiting on an unmerged pull request, or held by its start wait, \`mentat:backlog\` \"Start waits\");"
-phrase_check rules.md "the lookup result for no agreed work" ' no agreed work. It offers only an item that can start,'
-phrase_check rules.md "each item the lookup passed named with its wait, and no agreed work is left said only in the last case" 'It offers only an item that can start, naming each one it passed with its wait, and says "no agreed work is left" only in the last case.'
-phrase_check rules.md "the Inbox count named after no agreed work, not a question" "There it also counts the Inbox items triage would ask (\`mentat:backlog\` \"Stages\"); above zero, the ending adds one line with the count and \`/mentat:triage\` to type, not a question."
+phrase_check skills/backlog/next-work.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` \"The order of agreed work\") read-only, and reports one of:"
+phrase_check skills/backlog/next-work.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
+phrase_check skills/backlog/next-work.md "the lookup result for no recorded order" ' no recorded order;'
+phrase_check skills/backlog/next-work.md "the lookup result for agreed work all waiting on the maintainer" ' agreed work all waiting on the maintainer;'
+phrase_check skills/backlog/next-work.md "the lookup result for agreed work none of which can start, a start wait included" " agreed work none of which can start (in progress, waiting on an unmerged pull request, or held by its start wait, \`mentat:backlog\` \"Start waits\");"
+phrase_check skills/backlog/next-work.md "the lookup result for no agreed work" ' no agreed work. It offers only an item that can start,'
+phrase_check skills/backlog/next-work.md "each item the lookup passed named with its wait, and no agreed work is left said only in the last case" 'It offers only an item that can start, naming each one it passed with its wait, and says "no agreed work is left" only in the last case.'
+phrase_check skills/backlog/next-work.md "the Inbox count named after no agreed work, not a question" "There it also counts the Inbox items triage would ask (\`mentat:backlog\` \"Stages\"); above zero, the ending adds one line with the count and \`/mentat:triage\` to type, not a question."
 phrase_check skills/backlog/SKILL.md "the offer's read-only Inbox count with triage's Later filter" "count, read-only and running no reader, this session's project's Inbox entries, with any further inbox named for it, that triage would ask, reading every page: all but an entry with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed or the maintainer raised it again. An Inbox that cannot be read gives no count."
-phrase_check rules.md "no offer from a started session" 'A session started by another session makes no offer; its ending goes to the session that started it.'
-phrase_check rules.md "no offer after a stop" 'After "Stop here", "Stop" or a no, no offer is made that turn;'
-phrase_check rules.md "a no declining that batch only" 'a no declines that batch only.'
-phrase_check rules.md "a forwarded yes starting the build session, briefed as mentat:propose says" "A yes, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as \`mentat:propose\` \"Starting a build\" says."
-phrase_check rules.md "the build session's checks kept and its questions sent through the starting session" 'The build session still runs readiness, plan usage and the quick check, and sends its open questions through the session that started it.'
+phrase_check skills/backlog/next-work.md "no offer from a started session" 'A session started by another session makes no offer; its ending goes to the session that started it.'
+phrase_check skills/backlog/next-work.md "no offer after a stop" 'After "Stop here", "Stop" or a no, no offer is made that turn;'
+phrase_check skills/backlog/next-work.md "a no declining that batch only" 'a no declines that batch only.'
+phrase_check skills/backlog/next-work.md "a forwarded yes starting the build session, briefed as mentat:propose says" "A yes, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as \`mentat:propose\` \"Starting a build\" says."
+phrase_check skills/backlog/next-work.md "the build session's checks kept" 'The build session still runs readiness, plan usage and the quick check.'
 phrase_check skills/plan/SKILL.md "the pointer to the ending" "or none is left, end as \`rules.md\` \"Ending finished work\" says."
 phrase_check skills/triage/SKILL.md "the offer as the only question after a sitting with none left" "no question, except the offer \`rules.md\` \"Ending finished work\" calls for."
 phrase_check skills/build/SKILL.md "the final message's pointer to the ending" "and each decision made without the maintainer. Then end as \`rules.md\` \"Ending finished work\" says."
@@ -562,8 +564,8 @@ if [ "$(grep -c -F "not for \`mentat:propose\`'s or \`mentat:plan\`'s read," ski
 else
   fail "skills/backlog/linear.md must exempt the propose step's and planning session's reads in both the hand-made items and waits left open bullets"
 fi
-# The lookup of the offer in rules.md "Ending finished work" neither refines hand-made items nor clears waits: both sections exempt it.
-if [ "$(grep -c -F "not for the lookup of the offer in \`rules.md\` \"Ending finished work\"," skills/backlog/linear.md)" -eq 2 ]; then
+# The lookup of the next-work offer neither refines hand-made items nor clears waits: both sections exempt it.
+if [ "$(grep -c -F "not for the lookup of the next-work offer (\`next-work.md\`)," skills/backlog/linear.md)" -eq 2 ]; then
   pass "skills/backlog/linear.md exempts the offer's lookup from refining items and clearing waits"
 else
   fail "skills/backlog/linear.md must exempt the offer's lookup in both the hand-made items and waits left open sections"
@@ -571,7 +573,7 @@ fi
 # The listing session clears a hand wait from a comment reporting its Ends when result; an unclear case,
 # or any case read by a skill that forbids writes, is named as "may be done" and left unchanged.
 phrase_check skills/backlog/linear.md "the waits left open section" '## Waits left open'
-phrase_check skills/backlog/linear.md "the waits left open section's exemptions" "(not for \`mentat:propose\`'s or \`mentat:plan\`'s read, not for the lookup of the offer in \`rules.md\` \"Ending finished work\", not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
+phrase_check skills/backlog/linear.md "the waits left open section's exemptions" "(not for \`mentat:propose\`'s or \`mentat:plan\`'s read, not for the lookup of the next-work offer (\`next-work.md\`), not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
 phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits and open pull requests left to their own path" "Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments."
 phrase_check skills/backlog/linear.md "a hand wait with an open pull request left for review" "An item whose linked pull request is still open is left unchanged for \`mentat:review\`, and named \"may be done\" the same way when a comment may report its result."
 phrase_check skills/backlog/linear.md "a hand wait cleared from a reporting comment" "A comment that reports the wait's \`Ends when\` result ends the wait (\"Marking a wait\": the block, the label and the lead's assignment removed)."
