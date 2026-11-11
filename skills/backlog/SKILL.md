@@ -79,7 +79,7 @@ With either tracker, agreed work that cannot start until another item is done, a
 
 ## Replies in chat
 
-After each `mentat second-opinion` round, with any backlog, the maintainer sees the replies in a block. Before showing it, read `replies.md` in this skill's folder, and again after a compaction.
+After each `mentat second-opinion` round, with any backlog, the replies go in a block. Before showing it, read `replies.md` in this skill's folder, and again after a compaction.
 
 ## Tracker: Linear
 
