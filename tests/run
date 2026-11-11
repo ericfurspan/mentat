@@ -646,11 +646,29 @@ phrase_check skills/propose/SKILL.md "that accepting an item is no commitment, a
 phrase_check skills/propose/SKILL.md "the agreement question's two answers" 'Its first two options are "Agree and build now", which commits the item to Todo and starts its build, checks and reviews, and "Agree, build later", which commits it to Todo and starts nothing;'
 phrase_check skills/propose/SKILL.md "build now recommended where wanted this session" 'the first is recommended where the maintainer wants it built in this session.'
 phrase_check skills/propose/SKILL.md "a Not now option that commits and records nothing" 'Its last option, "Not now", commits nothing and records no fingerprint.'
+# The agreement question is short: the replies and the full proposal are shown only when the maintainer asks.
+phrase_check skills/propose/SKILL.md "the agreement question asked without showing the replies first" 'only after every reply is in, without showing the replies first.'
+phrase_check skills/propose/SKILL.md "the agreement question's short content" "That question holds only what the maintainer gets; what it costs, naming any hand check offered (which holds back \"Ready to merge: #N\" until they report it, step 5) and any fast track proposed (step 6); each tool that disagreed (\`DO IT DIFFERENTLY\` or \`DON'T\`), with why in a few words; and these facts:"
+phrase_check skills/propose/SKILL.md "the agreement question's reason for its first option, without the replies or the proposal" "It also says why the first option is recommended, as \`rules.md\` \"What goes to the maintainer\" requires; the replies blocks and the full proposal stay out of it."
+phrase_check skills/propose/SKILL.md "the Show option printing every round's block and the proposal, never the saved output" "Its third, \"Show the full proposal\", prints in chat every round's replies block as \`mentat:backlog\` \"Replies in chat\" says, never the saved command output, and the full proposal (step 5);"
+phrase_check skills/propose/SKILL.md "the Show option changing nothing and asking again" 'it records nothing, commits nothing and runs no round, then asks the same agreement question again.'
+phrase_check skills/propose/SKILL.md "only an Agree answer writing the spec, the fingerprint or the stage" 'Only an Agree answer writes the spec, records the fingerprint or moves the item.'
+if grep -E '^4\. ' skills/propose/SKILL.md | grep -q -E '"Agree and build now".*"Agree, build later".*"Show the full proposal".*"Not now"'; then
+  pass "skills/propose/SKILL.md gives the agreement question's four options in order"
+else
+  fail "skills/propose/SKILL.md step 4 must give \"Agree and build now\", \"Agree, build later\", \"Show the full proposal\" and \"Not now\" in that order"
+fi
+small_request=$(grep -E '^A small, clear request' skills/propose/SKILL.md)
+if [ -z "$small_request" ] || printf '%s\n' "$small_request" | grep -q -F 'Show the full proposal'; then
+  fail "skills/propose/SKILL.md's small, clear request path must exist and offer no \"Show the full proposal\""
+else
+  pass "skills/propose/SKILL.md's small, clear request path offers no \"Show the full proposal\""
+fi
 phrase_check skills/propose/SKILL.md "Agree and build now applying the start wait rule before any branch, its wait named" "\"Agree and build now\" applies \`mentat:backlog\` \"Start waits\" before any branch or build session: an item held by its start wait is committed but not started in that turn, and the reply names its wait."
 phrase_check skills/propose/SKILL.md "the start wait line added in the agreement's write" "When the agreed item must wait on another item, a pull request or a count, the same write adds its start wait line (\`mentat:backlog\` \"Start waits\")."
 phrase_check skills/propose/SKILL.md "each answer's effect in a chat request" "In a chat request, \"Agree and build now\" goes on to build in this session through \`rules.md\` \"A change\" steps 2 to 5, and \"Agree, build later\" stops once step 7 is done."
 phrase_check skills/propose/SKILL.md "an item for later built only on the maintainer's command or offer yes" "An item committed for later is built only when the maintainer types \`/mentat:build\`, with or without its id, or says yes to a next-work offer naming it."
-phrase_check skills/propose/SKILL.md "the small request's agreement with step 4's three answers, recorded with the fingerprint" 'Its agreement offers step 4'"'"'s answers, "Agree and build now", "Agree, build later" and "Not now", with the same effects, and step 7 records the chosen answer with the fingerprint.'
+phrase_check skills/propose/SKILL.md "the small request's agreement with step 4's three answers, recorded with the fingerprint" 'Its agreement offers only three of step 4'"'"'s answers, "Agree and build now", "Agree, build later" and "Not now", with the same effects, and step 7 records the chosen answer with the fingerprint.'
 phrase_check skills/propose/SKILL.md "the fingerprint and answer recorded at agreement" "On the item it then records the spec's fingerprint and the chosen answer (build now or later), as \`mentat:backlog\` \"Agreement\" says, and again whenever an agreed change of scope rewrites the spec."
 phrase_check skills/propose/SKILL.md "each committed item linked to the last round's review" "For each item the agreement commits, when a second opinion round ran, it runs \`mentat second-opinion --link <item id> <idea file>\` with the last round's idea file; the link calls no model and is not another second opinion. When it links nothing, the agreement stands and step 7 goes on."
 # A session that starts a build session writes the build command bare in the brief, since Claude Code grants a
@@ -750,16 +768,18 @@ phrase_check skills/setup/SKILL.md "the first run's per-repository install recom
 phrase_check skills/setup/SKILL.md "the first run's skipped check outside a repository" "Outside a GitHub checkout, skip its \`mentat check\`, which needs a repository, and say the check runs in one."
 phrase_check skills/backlog/SKILL.md "the wait marking for agreed work only" 'for agreed work only (an item that is not agreed waits on no one)'
 
-# After each second opinion round, the maintainer sees each tool's reply and what Claude Code did with it in one block.
+# After each second opinion round, each tool's reply and what Claude Code did with it go in one block, never in a decision prompt.
 phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
-phrase_check skills/backlog/SKILL.md "the pointer to replies.md" "the maintainer sees the replies in a block. Before showing it, read \`replies.md\` in this skill's folder, and again after a compaction."
+phrase_check skills/backlog/SKILL.md "the pointer to replies.md" "the replies go in a block. Before showing it, read \`replies.md\` in this skill's folder, and again after a compaction."
 phrase_check skills/backlog/SKILL.md "the round in each reply's heading" "such as \"Codex: second opinion\", or \"Codex: second opinion, round 2\" with more than one round (\`mentat:propose\` step 4), and the commit it read"
-phrase_check skills/backlog/replies.md "each round's replies block, only the last opening the agreement question" "each round's block is shown, with a first line \`Round <n>\` as its one addition, and only the last round's block opens the agreement question."
+phrase_check skills/backlog/replies.md "no block printed as a round ends, each round's block with its round line on Show" "A round that ends during \`mentat:propose\` step 4 prints nothing as it ends. \"Show the full proposal\" prints every round's block; with more than one round, each block gets a first line \`Round <n>\` as its one addition."
+phrase_check skills/backlog/SKILL.md "the description's replies recorded after a round, shown as replies.md says" 'right after mentat second-opinion, to record the replies (with an external backlog, post them) and show them as replies.md says.'
+phrase_check skills/backlog/SKILL.md "nothing posted for a chat request that is not agreed" "A chat request has no item yet: keep each round's settlement and file for \"Agreement\", which posts them on the item it creates. If nothing is agreed, nothing is posted."
 phrase_check skills/backlog/replies.md "the replies block's Adopting line" 'Adopting: <'
 phrase_check skills/backlog/replies.md "the replies block's Not adopting line" 'Not adopting: <'
 phrase_check skills/backlog/replies.md "the replies block's line for a tool with no answer" "A tool with no answer gets \`no second opinion\` and why, in public-safe words, never a log path."
-phrase_check skills/backlog/replies.md "the replies block inside a decision prompt" 'the block opens its question'
-phrase_check skills/backlog/replies.md "each line of the replies block on its own line" "Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included."
+phrase_check skills/backlog/replies.md "the replies block kept out of decision prompts, shown on request in propose" "The block never goes in a decision prompt. In \`mentat:propose\` step 4 it is shown in chat only when the maintainer picks \"Show the full proposal\"; elsewhere it goes in the message."
+phrase_check skills/backlog/replies.md "each line of the replies block on its own line" 'Each line of the block stays on its own line wherever the block is shown.'
 phrase_check skills/backlog/SKILL.md "stages, item creation and stage moves, the opening sentence, the start wait, titles, replies and waits with GitHub issues" 'only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape'"'"'s opening sentence and start wait, "Titles", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".'
 # Committing to Todo, with either answer, always needs an item: one is created first, an issue with GitHub issues.
 phrase_check skills/backlog/SKILL.md "an item created first on agreement with either answer" "When the maintainer agrees to build something, with either answer to \`mentat:propose\`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item."
