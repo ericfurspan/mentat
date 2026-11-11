@@ -70,6 +70,6 @@
     <path class="l" d="M 272 214 L 288 214" marker-end="url(#a)"/>
     <path class="l" d="M 350 242 L 350 274" marker-end="url(#a)"/>
     <text class="lt" x="210" y="354" font-size="12" font-weight="400">Amber: you. Teal: Codex and Grok, the default checks.</text>
-    <text class="lt" x="210" y="374" font-size="12" font-weight="400">Gray: Claude Code and the backlog.</text>
+    <text class="lt" x="210" y="374" font-size="12" font-weight="400">Gray: requests, the backlog and Claude Code's work.</text>
   </g>
 </svg>
