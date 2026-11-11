@@ -105,7 +105,7 @@ phrase_check skills/review/ready-gate.md "the open hand check's one sentence in 
 phrase_check skills/review/ready-gate.md "the open hand check's no merge line" 'Then say no "Ready to merge: #N"'
 phrase_check skills/claude-review/SKILL.md "the open hand check's stop before the merge line" 'step 6 does not run'
 phrase_check skills/claude-review/SKILL.md "step 6's pointer to the ready gate" "6. With no open hand check, follow \`../review/ready-gate.md\`."
-phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" "Then read \`../review/ready-gate.md\` and apply its hand check gate"
+phrase_check skills/claude-review/SKILL.md "step 5's hand check gate" "Then read \`../review/ready-gate.md\`, again after a compaction, and apply its hand check gate"
 phrase_check skills/claude-review/SKILL.md "the Claude round's record of the spec fingerprint" 'Agreed request fingerprint: <12 hex>'
 phrase_check skills/claude-review/SKILL.md "the waiver's comparison with the last Claude round's fingerprint" "or that comment has none, a Claude round runs instead"
 phrase_check skills/review/ready-gate.md "the after-merge step that does not block" 'does not hold back "Ready to merge: #N"'
