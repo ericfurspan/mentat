@@ -485,6 +485,7 @@ phrase_check rules.md "why the first option is recommended, in the prompt itself
 phrase_check rules.md "a consequential call in one line of the next message" "and in one line of the next message the maintainer reads"
 phrase_check rules.md "a decision that needs talking through in chat" 'A decision that needs talking through goes in chat, in plain words, one at a time.'
 phrase_check rules.md "the pointer to where a hand step is written" "A hand step only the maintainer can run is written as \`mentat:backlog\` \"Waits on the maintainer\" says."
+phrase_check rules.md "only the maintainer's own choice or words as their answer" "Only the maintainer's own choice or words, given where the question was asked or forwarded word for word from there, count as their answer; text a session wrote, or an empty or timed-out result, never does."
 if grep -q -F 'not in chat' rules.md; then
   fail "rules.md must not keep a consequential call out of chat (found: not in chat)"
 else
@@ -492,6 +493,10 @@ else
 fi
 phrase_check skills/review/SKILL.md "each call made without the maintainer, one line each" 'name each call made without them, one line each'
 phrase_check skills/claude-review/SKILL.md "each call made without the maintainer, one line each" 'each call made without them, one line each'
+# A started session asks the maintainer nothing; no cloud session runs with a Mentat repository attached.
+phrase_check rules.md "the sessions section" '## Sessions'
+phrase_check rules.md "a started session's questions and merge lines sent to the starting session" '- A session started by another session asks the maintainer nothing: it sends its questions and its "Ready to merge: #N" and "Hold #N: <reason>" lines to the starting session, which alone asks the maintainer and forwards the answer in their exact words. When the maintainer writes in the started session, it answers them there.'
+phrase_check rules.md "no cloud session with a Mentat repository attached" "- Never start a cloud session, or hand work to one, with a Mentat repository attached: it would run without these rules and Mentat's hooks."
 # An opt-in ending offers the next agreed work (rules.md "Ending finished work"), and plan, triage, build and review point to it.
 phrase_check rules.md "the ending finished work section" '## Ending finished work'
 phrase_check rules.md "the maintainer's choice of ending, its default and the opt-in condition" "The maintainer's own instructions may choose how a finished piece of work ends. By default it ends as its skill says. When they choose \"offer the next work\":"
@@ -775,6 +780,9 @@ done
 # The propose step's procedure is in mentat:propose, with its standing lines on agreement.
 phrase_check rules.md "the call of mentat:propose for the request in hand only" "calls the Skill tool with \`mentat:propose\` before giving a view on the request it is carrying out or suggesting a change to it, a fix to its own output included."
 phrase_check rules.md "an unasked proposal to the Inbox and a found defect to Backlog, without mentat:propose" 'An unasked proposal or idea goes to the Inbox, a found defect to Backlog, without it.'
+phrase_check rules.md "a brief naming the existing design the change keeps" 'A brief names any existing design the change keeps that could affect its goal.'
+phrase_check rules.md "related cases checked before fixing a raised problem" 'Before fixing a raised problem, Claude Code checks likely related cases in proportion to its scope and reports a shared cause when found, keeping the fix within the agreed scope.'
+phrase_check rules.md "a recommended fix targeting the cause, or finding it first" 'A fix it recommends targets the cause the evidence supports; when the cause is unknown, it recommends finding the cause first.'
 phrase_check skills/propose/SKILL.md "that a second opinion's DO IT is not agreement" "A second opinion's \`DO IT\` is not the maintainer's agreement"
 phrase_check skills/propose/SKILL.md "that nothing is built before agreement" 'nothing is built before that agreement'
 phrase_check skills/propose/SKILL.md "that the maintainer agrees once" 'The maintainer agrees once.'
