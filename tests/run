@@ -676,12 +676,34 @@ phrase_check skills/backlog/SKILL.md "the opening sentence's length" 'The openin
 phrase_check skills/backlog/SKILL.md "the opening sentence's kind of item" 'It says what the item is (such as a bug, a proposal, a follow-up or a question)'
 phrase_check skills/backlog/SKILL.md "no status or wait restated in the opening sentence" 'It does not restate status or waits, which the tracker'"'"'s fields show, so a change of status does not rewrite it.'
 phrase_check skills/backlog/SKILL.md "the opening sentence's four exceptions" 'It names only four things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), during a merge wait, that it waits on the merge of #N (step 4), and anything the tracker'"'"'s adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.'
-if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
-  /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
-  pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the wait block, the spec, then the current plan"
+if awk '/^Item shape\./ { h = NR } /^- The opening sentence:/ { a = NR } /^- The start wait/ { s = NR } /^- The wait block/ { b = NR } /^- The "Spec" section/ { c = NR } /^- The current plan/ { d = NR }
+  /^Anything else, such as progress notes/ { e = NR } END { exit !(h && h < a && a < s && s < b && b < c && c < d && d < e) }' skills/backlog/SKILL.md; then
+  pass "skills/backlog/SKILL.md's item shape puts the opening sentence, the start wait, the wait block, the spec, then the current plan"
 else
-  fail "skills/backlog/SKILL.md's item shape must put the opening sentence, the wait block, the spec, then the current plan, in that order"
+  fail "skills/backlog/SKILL.md's item shape must put the opening sentence, the start wait, the wait block, the spec, then the current plan, in that order"
 fi
+# A start wait keeps agreed work from starting until another item is done, a pull request merges or a count is
+# reached. The rule lives in the backlog skill's start-waits.md; each consumer points to it.
+phrase_check skills/backlog/SKILL.md "the start wait's slot under the opening sentence and its links" "- The start wait, optional: one line opening \`Starts after:\`, right under the opening sentence and its links, outside \`## Spec\` and \`## Current plan\` (\"Start waits\")."
+phrase_check skills/backlog/SKILL.md "the start waits section" '## Start waits'
+phrase_check skills/backlog/SKILL.md "the pointer to start-waits.md" "Before writing or reading one, read \`start-waits.md\` in this skill's folder"
+phrase_check skills/backlog/SKILL.md "a start wait adding no wait-on-maintainer mark and parking nothing" "A start wait never adds the tracker's wait-on-maintainer mark and never parks the item."
+phrase_check skills/backlog/start-waits.md "the item form, completed only" "- \`Starts after: <item id> done\`: that item ends completed, not canceled or duplicate."
+phrase_check skills/backlog/start-waits.md "the pull request form" "- \`Starts after: <owner/repo>#<N> merged\`: that pull request is merged."
+phrase_check skills/backlog/start-waits.md "the count form, read in full" "- \`Starts after: count <what> in <where> <opened|merged> after <YYYY-MM-DD> reaches <N>\`:"
+phrase_check skills/backlog/start-waits.md "the count read in full" 'read in full (every page).'
+phrase_check skills/backlog/start-waits.md "the writer rule for propose and plan" "Agreement in \`mentat:propose\` and a planning session in \`mentat:plan\` add the line in the same write that records that an agreed item must wait on one of these conditions."
+phrase_check skills/backlog/start-waits.md "the line left unchanged by other writes" "Writes to \`## Current plan\`, triage and the Linear adapter's refinement of hand-made items leave the line unchanged."
+phrase_check skills/backlog/start-waits.md "a met wait's line removable, nothing depending on it" 'A session that finds the wait met may remove the line when it next writes the item; nothing depends on that.'
+phrase_check skills/backlog/start-waits.md "an unmet wait and its report" '- unmet while its condition does not hold, reported as "waits on <condition>";'
+phrase_check skills/backlog/start-waits.md "an unchecked wait and its report" '- unchecked when a read it needs fails, reported as "could not check its wait: <why>";'
+phrase_check skills/backlog/start-waits.md "a dead wait and its report" "- dead when the line matches no form, the prerequisite item ended canceled or duplicate, or the pull request closed without merging, reported by naming the item with \`/mentat:plan <id>\`."
+phrase_check skills/backlog/start-waits.md "a held item kept from starting, passed, and back once met" 'An unmet, unchecked or dead wait holds the item: it is not offered, built or named as next. A session walking the order passes it, reports it as above and goes on to the next item. Once the wait is met, the item can start again with no write.'
+phrase_check skills/backlog/github.md "an issue done only when closed as completed" "an \`<item id>\` is the issue's \`#<N>\`, done only when closed with the reason completed"
+phrase_check skills/backlog/github.md "an issue closed as not planned or duplicate making the wait dead" 'closed as not planned or duplicate, the wait is dead.'
+phrase_check skills/backlog/linear.md "a Linear item done only in Done, Canceled or Duplicate making the wait dead" "- Start waits (\`start-waits.md\`): an \`<item id>\` is done only in the Done status; Canceled or Duplicate makes the wait dead."
+phrase_check skills/backlog/linear.md "the hand-made refinement keeping a start wait line" 'and the original'"'"'s links, with any start wait line unchanged.'
+phrase_check skills/linear/SKILL.md "the migration keeping a start wait line, its prerequisite remapped" "the issue's \`Starts after:\` line, with a prerequisite issue number rewritten to that issue's item id through step 7's map"
 phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds only these, in this order:'
 phrase_check skills/backlog/SKILL.md "the wait block's pointer to the wait's shape" 'It is the first heading of the description, in the shape "Waits on the maintainer" gives.'
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
@@ -719,7 +741,7 @@ phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'No
 phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "A tool with no answer gets \`no second opinion\` and why, in public-safe words, never a log path."
 phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
 phrase_check skills/backlog/SKILL.md "each line of the replies block on its own line" "Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included."
-phrase_check skills/backlog/SKILL.md "stages, step 6's creation and stage moves, the opening sentence, titles, replies and waits with GitHub issues" 'only step 2'"'"'s stages, step 6'"'"'s item creation, stage moves and fingerprint comment, the item shape'"'"'s opening sentence, "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of steps 1 to 8.'
+phrase_check skills/backlog/SKILL.md "stages, step 6's creation and stage moves, the opening sentence, the start wait, titles, replies and waits with GitHub issues" 'only step 2'"'"'s stages, step 6'"'"'s item creation, stage moves and fingerprint comment, the item shape'"'"'s opening sentence and start wait, "Titles", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of steps 1 to 8.'
 # Committing to Todo, with either answer, always needs an item: one is created first, an issue with GitHub issues.
 phrase_check skills/backlog/SKILL.md "an item created first on agreement with either answer" "6. When the maintainer agrees to build something, with either answer to \`mentat:propose\`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item."
 phrase_check skills/propose/SKILL.md "the spec written on an item created first, never chat only" "7. Once agreed, with either answer, it writes the spec (shape in \`mentat:pr\`) in the backlog item, creating the item first when the request has none (with GitHub issues, an issue), so the spec, the fingerprint comment and the Todo stage are recorded on it, and, unless the backlog is external, in the pull request once open. Committing to Todo always needs an item."

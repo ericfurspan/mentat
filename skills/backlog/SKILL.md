@@ -4,13 +4,14 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only step 2's stages, step 6's item creation, stage moves and fingerprint comment, the item shape's opening sentence, "Titles", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of steps 1 to 8.
+With no external backlog, the backlog is GitHub issues: only step 2's stages, step 6's item creation, stage moves and fingerprint comment, the item shape's opening sentence and start wait, "Titles", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of steps 1 to 8.
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
 Item shape. Keep an item's description short, so items look alike. It holds only these, in this order:
 
 - The opening sentence: one plain sentence, not a heading, of at most about 25 words. It says what the item is (such as a bug, a proposal, a follow-up or a question) and, from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat, written by the maintainer, found by an agent while building, a subtask of another request, or proposed by an agent and agreed. It does not restate status or waits, which the tracker's fields show, so a change of status does not rewrite it. It names only four things those fields cannot show: "parked" for an item set aside, that a parked item was agreed (step 2), during a merge wait, that it waits on the merge of #N (step 4), and anything the tracker's adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.
+- The start wait, optional: one line opening `Starts after:`, right under the opening sentence and its links, outside `## Spec` and `## Current plan` ("Start waits").
 - The wait block (step 4), only while steps wait on the maintainer. It is the first heading of the description, in the shape "Waits on the maintainer" gives. Remove it when the wait ends.
 - The "Spec" section (step 6), absent until agreement: intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written. It runs from its `## Spec` heading to the next heading of the same level or higher (such as `## Current plan`); subheadings inside it belong to it. Its body, without the heading line, is the request that is exported and fingerprinted. Its text stays byte for byte as agreed, since reviews fingerprint it. Reshaping an item never rewords, retitles or re-spaces it; only a change of scope updates it, as step 6 says. An item agreed before the spec had that name keeps its `## Agreed request` heading and body as they are; every place that reads the section accepts either heading.
 - The current plan, optional, under its own heading `## Current plan`: a short plan or the next step in at most five lines, replaced in place. A longer plan goes in a comment, and the section keeps the next step.
@@ -49,6 +50,10 @@ With either tracker, when agreed work waits on a hand test or setup step only th
 Each step is one line naming where it runs: a website page, or an app and folder, the folder only in terms the record may hold (`rules.md` "Records"). A step whose result a later step depends on says what the maintainer should see. Each command or text to paste sits in its own fenced block under its step, complete with real, non-secret values and no placeholder the maintainer must look up; a step run N times keeps its one command. The steps are written in full in the wait, never pointing to a comment or a document; long text to paste, such as a prompt, also sits in a fenced block under its step. A detail the writer has not checked is marked unverified, never guessed. The wait's last line says what ends it, as `Ends when: <the result that shows it is done>`, and is its only overall pass.
 
 When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command. With no record, the steps go in chat once.
+
+## Start waits
+
+With either tracker, agreed work that cannot start until another item is done, a pull request merges or a count is reached carries a start wait. Before writing or reading one, read `start-waits.md` in this skill's folder: its forms, who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
 
 ## Replies in chat
 
