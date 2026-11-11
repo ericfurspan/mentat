@@ -49,26 +49,26 @@
     <rect class="ab" x="290" y="100" width="120" height="52" rx="8"/>
     <text class="at" x="350" y="118" font-size="14" font-weight="600">You</text>
     <text class="as" x="350" y="136" font-size="12" font-weight="400">agree a spec</text>
-    <rect class="gb" x="290" y="188" width="120" height="52" rx="8"/>
-    <text class="gt" x="350" y="206" font-size="14" font-weight="600">Todo</text>
-    <text class="gs" x="350" y="224" font-size="12" font-weight="400">build now or later</text>
+    <rect class="gb" x="10" y="188" width="120" height="52" rx="8"/>
+    <text class="gt" x="70" y="206" font-size="14" font-weight="600">Todo</text>
+    <text class="gs" x="70" y="224" font-size="12" font-weight="400">build now or later</text>
     <rect class="gb" x="150" y="188" width="120" height="52" rx="8"/>
     <text class="gt" x="210" y="214" font-size="14" font-weight="600">Build</text>
-    <rect class="tb" x="10" y="188" width="120" height="52" rx="8"/>
-    <text class="tt" x="70" y="206" font-size="14" font-weight="600">Codex, Grok</text>
-    <text class="ts" x="70" y="224" font-size="12" font-weight="400">code review</text>
-    <rect class="ab" x="10" y="276" width="120" height="52" rx="8"/>
-    <text class="at" x="70" y="294" font-size="14" font-weight="600">You</text>
-    <text class="as" x="70" y="312" font-size="12" font-weight="400">merge</text>
+    <rect class="tb" x="290" y="188" width="120" height="52" rx="8"/>
+    <text class="tt" x="350" y="206" font-size="14" font-weight="600">Codex, Grok</text>
+    <text class="ts" x="350" y="224" font-size="12" font-weight="400">code review</text>
+    <rect class="ab" x="290" y="276" width="120" height="52" rx="8"/>
+    <text class="at" x="350" y="294" font-size="14" font-weight="600">You</text>
+    <text class="as" x="350" y="312" font-size="12" font-weight="400">merge</text>
     <path class="l" d="M 132 38 L 148 38" marker-end="url(#a)"/>
     <path class="l" d="M 272 38 L 288 38" marker-end="url(#a)"/>
     <path class="l" d="M 314 66 L 314 82 L 236 82 L 236 98" stroke-linejoin="round" marker-end="url(#a)"/>
     <path class="l" d="M 132 126 L 148 126" marker-end="url(#a)"/>
     <path class="l" d="M 272 126 L 288 126" marker-end="url(#a)"/>
-    <path class="l" d="M 350 154 L 350 186" marker-end="url(#a)"/>
-    <path class="l" d="M 288 214 L 272 214" marker-end="url(#a)"/>
-    <path class="l" d="M 148 214 L 132 214" marker-end="url(#a)"/>
-    <path class="l" d="M 70 242 L 70 274" marker-end="url(#a)"/>
+    <path class="l" d="M 350 154 L 350 170 L 70 170 L 70 186" stroke-linejoin="round" marker-end="url(#a)"/>
+    <path class="l" d="M 132 214 L 148 214" marker-end="url(#a)"/>
+    <path class="l" d="M 272 214 L 288 214" marker-end="url(#a)"/>
+    <path class="l" d="M 350 242 L 350 274" marker-end="url(#a)"/>
     <text class="lt" x="210" y="354" font-size="12" font-weight="400">Amber: you. Teal: Codex and Grok, the default checks.</text>
     <text class="lt" x="210" y="374" font-size="12" font-weight="400">Gray: Claude Code and the backlog.</text>
   </g>
