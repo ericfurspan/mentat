@@ -573,6 +573,7 @@ fi
 # The listing session clears a hand wait from a comment reporting its Ends when result; an unclear case,
 # or any case read by a skill that forbids writes, is named as "may be done" and left unchanged.
 phrase_check skills/backlog/linear.md "the waits left open section" '## Waits left open'
+phrase_check skills/backlog/linear.md "the waits left open trigger" "When a session lists this project to choose or plan work (not for \`mentat:propose\`'s or \`mentat:plan\`'s read,"
 phrase_check skills/backlog/linear.md "the waits left open section's exemptions" "(not for \`mentat:propose\`'s or \`mentat:plan\`'s read, not for the lookup of the next-work offer (\`next-work.md\`), not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait."
 phrase_check skills/backlog/linear.md "the hand wait's comments read, merge waits and open pull requests left to their own path" "Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments."
 phrase_check skills/backlog/linear.md "a hand wait with an open pull request left for review" "An item whose linked pull request is still open is left unchanged for \`mentat:review\`, and named \"may be done\" the same way when a comment may report its result."
