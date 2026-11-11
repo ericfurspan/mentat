@@ -235,14 +235,13 @@ phrase_check skills/propose/SKILL.md "the agreement question's note of a last ch
 # A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
 phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
 phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
-# A lasting lesson from a correction is followed at once and filed in Backlog only on a yes asked in the reply to it, never with another question.
+# A lasting lesson from a correction is followed at once and filed in the Inbox at once with no prompt, named in one line of the reply; triage settles it and merges repeats.
 phrase_check rules.md "a correction within the agreed scope followed at once" 'Claude Code follows any correction within the agreed scope at once.'
-phrase_check rules.md "the triggers for asking to file a lesson" 'When the maintainer corrected the same point twice, said it should hold in later work, or stated a preference about how agents work in general,'
-phrase_check rules.md "the lesson asked once in the reply to the correction" "its reply to that correction asks once, in one \`AskUserQuestion\` prompt, whether to file it;"
-phrase_check rules.md "what does not trigger the lesson ask, and once per point" 'never for a one-off instruction for this task, a reversal already asked as a scope question or a failed check inside the review loop, and at most once per point per session.'
-phrase_check rules.md "a yes files a lesson as a Backlog item, naming what it would change" "A yes files a Backlog item naming what it would change (for a working-style preference, the maintainer's own instructions);"
-phrase_check rules.md "the lesson's yes agrees nothing else and is asked alone" 'it agrees nothing else and is never combined with another question, such as the next-work offer.'
-phrase_check rules.md "a lesson filed only on a yes, unlike other unasked follow-ups" 'Unlike other unasked follow-ups, a lesson is filed only on that yes.'
+phrase_check rules.md "the triggers for filing a lesson" 'When the maintainer corrected the same point twice, said it should hold in later work, or stated a preference about how agents work in general,'
+phrase_check rules.md "a lesson filed at once in the Inbox with no prompt, named in one line of the reply, and a failed write said" 'Claude Code files the lesson at once in the Inbox, with no prompt, and names it in one line of its reply, which says the write failed if it did;'
+phrase_check rules.md "what does not trigger filing a lesson, and once per point" 'never for a one-off instruction for this task, a reversal already asked as a scope question or a failed check inside the review loop, and at most once per point per session.'
+phrase_check rules.md "the lesson entry names what it would change, and filing agrees nothing" "The entry names what an accepted item would change (for a working-style preference, the maintainer's own instructions); filing agrees nothing, and triage settles it."
+phrase_check rules.md "no duplicate check when filing a lesson" 'There is no duplicate check at filing; triage merges repeats.'
 
 # A triage sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
 # after a compaction, and sends nothing it collects to Codex or Grok.
@@ -475,6 +474,9 @@ phrase_check rules.md "what Claude Code settles without asking" 'Claude Code set
 # A decision prompt can be answered on its own, a call made without the maintainer reaches chat one line each,
 # mentat:propose reads the open backlog before planning, and a record is re-read right before asking about it.
 phrase_check rules.md "a decision as one question about outcomes, never the mechanism" 'A decision reaches them as one question about what they get, pay or risk, never about the mechanism'
+phrase_check rules.md "the recommendation checked against earlier answers and stated goals" "The recommended option is also checked against the maintainer's earlier answers in the series and their stated goals;"
+phrase_check rules.md "a conflict or unstated, unchecked goal or premise named in the reason" "the question's reason for it names any conflict, and any goal or premise it rests on that they did not state and that could not be checked."
+phrase_check rules.md "a conflict with an earlier answer never silently overridden" 'A conflict with an earlier answer is corrected or asked as revisiting it, never silently overridden.'
 phrase_check rules.md "what each option authorizes and gets, with only the costs that differ" 'each option saying what it authorizes and gets, and naming only the costs that differ,'
 phrase_check rules.md "unasked work and mid-task ideas routed to the Inbox, settled in triage" "Work they did not ask for (shared links, project comments, improvements or features an agent proposes) and an idea they raise mid-task go to the Inbox, settled in triage (\`/mentat:triage\`);"
 phrase_check rules.md "a found defect and an explicit request to file work routed to Backlog" 'a defect an agent finds and an explicit request to file something as work go to Backlog;'
@@ -761,13 +763,14 @@ phrase_check skills/backlog/SKILL.md "the wait marking for agreed work only" 'fo
 
 # After each second opinion round, the maintainer sees each tool's reply and what Claude Code did with it in one block.
 phrase_check skills/backlog/SKILL.md "the replies block's section" '## Replies in chat'
+phrase_check skills/backlog/SKILL.md "the pointer to replies.md" "the maintainer sees the replies in a block. Before showing it, read \`replies.md\` in this skill's folder, and again after a compaction."
 phrase_check skills/backlog/SKILL.md "the round in each reply's heading" "such as \"Codex: second opinion\", or \"Codex: second opinion, round 2\" with more than one round (\`mentat:propose\` step 4), and the commit it read"
-phrase_check skills/backlog/SKILL.md "each round's replies block, only the last opening the agreement question" "each round's block is shown, with a first line \`Round <n>\` as its one addition, and only the last round's block opens the agreement question."
-phrase_check skills/backlog/SKILL.md "the replies block's Adopting line" 'Adopting: <'
-phrase_check skills/backlog/SKILL.md "the replies block's Not adopting line" 'Not adopting: <'
-phrase_check skills/backlog/SKILL.md "the replies block's line for a tool with no answer" "A tool with no answer gets \`no second opinion\` and why, in public-safe words, never a log path."
-phrase_check skills/backlog/SKILL.md "the replies block inside a decision prompt" 'the block opens its question'
-phrase_check skills/backlog/SKILL.md "each line of the replies block on its own line" "Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included."
+phrase_check skills/backlog/replies.md "each round's replies block, only the last opening the agreement question" "each round's block is shown, with a first line \`Round <n>\` as its one addition, and only the last round's block opens the agreement question."
+phrase_check skills/backlog/replies.md "the replies block's Adopting line" 'Adopting: <'
+phrase_check skills/backlog/replies.md "the replies block's Not adopting line" 'Not adopting: <'
+phrase_check skills/backlog/replies.md "the replies block's line for a tool with no answer" "A tool with no answer gets \`no second opinion\` and why, in public-safe words, never a log path."
+phrase_check skills/backlog/replies.md "the replies block inside a decision prompt" 'the block opens its question'
+phrase_check skills/backlog/replies.md "each line of the replies block on its own line" "Each line of the block stays on its own line wherever the block is shown, inside a decision prompt's question included."
 phrase_check skills/backlog/SKILL.md "stages, item creation and stage moves, the opening sentence, the start wait, titles, replies and waits with GitHub issues" 'only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape'"'"'s opening sentence and start wait, "Titles", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".'
 # Committing to Todo, with either answer, always needs an item: one is created first, an issue with GitHub issues.
 phrase_check skills/backlog/SKILL.md "an item created first on agreement with either answer" "When the maintainer agrees to build something, with either answer to \`mentat:propose\`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item."
@@ -775,7 +778,13 @@ phrase_check skills/propose/SKILL.md "the spec written on an item created first,
 phrase_check skills/backlog/SKILL.md "the settlement from the replies block" "the block's Adopting and Not adopting lines"
 phrase_check skills/propose/SKILL.md "the propose step's replies block" '"Replies in chat"'
 # Claude, as a review tool the setting lists, gets its own line and comment headings.
-phrase_check skills/backlog/SKILL.md "the replies block's Claude line" 'Claude: <verdict> - <its main point>'
+phrase_check skills/backlog/replies.md "the replies block's Claude line" 'Claude: <label> - <reason>'
+# Each tool's line gives a plain label for its verdict and the tool's own reason.
+phrase_check skills/backlog/replies.md "the label for DO IT" "\`worth doing\` for \`DO IT\`"
+phrase_check skills/backlog/replies.md "the label for DO IT DIFFERENTLY" "\`another way\` for \`DO IT DIFFERENTLY\`"
+phrase_check skills/backlog/replies.md "the label for DON'T" "\`not worth doing\` for \`DON'T\`"
+phrase_check skills/backlog/replies.md "the reason from the tool's own reply" "The reason is the tool's own, in about 10 words, keeping any condition or required change even if longer: the text after the dash for \`DO IT DIFFERENTLY\` and \`DON'T\`, the reply's main point for \`DO IT\`."
+phrase_check skills/backlog/replies.md "the fallback reason, never a label alone" "With nothing to summarize, the reason is \`no reason given\`; a label is never shown alone."
 phrase_check skills/backlog/SKILL.md "one settlement comment and the replies as one file uploaded from disk" "Claude Code posts one comment with its settlement, the block's Adopting and Not adopting lines (\"Replies in chat\"), with any detail agents need, and attaches the tools' replies as one file uploaded from disk."
 phrase_check skills/backlog/SKILL.md "the replies file cleaned before the upload" "remove the header lines (they name local files), log paths, secrets and each \`no second opinion\` line, which can end with the path of a private log."
 phrase_check skills/backlog/SKILL.md "the attachment read back, and the fallback when the upload fails" "then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is."
