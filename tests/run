@@ -709,7 +709,10 @@ phrase_check skills/backlog/github.md "an issue done only when closed as complet
 phrase_check skills/backlog/github.md "an issue closed as not planned or duplicate making the wait dead" 'closed as not planned or duplicate, the wait is dead.'
 phrase_check skills/backlog/linear.md "a Linear item done only in Done, Canceled or Duplicate making the wait dead" "- Start waits (\`start-waits.md\`): an \`<item id>\` is done only in the Done status; Canceled or Duplicate makes the wait dead."
 phrase_check skills/backlog/linear.md "the hand-made refinement keeping a start wait line" 'and the original'"'"'s links, with any start wait line unchanged.'
-phrase_check skills/linear/SKILL.md "the migration keeping a start wait line, its prerequisite remapped" "the issue's \`Starts after:\` line, with a prerequisite issue number rewritten to that issue's item id through step 7's map"
+phrase_check skills/linear/SKILL.md "the migration copying a start wait line as it is" "the issue's \`Starts after:\` line as it is (step 8 rewrites it);"
+phrase_check skills/linear/SKILL.md "the rewrite pass after every item, before the wait block and the closes" "8. After every item is created, and before the switch item's wait block (step 3) and step 5's closes, rewrite each \`Starts after: #<N> done\` line in the items under \"Migrated\" in the mapping comment to the item id the comment gives for \`#<N>\`, and read each item back."
+phrase_check skills/linear/SKILL.md "the rewrite pass on a resumed run" 'A resumed run does this too, over every migrated item, skipped issues included.'
+phrase_check skills/linear/SKILL.md "an issue held back with its held-back prerequisite" "An issue whose \`Starts after: #<N> done\` prerequisite is held back or not migrated is held back too, listed under \"Held back\" with that reason, so its wait stays checkable on GitHub."
 phrase_check skills/backlog/SKILL.md "the item shape's closed list" 'It holds only these, in this order:'
 phrase_check skills/backlog/SKILL.md "the wait block's pointer to the wait's shape" 'It is the first heading of the description, in the shape "Waits on the maintainer" gives.'
 phrase_check skills/backlog/SKILL.md "the spec's limits" 'intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written.'
