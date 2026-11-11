@@ -394,12 +394,13 @@ fi
 # question, a settled item loses its /mentat:plan pointer, and each item still open when asking ends gets one. A build
 # starts only when asking ends; "Stop here" gives the build lines and starts nothing.
 phrase_check skills/plan/SKILL.md "the items asked as one queue, one item at a time" "With several items, ask them as one queue, one item at a time: each item's questions together, never interleaved with another item's, settling one before the next."
-phrase_check skills/plan/SKILL.md "a settled item defined" "An item is settled when no decision of the maintainer's is open on it."
+phrase_check skills/plan/SKILL.md "a settled item defined, its agreement question included" "An item is settled when no decision of the maintainer's is open on it, an agreement question \`mentat:propose\` asks in its turn included."
 phrase_check skills/plan/SKILL.md "a dependent item waiting for the decision it depends on" "For each next turn, an item with a decision that depends on an open decision on another item waits until that one is settled;"
 phrase_check skills/plan/SKILL.md "items without a big decision first, then the planning order" "among the ready items, one with no decision that sets direction past its own item, or needs analysis or discussion that would dominate the session, goes before one with such a decision; then the planning order its tracker's adapter gives (\`mentat:backlog\`)."
 phrase_check skills/plan/SKILL.md "no decision left unasked for being big" "No decision is left unasked for being big."
 phrase_check skills/plan/SKILL.md "an opened decision asked in its item's turn, later for a settled item" "An answer that opens a decision on another item is asked in that item's turn, a later turn for an item already settled."
 phrase_check skills/plan/SKILL.md "the end of asking and the report naming what each open item waits on" "Asking ends when every item is settled or left (step 7), or the rest wait on a left item or on each other; those stay open, and the report names what each waits on."
+phrase_check skills/plan/SKILL.md "Agree and build now committing without starting a build mid-session" 'In this session, "Agree and build now" commits the item without starting its build; the build starts only at step 8, once, after asking ends.'
 phrase_check skills/plan/SKILL.md "the agreement question saying a build starts when asking ends" "In a session over several items, while asking continues, the agreement question says a build starts when asking ends."
 phrase_check skills/plan/SKILL.md "a reopened scope through mentat:propose, Not now keeping the earlier spec" "When a later answer changes the scope of an item agreed in this session, that item goes through \`mentat:propose\` again, and \"Not now\" there keeps its earlier spec and fingerprint."
 phrase_check skills/plan/SKILL.md "each answer recorded on its item before the next question" "With several items, record each answer on its item before the next question;"
