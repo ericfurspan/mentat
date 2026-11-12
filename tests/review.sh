@@ -77,7 +77,7 @@ check "ci does not let a skipped check block (exit 0)" '[ "$rc" = 0 ] && grep -q
 rc=$("$mentat" ci abc >/dev/null 2>&1; echo $?)
 check "ci with a bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 rc=$("$mentat" review 7 --local >"$STUB/out" 2>&1; echo $?)
-check "an argument after the number is a usage error, not ignored (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" "$STUB/out"'
+check "an argument after the number is a usage error, not ignored (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" "$STUB/out"'
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 

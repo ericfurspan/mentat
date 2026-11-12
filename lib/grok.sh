@@ -3,7 +3,8 @@
 # second-opinion, with its sandbox profile and its isolated home. Sourced by bin/mentat.
 
 # A Grok review (`mentat review --grok`) runs beside the main review, once per
-# pull request. Grok runs at once; the review waits for CI on the same head after
+# pull request; the stop review (`--stop`, the same review under its own comment
+# lines) is the one other run, also once. Grok runs at once; the review waits for CI on the same head after
 # it, and the start comment and the review are posted only once CI passed there and
 # the head has not moved, so a run that is not posted is not Grok's one run. Grok
 # gets read-only file tools and no shell, a plain export of the head without git
@@ -38,14 +39,21 @@ GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
 GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
-# Grok reviews a pull request once. Only this account's own start comment counts:
-# anyone who can comment could otherwise post the text and keep Grok from running.
+# Grok reviews a pull request once, and once more as the stop review (the caller's
+# grok_stop is yes); no plain review runs after a stop review started. Only this
+# account's own start comments count: anyone who can comment could otherwise post
+# the text and keep Grok from running.
 grok_not_started() { # $1 repo, $2 pull request, $3 this account's login
   local n
   n=$(gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg me "$3" \
-    '[.[][] | select(.user.login == $me and (.body | startswith("Grok review started on ")))] | length') ||
+    '[.[][] | select(.user.login == $me) | .body] | "\(map(select(startswith("Grok review started on "))) | length) \(map(select(startswith("Grok stop review started on "))) | length)"') ||
     not_reviewed "could not read the comments on #$2"
-  [ "$n" = 0 ] || not_reviewed "Grok already reviewed #$2 (its start comment is on the pull request); it runs once per pull request"
+  case "${grok_stop:-no}:$n" in
+    yes:*" 0" | no:"0 0") ;;
+    yes:*) not_reviewed "Grok's stop review already ran on #$2 (its start comment is on the pull request); it runs once per pull request" ;;
+    no:*" 0") not_reviewed "Grok already reviewed #$2 (its start comment is on the pull request); it runs once per pull request, and once more only as the stop review (--stop)" ;;
+    *) not_reviewed "Grok's stop review ran on #$2 (its start comment is on the pull request); no plain Grok review runs after it" ;;
+  esac
 }
 
 # Reads the pull request and everything the review needs from GitHub and git, without
@@ -321,7 +329,10 @@ grok_keep_log() {
 grok_fail() {
   local kept held=""
   grok_keep_log
-  if [ "$started" = yes ]; then
+  if [ "$started" = yes ] && [ "${grok_stop:-no}" = yes ]; then
+    held=$(held_comment "Grok stop review did not finish on $head: $1" "$repo") ||
+      gh pr comment "$pr" --body "Grok stop review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
+  elif [ "$started" = yes ]; then
     held=$(held_comment "Grok review did not finish on $head: $1" "$repo") ||
       gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
   fi
@@ -360,8 +371,13 @@ grok_exec() {
 grok_start() {
   grok_not_started "$repo" "$pr" "$me"
   local held
-  if held=$(held_comment "Grok review started on $head" "$repo"); then not_reviewed "$held"; fi
-  gh pr comment "$pr" --body "Grok review started on $head" >/dev/null || not_reviewed "could not post the start comment on #$pr"
+  if [ "${grok_stop:-no}" = yes ]; then
+    if held=$(held_comment "Grok stop review started on $head" "$repo"); then not_reviewed "$held"; fi
+    gh pr comment "$pr" --body "Grok stop review started on $head" >/dev/null || not_reviewed "could not post the start comment on #$pr"
+  else
+    if held=$(held_comment "Grok review started on $head" "$repo"); then not_reviewed "$held"; fi
+    gh pr comment "$pr" --body "Grok review started on $head" >/dev/null || not_reviewed "could not post the start comment on #$pr"
+  fi
   started=yes
 }
 
@@ -398,7 +414,11 @@ grok_post() {
   model=$(jq -r 'if (.modelUsage | type) == "object" and (.modelUsage | length) > 0 then (.modelUsage | keys | join(", ")) else "unknown" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9._, -') || model=unknown
   [ -n "$model" ] || model=unknown
   {
-    printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' "$head" "$(result_word "$result")" "$request_fp"
+    if [ "${grok_stop:-no}" = yes ]; then
+      printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' "$head" "$(result_word "$result")" "$request_fp"
+    else
+      printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' "$head" "$(result_word "$result")" "$request_fp"
+    fi
     printf '<details><summary>Full review</summary>\n\n'
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
@@ -424,8 +444,9 @@ review_grok() {
   local run="" started=no real_grok home_real tmpdir denied roots cache ghome
   local entries args=() out err result_file fail=not_reviewed
   # shellcheck disable=SC2034 # read by grok_args
-  local web_search=""
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  local web_search="" again="mentat review --grok"
+  [ "${grok_stop:-no}" = no ] || again="mentat review --grok --stop"
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--stop] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   read_request "$pr"
   grok_prepare
   grok_run_folder
@@ -436,9 +457,9 @@ review_grok() {
   fail=grok_fail
   grok_exec
   grok_check
-  wait_for_ci "$repo" "$head" "$result_file" "$pr" "mentat review --grok"
+  wait_for_ci "$repo" "$head" "$result_file" "$pr" "$again"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
-  [ "$now" = "$head" ] || die "the head moved from $head; run mentat review --grok again" 3
+  [ "$now" = "$head" ] || die "the head moved from $head; run $again again" 3
   grok_start
   grok_post
 }
