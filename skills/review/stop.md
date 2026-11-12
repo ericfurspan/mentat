@@ -16,13 +16,13 @@ Push nothing and commission no fixes until the answer. Fixes, or the final check
 
 ## Evidence
 
-The reviewers' own finding text, the spec's goal, Grok's stop review, and any disproved material assumption still open in the item's latest assumptions comment. When Grok is not installed, is off, did not finish or refused, the question says so. No new subagent.
+The reviewers' own finding text, the spec's goal, Grok's stop review, and any disproved material assumption still open in the item's latest assumptions comment (`mentat:backlog` "Material assumptions"). When Grok is not installed, is off, did not finish or refused, the question says so. No new subagent.
 
 ## The question
 
 One decision, asked as `rules.md` "What goes to the maintainer" says: go on, shrink or close. Recommend close or shrink when the findings show the goal or a required safeguard is still missed; go on for ordinary defects. Each option says what it does:
 
-- Go on: fixes that round's findings only and keeps the spec (an open disproved assumption stays as it is); it adds no round past the limit and gives no Ready for an unreviewed fix. On the Claude-only path, its fixes get no further round and no Ready. Fixes left with no round end as `Not reviewed: no review round left`.
+- Go on: fixes that round's findings only, Grok's stop review findings among them (sorted as `findings.md` says), and keeps the spec (an open disproved assumption stays as it is); it adds no round past the limit and gives no Ready for an unreviewed fix. On the Claude-only path, its fixes get no further round and no Ready. Fixes left with no round end as `Not reviewed: no review round left`.
 - Shrink: asks the scope change as one question, then rewrites the spec and records its fingerprint (`mentat:backlog` "Agreement"). This is how a disproved assumption changes scope.
 - Close: closes the pull request and cancels the item.
 
@@ -40,4 +40,4 @@ A build session another session started sends the question to its starting sessi
 
 ## Grok coverage
 
-Grok's review of an older head or spec is disclosed in `mentat:review` "Final check", never a reason for another round.
+Grok's plain review covers the first head by design, so only its spec can be older; its stop review can be on an older head or spec. Either is disclosed in `mentat:review` "Final check", never a reason for another round.
