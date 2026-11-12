@@ -217,6 +217,14 @@ phrase_check lib/shared.sh "the review prompt's intent from the alert, not the W
 # The note's first sentence is short and plain, and a shorter one is not a disagreement with the reviewer's.
 phrase_check skills/pr/SKILL.md "the note's plain first sentence of about 25 words with no path, command or flag" "The note's first sentence says what changes for the maintainer, in plain words, in about 25 words at most, with no file path, command or flag."
 phrase_check lib/shared.sh "the review prompt's rule that leaving out detail is not a disagreement" 'A description sentence that leaves out detail yours has does not disagree with it; only a different claim about what the change does is a disagreement.'
+# The description says which models built the pull request, as read or configured, never inferred.
+phrase_check skills/pr/SKILL.md "the model line in the template" 'Built with: session <model>, effort <effort> (read at each builder run); builder <model>, effort <effort> (configured).'
+phrase_check skills/pr/SKILL.md "the session values read at or right after each builder run, earlier entries kept" 'the model and effort setting the build session read for itself at or right after each builder run, one entry per run when they changed; earlier entries stay as written.'
+phrase_check skills/pr/SKILL.md "the builder values labeled as configured" "The builder values are what its definition sets, labeled as configured; a definition that sets no effort says \`effort not set\`."
+phrase_check skills/pr/SKILL.md "unknown for a value not read, nothing inferred" "A value not read is \`unknown\`; nothing is inferred, from a model-family alias or from memory."
+for f in skills/review/SKILL.md skills/claude-review/SKILL.md; do
+  phrase_check "$f" "the session's model and effort read at each builder run" "at each builder run, read this session's model and effort for the description's \`Built with:\` line (\`mentat:pr\`)"
+done
 phrase_check lib/shared.sh "the review prompt's rule for wording in text agents follow" 'There, wording, names included, is a correctness problem when it can be read in a way that makes an agent act wrongly'
 phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat'
 for s in 'Look here first' 'Not in scope'; do
