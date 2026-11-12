@@ -13,7 +13,7 @@ fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
 # labels or buttons. The list is the Linear adapter's own words; the core writes "triage" in lowercase.
 linear_words="Waiting on you|Priority|No priority|Urgent|Mark as duplicate|Decline|Snooze|Linear's Accept|[a-z,;(] Triage|[(]Triage|Triage status"
 tracker_words=$( { printf '%s\n' rules.md prompts/builder.md; git ls-files -- skills; } |
-  grep -v -x -e skills/backlog/linear.md -e skills/backlog/github.md -e skills/linear/SKILL.md | tr '\n' '\0' |
+  grep -v -x -e skills/backlog/linear.md -e skills/backlog/github.md | tr '\n' '\0' |
   xargs -0 grep -n -E -e "$linear_words")
 if [ -z "$tracker_words" ]; then
   pass "no tracker's own words outside the tracker adapters"

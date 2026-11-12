@@ -54,7 +54,7 @@ When a session lists this project to choose or plan work (not for `mentat:propos
 
 ## Labels
 
-The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`. `mentat:linear` made them.
+The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`.
 
 ## New project shape
 
