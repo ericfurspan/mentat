@@ -50,9 +50,17 @@ Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog,
 - `/mentat:retro`: propose improvements from a session.
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
-Mentat reads three things in AGENTS.md: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (else GitHub issues), ``The one test command is `<command>`.`` and a `## Code Review Rules` section. Moving to Linear is by hand: create the project as `skills/backlog/linear.md` says (new project shape, you as lead, the team's labels), then move open issues, holding back any with an open closing pull request or a held-back `Starts after:` prerequisite. Copy specs unchanged, rewrite `Starts after:` lines, and close only moved issues once the AGENTS.md change merges.
-
 [`rules.md`](rules.md) has the full workflow.
+
+## Configuration
+
+Mentat reads these from AGENTS.md:
+
+- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (else GitHub issues)
+- The one test command: ``The one test command is `<command>`.``
+- A `## Code Review Rules` section, the rules reviewers apply.
+
+Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/linear.md#moving-to-linear).
 
 ## Review tools
 
