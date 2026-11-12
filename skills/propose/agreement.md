@@ -1,10 +1,10 @@
 # Second opinion rounds and the agreement question
 
-Read this from `mentat:propose` step 4 before the first `mentat second-opinion` round, and again after a compaction.
+Read this at `mentat:propose` step 4, and again after a compaction.
 
 ## Rounds
 
-It runs another round only when the last round's settlement adopts a change to the idea's requirements, scope or approach; a wording-only change does not count. The rounds stop when a settlement adopts no such change, or after three rounds in all. Each later round's file holds the whole revised idea, with its answers and deferred choices, and no earlier replies or summary of them. A round in which no tool gives a verdict stops the rounds.
+Claude Code runs another round only when the last round's settlement adopts a change to the idea's requirements, scope or approach; a wording-only change does not count. The rounds stop when a settlement adopts no such change, or after three rounds in all. Each later round's file holds the whole revised idea, with its answers and deferred choices, and no earlier replies or summary of them. A round in which no tool gives a verdict stops the rounds.
 
 Each round's idea file also holds the material assumptions and the failures that would become requirements known then (`mentat:propose` step 5), plus one line naming the failures considered and left out.
 
