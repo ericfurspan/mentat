@@ -133,7 +133,7 @@ for stub in keeps_branches setting_unreadable; do
   check "with the kept-branches setting off, $stub reads no branch setting and adds no line or warning" '[ "$rc" = 0 ] && grep -qx "OK: owner/repo is readable" "$STUB/out" && ! grep -q delete_branch_on_merge "$STUB/calls" && ! grep -q "head branches" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 done
 reset; touch "$STUB/no_repo"; rc=$(run)
-check "no repository to find fails and says to run it inside a checkout" '[ "$rc" = 1 ] && grep -q "run mentat check inside a checkout" "$STUB/out"'
+check "no repository to find fails and says it could not tell which repository this is" '[ "$rc" = 1 ] && grep -q "could not tell which GitHub repository this is" "$STUB/out"'
 
 reset; rc=$(run)
 check "a readable private word list is OK, and its words are not printed" '[ "$rc" = 0 ] && grep -qx "OK: the private word list is readable" "$STUB/out" && ! grep -q stubword "$STUB/out"'

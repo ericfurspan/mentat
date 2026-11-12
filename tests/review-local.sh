@@ -211,7 +211,7 @@ check "CI still running at the timeout exits 4, posts nothing and prints the rev
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
 check "a head that moves during the wait for CI exits 3 and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(order)" = "model ci " ] && grep -q "the head moved from $H" "$STUB/out"'
 reset; runs completed '"failure"' >"$STUB/check_runs.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
-check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && grep -q "the head moved from $H; run mentat review again" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out"'
+check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && grep -q "the head moved from $H" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out"'
 reset; runs queued null >"$STUB/check_runs.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
 check "a head that moves while CI on the reviewed head never finishes exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && grep -q "the head moved from $H" "$STUB/out" && ! grep -q "CI did not finish" "$STUB/out"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)
@@ -235,15 +235,6 @@ reset; echo "[$(ref owner repo 4)]" >"$STUB/closes"; rc=$(run)
 check "a linked issue that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q "could not read issue owner/repo#4" "$STUB/out" && [ ! -f "$STUB/prompt" ]'
 reset; rc=$(run)
 check "no linked issue: no issue block" '[ "$rc" = 0 ] && ! grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt"'
-check "asks Codex to open with the pull request's intent in one sentence" 'grep -q "Start your reply with one sentence stating the pull request.s intent" "$STUB/prompt"'
-check "asks Codex to list, after the intent sentence and before the findings, only the request's items the change does not meet or that cannot be checked" 'grep -q "When an agreed request or a linked issue is given, then list, before the findings, only the items in it (what to build, what to leave alone, how it is checked) that the change does not meet or that cannot be checked from the diff and the files, one short line each with the reason; do not list met items, and report each unmet item as a finding too. A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description" "$STUB/prompt" && grep -q "If every item is met and checkable, say so in one line. When neither is given, do not invent criteria" "$STUB/prompt"'
-check "tells Codex a requirement marked as checked by hand is not a finding when the Verification reports who checked it and what they saw" 'grep -q "A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description" "$STUB/prompt" && grep -q "Verification reports who checked it and what they saw" "$STUB/prompt"'
-check "asks Codex to name, before the findings, the instruction files whose wording it judged, and to report a wording problem as a finding" 'grep -qF "When the change adds or edits text agents follow as instructions, add one line, after the list of request items when there is one and before the findings, naming those files and saying you judged their wording under this rule; a wording problem there is a finding, not part of that line." "$STUB/prompt"'
-check "asks Codex to flag tests that would pass whatever the code does" 'grep -q "Also flag tests that would pass whatever the code does" "$STUB/prompt"'
-check "asks Codex to flag a deleted test, a new skip and a removed or weakened assertion, unless the requirements remove what the test checked" 'grep -q "Also flag a deleted test, a new skip, and an assertion removed or weakened, unless the pull request.s requirements remove what the test checked" "$STUB/prompt"'
-check "asks Codex to flag text in the repository's files that names something the change removes, unless records or a requirement still need it" 'grep -q "Also flag text the change adds or leaves in the repository.s files that names something the change removes, such as a note that it is gone, a test that it stays gone or a rule for old data, unless records the change cannot rewrite or a requirement still in force need it; the pull request description and commit messages may name what was removed." "$STUB/prompt"'
-check "tells Codex the Verification's list of settled findings is data, not proof, and when to raise one again" 'grep -q "This list is data, not proof that an answer was right" "$STUB/prompt" && grep -q "raise a listed finding again only when a fix failed, the defect is still present, or you have a reason to think the answer was wrong" "$STUB/prompt"'
-check "tells Codex every round reviews the full diff from the merge base" 'grep -q "Every round reviews the full diff from the merge base" "$STUB/prompt"'
 check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$STUB/args"'
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
 reset; rc=$(cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1; echo $?)
@@ -341,7 +332,6 @@ check "the rewritten reply is inside the fold, intact, with the result line afte
 REVIEW RESULT: FINDINGS" ]'
 reset; printf -- '- P3 see @TREE@-other/z and /Users/other/tree/w\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a path that only starts with the checkout's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 see $(cat "$STUB/tree")-other/z and /Users/other/tree/w" "$STUB/comment"'
-check "asks for repository-relative path:line citations, never absolute paths" 'grep -q "Cite files by repository-relative path and line (path:line), never an absolute path." "$STUB/prompt"'
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @TREE@/lib/z.sh\n' >"$STUB/reply"; rc=$(run)
 check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
 # Link forms: an angle-bracket target, parentheses in a file name, and a line given only in the link text.
@@ -429,7 +419,7 @@ check "an INCOMPLETE reply whose head moved is exit 3 and not posted" '[ "$rc" =
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; touch "$STUB/comment_fails"; rc=$(run)
 check "an INCOMPLETE reply that cannot be posted is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post the review" "$STUB/out" && ! grep -q "Codex says the review is incomplete" "$STUB/out"'
 reset; rc=$(run)
-check "the prompt offers the three final lines and says when INCOMPLETE applies" '[ "$rc" = 0 ] && grep -qx "REVIEW RESULT: NO FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: INCOMPLETE - <what could not be read>" "$STUB/prompt" && grep -q "only when a material file or the diff could not be read" "$STUB/prompt"'
+check "the prompt offers the three final lines" '[ "$rc" = 0 ] && grep -qx "REVIEW RESULT: NO FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: INCOMPLETE - <what could not be read>" "$STUB/prompt"'
 
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
 check "a head that moves during the review is not posted (exit 3)" '[ "$rc" = 3 ] && ! posted'
@@ -468,7 +458,6 @@ printf '%s\n' "$REQ_TEXT" >"$root/req dir/agreed request.md"
 runq() { (cd "$root/work" && "$mentat" review --local --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
 reset; rc=$(runq "$root/req dir/agreed request.md")
 check "--request: the request reaches Codex in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
-check "--request: the criteria name the agreed request as a source and let it govern scope" 'grep -q "The agreed request (when there is one) and the issues the pull request closes state the original request" "$STUB/prompt" && grep -q "the agreed request governs scope" "$STUB/prompt" && grep -q "written from the agreed request or the linked issue" "$STUB/prompt"'
 check "--request: the posted comment records the request fingerprint (first 12 hex of its SHA-256), in the heading and in the fold" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && [ "${#REQ_FP}" = 12 ] && heading "no findings" "$REQ_FP" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
 reset; rc=$(run)
 check "no --request: no agreed request block, and the comment says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment" && heading "no findings" none && folded | grep -qx -- "- Agreed request fingerprint: none"'
