@@ -59,3 +59,5 @@ The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`. `men
 ## New project shape
 
 A new project's overview holds only what is unique to it: its short summary is one line saying what the project is for, its long description stays empty, and its repository, where there is one, is a link under Resources.
+
+When a repository's GitHub issues are moved to Linear, each issue's latest assumptions comment is copied to its new item (`assumptions.md`).

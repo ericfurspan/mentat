@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".
+With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -73,13 +73,17 @@ With either tracker, when Claude Code recommended closing, shrinking or not buil
 
 It follows the `rules.md` "Records" rules. The latest such comment stands. `mentat:review` "Final check" says how "Ready to merge: #N" quotes it.
 
+## Material assumptions
+
+With either tracker, before posting an item's material assumptions, or briefing a builder for an item, read `assumptions.md` in this skill's folder, and again after a compaction: the comment's shape, when it is posted and what reaches the maintainer.
+
+## Relayed writes
+
+With either tracker, a backlog write that a build session another session started sends back is made as "Relayed writes" in `../build/SKILL.md` says; read it then.
+
 ## Waits on the maintainer
 
-With either tracker, when agreed work waits on a hand test or setup step only the maintainer can run, the wait goes at the top of its backlog item, else its pull request, else a new backlog item where there is a backlog, as a heading saying it waits on the maintainer, then numbered steps (how many first). When the wait is on a backlog item, external or a GitHub issue, the full wait lives only there; the top of the work's pull request carries one line saying it waits on the maintainer and the steps are on the backlog item, naming neither the backlog's workspace nor the item.
-
-Each step is one line naming where it runs: a website page, or an app and folder, the folder only in terms the record may hold (`rules.md` "Records"). A step whose result a later step depends on says what the maintainer should see. Each command or text to paste sits in its own fenced block under its step, complete with real, non-secret values and no placeholder the maintainer must look up; a step run N times keeps its one command. The steps are written in full in the wait, never pointing to a comment or a document; long text to paste, such as a prompt, also sits in a fenced block under its step. A detail the writer has not checked is marked unverified, never guessed. The wait's last line says what ends it, as `Ends when: <the result that shows it is done>`, and is its only overall pass.
-
-When the only record is on GitHub and a step needs a value GitHub records may not hold, such as a local path, the record keeps the steps with that value in general terms and the fenced commands go in chat once; an external backlog item holds the real command. With no record, the steps go in chat once.
+With either tracker, before writing or reading a wait on a hand test or setup step only the maintainer can run, read `waits.md` in this skill's folder, and again after a compaction: where the wait goes and its shape.
 
 ## Start waits
 

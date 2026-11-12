@@ -148,6 +148,9 @@ status_heading lib/codex.sh "printf '## Local Codex review of %s: %s, spec finge
 status_heading lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
 status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
 status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
+status_heading lib/grok.sh "printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review started on \$head\""
+status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review did not finish on \$head: \$1\""
 status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'

@@ -10,10 +10,15 @@
 #     private name, in a public repository, is kept in a local file and not posted (exit 1).
 #   mentat review --grok <PR>  The same with Grok, if installed: its start comment and
 #     review are posted only once CI passed on the head it reviewed. Same exit codes.
+#     It runs once per pull request: this gh account's own start comment refuses another.
+#     `mentat review --grok --stop <PR>` is the one other run, also once per pull request:
+#     the same review, whose comments say "Grok stop review" in place of "Grok review".
+#     A plain --grok is refused once this account's stop review started.
 #     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
 #     MENTAT_GROK_REASONING_EFFORT to pass --reasoning-effort to Grok (second-opinion too);
 #     unset leaves Grok's default.
-#     Both take `--request <file>` and `--require-ci` after the mode, if any, in either order:
+#     Both take `--request <file>` and `--require-ci` after the mode, if any, in any order
+#     with --stop:
 #     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran
 #     exits 4 like failed CI, posting nothing; without it, such a head is reviewed and posted.
 #     The file holds the agreed request (what to build, what to leave alone, how it is checked)
@@ -26,8 +31,9 @@
 #   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
 #     review state from the comments the review commands posted as this gh account: the head
 #     commit, the local Codex rounds (and Claude review rounds when present), whether the head
-#     is the last reviewed commit, the Grok state (none, running, done or did not finish) and
-#     the CI state (none, running, passed or failed). With --request, also whether the last
+#     is the last reviewed commit, the Grok state (none, running, done or did not finish), the
+#     Grok stop review's (none, or running, done or did not finish on a commit, a done one
+#     with its result and spec fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
 #     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
 #   The review tools setting: ~/.config/mentat/reviewers lists the tools second-opinion
 #     runs, any of claude, codex and grok; missing or empty runs Codex and Grok.
@@ -92,25 +98,28 @@ case "${1:-}" in
     # --grok" would otherwise run local Codex.
     mode=local
     case "${1:-}" in --local) shift ;; --grok) shift; mode=grok ;; esac
-    # --request <file> and --require-ci, each at most once, in either order.
-    request_file="" request_given=no require_ci=no
+    # --request <file>, --require-ci and, with --grok only, --stop, each at most once, in any order.
+    request_file="" request_given=no require_ci=no grok_stop=no
     while :; do
       case "${1:-}" in
+        --stop)
+          [ "$mode" = grok ] && [ "$grok_stop" = no ] || die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
+          grok_stop=yes; shift ;;
         --request)
-          [ "$request_given" = no ] && [ $# -ge 2 ] || die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64
+          [ "$request_given" = no ] && [ $# -ge 2 ] || die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
           # shellcheck disable=SC2034 # read by read_request in lib/shared.sh
           request_file=$2 request_given=yes; shift 2 ;;
         --require-ci)
-          [ "$require_ci" = no ] || die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64
+          [ "$require_ci" = no ] || die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
           require_ci=yes; shift ;;
         *) break ;;
       esac
     done
-    [ $# -eq 1 ] || die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number>" 64
+    [ $# -eq 1 ] || die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
     case "$mode" in grok) review_grok "$@" ;; *) review_local "$@" ;; esac ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   status) shift; status "$@" ;;
   second-opinion) shift; second_opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
 esac
