@@ -219,9 +219,9 @@ new_line() {
   end_command
   [ -n "$cont" ] || c_start=1
 }
-# parens <word>: sets n, the number of ( in the word outside quotes.
+# parens <word>: sets n, the number of ( in the word outside quotes and escapes.
 parens() {
-  local s=$1 q='^([^"'"'"']*)("([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')(.*)$'
+  local s=${1//\\?/} q='^([^"'"'"']*)("([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')(.*)$'
   while [[ $s =~ $q ]]; do s=${BASH_REMATCH[1]}${BASH_REMATCH[4]}; done
   s=${s//[!(]/}; n=${#s}
 }
@@ -249,9 +249,10 @@ heredoc() {
   [ "$line" != "$rest" ] || return 1
   case "$line" in *'<<'* | *\\) return 1 ;; esac
   s=${rest#*$'\n'}
-  k=$(D=$d T=$t awk '{ l = $0; if (ENVIRON["T"] != "") sub(/^\t+/, "", l); if (l == ENVIRON["D"]) { print NR; exit } }' <<<"$s")
+  k=$(D=$d T=$t awk '{ l = $0; if (ENVIRON["T"] != "") sub(/^\t+/, "", l); if (l "" == ENVIRON["D"] "") { print NR; exit } }' <<<"$s")
   [ -n "$k" ] || return 1
-  body=$(head -n "$((k - 1))" <<<"$s")
+  body=""
+  [ "$k" -le 1 ] || body=$(head -n "$((k - 1))" <<<"$s")
   s=$(tail -n "+$((k + 1))" <<<"$s")
   kept+=$held$m; held=""
   hd_text+=$'\n'$body
@@ -370,11 +371,12 @@ outside() {
 # reads, which replace their names in the checked text. It follows each cd, and steps
 # over heredoc bodies and # comments without walking them. Words cannot be told apart
 # past a stop ($( in gh, or a << it cannot read); that text goes to past, with any word
-# outside a gh command. grp counts open ( and { groups; c_start marks the start of a
+# outside a gh command. grp counts open ( and { groups, cmp open compound commands and
+# case_at the grp of each open case; c_start marks the start of a
 # chain, c_any a word already in the command, cont a line that goes on after && || |.
 repo="" targets=$'\n' unread_api="" kept="" past="" held="" hd_text=""
 o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" sed_unk="" subst="" late=""
-cd_on="" cd_text="" cd_n=0 cd_arg="" grp=0 c_start=1 c_any="" cont="" lastw=""
+cd_on="" cd_text="" cd_n=0 cd_arg="" grp=0 cmp=0 case_at="" c_start=1 c_any="" cont="" lastw=""
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 next_re="^[[:blank:]]*($arg)"
@@ -389,7 +391,7 @@ while [[ $rest =~ $re ]]; do
   [ "$w" != $'\\\n' ] || { held+=$m; continue; }
   # A & in a redirect (2>&1, >&2, <&3, &>file, &>>file) belongs to that redirect.
   if [ "$w" = '&' ]; then
-    case "$m$pw" in '&'*'>' | '&'*'<') keep; continue ;; esac
+    case "$m$pw" in '&'*\\'>' | '&'*\\'<') ;; '&'*'>' | '&'*'<') keep; continue ;; esac
     case "$rest" in '>'*) keep; continue ;; esac
   fi
   case "$w" in
@@ -399,8 +401,14 @@ while [[ $rest =~ $re ]]; do
     [\;\&\|\)]*)
       # A token may join closing parens to operators, as in )&, ); or ;)&. The operator
       # after the last ) acts at the depth left. A background & at the outer depth may
-      # take a cd with it, so the folder is unknown after it.
-      v=${w//[!)]/}; grp=$((grp - ${#v})); [ "$grp" -ge 0 ] || grp=0
+      # take a cd with it, so the folder is unknown after it. In a case at the depth it
+      # opened at, a ) ends a pattern and closes no group.
+      v=${w//[!)]/}
+      while [ -n "$v" ]; do
+        v=${v#?}
+        if [ -z "$case_at" ] || [ "$grp" -ne "${case_at%% *}" ]; then grp=$((grp - 1)); fi
+      done
+      [ "$grp" -ge 0 ] || grp=0
       op=${w##*)}
       cd_end "$op"; end_command; keep
       [ "$op" != '&' ] || [ "$grp" -ne 0 ] || dir=""
@@ -413,19 +421,37 @@ while [[ $rest =~ $re ]]; do
   prior=$c_any c_any=1 cont=""
   if [ -z "$in_gh" ]; then
     if [ -n "$cd_on" ]; then cd_text+=$m; past+=$m; cd_n=$((cd_n + 1)); cd_arg=$w; continue; fi
-    if [ "$w" = cd ] && [ -z "$prior" ] && [ -n "$c_start" ] && [ "$grp" -eq 0 ]; then
+    # A compound command (if, while, until, for, select, case) runs its body only
+    # sometimes, so no cd in it is followed until its fi, done or esac.
+    v=$w
+    while :; do case "$v" in "("* | "{"*) v=${v#?} ;; *) break ;; esac; done
+    case "$v" in
+      if | while | until | for | select | case)
+        if [ -z "$prior" ] || case "$pw" in then | do | else | elif | '!' | time | '{' | '(') true ;; *) false ;; esac; then
+          cmp=$((cmp + 1))
+          [ "$v" != case ] || case_at="$grp $case_at"
+        fi
+        ;;
+      'fi' | 'done' | 'esac')
+        if [ -z "$prior" ] && [ "$cmp" -gt 0 ]; then
+          cmp=$((cmp - 1))
+          [ "$v" != 'esac' ] || case_at=${case_at#* }
+        fi
+        ;;
+    esac
+    if [ "$w" = cd ] && [ -z "$prior" ] && [ -n "$c_start" ] && [ "$grp" -eq 0 ] && [ "$cmp" -eq 0 ]; then
       cd_on=1 cd_text=$held$m cd_n=0 cd_arg="" o_cmd=cd held=""; past+=$m; continue
     fi
     if [ -z "$o_cmd" ]; then
       case "$w" in
         '}') grp=$((grp - 1)); [ "$grp" -ge 0 ] || grp=0 ;;
-        '{'* | '('*) v=${w%%[!({]*}; v=${v//[!\{]/}; grp=$((grp + ${#v})) ;;
+        '{'* | '('*) b=${w%%[!({]*}; b=${b//[!\{]/}; grp=$((grp + ${#b})) ;;
       esac
     fi
     # Any other folder change leaves the folder unknown.
-    v=$w
-    while :; do case "$v" in "("* | "{"*) v=${v#?} ;; *) break ;; esac; done
     case "$v" in cd | pushd | popd) dir="" ;; esac
+    # gh run through ( or $( or a backtick runs in the folder known here.
+    case "$w" in *'(gh' | *'(gh'[[:space:]]* | *'`gh' | *'`gh'[[:space:]]*) here ;; esac
     if [ "$w" != gh ]; then past+=$m; outside "$w"; continue; fi
   fi
   case "$w" in *'$('*) rest=$m$rest; break ;; esac
@@ -478,6 +504,12 @@ stopped=""
 case "$rest" in *[![:space:]]*) stopped=1 ;; esac
 if [ -n "$stopped" ]; then cd_end stop; else cd_end end; fi
 end_command
+# A gh write among the words walked outside gh that no ( $( or backtick holds, such as
+# /usr/local/bin/gh pr comment, runs where the walk cannot tell.
+gh_head='(^|[^[:alnum:]_.-])gh'
+any_n=$(grep -Eo -e "$forms" -e "$gh_api" <<<"$past" | wc -l)
+held_n=$(grep -Eo -e "[(\`{]gh${forms#"$gh_head"}" -e "[(\`{]gh${gh_api#"$gh_head"}" <<<"$past" | wc -l)
+[ "$any_n" -le "$held_n" ] || add_target u:
 kept+=$held$hd_text$rest past+=$rest
 stop_dir=$dir
 if [ -n "$stopped" ]; then

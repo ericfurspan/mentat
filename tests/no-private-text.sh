@@ -150,6 +150,7 @@ mkdir -p "$priv" "$priv2" "$pub" "$pad"
 printf 'about StubCodename\n' >"$pub/note.md"
 for f in "$priv/note.md" "$priv/word.md" "$priv/body.md" "$pub/body.md"; do printf 'clean\n' >"$f"; done
 dirs() { printf '%s\n' "$priv" "$priv2" >"$STUB/private_dirs"; }
+tilde='~'
 silent() { rm -f "$STUB/calls"; [ -z "$(decision "$@")" ]; }
 asks() { rm -f "$STUB/calls"; [ "$(decision "$@")" = ask ]; }
 looked_in() { grep -qsF "$1: repo view --json isPrivate" "$STUB/calls"; }
@@ -265,6 +266,62 @@ true
 check "a chain with a followed cd and a multi-line group, ended by &, leaves the folder unknown" 'asks "$c" && ! looked_up'
 check "cd <private> && if ...; fi & gh leaves the folder unknown" 'asks "cd \"$priv\" && if true; then true; fi & gh pr comment 1 --body stubcodename" && ! looked_up'
 check "cd <private> && for ...; done & gh leaves the folder unknown" 'asks "cd \"$priv\" && for x in a; do true; done & gh pr comment 1 --body stubcodename" && ! looked_up'
+while IFS='|' read -r name open close; do
+  c="$open
+cd \"$priv\"
+$close
+gh pr comment 1 --body stubcodename"
+  check "a cd on its own line inside $name leaves the folder unknown" 'asks "$c" && ! looked_up'
+done <<'EOF'
+if ... fi|if [ -d /nonexistent ]; then|fi
+while ... done|while false; do|done
+until ... done|until true; do|done
+for ... done|for x in; do|done
+case ... esac|case x in y)|;; esac
+EOF
+while IFS= read -r c; do
+  check "a cd inside a compound command on one line leaves the folder unknown: ${c//"$HOME"/$tilde}" 'asks "$c" && ! looked_up'
+done <<EOF
+if false; then :; cd "$priv"; fi; gh pr comment 1 --body stubcodename
+if true; then cd "$pub"; else cd "$priv"; fi; gh pr comment 1 --body stubcodename
+( case x in a) : ;; esac; cd "$priv" ); gh pr comment 1 --body stubcodename
+EOF
+c="cd \"$priv\"
+cat <<007
+7
+cd \"$pub\"
+007
+gh pr comment 1 --body stubcodename"
+check "a numeric heredoc delimiter is matched as text" 'silent "$c" && looked_in "$priv"'
+c="cat <<EOF
+EOF
+cd \"$priv\"
+gh pr comment 1 --body stubcodename"
+check "an empty heredoc body prints nothing to stderr" 'silent "$c" && looked_in "$priv" && [ -z "$(output "$c" 2>&1 >/dev/null)" ]'
+check "an escaped > before & is no redirect" 'asks "cd \"$priv\" && echo a\\>& gh pr comment 1 --body stubcodename" && ! looked_up'
+check "an escaped ( opens no group" 'silent "cd \"$pub\"; echo \\( ; cd \"$priv\"; gh pr comment 1 --body stubcodename" && looked_in "$priv"'
+c="if true; then
+true
+fi
+cd \"$priv\"
+gh pr comment 1 --body stubcodename"
+check "a cd after the fi line is followed" 'silent "$c" && looked_in "$priv"'
+c="case x in
+(y) true ;;
+esac
+cd \"$priv\"
+gh pr comment 1 --body stubcodename"
+check "a cd after a case with ( patterns is followed" 'silent "$c" && looked_in "$priv"'
+check "a gh write in a subshell gets the folder it runs in" 'asks "cd \"$pub\" && (gh pr comment 1 --body \"at $HOME/x\"); cd \"$priv\"" && looked_in "$pub"'
+check "a gh write in \$( ) gets the folder it runs in" 'asks "cd \"$pub\" && x=\$(gh pr comment 1 --body \"at $HOME/x\"); cd \"$priv\"" && looked_in "$pub"'
+c="cd \"$pub\"
+num=\$(gh issue create --title t --body \"about stubcodename\" | tail -1)
+cd \"$priv\"
+gh pr comment 5 --body \"tracked in \$num\""
+check "a gh write in \$( ) on its own line gets the folder it runs in" 'asks "$c" && looked_in "$pub"'
+check "a gh write in backticks gets the folder it runs in" 'asks "cd \"$pub\" && out=\`gh pr comment 1 --body stubcodename\`; cd \"$priv\"" && looked_in "$pub"'
+check "a gh write by its full path makes the folder unknown" 'asks "cd \"$priv\" && /opt/homebrew/bin/gh pr comment 1 --body stubcodename" && ! looked_up'
+check "a gh write in a subshell in a private folder stays silent" 'silent "cd \"$priv\" && (gh pr comment 1 --body stubcodename)" && looked_in "$priv"'
 check "a & inside a group after a followed cd keeps the folder" 'silent "cd \"$priv\" && (sleep 1 & true); gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 c="gh pr comment 1 --repo owner/private --body ok
 &>/dev/null gh pr comment 2 --body stubcodename"
@@ -295,7 +352,6 @@ check "an unknown folder asks on a hit with no lookup, from a private session fo
 check "an unknown folder with no hit stays silent" 'silent "cd -; gh pr comment 1 --body ok" && ! looked_up'
 check "a cd to an absolute path after an unknown folder is followed" 'silent "cd -; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 check "a relative cd after an unknown folder is not followed" 'asks "cd -; cd wtpriv; gh pr comment 1 --body stubcodename" "$HOME" && ! looked_up'
-tilde='~'
 while IFS= read -r c; do
   check "a folder change it does not follow leaves the folder unknown: ${c//"$HOME"/$tilde}" 'asks "$c" "$priv" && ! looked_up'
 done <<EOF
