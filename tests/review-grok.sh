@@ -121,6 +121,7 @@ if [ "${1:-}" = models ]; then
   printf '%s\n' "$@" >"$STUB/args_models"
   env | sort >"$STUB/env_models"
   printf '%s\n' "$GROK_HOME" >"$STUB/models_home"
+  [ -f "$STUB/models_hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
   if [ -f "$STUB/refresh_to" ]; then
     printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token-2"}}\n' "$(cat "$STUB/refresh_to")" >"$GROK_HOME/auth.json"
     chmod 600 "$GROK_HOME/auth.json"
@@ -154,7 +155,7 @@ if [ -f "$STUB/live" ]; then
   exit "$rc"
 fi
 for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
-[ -f "$STUB/hang" ] && exec sleep 30
+[ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
 # @EXPORT@ in the reply becomes the export's path, which is where Grok works.
 sed "s|@EXPORT@|$(pwd -P)|g" "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
@@ -535,6 +536,38 @@ for args in "--grok" "--grok abc" "--grok 7 8" "--grok --local 7" "--grok --loca
   rc=$("$mentat" review $args >/dev/null 2>&1; echo $?)
   check "usage error (exit 64) for: review $args" '[ "$rc" = 64 ]'
 done
+
+# Interrupts, as in tests/review-local.sh: mentat in its own process group with default INT
+# handling, signalled once the sign-in refresh or Grok has started, or the wait for CI has
+# begun. Within seconds nothing of the run is left: no process in its group, no Grok, no run folder.
+interrupt() { # $1 ci for a long pause between CI reads, which the signal must not wait out
+  local i
+  (
+    cd "$root/work tree" || exit 1
+    [ "${1:-}" != ci ] || export MENTAT_REVIEW_INTERVAL_SECONDS=30 MENTAT_CI_TIMEOUT_SECONDS=120
+    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --grok 7 >"$STUB/out" 2>&1
+  ) &
+  ip=$! ready=no
+  for i in $(seq 100); do
+    if [ -f "$STUB/model_pid" ] || grep -q '^Waiting for CI' "$STUB/out" 2>/dev/null; then ready=yes; break; fi
+    sleep 0.1
+  done
+  before=$(left_over) took=$SECONDS
+  kill -INT -- "-$ip"
+  wait "$ip"
+  for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
+  took=$((SECONDS - took))
+}
+gone() { [ "$ready" = yes ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ -z "$(left_over)" ]; }
+reset; touch "$STUB/models_hang"; set_signin 2020-01-01T00:00:00.000000Z; interrupt; reset_signin
+check "INT to its process group while grok models refreshes the sign-in stops it within seconds" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
+reset; touch "$STUB/hang"; interrupt
+check "INT to its process group while Grok runs stops Grok and removes the run folder within seconds" '[ -n "$before" ] && [ -s "$STUB/cwd" ] && [ ! -e "$(dirname "$(cat "$STUB/cwd")")" ] && gone'
+kill -9 -- "-$ip" 2>/dev/null
+reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci
+check "INT to its process group during the wait for CI leaves no process, removes the run folder within seconds and posts nothing" '[ -n "$before" ] && gone && [ "$(comments)" = 0 ]'
+kill -9 -- "-$ip" 2>/dev/null
 
 # Live profile check. Starts the real Grok through the review, with the sign-in removed
 # so that no model is called and nothing is sent, and reads the event Grok writes when it

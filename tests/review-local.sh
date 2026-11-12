@@ -155,6 +155,7 @@ cat >"$STUB/prompt"
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
 # @TREE@ and @TREEP@ in the reply become the checkout's path as created and resolved (macOS: /var and /private/var).
 pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
+[ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
 while [ $# -gt 0 ]; do [ "$1" = -o ] && sed -e "s|@TREE@|$(pwd)|g" -e "s|@TREEP@|$(pwd -P)|g" "$STUB/reply" >"$2"; shift; done
 STUBEOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex"
@@ -495,6 +496,41 @@ for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   rc=$("$mentat" review --local $args >/dev/null 2>&1; echo $?)
   check "usage error (exit 64) for: review --local $args" '[ "$rc" = 64 ]'
 done
+
+# Interrupts. mentat runs in its own process group with default INT handling (a job this
+# script starts in the background ignores INT), and is signalled once the hung model has
+# started or the wait for CI has begun. Within seconds nothing of the run is left: no
+# process in its group, no model, no worktree.
+worktrees() { git -C "$root/work" worktree list | wc -l | tr -d ' '; }
+interrupt() { # $1 model or ci, $2 signal, $3 group or pid
+  local i
+  (
+    cd "$root/work" || exit 1
+    # A long pause between CI reads, which the signal must not wait out.
+    [ "$1" = model ] || export MENTAT_REVIEW_INTERVAL_SECONDS=30 MENTAT_CI_TIMEOUT_SECONDS=120
+    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --local 7 >"$STUB/out" 2>&1
+  ) &
+  ip=$! ready=no
+  for i in $(seq 100); do
+    if [ -f "$STUB/model_pid" ] || grep -q '^Waiting for CI' "$STUB/out" 2>/dev/null; then ready=yes; break; fi
+    sleep 0.1
+  done
+  before=$(worktrees) took=$SECONDS
+  if [ "$3" = group ]; then kill -"$2" -- "-$ip"; else kill -"$2" "$ip"; fi
+  wait "$ip"
+  for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
+  took=$((SECONDS - took))
+}
+gone() { [ "$ready" = yes ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ "$(worktrees)" = 1 ] && [ -s "$STUB/tree" ] && [ ! -e "$(cat "$STUB/tree")" ]; }
+reset; touch "$STUB/hang"; interrupt model INT group
+check "INT to its process group while Codex runs stops Codex and removes the worktree within seconds" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
+reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci INT group
+check "INT to its process group during the wait for CI leaves no process and removes the worktree within seconds" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
+reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
+check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
 
 # Live sandbox check. Replays the -c settings the review passed to the stub through the
 # real `codex sandbox` (no model call) and runs shell probes against the review
