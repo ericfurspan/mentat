@@ -476,6 +476,60 @@ check "an account that cannot be read is not reviewed" '[ "$rc" = 1 ] && grep -q
 reset; touch "$STUB/comments_fail"; rc=$(run)
 check "comments that cannot be read are not reviewed" '[ "$rc" = 1 ] && grep -q "could not read the comments" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 
+# The stop review (--stop): the same review under its own comment lines, once per pull request,
+# with or without a plain run before it; a plain run is refused once it started. Only this
+# account's own start comments count.
+srun() { (cd "$root/work tree" && "$mentat" review --grok --stop "$@" 7 >"$STUB/out" 2>&1); echo $?; }
+first() { head -n 1 "$STUB/comment.$1"; }
+stop_comment() { jq -n --arg u "$1" --arg b "Grok stop review started on $H" '[{user: {login: $u}, body: $b}]'; }
+reset; rc=$(runq "$root/req dir/agreed request.md"); cp "$STUB/prompt" "$root/plain_prompt"
+reset; rc=$(srun --request "$root/req dir/agreed request.md")
+check "--stop with no plain run before it posts its own start comment, then its own review heading (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ] && fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
+check "--stop gives Grok the same prompt as a plain run" '[ -s "$root/plain_prompt" ] && cmp -s "$STUB/prompt" "$root/plain_prompt"'
+check "--stop: status reports it in its own field, with its head and fingerprint, and grok: none" 'status | grep -qF "grok: none, grok stop: done on ${H:0:7} (no findings, spec fingerprint $REQ_FP), ci:"'
+rm "$STUB/args"; rc=$(srun)
+check "--stop after a posted stop review is refused: exit 1, Grok does not run, nothing posted" '[ "$rc" = 1 ] && grep -q "not reviewed: Grok.s stop review already ran on #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 2 ]'
+rc=$(run)
+check "a plain --grok after a posted stop review is refused: exit 1, Grok does not run, nothing posted" '[ "$rc" = 1 ] && grep -q "not reviewed: Grok.s stop review ran on #7 .*no plain Grok review runs after it" "$STUB/out" && ! grok_ran && [ "$(comments)" = 2 ]'
+reset; rc1=$(run); rm "$STUB/args"; rc=$(srun)
+check "--stop after a plain run reviews again and posts after it (exit 0)" '[ "$rc1" = 0 ] && [ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 4 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && [ "$(cat "$STUB/comment.3")" = "Grok stop review started on $H" ] && [ "$(first 4)" = "## Local Grok stop review of $H: no findings, spec fingerprint none" ]'
+check "after both runs, status gives grok done and the stop review done, each in its own field" 'status | grep -qF "grok: done, grok stop: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
+reset; stop_comment agent-bot >"$STUB/issue_comments.json"; rc=$(srun)
+check "this account's stop start comment refuses --stop before Grok runs" '[ "$rc" = 1 ] && grep -q "stop review already ran on #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; stop_comment agent-bot >"$STUB/issue_comments.json"; rc=$(run)
+check "this account's stop start comment refuses a plain --grok before Grok runs" '[ "$rc" = 1 ] && grep -q "no plain Grok review runs after it" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
+reset; stop_comment someone-else >"$STUB/issue_comments.json"; rc=$(srun)
+check "a stop start comment from another account does not refuse --stop" '[ "$rc" = 0 ] && grok_ran && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
+reset; stop_comment someone-else >"$STUB/issue_comments.json"; rc=$(run)
+check "a stop start comment from another account does not refuse a plain --grok" '[ "$rc" = 0 ] && grok_ran && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ]'
+reset; start_comment agent-bot >"$STUB/issue_comments.json"; rc=$(srun)
+check "this account's plain start comment does not refuse --stop" '[ "$rc" = 0 ] && grok_ran && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
+# A stop run that is not posted leaves its one run unused.
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(srun)
+check "--stop with CI failing after the review exits 4 and posts nothing, not even its start comment" '[ "$rc" = 4 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "CI did not pass on $H" "$STUB/out" && status | grep -q "grok stop: none,"'
+runs completed '"success"' >"$STUB/check_runs.json"; rm "$STUB/check_runs_later.json" "$STUB/args"; rc=$(srun)
+check "so --stop runs again after failed CI, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(srun)
+check "--stop with a head that moves during the wait for CI exits 3, posts nothing and names the stop command to run again" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from $H; run mentat review --grok --stop again" "$STUB/out"'
+echo "$H" >"$STUB/head"; rm "$STUB/push_on_ci" "$STUB/args"; rc=$(srun)
+check "so --stop runs again after the head moved, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
+reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(srun)
+check "--stop with a head the fetch does not match exits 3, before Grok runs, and names the stop command to run again" '[ "$rc" = 3 ] && ! grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from 4444444444444444444444444444444444444444; run mentat review --grok --stop again" "$STUB/out"'
+reset; touch "$STUB/hang"; rc=$(cd "$root/work tree" && MENTAT_GROK_TIMEOUT_SECONDS=2 "$mentat" review --grok --stop 7 >"$STUB/out" 2>&1; echo $?)
+check "--stop with a Grok timeout exits 1 before CI is read and posts nothing" '[ "$rc" = 1 ] && grep -q "not reviewed: .*did not finish within 2 seconds" "$STUB/out" && [ "$(comments)" = 0 ] && ! grep -q check-runs "$STUB/calls"'
+rm "$STUB/hang" "$STUB/args"; rc=$(srun)
+check "so --stop runs again after a timeout, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
+reset; touch "$STUB/result_fails"; rc=$(srun)
+check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, ci:"'
+reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --stop --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
+check "--stop between the other flags after --grok posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ]'
+for args in "--stop 7" "--local --stop 7" "--stop --grok 7" "--grok --stop --stop 7" "--grok 7 --stop"; do
+  reset
+  # shellcheck disable=SC2086 # the words are the arguments
+  rc=$(cd "$root" && "$mentat" review $args >"$STUB/out" 2>&1; echo $?)
+  check "usage error (exit 64), nothing read, for: review $args" '[ "$rc" = 64 ] && grep -qF "usage: mentat review" "$STUB/out" && [ ! -f "$STUB/calls" ]'
+done
+
 for args in "--grok" "--grok abc" "--grok 7 8" "--grok --local 7" "--grok --local" "--local --grok 7" "--grok 7 --local" "--grok --require-ci --require-ci 7" "--require-ci --grok 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   rc=$("$mentat" review $args >/dev/null 2>&1; echo $?)

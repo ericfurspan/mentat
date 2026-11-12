@@ -148,6 +148,9 @@ status_heading lib/codex.sh "printf '## Local Codex review of %s: %s, spec finge
 status_heading lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
 status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
 status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
+status_heading lib/grok.sh "printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review started on \$head\""
+status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review did not finish on \$head: \$1\""
 status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
@@ -183,17 +186,19 @@ else
 fi
 
 # The SessionStart hook prints rules.md unchanged, and its complete output, trailing newline
-# included, stays under 9,500, leaving 500 of headroom under Claude Code's 10,000-character
-# cap on a hook's output. It counts bytes, never fewer than characters, so it is never looser than the cap.
+# included, stays under a limit just above its current size, well under Claude Code's
+# 10,000-character cap on a hook's output. Growth past the limit raises it in the same pull
+# request, with the maintainer's agreement in the spec. It counts bytes, never fewer than
+# characters, so it is never looser than the cap.
 hook_file=$(mktemp) || exit 1
 if hooks/session-start >"$hook_file"; then
   hook_size=$(wc -c <"$hook_file" | tr -d ' ')
   if ! cmp -s "$hook_file" rules.md; then
     fail "hooks/session-start output differs from rules.md"
-  elif [ "$hook_size" -ge 9500 ]; then
-    fail "hooks/session-start prints $hook_size bytes, trailing newline included (limit 9500)"
+  elif [ "$hook_size" -ge 8900 ]; then
+    fail "hooks/session-start prints $hook_size bytes, trailing newline included (limit 8900)"
   else
-    pass "hooks/session-start prints rules.md, $hook_size bytes, trailing newline included (limit 9500)"
+    pass "hooks/session-start prints rules.md, $hook_size bytes, trailing newline included (limit 8900)"
   fi
 else
   fail "hooks/session-start exited non-zero"

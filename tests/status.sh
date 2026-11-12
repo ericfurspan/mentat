@@ -71,25 +71,44 @@ line() { [ "$(cat "$STUB/out")" = "$1" ]; }
 read_only() { [ ! -f "$STUB/writes" ] && [ -z "$(find "$root/work dir" -newer "$STUB/head" -print -quit)" ]; }
 
 reset; rc=$(run 7)
-check "with no reviews prints one line: no rounds, no review yet, no Grok, no CI" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, ci: none"'
+check "with no reviews prints one line: no rounds, no review yet, no Grok, no CI" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: none, ci: none"'
 check "reads only: posts, edits and pushes nothing" 'read_only && ! grep -qv -e "^repo view " -e "^api user " -e "^pr view 7 " -e "^api --paginate repos/owner/repo/" "$STUB/calls"'
 
 reset; codex "$H" findings; comment mentat-bot "Grok review started on $H"; grok "$H" "no findings"; checks completed success; rc=$(run 7)
-check "a reviewed head: one Codex round, head reviewed, Grok done, CI passed" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: done, ci: passed"'
+check "a reviewed head: one Codex round, head reviewed, Grok done, CI passed" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: done, grok stop: none, ci: passed"'
 
 reset; codex "$OLD" findings; comment mentat-bot "Grok review started on $OLD"; checks completed success in_progress -; rc=$(run 7)
-check "the head moved after the last review: names the last reviewed commit; Grok running, CI running" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: no (last reviewed 1111111), grok: running, ci: running"'
+check "the head moved after the last review: names the last reviewed commit; Grok running, CI running" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: no (last reviewed 1111111), grok: running, grok stop: none, ci: running"'
 
 reset; codex "$OLD" findings; codex "$H" incomplete; comment mentat-bot "Grok review started on $OLD"
 comment mentat-bot "Grok review did not finish on $OLD: Grok exited with status 1"; checks completed success completed failure; rc=$(run 7)
-check "an incomplete Codex review is not a round and not a reviewed head; Grok did not finish; CI failed" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: no (last reviewed 1111111), grok: did not finish, ci: failed"'
+check "an incomplete Codex review is not a round and not a reviewed head; Grok did not finish; CI failed" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: no (last reviewed 1111111), grok: did not finish, grok stop: none, ci: failed"'
 
 reset; codex "$H" findings; comment mentat-bot "Grok review started on $H"; grok "$H" incomplete; rc=$(run 7)
-check "a Grok review posted as incomplete did not finish" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: did not finish, ci: none"'
+check "a Grok review posted as incomplete did not finish" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: did not finish, grok stop: none, ci: none"'
 
 reset; codex "$OLD" findings; codex "$H" "no findings"; comment someone-else "## Local Codex review of $OLD: findings, spec fingerprint none"
 comment someone-else "Grok review started on $H"; comment someone-else "Claude review round 3 on $OLD"; rc=$(run 7)
-check "counts only comments by the account gh is signed in as" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 2, head reviewed: yes, grok: none, ci: none"'
+check "counts only comments by the account gh is signed in as" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 2, head reviewed: yes, grok: none, grok stop: none, ci: none"'
+
+# The Grok stop review has its own field; the grok field reads only the plain review.
+stop_review() { comment "${4:-mentat-bot}" "## Local Grok stop review of $1: $2, spec fingerprint ${3:-none}
+
+REVIEW RESULT: X"; }
+reset; comment mentat-bot "Grok stop review started on $H"; rc=$(run 7)
+check "a stop review's start comment alone: stop running on its head, grok none" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: running on 2222222, ci: none"'
+reset; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" "no findings" "$REQ_FP"; rc=$(run 7)
+check "a posted stop review: done, with its head, result and spec fingerprint; grok none" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: done on 2222222 (no findings, spec fingerprint $REQ_FP), ci: none"'
+reset; comment mentat-bot "Grok stop review started on $OLD"; comment mentat-bot "Grok stop review did not finish on $OLD: Grok exited with status 1"; rc=$(run 7)
+check "a stop review that did not finish names its head" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: did not finish on 1111111, ci: none"'
+reset; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" incomplete; rc=$(run 7)
+check "a stop review posted as incomplete did not finish" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: did not finish on 2222222, ci: none"'
+reset; codex "$H" findings; comment mentat-bot "Grok review started on $OLD"; grok "$OLD" findings; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" findings "$REQ_FP"; rc=$(run 7)
+check "a plain review and a stop review: each in its own field" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: done, grok stop: done on 2222222 (findings, spec fingerprint $REQ_FP), ci: none"'
+reset; comment mentat-bot "Grok review started on $OLD"; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" findings; rc=$(run 7)
+check "a stop review does not change a plain run still running" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: running, grok stop: done on 2222222 (findings, spec fingerprint none), ci: none"'
+reset; comment someone-else "Grok stop review started on $H"; stop_review "$H" findings none someone-else; comment someone-else "Grok stop review did not finish on $H: x"; rc=$(run 7)
+check "a stop review by another account does not count" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: none, ci: none"'
 
 reset; comment mentat-bot "Claude review round 1 on ${OLD:0:7}
 
@@ -97,28 +116,28 @@ Agreed request fingerprint: 000000000000"; comment mentat-bot "Claude review rou
 
 No findings.
 Agreed request fingerprint: $REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "Claude review rounds are counted when present, a short head matches, and the spec fingerprint matches" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, claude rounds 2, head reviewed: yes, grok: none, ci: none, spec: matches"'
+check "Claude review rounds are counted when present, a short head matches, and the spec fingerprint matches" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, claude rounds 2, head reviewed: yes, grok: none, grok stop: none, ci: none, spec: matches"'
 
 reset; codex "$H" findings "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request: the fingerprint matches as mentat review --request computes it (a path with spaces works)" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, ci: none, spec: matches"'
+check "--request: the fingerprint matches as mentat review --request computes it (a path with spaces works)" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, grok stop: none, ci: none, spec: matches"'
 other=$(printf '%s' "$(cat "$root/work dir/other request.md")" | shasum -a 256 | cut -c1-12)
 rc=$(run 7 --request "$root/work dir/other request.md")
-check "--request: a different spec is told apart, with both fingerprints" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review $REQ_FP, file $other)"'
+check "--request: a different spec is told apart, with both fingerprints" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, grok stop: none, ci: none, spec: differs (last review $REQ_FP, file $other)"'
 reset; codex "$H" findings; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request: a review without a fingerprint differs" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
+check "--request: a review without a fingerprint differs" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, head reviewed: yes, grok: none, grok stop: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
 reset; codex "$OLD" findings; comment mentat-bot "Claude review round 1 on ${H:0:7}
 
 No findings."; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request: a Claude round without a fingerprint line reads as none" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, claude rounds 1, head reviewed: yes, grok: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
+check "--request: a Claude round without a fingerprint line reads as none" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 1, claude rounds 1, head reviewed: yes, grok: none, grok stop: none, ci: none, spec: differs (last review none, file $REQ_FP)"'
 reset; comment mentat-bot "Claude review round 1 on ${H:0:7}
 
 The Codex comment says Agreed request fingerprint: 000000000000 for an older request.
 > - Agreed request fingerprint: 000000000000
 
 Agreed request fingerprint: $REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request: a Claude round's fingerprint is its own record line, not one quoted in its findings" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, claude rounds 1, head reviewed: yes, grok: none, ci: none, spec: matches"'
+check "--request: a Claude round's fingerprint is its own record line, not one quoted in its findings" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, claude rounds 1, head reviewed: yes, grok: none, grok stop: none, ci: none, spec: matches"'
 reset; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request with no review yet says so" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, ci: none, spec: no review yet"'
+check "--request with no review yet says so" '[ "$rc" = 0 ] && line "head 2222222, codex rounds 0, head reviewed: no (no review yet), grok: none, grok stop: none, ci: none, spec: no review yet"'
 reset; rc=$(run 7 --request "$root/no such file.md")
 check "--request with a missing file cannot read (exit 1) and reads nothing from GitHub" '[ "$rc" = 1 ] && grep -q "could not read the agreed request file" "$STUB/err" && [ ! -f "$STUB/calls" ]'
 

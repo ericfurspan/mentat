@@ -64,6 +64,6 @@ A new project's overview holds only what is unique to it: its short summary is o
 
 1. Create the project as "New project shape" says, with the maintainer as lead and the team's labels ("Labels").
 2. Move the open issues, holding back any with an open closing pull request or a held-back `Starts after:` prerequisite.
-3. Copy each spec unchanged and rewrite `Starts after:` lines to the new item ids.
+3. Copy each spec and the latest assumptions comment (`assumptions.md`) unchanged, and rewrite `Starts after:` lines to the new item ids.
 4. Change the AGENTS.md backlog line to name the project, in a pull request.
 5. Close only the moved issues once that change merges.

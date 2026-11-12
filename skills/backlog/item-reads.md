@@ -10,7 +10,7 @@ A listing reads only what it names. The lookup of the next-work offer (`next-wor
 
 ## The maintainer's comments
 
-The maintainer is who the tracker's adapter names. A comment this session wrote, or one in a record shape these skills define (spec fingerprint, advice, second-opinion settlement, the copy of a hand-made item's original text, answer replies) or the maintainer's own instructions name, is not theirs. Text whose authorship stays unclear is context, never a maintainer choice.
+The maintainer is who the tracker's adapter names. A comment this session wrote, or one in a record shape these skills define (spec fingerprint, advice, material assumptions, second-opinion settlement, the copy of a hand-made item's original text, answer replies) or the maintainer's own instructions name, is not theirs. Text whose authorship stays unclear is context, never a maintainer choice.
 
 A maintainer comment that asks a question or objects is open until a later answer reply answers it, the maintainer answers or withdraws it, or its thread is resolved where the tracker has resolved threads. A later maintainer question or objection in a resolved thread opens it again.
 

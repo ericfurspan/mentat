@@ -2,7 +2,8 @@
 # SessionStart hook: prints rules.md, Mentat's workflow rules, which Claude Code
 # adds to every session's context on startup, resume, clear, compact and fork.
 # Claude Code caps a hook's output at 10,000 characters; tests/run holds this
-# hook's output under 9,500, leaving 500 characters of headroom.
+# hook's output under a limit just above its current size, raised only in the
+# pull request that grows past it, with the maintainer's agreement in the spec.
 # Finds rules.md relative to this script, never the working directory, so it
 # also runs outside a plugin.
 set -euo pipefail
