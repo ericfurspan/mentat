@@ -25,7 +25,7 @@ The maintainer's own instructions name channel readers for triage, in an order; 
 
 ## The Inbox
 
-For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say). Read every page of a list. Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.
+For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say). Read every page of a list. Read each item the sitting asks about in full, as `mentat:backlog` "Reading an item" says. Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.
 
 ## Search
 
@@ -46,7 +46,7 @@ Ask each item's questions together, never interleaved with another item's. A dec
 
 ## Record each answer
 
-Record each answer before asking the next, as `mentat:backlog`, the tracker's adapter and the maintainer's instructions say, so "The Inbox" does not find the item again. An item from a further inbox is recorded as those instructions say; accepted, it becomes a backlog item holding its text (or reuses one), read back, then leaves that inbox. For an Inbox item:
+Record each answer before asking the next, as `mentat:backlog`, the tracker's adapter and the maintainer's instructions say, so "The Inbox" does not find the item again. An item from a further inbox is recorded as those instructions say; accepted, it becomes a backlog item holding its text (or reuses one), read back, then leaves that inbox. Recording an answer also posts the answer reply for the open maintainer comments it answered (`mentat:backlog` "Reading an item"). For an Inbox item:
 
 - Accept: Claude Code writes the item shape through `mentat:backlog`, moves it to Backlog and reads it back, never through the tracker's own triage actions.
 - Close: one update adds the first description line `Closed <date>: <the maintainer's reason in their terms>.` and ends the item as canceled. A retry adds no line the description already opens with.
@@ -57,7 +57,7 @@ For an item from a reader that posts outcomes at its source, follow that reader'
 
 ## Report
 
-Report once, after the asking, with only these parts in this order: one line saying how many questions were decided and how many questions were left for a later sitting, by project only when the sitting covered more than one; a failure only when something is still broken or was skipped, saying what it blocks; one line per reader run unscoped; one line per decision that "Ask" sent to its own planning session, naming `/mentat:plan <id>`; one line per consequential call Claude Code made without the maintainer; and, when no item was accepted and no questions are left, one line saying nothing is left to propose. Each item's outcome and number stay in the records that "Record each answer" wrote. When a closing question follows, the report opens its text, ahead of the question; with none, the report is the reply. Then, unless the sitting stopped at "Stop", exactly one of these:
+Report once, after the asking, with only these parts in this order: one line saying how many questions were decided and how many questions were left for a later sitting, by project only when the sitting covered more than one; a failure only when something is still broken or was skipped, saying what it blocks; one line per reader run unscoped; one line per decision that "Ask" sent to its own planning session, naming `/mentat:plan <id>`; one line per consequential call Claude Code made without the maintainer; and, when no item was accepted and no questions are left, one line saying the Inbox holds nothing more to settle. Each item's outcome and number stay in the records that "Record each answer" wrote. When a closing question follows, the report opens its text, ahead of the question; with none, the report is the reply. Then, unless the sitting stopped at "Stop", exactly one of these:
 
 - An accepted item has no decision that "Ask" sent to its own planning session, whether or not questions are left: one `AskUserQuestion` asks which such item to plan first with `mentat:propose`: the recommended one first, named, with why in the question, then other such items in the slots the prompt's limit leaves, and "Not now" last. An item with such a decision is not offered; its next step stays `/mentat:plan <id>`.
 - None was accepted, or each has such a decision, and questions are left: one `AskUserQuestion` offers another sitting, "Not now" last.

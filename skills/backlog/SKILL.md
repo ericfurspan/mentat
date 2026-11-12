@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Start waits", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".
+With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -84,6 +84,10 @@ When the only record is on GitHub and a step needs a value GitHub records may no
 ## Start waits
 
 With either tracker, agreed work that cannot start until another item is done, a pull request merges or a count is reached carries a start wait. Before writing or reading one, read `start-waits.md` in this skill's folder: its forms, who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
+
+## Reading an item
+
+With either tracker, before reading an item to plan, propose, triage or build it, or to record an answer on it, read `item-reads.md` in this skill's folder, and again after a compaction.
 
 ## Replies in chat
 
