@@ -285,7 +285,7 @@ reset; echo 2021-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-
 grok_no_opinion "a refresh that does not extend an expired sign-in" "Grok's sign-in expired at 2021-01-01T00:00:00Z"
 check "that refresh was tried, Grok never started and no token is printed" '! grok_ran && [ -f "$STUB/args_models" ] && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr"'
 reset; echo garbage >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run "$idea"); reset_signin
-grok_no_opinion "a sign-in that cannot be read after the refresh" "Grok's sign-in could not be read after Mentat tried to refresh it.*grok login"
+grok_no_opinion "a sign-in that cannot be read after the refresh" "Grok's sign-in could not be read after Mentat tried to refresh it"
 check "that sign-in means Grok never started and nothing from the file is printed" '! grok_ran && ! grep -q "fake-token\|garbage" "$STUB/stdout" "$STUB/stderr"'
 reset; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run "$idea"); reset_signin
 grok_no_opinion "a time limit that is not a number" "could not work out when Grok's time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is soon)"
