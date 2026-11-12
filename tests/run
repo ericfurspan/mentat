@@ -214,6 +214,9 @@ phrase_check skills/pr/SKILL.md "the Why line's source, never a guess" "Take it 
 phrase_check skills/pr/SKILL.md "the Why line's fallback with no record" "with no record it reads \`Why: not recorded.\`"
 phrase_check skills/pr/SKILL.md "the status line's rounds against the limit" "the \`codex rounds\` count from \`mentat status <N>\` against a limit of five plus any extra rounds a Verification line records the maintainer allowing, or, on the Claude-only path (\`mentat:claude-review\`), the \`claude rounds\` count against two"
 phrase_check lib/shared.sh "the review prompt's intent from the alert, not the Why line" 'its "Why:" line says where the work came from, not the intent'
+# The note's first sentence is short and plain, and a shorter one is not a disagreement with the reviewer's.
+phrase_check skills/pr/SKILL.md "the note's plain first sentence of about 25 words with no path, command or flag" "The note's first sentence says what changes for the maintainer, in plain words, in about 25 words at most, with no file path, command or flag."
+phrase_check lib/shared.sh "the review prompt's rule that leaving out detail is not a disagreement" 'A description sentence that leaves out detail yours has does not disagree with it; only a different claim about what the change does is a disagreement.'
 phrase_check lib/shared.sh "the review prompt's rule for wording in text agents follow" 'There, wording, names included, is a correctness problem when it can be read in a way that makes an agent act wrongly'
 phrase_check skills/backlog/SKILL.md "where the work came from in an item's opening sentence" 'from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat'
 for s in 'Look here first' 'Not in scope'; do
