@@ -45,7 +45,7 @@ Head: <commit>, round <n> of <limit>
 
 | Requirement | Check | Observed |
 |---|---|---|
-| <number> | <the check that covers it> | <what was observed; a hand check says who checked and what they saw> |
+| <number> | <the check that covers it> | <what was observed; a check that failed before the fix and passed after is the builder's report and gives both; a hand check says who checked and what they saw> |
 
 Built with: session <model>, effort <effort> (read at each builder run); builder <model>, effort <effort> (configured).
 
