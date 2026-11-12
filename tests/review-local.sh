@@ -83,8 +83,10 @@ trap cleanup EXIT
 export STUB="$root/stub"
 # A temporary home: the publish check reads the home path and the word list from it.
 export HOME="$root/home"
+# Kept logs and held comments, and the folders the start sweep reads, are the test's own.
+export TMPDIR="$root/tmp" XDG_CACHE_HOME="$root/cache"
 LIST="$HOME/.config/mentat/private-words"
-mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")"
+mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")" "$TMPDIR"
 failures=0
 check() { if eval "$2"; then printf 'PASS: review --local %s\n' "$1"; else printf 'FAIL: review --local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -531,6 +533,26 @@ kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
 check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
+
+# At start, Grok run folders older than a day, and kept logs and held comments older than
+# seven days, are deleted. Newer ones, other names, symlinks and their targets stay.
+ago() { touch -h -t "$(date -v-"$1"M +%Y%m%d%H%M.%S)" "$2"; } # $1 minutes ago, $2 path
+c="$XDG_CACHE_HOME/mentat" elsewhere="$root/elsewhere"
+mkdir -p "$c" "$elsewhere/dir" && echo keep >"$elsewhere/dir/f" && echo keep >"$elsewhere/file"
+for d in grok-review.old grok-opinion.old grok-opinion-web.old grok-review.new grok-reviewx; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
+ln -s "$elsewhere/dir" "$c/grok-review.link"
+for f in mentat-codex-log.old mentat-grok-log.old mentat-held-comment.old mentat-codex-log.new mentat-codex-logs; do echo x >"$TMPDIR/$f"; done
+ln -s "$elsewhere/file" "$TMPDIR/mentat-grok-log.link"
+for p in grok-review.old grok-opinion.old grok-opinion-web.old; do ago 1445 "$c/$p"; done
+ago 1435 "$c/grok-review.new"
+for p in "$c/grok-reviewx" "$c/grok-review.link" "$elsewhere/dir"; do ago 2880 "$p"; done
+for p in mentat-codex-log.old mentat-grok-log.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
+ago 10075 "$TMPDIR/mentat-codex-log.new"
+for p in "$TMPDIR/mentat-codex-logs" "$TMPDIR/mentat-grok-log.link" "$elsewhere/file"; do ago 20160 "$p"; done
+reset; rc=$(run)
+check "at start, deletes Grok run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/grok-review.old" ] && [ ! -e "$c/grok-opinion.old" ] && [ ! -e "$c/grok-opinion-web.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ] && [ ! -e "$TMPDIR/mentat-grok-log.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
+check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/grok-review.new/f" ] && [ -f "$c/grok-reviewx/f" ] && [ -L "$c/grok-review.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-codex-log.new" ] && [ -f "$TMPDIR/mentat-codex-logs" ] && [ -L "$TMPDIR/mentat-grok-log.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
+rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
 
 # Live sandbox check. Replays the -c settings the review passed to the stub through the
 # real `codex sandbox` (no model call) and runs shell probes against the review

@@ -255,6 +255,13 @@ took=$((SECONDS - took))
 check "INT to its process group stops both model processes within seconds and leaves no process, run folder or temporary folder" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/grok_pid" ] && [ -n "$before" ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$wp" 2>/dev/null && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/grok_pid")" 2>/dev/null && clean'
 kill -9 -- "-$wp" 2>/dev/null
 
+# The start sweep (tests/review-local.sh has its full set of cases) runs for second-opinion --web too.
+mkdir -p "$cache/mentat/grok-opinion-web.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-opinion-web.old"
+echo x >"$TMPDIR/mentat-grok-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-grok-log.old"
+reset; rc=$(run "$question")
+check "at start, deletes a Grok run folder older than a day and a kept log older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-opinion-web.old" ] && [ ! -e "$TMPDIR/mentat-grok-log.old" ]'
+rm -rf "$cache/mentat/grok-opinion-web.old" "$TMPDIR/mentat-grok-log.old"
+
 # Usage errors: exactly one existing file.
 reset; rc=$(run)
 check "no question file is a usage error (exit 64) with the usage line, and nothing ran" '[ "$rc" = 64 ] && grep -qF "usage: mentat second-opinion [--web] <file>" "$STUB/stderr" && ! codex_ran && ! grok_ran'

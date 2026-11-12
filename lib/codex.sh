@@ -148,6 +148,7 @@ run_codex() {
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp headref baseref
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  sweep_leftovers
   review_traps
   read_request "$pr"
   local tool

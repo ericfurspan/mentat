@@ -450,6 +450,7 @@ review_grok() {
   local web_search="" again="mentat review --grok"
   [ "${grok_stop:-no}" = no ] || again="mentat review --grok --stop"
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--stop] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  sweep_leftovers
   review_traps
   read_request "$pr"
   grok_prepare

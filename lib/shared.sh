@@ -30,6 +30,15 @@ review_stop() { # $1 exit status
   fi
   exit "$1"
 }
+# Deletes, at the start of a review or second opinion, what stopped runs left: Grok run
+# folders older than a day, and kept logs and held comments older than seven days. It
+# follows no symlink in those folders, and a failure is ignored.
+sweep_leftovers() {
+  local cache=${XDG_CACHE_HOME:-$HOME/.cache}
+  case "$cache" in /*) find "$cache/mentat/" -mindepth 1 -maxdepth 1 -type d \( -name 'grok-review.*' -o -name 'grok-opinion.*' -o -name 'grok-opinion-web.*' \) -mmin +1440 -exec rm -rf {} + 2>/dev/null ;; esac
+  find "${TMPDIR:-/tmp}/" -mindepth 1 -maxdepth 1 -type f \( -name 'mentat-codex-log.*' -o -name 'mentat-grok-log.*' -o -name 'mentat-held-comment.*' \) -mmin +10080 -exec rm -f {} + 2>/dev/null
+  return 0
+}
 
 # How many commits on origin's default branch HEAD lacks, so a second opinion never
 # judges a stale checkout. Sets the caller's fresh_def (the default branch), fresh_behind

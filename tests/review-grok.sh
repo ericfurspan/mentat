@@ -569,6 +569,13 @@ reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci
 check "INT to its process group during the wait for CI leaves no process, removes the run folder within seconds and posts nothing" '[ -n "$before" ] && gone && [ "$(comments)" = 0 ]'
 kill -9 -- "-$ip" 2>/dev/null
 
+# The start sweep (tests/review-local.sh has its full set of cases) runs for review --grok too.
+mkdir -p "$cache/mentat/grok-review.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-review.old"
+echo x >"$TMPDIR/mentat-held-comment.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-held-comment.old"
+reset; rc=$(run)
+check "at start, deletes a Grok run folder older than a day and a held comment older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-review.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
+rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
+
 # Live profile check. Starts the real Grok through the review, with the sign-in removed
 # so that no model is called and nothing is sent, and reads the event Grok writes when it
 # applies the generated profile: it must apply, be enforced, and carry the profile's

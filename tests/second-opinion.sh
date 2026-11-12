@@ -329,6 +329,13 @@ took=$((SECONDS - took))
 check "INT to its process group stops both model processes within seconds and leaves no process, worktree, run folder or temporary folder" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/grok_pid" ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$wp" 2>/dev/null && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/grok_pid")" 2>/dev/null && clean'
 kill -9 -- "-$wp" 2>/dev/null
 
+# The start sweep (tests/review-local.sh has its full set of cases) runs for second-opinion too.
+mkdir -p "$cache/mentat/grok-opinion.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-opinion.old"
+echo x >"$TMPDIR/mentat-codex-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-codex-log.old"
+reset; rc=$(run "$idea")
+check "at start, deletes a Grok run folder older than a day and a kept log older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-opinion.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ]'
+rm -rf "$cache/mentat/grok-opinion.old" "$TMPDIR/mentat-codex-log.old"
+
 # Usage errors: exactly one existing file.
 reset; rc=$(run)
 check "no idea file is a usage error (exit 64), and nothing ran" '[ "$rc" = 64 ] && ! codex_ran && ! grok_ran'
