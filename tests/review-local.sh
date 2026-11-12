@@ -225,6 +225,9 @@ check "the bullets and the whole reply are folded, a blank line follows the summ
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
+check "the prompt takes the intent from the Summary opening sentence, or the template equivalent" 'grep -q "its intent is the opening sentence of its Summary (or of the equivalent section of the repository.s own template)" "$STUB/prompt"'
+check "the prompt finds the finding lines in the Review details" 'grep -q "description.s Review details hold one line for each finding already fixed or answered" "$STUB/prompt"'
+check "the prompt finds the hand-check report in the Review details" 'grep -q "description.s Review details report who checked it and what they saw" "$STUB/prompt"'
 # The issues the pull request closes reach Codex as labeled data, ahead of the description.
 ref() { printf '{"number":%s,"repository":{"name":"%s","owner":{"login":"%s"}}}' "$3" "$2" "$1"; }
 reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(run)
