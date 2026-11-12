@@ -26,7 +26,7 @@ On a wait, add the `Waiting on you` label and assign the item to the project's l
 
 The next agreed work, the tracker's order, is the open Todo items without the `Waiting on you` label and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
 
-The Backlog order, for the lookup of the next-work offer (`next-work.md`), is the open Backlog items, not parked, ranked by the same keys: Priority level, then oldest created first within a level.
+The Backlog order, for the lookup of the next-work offer (`next-work.md`), is the open Backlog items, not parked, ranked by the same keys: Priority level, then oldest created first within a level. Read every page of results before ranking; Linear's own drag order is not used.
 
 ## Reading an item
 
