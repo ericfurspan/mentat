@@ -247,8 +247,10 @@ phrase_check rules.md "a correction within the agreed scope followed at once" 'C
 phrase_check rules.md "the triggers for filing a lesson" 'When the maintainer corrected the same point twice, said it should hold in later work, or stated a preference about how agents work in general,'
 phrase_check rules.md "a lesson filed at once in the Inbox with no prompt, named in one line of the reply, and a failed write said" 'Claude Code files the lesson at once in the Inbox, with no prompt, and names it in one line of its reply, which says the write failed if it did;'
 phrase_check rules.md "what does not trigger filing a lesson, and once per point" 'never for a one-off instruction for this task, a reversal already asked as a scope question or a failed check inside the review loop, and at most once per point per session.'
-phrase_check rules.md "the lesson entry names what it would change, and filing agrees nothing" "The entry names what an accepted item would change (for a working-style preference, the maintainer's own instructions); filing agrees nothing, and triage settles it."
-phrase_check rules.md "no duplicate check when filing a lesson" 'There is no duplicate check at filing; triage merges repeats.'
+phrase_check skills/backlog/lessons.md "when to read it" "Read this when filing a lesson from a correction (\`rules.md\` \"What goes to the maintainer\"), and again after a compaction."
+phrase_check skills/backlog/lessons.md "the lesson entry names what it would change, and filing agrees nothing" "The entry names what an accepted item would change (for a working-style preference, the maintainer's own instructions); filing agrees nothing, and triage settles it."
+phrase_check skills/backlog/lessons.md "no duplicate check when filing a lesson" 'There is no duplicate check at filing; triage merges repeats.'
+phrase_check skills/backlog/SKILL.md "the pointer to lessons.md" "A lesson from a correction is filed as \`lessons.md\` in this skill's folder says."
 
 # A triage sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
 # after a compaction, and sends nothing it collects to Codex or Grok.
