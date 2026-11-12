@@ -159,6 +159,16 @@ for c in "grep -n 'git commit -am' tests/run" 'echo "then run git commit -am wip
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c commits nothing and stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
 done
+heredoc_to() { printf '%s <<EOF\ngit commit -am x\nEOF' "$1"; }
+for c in "gh pr create --body 'run git commit -am x'" "$(heredoc_to cat)"; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c commits nothing and stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
+done
+for c in "bash -c 'git commit -am x'" 'sh -c "git commit -am x"' 'eval "git commit -am x"' "$(heredoc_to bash)" \
+  "sudo bash -c 'git commit -am x'" "xargs sh -c 'git commit -am x'"; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c, a commit a shell may run, asks as a failed simulation" 'sim_failed'
+done
 for c in '(echo "git commit -am x")' 'x=$(echo "git commit -am x")'; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c, a quoted commit it cannot place, asks as a failed simulation" 'sim_failed'
