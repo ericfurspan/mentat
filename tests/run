@@ -527,7 +527,7 @@ phrase_check skills/backlog/next-work.md "the offer after a build queue, none mi
 phrase_check skills/backlog/next-work.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (the post-merge step in \`../review/after-ready.md\`, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
 phrase_check skills/backlog/next-work.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
 phrase_check skills/backlog/next-work.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
-phrase_check skills/backlog/next-work.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
+phrase_check skills/backlog/next-work.md "a merge still waiting named in one plain line, with no repeated merge line" 'A merge still waiting is named in one line, in plain words, without repeating a "Ready to merge: #N" line an earlier message gave.'
 phrase_check rules.md "a web-mode question file holding only the question, nothing private" "- A \`mentat second-opinion --web\` file holds only the question, nothing private."
 phrase_check skills/backlog/next-work.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` \"The order of agreed work\") read-only, and reports one of:"
 phrase_check skills/backlog/next-work.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
