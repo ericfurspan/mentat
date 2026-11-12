@@ -465,8 +465,10 @@ while [[ $rest =~ $re ]]; do
       ;;
   esac
 done
-# Past a stop, a write runs in the folder known there, unknown if a cd may come first;
-# files past it are still read from the folder known there.
+# Past a stop, a write runs in the folder known there, unknown if a cd or a background &
+# (not && or a redirect such as 2>&1 or &>) may come first; files past it are still read
+# from the folder known there. A ) there cannot change it: a cd in a group already
+# leaves the folder unknown.
 stopped=""
 case "$rest" in *[![:space:]]*) stopped=1 ;; esac
 if [ -n "$stopped" ]; then cd_end stop; else cd_end end; fi
@@ -474,7 +476,10 @@ end_command
 kept+=$held$hd_text$rest past+=$rest
 stop_dir=$dir
 if [ -n "$stopped" ]; then
-  ! grep -Eq '(^|[^[:alnum:]_.-])(cd|pushd|popd)([[:space:]]|$)' <<<"$rest" || dir=""
+  if grep -Eq '(^|[^[:alnum:]_.-])(cd|pushd|popd)([[:space:]]|$)' <<<"$rest" ||
+    grep -Eq '(^|[^&<>|])&([^&>]|$)' <<<"$rest"; then
+    dir=""
+  fi
   ! grep -Eq -e "$forms" -e "$gh_api" <<<"$rest" || here
 fi
 [ "$targets" != $'\n' ] || here
@@ -514,16 +519,17 @@ while IFS= read -r flag; do
 done <<<"$(grep -Eo -- "(^|[[:space:]])$re" <<<"$past")"
 
 # A hit asks if any target is public. A folder's checkout is looked up from that folder,
-# and one the lookup cannot enter counts as public; an unknown folder asks unlooked.
+# and one the lookup cannot enter counts as public; an unknown folder asks before any
+# lookup.
 text=$kept$files
 hit=$(private_text "$text") || exit 0
-targets=${targets#$'\n'}
 public=""
-while IFS= read -r t; do
+case "$targets" in *$'\n'u:$'\n'*) public=1 ;; esac
+targets=${targets#$'\n'}
+[ -n "$public" ] || while IFS= read -r t; do
   case "$t" in
     r:*) publish_hit "$text" "${t#r:}" >/dev/null && public=1 ;;
     d:*) (cd "${t#d:}" 2>/dev/null || exit 0; publish_hit "$text" "" >/dev/null) && public=1 ;;
-    *) public=1 ;;
   esac
   [ -z "$public" ] || break
 done <<<"${targets%$'\n'}"

@@ -229,6 +229,8 @@ A
 cd y
 B"
 check "past a heredoc it cannot read, with a cd in it, a relative body file is read from the stop folder" 'asks "$c"'
+check "a background & past a stop makes the remainder's target unknown" 'asks "true; cd \"$priv\" && gh pr edit 1 --body \"\$(printf ok)\" & gh pr comment 2 --body stubcodename" && ! looked_up'
+check "a 2>&1 redirect past a stop keeps the stop folder as the remainder's target" 'silent "true; cd \"$priv\" && gh pr edit 1 --body \"\$(printf ok)\" 2>&1; gh pr comment 2 --body stubcodename" && looked_in "$priv"'
 check "a ) closing a group before a cd lets the cd be followed" 'silent "(true); cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 check "private then public cd: the public one counts" 'asks "cd \"$priv\"; cd \"$pub\" && gh pr comment 1 --body stubcodename" && looked_in "$pub" && ! looked_in "$priv"'
 check "public then private cd: the private one counts" 'silent "cd \"$pub\"; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv" && ! looked_in "$pub"'
