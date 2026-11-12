@@ -26,6 +26,12 @@ On a wait, add the `Waiting on you` label and assign the item to the project's l
 
 The next agreed work, the tracker's order, is the open Todo items without the `Waiting on you` label and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
 
+The Backlog order, for the lookup of the next-work offer (`next-work.md`), is the open Backlog items, not parked, ranked by the same keys: Priority level, then oldest created first within a level. Read every page of results before ranking; Linear's own drag order is not used.
+
+## Reading an item
+
+For `item-reads.md`: the maintainer is the project's lead, the lead field of the project. List every page of an item's comments. An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads included. Attachment links in comments are not downloaded.
+
 ## Second opinion records
 
 Upload the replies file with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
