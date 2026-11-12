@@ -19,7 +19,7 @@ A builder's brief for an item carries its latest assumptions comment as given, w
 
 ## What reaches the maintainer
 
-The comment is the agents' record; nothing the maintainer must see is only there. The standing assumptions reach them in `mentat:propose`'s agreement question. A disproof that changes scope, cost or risk, or would change a numbered requirement, reaches them in chat as the existing scope question and, until answered, is recorded on the item as a decision for the maintainer that blocks its work (`mentat:build` step 3). An agreed change rewrites the spec and records its fingerprint ("Agreement" in `SKILL.md`). Any other disproof changes only how the build meets and tests the existing requirements.
+The comment is the agents' record; nothing the maintainer must see is only there. The standing assumptions reach them in `mentat:propose`'s agreement question. A disproof that changes scope, cost or risk, or would change a numbered requirement, reaches them in chat as the existing scope question and, until answered, is recorded on the item as a decision for the maintainer that blocks its work (`../build/SKILL.md` step 3). An agreed change rewrites the spec and records its fingerprint ("Agreement" in `SKILL.md`). Any other disproof changes only how the build meets and tests the existing requirements.
 
 ## Moving GitHub issues to Linear
 
