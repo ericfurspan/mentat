@@ -207,6 +207,38 @@ else
   fail "hooks/session-start differs when run from another directory"
 fi
 
+# The safety rules in rules.md match tests/fixtures/rules-safety.md exactly: the Approval and
+# "What agents never do" sections (heading to the next level-two heading, trailing blank lines
+# dropped) and each line before the fixture's first heading, as a whole line of rules.md.
+safety=tests/fixtures/rules-safety.md
+rules_section() {
+  awk -v h="$2" '
+    $0 == h { on = 1; print; next }
+    on && /^## / { exit }
+    on && $0 == "" { blank++; next }
+    on { while (blank > 0) { print ""; blank-- } print }
+  ' "$1"
+}
+for h in '## Approval' '## What agents never do'; do
+  n=$(grep -cxF -- "$h" rules.md)
+  if [ "$n" != 1 ]; then
+    fail "rules.md must have the heading \"$h\" exactly once (it has $n)"
+  elif d=$(diff <(rules_section "$safety" "$h") <(rules_section rules.md "$h")); then
+    pass "rules.md's \"$h\" section matches $safety"
+  else
+    fail "rules.md's \"$h\" section differs from $safety (< fixture, > rules.md):"
+    printf '%s\n' "$d"
+  fi
+done
+while IFS= read -r s; do
+  [ -n "$s" ] || continue
+  if grep -qxF -- "$s" rules.md; then
+    pass "rules.md has the whole line from $safety: ${s:0:60}..."
+  else
+    fail "rules.md must have this line from $safety, whole and unchanged: $s"
+  fi
+done <<< "$(awk '/^## / { exit } NF' "$safety")"
+
 # Each skill's name matches its folder, which is how Claude Code finds it.
 for f in skills/*/SKILL.md; do
   [ -e "$f" ] || continue
