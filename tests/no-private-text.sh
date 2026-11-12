@@ -21,6 +21,7 @@ cat >"$root/bin/gh" <<'STUBEOF'
 printf '%s\n' "$PWD: $*" >>"$STUB/calls"
 [ -f "$STUB/lookup_fails" ] && exit 1
 case "$*" in *owner/private*) echo true; exit ;; *o/public*) echo false; exit ;; esac
+[ -f "$STUB/private_dirs" ] && grep -qxF -- "$PWD" "$STUB/private_dirs" && { echo true; exit; }
 [ -f "$STUB/private" ] && echo true || echo false
 STUBEOF
 chmod +x "$root/bin/gh"
@@ -139,6 +140,137 @@ reset; decision "cd $root/other && gh pr comment 7 --body stubcodename" >/dev/nu
 check "looks up the checkout a leading cd goes to, else the session's" 'grep -qF "$root/other: repo view --json isPrivate" "$STUB/calls"'
 reset; decision "gh pr comment 7 --body stubcodename" >/dev/null
 check "without a cd, looks up the checkout of the session" 'grep -qF "$root/work: repo view --json isPrivate" "$STUB/calls"'
+
+# Each gh command's checkout is the folder it runs in. The stub says a folder listed in
+# private_dirs is private. The worktrees are under the home folder, so a cd operand left
+# in the text is a hit; the scratchpad is under TMPDIR.
+reset
+priv="$HOME/wtpriv" priv2="$HOME/wtpriv2" pub="$HOME/wtpub" pad="$TMPDIR/scratch pad"
+mkdir -p "$priv" "$priv2" "$pub" "$pad"
+printf 'about StubCodename\n' >"$pub/note.md"
+for f in "$priv/note.md" "$priv/word.md" "$priv/body.md" "$pub/body.md"; do printf 'clean\n' >"$f"; done
+dirs() { printf '%s\n' "$priv" "$priv2" >"$STUB/private_dirs"; }
+silent() { rm -f "$STUB/calls"; [ -z "$(decision "$@")" ]; }
+asks() { rm -f "$STUB/calls"; [ "$(decision "$@")" = ask ]; }
+looked_in() { grep -qsF "$1: repo view --json isPrivate" "$STUB/calls"; }
+dirs
+c="cd \"$pad\" && python3 - <<'PY'
+import pathlib
+pathlib.Path(\"$priv/body.md\").write_text(\"body\")
+PY
+cd \"$priv\" && gh pr edit 7 --body-file body.md"
+check "a scratchpad heredoc command, then a cd to a private worktree, stays silent" 'silent "$c" && looked_in "$priv" && ! looked_in "$pad"'
+c=${c//wtpriv/wtpub}
+check "a scratchpad heredoc command, then a cd to a public worktree, asks" 'asks "$c" && looked_in "$pub"'
+c="cat >notes.md <<'EOF'
+see $HOME/x
+EOF
+cd \"$pub\" && gh pr comment 1 --body ok"
+check "a home path in a heredoc body asks for a public repository" 'asks "$c" && looked_in "$pub"'
+c="cd \"$pub\" && cat <<EOF
+cd \"$priv\"
+EOF
+gh pr comment 1 --body stubcodename"
+check "a cd inside a heredoc body does not change the target" 'asks "$c" && looked_in "$pub" && ! looked_in "$priv"'
+c="cd \"$priv\" && gh pr comment 1 --body-file - <<EOF
+gh pr comment 1 --repo o/public about stubcodename
+EOF"
+check "a --repo inside a heredoc body does not change the target" 'silent "$c" && looked_in "$priv" && ! grep -qF o/public "$STUB/calls"'
+c="cd \"$pub\" && gh pr comment 1 --body-file - <<EOF
+see --body-file note.md
+EOF"
+check "a file flag inside a heredoc body is not read" 'silent "$c" && ! looked_up'
+for op in "<<EOF" "<<'EOF'" '<<"EOF"' "<< EOF" "<< 'EOF'" "<<-EOF" "2<<EOF"; do
+  c="cat $op
+about stubcodename
+EOF
+cd \"$priv\" && gh pr comment 1 --body ok"
+  check "the walk goes on after a heredoc opened by $op" 'silent "$c" && looked_in "$priv"'
+done
+c="cat <<-EOF
+	about stubcodename
+	EOF
+cd \"$priv\" && gh pr comment 1 --body ok"
+check "<<- takes a delimiter line indented by tabs" 'silent "$c" && looked_in "$priv"'
+c="gh pr comment 1 --body-file - <<EOF --repo owner/private
+about stubcodename
+EOF"
+check "words after << on its line are walked, with the delimiter on the last line" 'silent "$c" && grep -qF "repo view owner/private --json isPrivate" "$STUB/calls"'
+while IFS= read -r op; do
+  c="cat $op
+x
+A
+B
+cd \"$priv\" && gh pr comment 1 --body stubcodename"
+  check "a heredoc it cannot read stops the walk, and the cd past it is not followed: $op" 'asks "$c" && ! looked_in "$priv"'
+done <<'EOF'
+<<A <<B
+<<A"B"
+<<C
+EOF
+c="cd \"$priv\"
+cat <<A <<B
+x
+A
+B
+cd \"$pub\" && gh pr comment 1 --body stubcodename"
+check "a cd past a stop makes the folder unknown" 'asks "$c" && ! looked_up'
+check "private then public cd: the public one counts" 'asks "cd \"$priv\"; cd \"$pub\" && gh pr comment 1 --body stubcodename" && looked_in "$pub" && ! looked_in "$priv"'
+check "public then private cd: the private one counts" 'silent "cd \"$pub\"; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv" && ! looked_in "$pub"'
+check "two writes after different cds each get their own lookup" 'asks "cd \"$priv\" && gh pr comment 1 --body stubcodename; cd \"$pub\" && gh pr comment 2 --body ok" && looked_in "$priv" && looked_in "$pub"'
+c="cd \"$priv\" && gh pr comment 1 --body stubcodename
+cd \"$priv2\" && gh pr comment 2 --body ok"
+check "two writes in two private folders stay silent" 'silent "$c" && looked_in "$priv" && looked_in "$priv2"'
+check "a relative body file is read from the folder of a later cd" 'asks "cd \"$priv\" && gh pr view 1; cd \"$pub\" && gh pr comment 1 --body-file note.md" && looked_in "$pub"'
+check "a relative cd joins onto the known folder" 'silent "cd wtpriv && gh pr comment 1 --body stubcodename" "$HOME" && looked_in "$priv" && silent "cd \"$pub\"; cd ../wtpriv && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
+while IFS= read -r c; do
+  check "a cd through ~/ or \$HOME/ is followed: $c" 'silent "$c" && looked_in "$priv"'
+done <<'EOF'
+cd ~/wtpriv && gh pr comment 1 --body stubcodename
+cd "$HOME/wtpriv" && gh pr comment 1 --body stubcodename
+EOF
+check "false && cd <private> before a write leaves the folder unknown" 'asks "false && cd \"$priv\"; gh pr comment 1 --body stubcodename" && ! looked_up'
+check "false || cd <public> before a write leaves the folder unknown, from a private session folder" 'asks "false || cd \"$pub\"; gh pr comment 1 --body stubcodename" "$priv" && ! looked_up'
+check "cd <private> & gh leaves the folder unknown" 'asks "cd \"$priv\" & gh pr comment 1 --body stubcodename" && ! looked_up'
+check "(cd <private> && true); gh leaves the folder unknown" 'asks "(cd \"$priv\" && true); gh pr comment 1 --body stubcodename" && ! looked_up'
+check "after (cd <x> && true); gh, a relative body file still shows its hit" 'asks "(cd \"$priv\" && true); gh pr comment 1 --body-file word.md"'
+check "an unknown folder asks on a hit with no lookup, from a private session folder" 'asks "cd -; gh pr comment 1 --body stubcodename" "$priv" && ! looked_up'
+check "an unknown folder with no hit stays silent" 'silent "cd -; gh pr comment 1 --body ok" && ! looked_up'
+check "a cd to an absolute path after an unknown folder is followed" 'silent "cd -; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
+check "a relative cd after an unknown folder is not followed" 'asks "cd -; cd wtpriv; gh pr comment 1 --body stubcodename" "$HOME" && ! looked_up'
+while IFS= read -r c; do
+  check "a folder change it does not follow leaves the folder unknown: ${c//"$HOME"/\~}" 'asks "$c" "$priv" && ! looked_up'
+done <<EOF
+cd; gh pr comment 1 --body stubcodename
+cd -P "$pub"; gh pr comment 1 --body stubcodename
+cd "\$(echo $pub)"; gh pr comment 1 --body stubcodename
+cd "\$X/wtpub"; gh pr comment 1 --body stubcodename
+cd '$pub'; gh pr comment 1 --body stubcodename
+cd "$HOME/missing"; gh pr comment 1 --body stubcodename
+cd "$pub" | cat; gh pr comment 1 --body stubcodename
+cd "$pub" "$priv"; gh pr comment 1 --body stubcodename
+X=1 cd "$pub"; gh pr comment 1 --body stubcodename
+{ cd "$pub"; }; gh pr comment 1 --body stubcodename
+( true; cd "$pub" ); gh pr comment 1 --body stubcodename
+true && cd "$pub" && gh pr comment 1 --body stubcodename
+pushd "$pub"; gh pr comment 1 --body stubcodename
+EOF
+c="(
+cd \"$pub\"
+)
+gh pr comment 1 --body stubcodename"
+check "a cd on its own line inside a subshell leaves the folder unknown" 'asks "$c" "$priv" && ! looked_up'
+c="false &&
+cd \"$priv\"; gh pr comment 1 --body stubcodename"
+check "a cd on the line after && leaves the folder unknown" 'asks "$c" && ! looked_up'
+c="# cd \"$pub\" && gh pr comment 9 --repo o/public <<EOF \$(x)
+cd \"$priv\" && gh pr comment 1 --body stubcodename"
+check "a # comment holding command-like text is not walked" 'silent "$c" && looked_in "$priv" && ! grep -qF o/public "$STUB/calls"'
+check "an accepted cd's folder leaves the text" 'silent "cd \"$priv\" && gh pr comment 1 -R o/public --body ok"'
+check "a cd it does not follow keeps its folder in the text" 'asks "cd \"$priv\" | cat; gh pr comment 1 -R o/public --body ok"'
+c="cd \"$priv\" # $priv
+gh pr comment 1 -R o/public --body ok"
+check "a cd folder in a quote or a comment stays in the text" 'asks "cd \"$priv\" && gh pr comment 1 -R o/public --body \"cd $priv\"" && asks "$c"'
 
 # The target comes from gh's arguments, never a body. The stub says owner/private is
 # private, and o/public and the checkout, unless marked private, are public.
@@ -344,10 +476,11 @@ check "a real flag is read where gh is not its own word, and its name stays" '[ 
 check "past a stop, a file with a hit asks" '[ "$(decision "gh pr create --title \"\$(x)\" --body-file word.md")" = ask ]'
 check "past a stop, a clean file under the home folder asks, its path stays in the text" '[ "$(reason "gh pr create --title \"\$(x)\" --body-file \"$HOME/clean.md\"")" = "$path_hit" ]'
 check "past a stop, a clean file with no hit in its name is no hit" '[ -z "$(decision "gh pr create --title \"\$(x)\" --body-file clean.md")" ]'
-c='gh pr comment 5 --body-file - <<EOF
+c='gh pr comment 5 --body "$(cat <<EOF
 see --body-file word.md
-EOF'
-check "a file named in a heredoc is read too" '[ "$(decision "$c")" = ask ]'
+EOF
+)"'
+check "past a stop, a file named in a heredoc is read too" '[ "$(decision "$c")" = ask ]'
 
 # Outside the gh command, a temp path that only locates a file is not checked. TMPDIR
 # here is under a temp folder, and StubCodename in a path is the hit.
