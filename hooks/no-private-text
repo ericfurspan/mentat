@@ -212,12 +212,14 @@ cd_end() {
   cd_on=""
   case "$1" in ';' | ';;' | '&&' | '||' | nl | end) ;; *) cd_n=0 ;; esac
   if [ "$cd_n" = 1 ] && cd_dir "$cd_arg"; then dir=$v; else kept+=$cd_text; dir=""; fi
+  # A chain that goes on after the cd runs in the background if a & ends it.
+  case "$1" in '&&' | '||') chain_cd=1 ;; esac
 }
 new_line() {
   kept+=$hd_text; hd_text=""
   cd_end nl
   end_command
-  [ -n "$cont" ] || c_start=1
+  [ -n "$cont" ] || c_start=1 chain_cd=""
 }
 # parens <word>: sets n, the number of ( in the word outside quotes.
 parens() {
@@ -371,10 +373,11 @@ outside() {
 # over heredoc bodies and # comments without walking them. Words cannot be told apart
 # past a stop ($( in gh, or a << it cannot read); that text goes to past, with any word
 # outside a gh command. grp counts open ( and { groups; c_start marks the start of a
-# chain, c_any a word already in the command, cont a line that goes on after && || |.
+# chain, c_any a word already in the command, cont a line that goes on after && || |,
+# chain_cd a cd followed earlier in the chain.
 repo="" targets=$'\n' unread_api="" kept="" past="" held="" hd_text=""
 o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" sed_unk="" subst="" late=""
-cd_on="" cd_text="" cd_n=0 cd_arg="" grp=0 c_start=1 c_any="" cont=""
+cd_on="" cd_text="" cd_n=0 cd_arg="" chain_cd="" grp=0 c_start=1 c_any="" cont=""
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 next_re="^[[:blank:]]*($arg)"
@@ -392,6 +395,8 @@ while [[ $rest =~ $re ]]; do
     [\;\&\|\)]*)
       v=${w//[!)]/}; grp=$((grp - ${#v})); [ "$grp" -ge 0 ] || grp=0
       cd_end "$w"; end_command; keep
+      case "$w" in '&') [ -z "$chain_cd" ] || dir="" ;; esac
+      case "$w" in *';' | '&') chain_cd="" ;; esac
       case "$w" in *';') c_start=1 ;; *) c_start="" ;; esac
       case "$w" in '&&' | '||' | '|' | '|&') cont=1 ;; *) cont="" ;; esac
       continue

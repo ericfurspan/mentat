@@ -232,8 +232,19 @@ EOF
 check "false && cd <private> before a write leaves the folder unknown" 'asks "false && cd \"$priv\"; gh pr comment 1 --body stubcodename" && ! looked_up'
 check "false || cd <public> before a write leaves the folder unknown, from a private session folder" 'asks "false || cd \"$pub\"; gh pr comment 1 --body stubcodename" "$priv" && ! looked_up'
 check "cd <private> & gh leaves the folder unknown" 'asks "cd \"$priv\" & gh pr comment 1 --body stubcodename" && ! looked_up'
+check "cd <private> && true & gh leaves the folder unknown" 'asks "cd \"$priv\" && true & gh pr comment 1 --body stubcodename" && ! looked_up'
+check "cd <x>; cd <private> && true & gh leaves the folder unknown" 'asks "cd \"$pub\"; cd \"$priv\" && true & gh pr comment 1 --body stubcodename" && ! looked_up'
+c="cd \"$priv\" && true &
+gh pr comment 1 --body stubcodename"
+check "a chain with a followed cd ended by & at the end of a line leaves the folder unknown" 'asks "$c" && ! looked_up'
+check "cd <private> && gh, then ;, stays silent" 'silent "cd \"$priv\" && gh pr comment 1 --body stubcodename; true" && looked_in "$priv"'
 check "(cd <private> && true); gh leaves the folder unknown" 'asks "(cd \"$priv\" && true); gh pr comment 1 --body stubcodename" && ! looked_up'
-check "after (cd <x> && true); gh, a relative body file still shows its hit" 'asks "(cd \"$priv\" && true); gh pr comment 1 --body-file word.md"'
+# The subshell's folder is outside the home folder, so its cd text is no hit; its files
+# are the opposite of the session folder's.
+subsh="$root/subsh"
+mkdir -p "$subsh"
+cp "$root/work/clean.md" "$subsh/word.md"; cp "$root/work/word.md" "$subsh/clean.md"
+check "after (cd <x> && true); gh, a relative body file is read from the session folder" 'asks "(cd \"$subsh\" && true); gh pr comment 1 --body-file word.md" && silent "(cd \"$subsh\" && true); gh pr comment 1 --body-file clean.md"'
 check "an unknown folder asks on a hit with no lookup, from a private session folder" 'asks "cd -; gh pr comment 1 --body stubcodename" "$priv" && ! looked_up'
 check "an unknown folder with no hit stays silent" 'silent "cd -; gh pr comment 1 --body ok" && ! looked_up'
 check "a cd to an absolute path after an unknown folder is followed" 'silent "cd -; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
