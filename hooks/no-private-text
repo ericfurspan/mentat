@@ -3,12 +3,17 @@
 # gets a permission prompt when it holds a local path or a private name
 # (lib/publish.sh). It looks at gh pr create, pr edit, pr comment, pr review, issue
 # create, issue edit, issue comment and gh api writes: the command text, and files
-# named by --body-file, -F, --field or --notes-file, through a leading $NAME/ too. A
-# leading cd and the name of a file it reads are not published, so they are not looked
-# at, except a name past $( or <<. Outside a gh command and before any $(, backtick or
-# <<, a temp path that only locates a file is not looked at either: a redirect target, a
-# sed -i file, a file flag's value, or an assignment whose variable is used only there.
-# With several gh commands, it asks if any target is public.
+# named by --body-file, -F, --field or --notes-file, through a leading $NAME/ too. It
+# walks past heredoc and $(...) bodies, whose text stays checked, and a gh command in
+# a $(...) has its own target. A heredoc body is left out only when a lone cat writes
+# it to a literal file that no other word names. A gh file flag's value only locates
+# a file, so it is not looked at. Outside a gh command and before any $(, backtick or
+# <<, neither is another path that only locates one: a cd or git -C argument, a temp
+# or home path as a redirect target or sed -i file, a temp path after a file flag, or
+# an assignment whose variable is used only there. Each target is looked up in the
+# directory its command runs in: the session's, moved by each top-level cd the walk
+# can follow; after one it cannot, a target with no repository counts as public. It
+# asks if any target is public.
 # The prompt gives the category, never the match, and approving it clears a false
 # alarm. This is a net for mistakes, not a security boundary: other routes exist. When
 # it cannot read its input or its tools are missing, it stays out of the way.
@@ -59,10 +64,11 @@ plain() {
 text=$cmd
 re="^[[:space:]]*cd[[:space:]]+${word}[[:space:]]*(&&|;)"
 if [[ $text =~ $re ]]; then
-  text=${text#"${BASH_REMATCH[0]}"}
+  text=${text:${#BASH_REMATCH[0]}}
   plain "${BASH_REMATCH[1]}"
   cd "$v" 2>/dev/null || true
 fi
+nl=$'\n' tab=$'\t'
 
 # unquote <word>: sets $v, the word with its quotes and backslashes off.
 unquote() {
@@ -92,7 +98,7 @@ unquote() {
 # Assignments outside a gh command, in order: a_name, a_val, a_word (as written),
 # a_plain (no $ or backtick in the value), a_block (a $( or backtick, so the walk
 # cannot tell where the assignment ends), a_alone (the command only assigns, or is
-# export) and a_temp (the value is a temp path).
+# export) and a_temp (t for a temp path value, h for a home path).
 a_name=() a_val=() a_word=() a_plain=() a_block=() a_alone=() a_temp=()
 # lookup <name>: sets $val, the value $name has here: the latest plain value assigned
 # alone, else TMPDIR or HOME from the environment. An assignment in front of another
@@ -150,52 +156,121 @@ is_temp() {
   esac
   [ -n "$t" ] && case "$1" in "$t" | "$t"/*) true ;; *) false ;; esac
 }
+# is_home <path>: the path is the home folder or under it, written out or as ~,
+# $HOME or ${HOME}, with no .. segment.
+is_home() {
+  case "/$1/" in */../*) return 1 ;; esac
+  case "$1" in '~' | '~/'* | '$HOME' | '$HOME/'* | '${HOME}' | '${HOME}/'*) return 0 ;; esac
+  [ -n "${HOME:-}" ] && case "$1" in "$HOME" | "$HOME"/*) true ;; *) false ;; esac
+}
 
-# Reads the file a word names, if it is one. gh api's -F or --field names it as field=@file.
+# Reads the file a word names, if it is one. gh api's -F or --field names it as
+# field=@file. A relative name is read from the directory the walk is in, else from
+# the leading cd's or the session's.
 files=""
 read_file() {
   unquote "$1"
   expand "${v##*=@}"
   f=$v
+  case "$f" in /* | -) ;; *) [ -n "$late" ] || [ -n "$dunk" ] || f=$edir/$f ;; esac
   { [ -f "$f" ] && [ -r "$f" ]; } || return 1
   files+=$'\n'$(cat "$f")
 }
 set_repo() { plain "$1"; [ -n "$repo" ] || repo=$v; }
-set_method() { plain "$1"; case "$v" in [Gg][Ee][Tt]) is_get=1 ;; esac; }
+# A method counts only before any body in its command.
+set_method() {
+  [ -z "$cbody" ] || return 0
+  plain "$1"
+  case "$v" in [Gg][Ee][Tt]) is_get=1 ;; esac
+}
 keep() { kept+=$held$m; held=""; }
+
+# fresh: starts a new command: its gh state, its outside words and its step.
+fresh() {
+  prev="" in_gh="" in_api="" api="" is_get="" next="" repo="" cbody=""
+  o_cmd="" o_next="" o_first=${#a_name[@]} sed_i="" sed_script="" sed_amb="" sed_unk=""
+  st_cd="" cd_n=0 cd_ok="" cd_to="" st_n=0 st_nred=0 st_rw=0 st_target="" st_hq=${#HQ[@]} git_sub=""
+}
+# end_command: ends the command before $sep (a separator as written, a newline or
+# end). It records a gh command's target with the directory it runs in, decides
+# whether the step's heredocs are published, and moves the directory for a cd step
+# the walk can follow, or makes it unknown.
 end_command() {
-  local k=$o_first
+  local k=$o_first t
   [ -z "$in_api" ] || [ -n "$is_get" ] || unread_api=1
   if [ -n "$in_gh" ]; then
-    case "$targets" in *$'\n'"$repo"$'\n'*) ;; *) targets+=$repo$'\n' ;; esac
+    if [ -n "$repo" ]; then t="R$tab$repo"; elif [ -n "$dunk" ]; then t=U; else t="D$tab$edir"; fi
+    case "$targets" in *"$nl$t$nl"*) ;; *) targets+=$t$nl ;; esac
   fi
   if [ -z "$o_cmd" ] || [ "$o_cmd" = export ]; then
     while [ "$k" -lt "${#a_name[@]}" ]; do a_alone[k]=1; k=$((k + 1)); done
   fi
-  prev="" in_gh="" in_api="" api="" is_get="" next="" repo=""
-  o_cmd="" o_next="" o_first=${#a_name[@]} sed_i="" sed_script="" sed_amb="" sed_unk=""
+  k=$st_hq
+  while [ "$k" -lt "${#HQ[@]}" ]; do
+    if [ -z "$in_gh" ] && [ -z "$nest" ] && [ "$o_cmd" = cat ] && [ "$st_nred" = 1 ] &&
+      [ "${#HQ[@]}" = $((st_hq + 1)) ] && [ "$st_n" = $((st_rw + 2)) ] &&
+      case "$sepb$sep" in *'|'*) false ;; *) true ;; esac && lone "$st_target"; then
+      HP[k]=0
+    fi
+    k=$((k + 1))
+  done
+  if [ -n "$st_cd" ]; then
+    [ "$cd_n" != 0 ] || cd_ok=1 cd_to=$HOME
+    if [ -z "$dunk" ] && [ -z "$compound" ] && [ "$st_cd" = cd ] && [ -n "$cd_ok" ] && [ -d "$cd_to" ] &&
+      case "$sepb" in '' | ';' | '&&' | "$nl") true ;; *) false ;; esac &&
+      case "$sep" in ';' | '&&' | "$nl" | end) true ;; *) false ;; esac; then
+      edir=$cd_to
+      [ "$sepb" != '&&' ] || cdif=1
+    else
+      dunk=1
+    fi
+  fi
+  # After a cd that ran only if the step before it did, a step not joined by && may
+  # run without it.
+  [ -z "$cdif" ] || [ "$sep" = '&&' ] || dunk=1
+  case "$sep" in *')'* | '||' | ';;') compound=1 ;; esac
+  case "$sep" in '&&' | '&>' | '|&') ;; *'&'*) dunk=1 ;; esac
+  sepb=$sep
+  fresh
+}
+# lone <path>: the path is a plain name, and the command names its last part once.
+lone() {
+  local b
+  unquote "$1"
+  case "$v" in '' | */ | *'$'* | *'`'* | *'*'* | *'?'* | *'['*) return 1 ;; esac
+  b=${v##*/}
+  [ "$(awk -v b="$b" '{ s = $0; p = 0
+      while ((i = index(substr(s, p + 1), b)) > 0) {
+        a = p + i; pre = a > 1 ? substr(s, a - 1, 1) : ""; post = substr(s, a + length(b), 1)
+        if (pre !~ /[A-Za-z0-9_.-]/ && post !~ /[A-Za-z0-9_.-]/) c++
+        p = a
+      } } END { print c + 0 }' <<<"$cmd")" = 1 ]
 }
 
 # located holds each word that locates a file, so an assignment's uses can be matched
-# against it. A word with $( or a backtick runs something, so it locates nothing, and
-# from the first such word outside gh on ($subst) no word locates a file.
-located=""
+# against it, and located_w those of the wider forms, for a home path's. A word with
+# $( or a backtick runs something, so it locates nothing, and from the first such
+# word, or heredoc, on ($subst) no word locates a file.
+located="" located_w=""
 note_located() {
   [ -z "$subst" ] || return 0
-  case "$1" in *'$('* | *'`'*) ;; *) located+=$'\n'$1 ;; esac
+  case "$1" in *'$('* | *'`'*) return 0 ;; esac
+  located+=$nl$1
+  [ -z "${2:-}" ] || located_w+=$nl$1
 }
-# locate <word> <path part>: keeps the word, unless it is outside a gh command and
-# its path is a temp path.
+# locate <word> <path part> [wide|any]: keeps the word, unless it is outside a gh
+# command and its path is a temp path, with wide a temp or home path, with any any.
 locate() {
-  note_located "$2"
+  note_located "$2" "${3:-}"
   unquote "$2"
-  if [ -z "$in_gh" ] && [ -z "$subst" ] && is_temp "$v"; then
+  if [ -z "$in_gh" ] && [ -z "$subst" ] &&
+    { [ "${3:-}" = any ] || is_temp "$v" || { [ "${3:-}" = wide ] && is_home "$v"; }; }; then
     kept+="$held "; held=""
   else
     keep
   fi
 }
-# An assignment whose value is a temp path is held at a mark in kept until the end.
+# An assignment whose value is a temp or home path is held at a mark in kept until the end.
 mark=$'\037'
 assign_re='^[A-Za-z_][A-Za-z0-9_]*='
 assign() {
@@ -204,9 +279,11 @@ assign() {
   a_name[k]=${1%%=*} a_val[k]=$v a_word[k]=$1 a_alone[k]="" a_temp[k]=""
   case "$v" in *'$'* | *'`'*) a_plain[k]="" ;; *) a_plain[k]=1 ;; esac
   case "$v" in *'$('* | *'`'*) a_block[k]=1 ;; *) a_block[k]="" ;; esac
-  if [ -z "$subst" ] && is_temp "$v"; then
-    a_temp[k]=1
-    kept+=$held${m%"$1"}$mark$k$mark; held=""
+  if [ -z "$subst" ]; then
+    if is_temp "$v"; then a_temp[k]=t; elif is_home "$v"; then a_temp[k]=h; fi
+  fi
+  if [ -n "${a_temp[k]}" ]; then
+    kept+=$held${m:0:${#m}-${#1}}$mark$k$mark; held=""
   else
     keep
   fi
@@ -231,23 +308,41 @@ sed_word() {
       elif [ -n "$sed_amb" ]; then
         sed_amb=""
       elif [ -n "$sed_i" ] && [ -z "$sed_unk" ]; then
-        locate "$1" "$1"
+        locate "$1" "$1" wide
         return
       fi
       ;;
   esac
   keep
 }
+# cd_word <word>: an argument of a cd step: it only locates, and the first one is
+# where the step goes, if it is a literal path.
+cd_word() {
+  cd_n=$((cd_n + 1)) cd_ok=""
+  if [ "$cd_n" = 1 ]; then
+    unquote "$1"
+    case "$v" in
+      '~' | '$HOME' | '${HOME}') v=$HOME ;;
+      '~/'*) v=$HOME/${v#\~/} ;;
+      '$HOME/'*) v=$HOME/${v#\$HOME/} ;;
+      '${HOME}/'*) v=$HOME/${v#\$\{HOME\}/} ;;
+    esac
+    case "$v" in '' | -* | *'$'* | *'`'*) ;; /*) cd_ok=1 cd_to=$v ;; *) cd_ok=1 cd_to=$edir/$v ;; esac
+  fi
+  locate "$1" "$1" any
+}
 # outside <word>: a word outside a gh command. It is checked unless it only locates a
-# temp file; an assignment with a temp value waits for the end.
+# file; an assignment with a temp or home value waits for the end.
 outside() {
   local w=$1 p
+  st_n=$((st_n + 1))
   case "$w" in *'$('* | *'`'*) subst=1 ;; esac
   case "$o_next" in
-    redir) o_next=""; locate "$w" "$w"; return ;;
+    redir) o_next="" st_target=$w; locate "$w" "$w" wide; return ;;
     file) o_next=""; read_file "$w"; locate "$w" "$w"; return ;;
     field) o_next=""; read_file "$w"; case "$w" in *=@*) locate "$w" "${w#*=@}" ;; *) keep ;; esac; return ;;
     sedarg) o_next="" sed_script=1; keep; return ;;
+    gitc) o_next=""; locate "$w" "$w" any; return ;;
     sedi)
       o_next=""
       unquote "$w"
@@ -259,18 +354,41 @@ outside() {
       ;;
   esac
   case "$w" in
-    '>' | '>>' | [0-9]'>' | [0-9]'>>') o_next=redir; keep; return ;;
-    '>'* | [0-9]'>'*) p=${w#[0-9]}; p=${p#>}; p=${p#>}; locate "$w" "$p"; return ;;
+    '>' | '>>') o_next=redir st_nred=$((st_nred + 1)) st_rw=2; keep; return ;;
+    [0-9]'>' | [0-9]'>>') o_next=redir st_nred=9; keep; return ;;
+    '>'* | [0-9]'>'*)
+      p=${w#[0-9]}
+      if [ "$p" = "$w" ]; then st_nred=$((st_nred + 1)) st_rw=1; else st_nred=9; fi
+      p=${p#>}; p=${p#>}; st_target=$p
+      locate "$w" "$p" wide; return ;;
   esac
   if [ -z "$o_cmd" ] || [ "$o_cmd" = export ]; then
     # A ( or { opening a group comes before the command's first word.
     p=$w
-    while :; do case "$p" in "("* | "{"*) p=${p#?} ;; *) break ;; esac; done
+    while :; do case "$p" in "("* | "{"*) p=${p#?} compound=1 ;; *) break ;; esac; done
     [ -n "$p" ] || { keep; return; }
     if [[ $p =~ $assign_re ]]; then assign "$p"; return; fi
-    [ -n "$o_cmd" ] || { o_cmd=$w; keep; return; }
+    if [ -z "$o_cmd" ]; then
+      o_cmd=$w
+      case "$p" in
+        cd) if [ "$p" = "$w" ]; then st_cd='cd'; else st_cd=other; fi ;;
+        pushd | popd) st_cd=other ;;
+        'if' | 'then' | 'elif' | 'else' | 'fi' | 'while' | 'until' | 'do' | 'done' | 'for' | 'case' | 'esac' | \
+          'select' | 'function' | '!' | '}' | 'time') compound=1 ;;
+      esac
+      keep; return
+    fi
   fi
-  case "$o_cmd" in sed | */sed | gsed) sed_word "$w"; return ;; esac
+  if [ -n "$st_cd" ]; then cd_word "$w"; return; fi
+  case "$w" in cd | pushd | popd) dunk=1 ;; esac
+  case "$o_cmd" in
+    sed | */sed | gsed) sed_word "$w"; return ;;
+    git | */git)
+      if [ -z "$git_sub" ]; then
+        case "$w" in -C) o_next=gitc; keep; return ;; -*) ;; *) git_sub=1 ;; esac
+      fi
+      ;;
+  esac
   case "$w" in
     --body-file | --notes-file) o_next="file" ;;
     -F | --field) o_next=field ;;
@@ -281,70 +399,324 @@ outside() {
   keep
 }
 
-# A walk over gh's real arguments, never a body: each command's target (the first it
-# names; empty is the checkout's), a GET for each gh api command, and the files it
-# reads, which replace their names in the checked text. Words cannot be told apart past
-# $( or <<, or a << before gh; that text goes to past, with any word outside a gh command.
-repo="" targets=$'\n' unread_api="" kept="" past="" held=""
-o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" sed_unk="" subst="" late=""
+# The scanner reads a word holding $(, <(, >( or << as the shell does, with patterns
+# kept to short reaches so a long body costs little.
+sub_pat="[()\"'\\\\\`<#$nl]*"
+dq_pat="[\"\\\\\$\`]*"
+cd_re="(^|[^[:alnum:]_./-])(cd|pushd|popd)([^[:alnum:]_./-]|\$)"
+# scan <text>: reads the shell word at the start of <text>, its length in wl. Each
+# $(...), <(...) or >(...) in it is queued for its own walk, with the directory then
+# (sub_cd=1 if a cd runs in one), and a heredoc operator outside them adds its
+# delimiter to HQ (hword=1). Returns 1 where it cannot follow.
+scan() {
+  local s=$1 n=${#1} c r
+  j=0 hword="" sub_cd=""
+  while [ "$j" -lt "$n" ]; do
+    c=${s:j:1}
+    case "$c" in
+      ' ' | "$tab" | "$nl" | ';' | '&' | '|' | ')') break ;;
+      \\) j=$((j + 2)) ;;
+      "'") squote || return 1 ;;
+      '"') dq || return 1 ;;
+      '`') btick || return 1 ;;
+      '$' | '<' | '>')
+        if [ "${s:j+1:1}" = '(' ]; then
+          sub $((j + 2)) || return 1
+        elif [ "$c" = '<' ] && [ "${s:j+1:1}" = '<' ]; then
+          if [ "${s:j+2:1}" = '<' ]; then
+            j=$((j + 3))
+          else
+            hdop $((j + 2)) || return 1
+            HQ+=("$hd") HT+=("$ht") HP+=(1) hword=1
+          fi
+        else
+          j=$((j + 1))
+        fi ;;
+      *) j=$((j + 1)) ;;
+    esac
+  done
+  wl=$j
+}
+# squote, btick: move j past the single-quoted text or backtick text at j.
+squote() {
+  local r=${s:j+1}
+  case "$r" in *"'"*) ;; *) return 1 ;; esac
+  r=${r%%"'"*}
+  j=$((j + ${#r} + 2))
+}
+btick() {
+  local r=${s:j+1}
+  case "$r" in *'`'*) ;; *) return 1 ;; esac
+  r=${r%%'`'*}
+  j=$((j + ${#r} + 2))
+}
+# dq: moves j past the double-quoted text at j, reading each $( in it.
+dq() {
+  local r
+  j=$((j + 1))
+  while :; do
+    r=${s:j}
+    # shellcheck disable=SC2295 # dq_pat is a pattern.
+    r=${r%%$dq_pat}
+    j=$((j + ${#r}))
+    [ "$j" -lt "$n" ] || return 1
+    case "${s:j:1}" in
+      '"') j=$((j + 1)); return 0 ;;
+      \\) j=$((j + 2)) ;;
+      '`') btick || return 1 ;;
+      *) if [ "${s:j+1:1}" = '(' ]; then sub $((j + 2)) || return 1; else j=$((j + 1)); fi ;;
+    esac
+  done
+}
+# sub <at>: reads the body starting at <at> to its matching ), skipping the bodies of
+# heredocs in it, queues it, and moves j past the ).
+sub() {
+  local k=$1 depth=1 r c x
+  local -a ph pt
+  ph=() pt=()
+  j=$k
+  while :; do
+    r=${s:j}
+    # shellcheck disable=SC2295 # sub_pat is a pattern.
+    r=${r%%$sub_pat}
+    [[ ! $r =~ $cd_re ]] || sub_cd=1
+    j=$((j + ${#r}))
+    [ "$j" -lt "$n" ] || return 1
+    c=${s:j:1}
+    case "$c" in
+      '(') depth=$((depth + 1)) j=$((j + 1)) ;;
+      ')')
+        depth=$((depth - 1))
+        if [ "$depth" = 0 ]; then
+          [ "${#ph[@]}" = 0 ] || return 1
+          QB+=("${s:k:j-k}") QE+=("$edir") QU+=("$dunk")
+          j=$((j + 1))
+          return 0
+        fi
+        j=$((j + 1)) ;;
+      '"') dq || return 1 ;;
+      "'") squote || return 1 ;;
+      '`') btick || return 1 ;;
+      \\) j=$((j + 2)) ;;
+      '<')
+        if [ "${s:j+1:2}" = '<<' ]; then
+          j=$((j + 3))
+        elif [ "${s:j+1:1}" = '<' ]; then
+          hdop $((j + 2)) || return 1
+          ph+=("$hd") pt+=("$ht")
+        else
+          j=$((j + 1))
+        fi ;;
+      "$nl")
+        j=$((j + 1)) x=0
+        while [ "$x" -lt "${#ph[@]}" ]; do
+          if [ "$x" -gt 0 ]; then [ "${s:j:1}" = "$nl" ] || return 1; j=$((j + 1)); fi
+          dfind "${s:j}" "${ph[x]}" "${pt[x]}" || return 1
+          j=$((j + bl + dl)) x=$((x + 1))
+        done
+        ph=() pt=() ;;
+      '#')
+        case "${s:j-1:1}" in
+          ' ' | "$tab" | "$nl" | ';' | '(' | '&' | '|') r=${s:j}; r=${r%%"$nl"*}; j=$((j + ${#r})) ;;
+          *) [ "$j" != "$k" ] || { r=${s:j}; r=${r%%"$nl"*}; j=$((j + ${#r})); } ;;
+        esac
+        [ "$j" -lt "$n" ] || return 1
+        [ "${s:j:1}" != '#' ] || j=$((j + 1)) ;;
+    esac
+  done
+}
+# hdop <at>: reads the heredoc delimiter after the << just before <at>: sets hd to it
+# with its quotes off, ht=1 for <<-, and j past it. Returns 1 for a delimiter it
+# cannot match.
+hdop() {
+  local k=$1 c r
+  hd="" ht=0
+  if [ "${s:k:1}" = - ]; then ht=1 k=$((k + 1)); fi
+  while [ "${s:k:1}" = ' ' ] || [ "${s:k:1}" = "$tab" ]; do k=$((k + 1)); done
+  while [ "$k" -lt "$n" ]; do
+    c=${s:k:1}
+    case "$c" in
+      ' ' | "$tab" | "$nl" | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;;
+      "'" | '"')
+        r=${s:k+1}
+        case "$r" in *"$c"*) ;; *) return 1 ;; esac
+        r=${r%%"$c"*}; hd+=$r; k=$((k + ${#r} + 2)) ;;
+      \\) hd+=${s:k+1:1}; k=$((k + 2)) ;;
+      *) hd+=$c; k=$((k + 1)) ;;
+    esac
+  done
+  j=$k
+  [[ $hd =~ ^[A-Za-z0-9_.-]+$ ]]
+}
+# dfind <text> <delimiter> <tabs>: finds the first line of <text> equal to the
+# delimiter, after leading tabs with <tabs> 1, by lines: sets bl to the length of the
+# text before it and dl to its length. Returns 1 when there is none.
+dfind() {
+  local l e
+  bl=0
+  while IFS= read -r l; do
+    e=$l
+    if [ "$3" = 1 ]; then while [ "${e:0:1}" = "$tab" ]; do e=${e:1}; done; fi
+    if [ "$e" = "$2" ]; then dl=${#l}; return 0; fi
+    bl=$((bl + ${#l} + 1))
+  done <<<"$1"
+  return 1
+}
+# bodies: from just after the newline that ends the line of the pending heredocs,
+# skips their bodies, each to its delimiter line. A published body stays in the
+# checked text and in past. Returns 1 when a delimiter line is missing.
+bodies() {
+  local x=0
+  while [ "$x" -lt "${#HQ[@]}" ]; do
+    if [ "$x" -gt 0 ]; then
+      [ "${rest:0:1}" = "$nl" ] || return 1
+      rest=${rest:1} kept+=$nl
+    fi
+    dfind "$rest" "${HQ[x]}" "${HT[x]}" || return 1
+    if [ "${HP[x]}" != 0 ]; then kept+=${rest:0:bl+dl} past+=$nl${rest:0:bl}; fi
+    rest=${rest:bl+dl}
+    x=$((x + 1))
+  done
+  HQ=() HT=() HP=()
+}
+
+# walk: reads the commands in rest: each one's target (the first it names; empty is
+# the checkout's), a GET for each gh api command, and the files it reads, which
+# replace their names in the checked text. Body text is read by the scanner, never as
+# arguments. Returns 1 where it stops, leaving the rest in rest.
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
-rest=$text prev="" in_gh="" in_api="" api="" is_get="" next=""
-while [[ $rest =~ $re ]]; do
-  m=${BASH_REMATCH[0]} w=${BASH_REMATCH[1]}
-  rest=${rest:${#m}}
-  case "$w" in
-    $'\\\n') held+=$m; continue ;;
-    *'<<'*) rest=$m$rest; break ;;
-  esac
-  case "${m%"$w"}" in *$'\n'*) end_command ;; esac
-  case "$w" in [\;\&\|\)]*) end_command; keep; continue ;; esac
-  if [ -z "$in_gh" ] && [ "$w" != gh ]; then past+=$m; outside "$w"; continue; fi
-  case "$w" in *'$('*) rest=$m$rest; break ;; esac
-  in_gh=1 o_cmd=${o_cmd:-gh}
-  value=$next next=""
-  case "$value" in
-    repo) set_repo "$w"; keep; continue ;;
-    method) set_method "$w"; keep; continue ;;
-    file | field)
-      if [ "$value" = file ]; then note_located "$w"; else case "$w" in *=@*) note_located "${w#*=@}" ;; esac; fi
-      if read_file "$w"; then held=""; else keep; fi
+walk() {
+  local lead t body
+  while :; do
+    if [ "${#HQ[@]}" -gt 0 ]; then
+      t=${rest%%"$nl"*}
+      if [ "$t" != "$rest" ] && [ -z "${t//[[:blank:]]/}" ]; then
+        sep=$nl; end_command
+        kept+=$held$nl held=""
+        rest=${rest:${#t}+1}
+        bodies || return 1
+        continue
+      fi
+    fi
+    [[ $rest =~ $re ]] || break
+    m=${BASH_REMATCH[0]} w=${BASH_REMATCH[1]} hword="" sub_cd=""
+    lead=${m:0:${#m}-${#w}}
+    case "$w" in
+      *'$('* | *'<('* | *'>('* | *'<<'*)
+        scan "${rest:${#lead}}" || return 1
+        w=${rest:${#lead}:wl} m=$lead$w ;;
+    esac
+    rest=${rest:${#m}}
+    if [ "$w" = $'\\\n' ]; then held+=$m; continue; fi
+    case "$lead" in *"$nl"*) sep=$nl; end_command ;; esac
+    case "$w" in
+      [\;\&\|\)]*)
+        sep=$w
+        if [ "$w" = '&' ] && [ "${rest:0:1}" = '>' ]; then sep='&>'; fi
+        end_command; keep; continue ;;
+    esac
+    [ -z "$sub_cd" ] || dunk=1
+    body=$hword
+    case "$w" in *'$('* | *'<('* | *'>('*) body=1 ;; esac
+    if [ -n "$body" ]; then subst=1 cbody=$in_gh; fi
+    if [ -z "$in_gh" ] && [ "$w" != gh ]; then
+      past+=$m
+      if [ -n "$hword" ]; then st_n=$((st_n + 1)); keep; else outside "$w"; fi
       continue
-      ;;
-    redir) note_located "$w"; keep; continue ;;
-  esac
-  case "$w" in
-    -R | --repo) next=repo ;;
-    --repo=* | -R=*) set_repo "${w#*=}" ;;
-    -X | --method) next=method ;;
-    -X* | --method=*) v=${w#--method=}; v=${v#-X}; set_method "${v#=}" ;;
-    --body-file | --notes-file) next="file"; held+=$m; continue ;;
-    --field | -F) next=field; held+=$m; continue ;;
-    '>' | '>>' | [0-9]'>' | [0-9]'>>') next=redir ;;
-    '>'* | [0-9]'>'*) v=${w#[0-9]}; v=${v#>}; note_located "${v#>}" ;;
-    --body-file=* | --notes-file=*) note_located "${w#*=}"; if read_file "${w#*=}"; then continue; fi ;;
-    --field=* | -F=*)
-      v=${w#*=}
-      case "$v" in *=@*) note_located "${v#*=@}" ;; esac
-      if read_file "${w#*=}"; then continue; fi
-      ;;
-  esac
-  keep
-  if [ "$prev" = gh ] && [ "$w" = api ]; then in_api=1 api=1; fi
-  prev=$w
-  [ -n "$api" ] || continue
-  # gh api's path, up to the end of that command. A path with placeholders is the checkout's.
-  plain "$w"
-  case "$v" in
-    repos/* | /repos/*)
-      api=""
-      if [ -z "$repo" ] && [[ $v =~ $api_re ]]; then repo=${BASH_REMATCH[1]}; fi
-      ;;
-  esac
+    fi
+    [ -z "$body" ] || past+=$m
+    in_gh=1 o_cmd=${o_cmd:-gh}
+    if [ -n "$hword" ]; then keep; continue; fi
+    value=$next next=""
+    case "$value" in
+      repo) set_repo "$w"; keep; continue ;;
+      method) set_method "$w"; keep; continue ;;
+      file | field)
+        if [ "$value" = file ]; then note_located "$w" gh; else case "$w" in *=@*) note_located "${w#*=@}" gh ;; esac; fi
+        if read_file "$w" || [ "$value" = file ]; then
+          held=""
+        else
+          case "$w" in *=@*) held="" ;; *) keep ;; esac
+        fi
+        continue
+        ;;
+      redir) note_located "$w" gh; keep; continue ;;
+    esac
+    case "$w" in
+      -R | --repo) next=repo ;;
+      --repo=* | -R=*) set_repo "${w#*=}" ;;
+      -X | --method) next=method ;;
+      -X* | --method=*) v=${w#--method=}; v=${v#-X}; set_method "${v#=}" ;;
+      --body-file | --notes-file) next="file"; held+=$m; continue ;;
+      --field | -F) next=field; held+=$m; continue ;;
+      '>' | '>>' | [0-9]'>' | [0-9]'>>') next=redir ;;
+      '>'* | [0-9]'>'*) v=${w#[0-9]}; v=${v#>}; note_located "${v#>}" gh ;;
+      --body-file=* | --notes-file=*) note_located "${w#*=}" gh; read_file "${w#*=}"; continue ;;
+      --field=* | -F=*)
+        v=${w#*=}
+        case "$v" in *=@*) note_located "${v#*=@}" gh; read_file "$v"; continue ;; esac
+        if read_file "$v"; then continue; fi
+        ;;
+    esac
+    keep
+    if [ "$prev" = gh ] && [ "$w" = api ]; then in_api=1 api=1; fi
+    prev=$w
+    [ -n "$api" ] || continue
+    # gh api's path, up to the end of that command. A path with placeholders is the checkout's.
+    plain "$w"
+    case "$v" in
+      repos/* | /repos/*)
+        api=""
+        if [ -z "$repo" ] && [[ $v =~ $api_re ]]; then repo=${BASH_REMATCH[1]}; fi
+        ;;
+    esac
+  done
+  [ -z "${rest//[[:space:]]/}" ] && [ "${#HQ[@]}" = 0 ]
+}
+# run_walk: walks rest to its end. Where the walk stops, the text left stays checked
+# and in past, and an unknown target counts.
+run_walk() {
+  local ok=1
+  walk || ok=""
+  sep=end; end_command
+  if [ -z "$ok" ]; then
+    targets+=U$nl
+    kept+=$held$rest past+=$rest held=""
+  fi
+  HQ=() HT=() HP=()
+}
+
+# The command's own walk. Directories: edir, where the walk is; dunk=1 once it cannot
+# tell; compound=1 once it has seen a group, subshell or condition; cdif=1 after a
+# cd joined by && to the step before it.
+targets=$nl unread_api="" kept="" past="" held="" late="" nest="" subst=""
+edir=$PWD dunk="" compound="" cdif="" sepb="" sep=""
+QB=() QE=() QU=() HQ=() HT=() HP=()
+fresh
+rest=$text
+run_walk
+# With no gh command walked, the target is the checkout.
+if [ "$targets" = "$nl" ]; then
+  if [ -n "$dunk" ]; then targets+=U$nl; else targets+="D$tab$edir$nl"; fi
+fi
+
+# Each body's walk records its targets and reads its files. Its text is already in
+# the command's, nothing in it locates, and its names last only inside it.
+nest=1 qi=0
+while [ "$qi" -lt "${#QB[@]}" ]; do
+  s_kept=$kept s_past=$past s_loc=$located s_locw=$located_w n_a=${#a_name[@]}
+  rest=${QB[qi]} edir=${QE[qi]} dunk=${QU[qi]} compound=1 cdif="" sepb="" subst=1 held=""
+  fresh
+  run_walk
+  kept=$s_kept past=$s_past located=$s_loc located_w=$s_locw
+  while [ "${#a_name[@]}" -gt "$n_a" ]; do
+    k=$((${#a_name[@]} - 1))
+    unset "a_name[$k]" "a_val[$k]" "a_word[$k]" "a_plain[$k]" "a_block[$k]" "a_alone[$k]" "a_temp[$k]"
+  done
+  qi=$((qi + 1))
 done
-end_command
-kept+=$held$rest past+=$rest
 
 # uses <name> <text>: prints how often $name or ${name...} appears in the text.
 uses() {
@@ -352,17 +724,20 @@ uses() {
     { s = $0; while (match(s, re)) { s = substr(s, RSTART + RLENGTH); if (substr(s, 1, 1) !~ /[A-Za-z0-9_]/) k++ } }
     END { print k + 0 }' <<<"$2"
 }
-# A temp value assigned alone leaves the text when every use of its name, and at
-# least one, locates a file; otherwise the assignment goes back where it was.
+# A temp or home value assigned alone leaves the text when every use of its name,
+# and at least one, locates a file (for a home value, by a wider form); otherwise the
+# assignment goes back where it was.
 k=0
 while [ "$k" -lt "${#a_name[@]}" ]; do
   if [ -n "${a_temp[k]}" ]; then
     put=${a_word[k]}
     if [ -n "${a_alone[k]}" ]; then
       n=$(uses "${a_name[k]}" "$cmd")
-      [ "$n" -eq 0 ] || [ "$n" != "$(uses "${a_name[k]}" "$located")" ] || put=" "
+      if [ "${a_temp[k]}" = t ]; then l=$located; else l=$located_w; fi
+      [ "$n" -eq 0 ] || [ "$n" != "$(uses "${a_name[k]}" "$l")" ] || put=" "
     fi
-    kept=${kept%%"$mark$k$mark"*}$put${kept#*"$mark$k$mark"}
+    t=${kept%%"$mark$k$mark"*}
+    kept=$t$put${kept:${#t}+${#k}+2}
   fi
   k=$((k + 1))
 done
@@ -379,13 +754,18 @@ while IFS= read -r flag; do
   if [[ $flag =~ $re ]]; then read_file "${BASH_REMATCH[3]}"; fi
 done <<<"$(grep -Eo -- "(^|[[:space:]])$re" <<<"$past")"
 
-# A hit asks if any target is public. With no gh command walked, the target is the checkout.
-[ "$targets" != $'\n' ] || targets+=$'\n'
-targets=${targets#$'\n'}
+# A hit asks if any target is public: a named repository, the checkout of a known
+# directory (public if that directory is gone), or an unknown directory.
+targets=${targets#"$nl"}
 hit=""
 while IFS= read -r t; do
-  hit=$(publish_hit "$kept$files" "$t") && break
-done <<<"${targets%$'\n'}"
+  case "$t" in
+    "R$tab"*) hit=$(publish_hit "$kept$files" "${t#R"$tab"}") && break ;;
+    "D$tab"*)
+      hit=$(if cd "${t#D"$tab"}" 2>/dev/null; then publish_hit "$kept$files" ""; else private_text "$kept$files"; fi) && break ;;
+    *) hit=$(private_text "$kept$files") && break ;;
+  esac
+done <<<"${targets%"$nl"}"
 [ -n "$hit" ] || exit 0
 jq -n --arg r "Mentat: this text for a public repository holds $hit. Approve only if it is meant to be public." \
   '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'

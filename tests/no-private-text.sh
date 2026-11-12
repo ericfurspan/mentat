@@ -21,6 +21,7 @@ cat >"$root/bin/gh" <<'STUBEOF'
 printf '%s\n' "$PWD: $*" >>"$STUB/calls"
 [ -f "$STUB/lookup_fails" ] && exit 1
 case "$*" in *owner/private*) echo true; exit ;; *o/public*) echo false; exit ;; esac
+[ -f "$PWD/.stub-private" ] && { echo true; exit; }
 [ -f "$STUB/private" ] && echo true || echo false
 STUBEOF
 chmod +x "$root/bin/gh"
@@ -220,6 +221,17 @@ c='gh api \
   -f body=stubcodename'
 check "a gh api path after a line continuation stands" 'skips "$c"'
 check "the first target stands when the walk goes on past it" 'skips "gh pr comment 5 --repo owner/private --body stubcodename --repo o/public"'
+c='gh pr comment 5 --body-file - <<EOF -R owner/private
+about stubcodename
+EOF'
+check "a target after a heredoc operator stands" 'skips "$c"'
+c='gh pr comment 5 --body "$(cat <<EOF
+about stubcodename
+EOF
+)" -R owner/private'
+check "a target after a command substitution's heredoc stands" 'skips "$c"'
+c='gh pr comment 1 -R owner/private --body "$(gh api -X POST repos/o/public/issues/1/comments -f body=stubcodename)"'
+check "a public write inside a private comment's body asks" 'asks_for o/public "$c"'
 
 # Each gh command has its own target, and a hit asks if any target is public.
 reset
@@ -251,6 +263,33 @@ touch "$STUB/lookup_fails"
 check "a failed lookup counts as public with several targets" '[ "$(decision "gh pr view 1 -R owner/private && gh pr comment 2 -R o/public --body stubcodename")" = ask ]'
 reset
 check "the reason names the category with several targets" '[ "$(reason "gh pr view 1 -R owner/private && gh pr comment 2 -R o/public --body stubcodename")" = "Mentat: this text for a public repository holds a configured private name. Approve only if it is meant to be public." ]'
+
+# Each target is looked up from the directory it runs in. The stub reads a checkout
+# holding .stub-private as private.
+reset
+priv="$root/priv dir" pub="$root/pub dir"
+mkdir -p "$priv" "$pub"; touch "$priv/.stub-private"
+check "a public write then a private cd asks" '[ "$(decision "cd \"$pub\" && gh pr comment 1 --body stubcodename; cd \"$priv\" && gh pr comment 2 --body stubcodename")" = ask ]'
+check "a private cd, its write, then a public cd and its write asks" '[ "$(decision "cd \"$priv\" && gh pr comment 1 --body stubcodename; cd \"$pub\" && gh pr comment 2 --body stubcodename")" = ask ]'
+check "a later private cd counts for a write naming no target" 'rm -f "$STUB/calls"; [ -z "$(decision "true && cd \"$priv\" && gh pr comment 1 --body stubcodename" "$pub")" ] && grep -qF "$priv: repo view --json isPrivate" "$STUB/calls"'
+while IFS= read -r c; do
+  check "asks from a public directory where the cd cannot be followed: $c" '[ "$(decision "$c" "$pub")" = ask ]'
+done <<EOF
+cd "$priv" && true & gh pr comment 1 --body stubcodename
+cd "$priv" && (true)& gh pr comment 1 --body stubcodename
+true; cd "$priv" && gh pr edit 1 --body "\$(printf ok)" & gh pr comment 2 --body stubcodename
+(true); cd "$priv" && gh pr comment 1 --body stubcodename
+EOF
+printf 'about StubCodename\n' >"$pub/note.md"
+check "a cd inside a body does not move where a later file is read" '[ "$(decision "cd \"$pub\" && gh pr edit 7 --body \"\$(echo cd apps && make)\" --body-file note.md")" = ask ]'
+while IFS= read -r r; do
+  c="gh pr comment 1 -R owner/private --body ok
+$r gh pr comment 2 --body stubcodename"
+  check "a write starting with $r after a newline has its own target" 'asks_for "" "$c"'
+done <<'EOF'
+&>/dev/null
+2>/dev/null
+EOF
 
 # A method counts as GET only from a real argument of that gh api command.
 reset
@@ -324,7 +363,16 @@ c="cat >f <<EOF
 gh pr comment 5 --body-file \"$HOME/clean.md\"
 EOF
 gh pr comment 5 --body-file clean.md"
-check "a home path in a heredoc before gh is a local path" '[ "$(reason "$c")" = "$path_hit" ]'
+check "a home path in a heredoc written to a file no other word names is no hit" '[ -z "$(decision "$c")" ]'
+c='cat >f <<EOF
+about stubcodename
+EOF
+gh pr comment 5 --body-file f'
+check "a heredoc written to a file a later flag reads stays checked" '[ "$(decision "$c")" = ask ]'
+c='cat <<EOF | gh pr comment 5 --body-file -
+about stubcodename
+EOF'
+check "a heredoc piped into gh stays checked" '[ "$(decision "$c")" = ask ]'
 for f in --body-file --notes-file -F; do
   check "a real $f naming a clean file under the home folder is no hit" 'rm -f "$STUB/calls"; [ -z "$(decision "gh pr comment 5 $f \"$HOME/clean.md\"")" ] && [ -z "$(decision "gh pr comment 5 $f=\"$HOME/clean.md\"")" ] && ! looked_up'
   check "a real $f naming a file with a hit asks" '[ "$(decision "gh pr comment 5 $f \"$HOME/word.md\"")" = ask ]'
@@ -340,9 +388,16 @@ c='gh pr comment 5 \
   ~/clean.md'
 check "a clean file named across a line continuation is no hit" '[ -z "$(decision "$c")" ]'
 check "a real flag is read where gh is not its own word, and its name stays" '[ "$(decision "(gh pr comment 5 --body-file word.md)")" = ask ] && [ "$(HOME=$outhome reason "(gh pr comment 5 --body-file \"$outhome/clean.md\")")" = "$path_hit" ]'
-# Past the stop the words cannot be told apart: a flag is still read, nothing leaves the text.
+# A home path that only locates is not published: a cd or git -C argument, a gh file
+# flag's value, a redirect target, and a name used only there.
+check "a home path as a later cd argument is no hit" '[ -z "$(decision "true && cd \"$HOME/repo\" && gh pr comment 7 --body ok")" ]'
+check "a home path as a git -C argument is no hit" '[ -z "$(decision "git -C \"$HOME/repo\" status && gh pr comment 7 --body ok")" ]'
+check "a home path as a gh file flag's value is no hit, read or not" '[ -z "$(decision "gh pr comment 7 --body-file \"$HOME/missing.md\"")" ]'
+check "a home path as a redirect target is no hit" '[ -z "$(HOME=$outhome decision "printf x > \"$outhome/x.md\"; gh pr comment 5 --body ok")" ]'
+check "a home path in a name used only to locate is no hit" '[ -z "$(HOME=$outhome decision "S=$outhome/d; printf x >\$S/x.md; gh pr comment 5 --body-file \$S/x.md")" ]'
+# Past a command substitution the walk reads gh's real flags.
 check "past a stop, a file with a hit asks" '[ "$(decision "gh pr create --title \"\$(x)\" --body-file word.md")" = ask ]'
-check "past a stop, a clean file under the home folder asks, its path stays in the text" '[ "$(reason "gh pr create --title \"\$(x)\" --body-file \"$HOME/clean.md\"")" = "$path_hit" ]'
+check "past a command substitution, a real flag's clean file under the home folder is no hit" '[ -z "$(decision "gh pr create --title \"\$(x)\" --body-file \"$HOME/clean.md\"")" ]'
 check "past a stop, a clean file with no hit in its name is no hit" '[ -z "$(decision "gh pr create --title \"\$(x)\" --body-file clean.md")" ]'
 c='gh pr comment 5 --body-file - <<EOF
 see --body-file word.md
@@ -492,6 +547,25 @@ S=$TMPDIR/plain; S=\$X; gh pr edit 1 --body-file \$S/word.md
 S=$TMPDIR/plain gh pr edit 1 --body-file \$S/word.md
 S=$TMPDIR/plain; gh pr edit 1 --body-file \$SX/word.md
 EOF
+
+# A long body, inline or in a heredoc, is walked in well under a second, with its hit at the end.
+reset
+long_body=$(awk 'BEGIN { for (i = 0; i < 3500; i++) printf "line %d with some words, a (b) and c\n", i; printf "stubcodename" }')
+# quick <command>: the hook asks within a second.
+quick() {
+  local t
+  jq -n --arg c "$1" --arg d "$root/work" '{tool_name: "Bash", cwd: $d, tool_input: {command: $c}}' >"$root/long.json"
+  t=$({ /usr/bin/time -p "$hook" <"$root/long.json" >"$root/long.out"; } 2>&1 | awk '/^real/ { print $2 }')
+  [ "$(jq -r '.hookSpecificOutput.permissionDecision // empty' "$root/long.out")" = ask ] && awk -v t="$t" 'BEGIN { exit !(t < 1) }'
+}
+check "a long inline body is walked quickly" 'quick "gh pr comment 5 --body \"$long_body\" -R o/public"'
+check "a long heredoc body is walked quickly" 'quick "gh pr comment 5 --body-file - -R o/public <<'"'"'EOF'"'"'
+$long_body
+EOF"'
+check "a long heredoc in a command substitution is walked quickly" 'quick "gh pr comment 5 --body \"\$(cat <<'"'"'EOF'"'"'
+$long_body
+EOF
+)\" -R o/public"'
 
 # What the prompt says.
 reset
