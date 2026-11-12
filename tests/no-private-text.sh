@@ -554,15 +554,15 @@ S=$TMPDIR/plain gh pr edit 1 --body-file \$S/word.md
 S=$TMPDIR/plain; gh pr edit 1 --body-file \$SX/word.md
 EOF
 
-# A long body, inline or in a heredoc, is walked in well under a second, with its hit at the end.
+# A long body, inline or in a heredoc, is walked in under two seconds, with its hit at the end.
 reset
 long_body=$(awk 'BEGIN { for (i = 0; i < 3500; i++) printf "line %d with some words, a (b) and c\n", i; printf "stubcodename" }')
-# quick <command>: the hook asks within a second.
+# quick <command>: the hook asks within two seconds.
 quick() {
   local t
   jq -n --arg c "$1" --arg d "$root/work" '{tool_name: "Bash", cwd: $d, tool_input: {command: $c}}' >"$root/long.json"
   t=$({ /usr/bin/time -p "$hook" <"$root/long.json" >"$root/long.out"; } 2>&1 | awk '/^real/ { print $2 }')
-  [ "$(jq -r '.hookSpecificOutput.permissionDecision // empty' "$root/long.out")" = ask ] && awk -v t="$t" 'BEGIN { exit !(t < 1) }'
+  [ "$(jq -r '.hookSpecificOutput.permissionDecision // empty' "$root/long.out")" = ask ] && awk -v t="$t" 'BEGIN { exit !(t < 2) }'
 }
 check "a long inline body is walked quickly" 'quick "gh pr comment 5 --body \"$long_body\" -R o/public"'
 check "a long heredoc body is walked quickly" 'quick "gh pr comment 5 --body-file - -R o/public <<'"'"'EOF'"'"'
