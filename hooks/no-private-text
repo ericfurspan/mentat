@@ -423,22 +423,28 @@ while [[ $rest =~ $re ]]; do
     if [ -n "$cd_on" ]; then cd_text+=$m; past+=$m; cd_n=$((cd_n + 1)); cd_arg=$w; continue; fi
     # A compound command (if, while, until, for, select, case) runs its body only
     # sometimes, so no cd in it is followed until its fi, done or esac.
-    v=$w
-    while :; do case "$v" in "("* | "{"*) v=${v#?} ;; *) break ;; esac; done
-    case "$v" in
+    # A word that opens a group, $( or a backtick, after any NAME=, starts a command.
+    kw=$w
+    [[ ! $kw =~ $assign_re ]] || kw=${kw#*=}
+    while :; do case "$kw" in "("* | "{"* | '`'*) kw=${kw#?} ;; '$('* | '"$('*) kw=${kw#*\(} ;; *) break ;; esac; done
+    sub=""; [ "$kw" = "$w" ] || sub=1
+    kw=${kw%\`}
+    case "$kw" in
       if | while | until | for | select | case)
-        if [ -z "$prior" ] || case "$pw" in then | do | else | elif | '!' | time | '{' | '(') true ;; *) false ;; esac; then
+        if [ -z "$prior" ] || [ -n "$sub" ] || case "$pw" in then | do | else | elif | '!' | time | '{' | '(') true ;; *) false ;; esac; then
           cmp=$((cmp + 1))
-          [ "$v" != case ] || case_at="$grp $case_at"
+          [ "$kw" != case ] || case_at="$grp $case_at"
         fi
         ;;
       'fi' | 'done' | 'esac')
         if [ -z "$prior" ] && [ "$cmp" -gt 0 ]; then
           cmp=$((cmp - 1))
-          [ "$v" != 'esac' ] || case_at=${case_at#* }
+          [ "$kw" != 'esac' ] || case_at=${case_at#* }
         fi
         ;;
     esac
+    v=$w
+    while :; do case "$v" in "("* | "{"*) v=${v#?} ;; *) break ;; esac; done
     if [ "$w" = cd ] && [ -z "$prior" ] && [ -n "$c_start" ] && [ "$grp" -eq 0 ] && [ "$cmp" -eq 0 ]; then
       cd_on=1 cd_text=$held$m cd_n=0 cd_arg="" o_cmd=cd held=""; past+=$m; continue
     fi
@@ -505,10 +511,12 @@ case "$rest" in *[![:space:]]*) stopped=1 ;; esac
 if [ -n "$stopped" ]; then cd_end stop; else cd_end end; fi
 end_command
 # A gh write among the words walked outside gh that no ( $( or backtick holds, such as
-# /usr/local/bin/gh pr comment, runs where the walk cannot tell.
+# /usr/local/bin/gh pr comment, runs where the walk cannot tell. Quoted text with no $
+# or backtick runs nothing, so it is left out.
 gh_head='(^|[^[:alnum:]_.-])gh'
-any_n=$(grep -Eo -e "$forms" -e "$gh_api" <<<"$past" | wc -l)
-held_n=$(grep -Eo -e "[(\`{]gh${forms#"$gh_head"}" -e "[(\`{]gh${gh_api#"$gh_head"}" <<<"$past" | wc -l)
+unq=$(sed -e "s/'[^']*'//g" -e 's/"[^"$`]*"//g' <<<"$past")
+any_n=$(grep -Eo -e "$forms" -e "$gh_api" <<<"$unq" | wc -l)
+held_n=$(grep -Eo -e "[(\`{]gh${forms#"$gh_head"}" -e "[(\`{]gh${gh_api#"$gh_head"}" <<<"$unq" | wc -l)
 [ "$any_n" -le "$held_n" ] || add_target u:
 kept+=$held$hd_text$rest past+=$rest
 stop_dir=$dir

@@ -286,6 +286,14 @@ if false; then :; cd "$priv"; fi; gh pr comment 1 --body stubcodename
 if true; then cd "$pub"; else cd "$priv"; fi; gh pr comment 1 --body stubcodename
 ( case x in a) : ;; esac; cd "$priv" ); gh pr comment 1 --body stubcodename
 EOF
+c="if false; then
+x=\$(if true; then echo a; fi)
+y=\`while false; do :; done\`
+cd \"$priv\"
+fi
+gh pr comment 1 --body stubcodename"
+check "a compound command inside \$( ) or backticks does not close an outer one" 'asks "$c" && ! looked_up'
+check "a gh write named in a quoted message is no write" 'silent "cd \"$priv\" && git commit -m \"note: gh pr comment flow\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 c="cd \"$priv\"
 cat <<007
 7
