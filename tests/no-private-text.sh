@@ -263,6 +263,8 @@ true
 true
 ) & gh pr comment 1 --body stubcodename"
 check "a chain with a followed cd and a multi-line group, ended by &, leaves the folder unknown" 'asks "$c" && ! looked_up'
+check "cd <private> && if ...; fi & gh leaves the folder unknown" 'asks "cd \"$priv\" && if true; then true; fi & gh pr comment 1 --body stubcodename" && ! looked_up'
+check "cd <private> && for ...; done & gh leaves the folder unknown" 'asks "cd \"$priv\" && for x in a; do true; done & gh pr comment 1 --body stubcodename" && ! looked_up'
 check "a & inside a group after a followed cd keeps the folder" 'silent "cd \"$priv\" && (sleep 1 & true); gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 c="gh pr comment 1 --repo owner/private --body ok
 &>/dev/null gh pr comment 2 --body stubcodename"
