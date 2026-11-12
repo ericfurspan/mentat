@@ -99,7 +99,7 @@ After each `mentat second-opinion` round, with any backlog, the replies go in a 
 
 ## Tracker: Linear
 
-For a repository whose AGENTS.md names a Linear project: before any Linear action, including creating a project during setup or migration, read `linear.md` in this skill's folder, and again after a compaction. It maps the stages and holds the Linear parts of the sections from "Reaching the backlog" to "Second opinion records".
+For a repository whose AGENTS.md names a Linear project: before any Linear action, including creating a project, read `linear.md` in this skill's folder, and again after a compaction. It maps the stages and holds the Linear parts of the sections from "Reaching the backlog" to "Second opinion records".
 
 ## Tracker: GitHub issues
 

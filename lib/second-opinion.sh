@@ -1,11 +1,11 @@
 # shellcheck shell=bash
-# mentat second-opinion: the review tools (Codex and Grok, or those the setting lists)
-# each give a second opinion, in parallel and apart from Claude Code's own view, and
-# the result is printed for the maintainer. Sourced by bin/mentat.
+# mentat second-opinion: the review tools, Codex and Grok, each give a second opinion,
+# in parallel and apart from Claude Code's own view, and the result is printed for the
+# maintainer. Sourced by bin/mentat.
 
 # Two modes, each with its own runners behind the shared parallel code in
 # lib/parallel.sh (the runs, their result files, the stop and cancel handlers and the
-# printers); Claude's runners are in lib/claude.sh. The repository mode (opinion_*)
+# printers). The repository mode (opinion_*)
 # judges an idea at HEAD: the git checks, the worktree and export, the repository
 # prompt and the verdict line are here. The web mode (opinion_web_*, --web) answers
 # any question and needs no repository: it reads nothing but the question file and
@@ -140,8 +140,7 @@ opinion_repo() {
   local idea="$1"
   [ -f "$idea" ] || die "idea file not found: $idea" 64
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
-  local top head changes dirty=no res="" run_pids="" tools reviewers reviewers_why t both="both tools were" fresh_def fresh_behind fresh_note
-  review_tools
+  local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind fresh_note
   command -v git >/dev/null 2>&1 || die "no second opinion: git is not installed" 1
   top=$(git rev-parse --show-toplevel) || die "no second opinion: not inside a git repository" 1
   head=$(git -C "$top" rev-parse HEAD) || die "no second opinion: could not read HEAD" 1
@@ -161,7 +160,6 @@ opinion_repo() {
 
   printf '## Second opinion on %s\n\n- Commit read: %s\n' "$idea" "$head"
   [ -z "$fresh_note" ] || printf -- '- %s\n' "$fresh_note"
-  case "$tools" in *' '*' '*) both="each tool was" ;; *' '*) ;; *) both="the tool was" ;; esac
   if [ "$dirty" = yes ]; then
     printf -- '- Uncommitted changes: yes. They were not read; %s given only that commit.\n\n' "$both"
   else
@@ -247,8 +245,7 @@ opinion_web() {
   local question="$1"
   [ -f "$question" ] || die "question file not found: $question" 64
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
-  local res="" run_pids="" tools reviewers reviewers_why t
-  review_tools
+  local res="" run_pids="" tools="codex grok" t
   res=$(mktemp -d) || die "no second opinion: could not create a temporary directory" 1
   # shellcheck disable=SC2064 # expand now, so the path is fixed when the trap is set
   trap "rm -rf $(printf %q "$res")" EXIT

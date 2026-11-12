@@ -48,15 +48,23 @@ Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog,
 - `/mentat:plan [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
 - `/mentat:retro`: propose improvements from a session.
-- `/mentat:setup [first-run]`: show and change settings; start with `first-run`.
-- `/mentat:linear [project name] [team name]`: move planning from GitHub issues to Linear.
 - `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
 [`rules.md`](rules.md) has the full workflow.
 
+## Configuration
+
+Mentat reads these from AGENTS.md:
+
+- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (else GitHub issues)
+- The one test command: ``The one test command is `<command>`.``
+- A `## Code Review Rules` section, the rules reviewers apply.
+
+Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/linear.md#moving-to-linear).
+
 ## Review tools
 
-`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt. A `~/.config/mentat/reviewers` list (`claude`, `codex`, `grok`) replaces them. Claude gets read-only file tools on an idea, web search only with `--web`, and the model in `~/.config/mentat/claude-model`, else the most capable outside the builder's family. `/mentat:setup` changes both files; `mentat check` reports each tool in effect.
+`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt. `mentat check` reports each tool.
 
 ## Credits
 
