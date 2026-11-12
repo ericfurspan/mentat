@@ -499,10 +499,11 @@ phrase_check rules.md "the request in hand still through step 1" 'the request in
 phrase_check rules.md "detail the maintainer needs kept, such as outside services" 'which outside services receive their data'
 phrase_check rules.md "a question's premise checked first" 'A fact a question rests on is checked first'
 phrase_check rules.md "why the first option is recommended, in the prompt itself" 'the question saying why the first is recommended, so the prompt alone suffices'
-phrase_check rules.md "a recommendation resting on meeting the goal at the bar" 'a recommendation rests on meeting the goal at the bar an applicable established practice sets, else evidence of reliability and maintainability, required safeguards included, with no scope or machinery beyond.'
-phrase_check rules.md "cost, upkeep and time as facts, never grounds" 'Cost, upkeep and time are facts, never grounds, numbered only if looked up, else the gain called unmeasured or an estimate labeled one.'
-phrase_check rules.md "the simplest option meeting the bar winning" 'Of options meeting the bar, the simplest wins, saying each meets it and simplicity decided; cost and time break only a tie on that.'
-phrase_check rules.md "a budget or deadline conflict asked, never lowering the bar" 'A stated budget or deadline in conflict with the bar is asked as which may change, never silently lowering it.'
+phrase_check rules.md "a recommendation resting on meeting the goal at the bar" 'a recommendation rests on its practical gain: how well it meets the goal at the bar the problem requires, an applicable established practice where one exists, else judged directly on evidence of reliability and maintainability.'
+phrase_check rules.md "safeguards in the bar, no scope beyond it" 'Required safeguards are part of the bar, and it adds no scope or machinery the practice and problem do not call for.'
+phrase_check rules.md "cost, upkeep and time as facts, never grounds" 'Build cost, upkeep and time are stated as facts, never grounds for preferring an option, with a number only when the session looked it up, else saying the gain is unmeasured or labeling an estimate as one.'
+phrase_check rules.md "the least complex option meeting the bar recommended" 'Of options meeting the bar, the one with the least unnecessary technical complexity is recommended, saying each meets the bar and simplicity decided; cost and time decide only a tie on that.'
+phrase_check rules.md "a budget or deadline conflict asked, never lowering the bar" 'A budget or deadline the maintainer stated that conflicts with the bar is asked as which constraint may change, never lowering the bar silently.'
 phrase_check rules.md "a consequential call in one line of the next message" "and in one line of the next message the maintainer reads"
 phrase_check rules.md "a decision that needs talking through in chat" 'A decision that needs talking through goes in chat, in plain words, one at a time.'
 phrase_check rules.md "the pointer to where a hand step is written" "A hand step only the maintainer can run is written as \`mentat:backlog\` \"Waits on the maintainer\" says."
