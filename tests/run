@@ -170,7 +170,9 @@ phrase_check skills/claude-review/SKILL.md "a status state's round within the tw
 phrase_check skills/claude-review/SKILL.md "a defect after round two or a removal round to the maintainer" 'A real defect still unfixed after round two, or after a removal round, goes to the maintainer.'
 phrase_check skills/claude-review/SKILL.md "five rounds there as two Claude rounds and a removal round as a Claude round" "Here \"five rounds\" there means two Claude rounds, and a removal round (\`../review/SKILL.md\` \"Removal round\") is a Claude round."
 phrase_check skills/claude-review/SKILL.md "a new head's round within the two plus any removal round" 'within the same two rounds plus any removal round,'
-phrase_check skills/claude-review/SKILL.md "the hold reply naming the removal round" "that a push that only removes what they asked removed still gets one; with none left and no such push, the status line is \`Not reviewed: no review round left\`."
+phrase_check skills/claude-review/SKILL.md "the hold reply naming the removal round" "whether a Claude round remains and, with none left, that a push that only removes what they asked removed still gets one."
+phrase_check skills/claude-review/SKILL.md "the hold keeping its blocked status line" "At the hold the status line stays \`Blocked: <reason>\`."
+phrase_check skills/claude-review/SKILL.md "no round left set only after the answer, when the push does not qualify" "Only after the maintainer's answer, with no Claude round left and a push that, compared with the head before it, does not qualify for a removal round, does the status line become \`Not reviewed: no review round left\`."
 phrase_check skills/claude-review/SKILL.md "a blocked defect after round two or a removal round" 'for an agreed defect still unfixed after round two or a removal round'
 # From the second Codex round the description lists what is settled, which the review prompt treats as data.
 phrase_check skills/review/SKILL.md "the settled list from the second Codex round" "From the second Codex round, the description's Verification holds one line for each finding already fixed or answered, with its fix commit or its reason."
