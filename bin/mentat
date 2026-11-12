@@ -29,14 +29,7 @@
 #     is the last reviewed commit, the Grok state (none, running, done or did not finish) and
 #     the CI state (none, running, passed or failed). With --request, also whether the last
 #     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
-#   The review tools setting: ~/.config/mentat/reviewers lists the tools second-opinion
-#     runs, any of claude, codex and grok; missing or empty runs Codex and Grok.
-#     Another word stops that command (64). ~/.config/mentat/claude-model may name the
-#     Claude model; otherwise it is the most capable one in a family other than the
-#     builder's (prompts/builder.md). Claude runs headless in safe mode, with no settings
-#     files, no MCP servers and no saved session, in a rebuilt environment, and each of its
-#     replies names the builder and reviewer models.
-#   mentat second-opinion <idea file>  Has Codex and Grok (or the setting's tools) each
+#   mentat second-opinion <idea file>  Has Codex and Grok each
 #     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
 #     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
 #     is behind origin's default branch (not a tool failure: update it and run again),
@@ -46,20 +39,20 @@
 #     FETCH_HEAD as they are; when that fails or there is no origin,
 #     a local origin/<default> still counts, and the output says when freshness could not
 #     be checked. Time limits:
-#     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex and Claude) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
+#     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
 #     MENTAT_GROK_REASONING_EFFORT sets Grok's effort. Grok may use its backend web search here
-#     (never in review); the local fetch tool is denied. Claude reads an export with file tools only.
+#     (never in review); the local fetch tool is denied.
 #   mentat second-opinion --link <item id> <idea file>  Records the item as reviewed when
 #     that record holds a run with a verdict on the idea file's current content. Calls no
 #     model. 0 linked, 1 not (no such run, or not in a repository), 64 usage.
-#   mentat second-opinion --web <question file>  Has Codex and Grok (or the setting's tools)
+#   mentat second-opinion --web <question file>  Has Codex and Grok
 #     each answer any question, in parallel, each in an empty folder with no files and no
 #     repository (it works outside git), with web search on. Prints each reply with its
 #     answer line. Nothing is posted. 0 at least one tool answered, 1 none did, 64 usage.
-#     Same time limits and effort variables. Grok and Claude have web search alone; Grok's
+#     Same time limits and effort variables. Grok has web search alone; its
 #     local fetch tool is denied.
-#   mentat check  Checks, read-only, what Mentat itself needs: tools, each review tool in
-#     effect, gh signed in, the repository readable; prints the codex and grok versions, and warns
+#   mentat check  Checks, read-only, what Mentat itself needs: tools,
+#     gh signed in, the repository readable; prints the codex and grok versions, and warns
 #     when the private word list is unreadable, the list misses a private repository
 #     this account can reach, by count only, the Mentat plugin is installed at different
 #     versions, or, with ~/.config/mentat/warn-kept-branches present, the repository keeps
@@ -76,7 +69,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish codex grok claude parallel second-opinion check status; do
+for lib in shared publish codex grok parallel second-opinion check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1

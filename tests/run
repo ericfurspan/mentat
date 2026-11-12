@@ -311,11 +311,11 @@ for f in skills/*/SKILL.md; do
   done <<< "$(grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" "$f" | tr -d '\`' | sort -u)"
 done
 
-# mentat review, review --local, review --grok, second-opinion (both modes), the Claude review tool and check behave as
+# mentat review, review --local, review --grok, second-opinion (both modes) and check behave as
 # specified (stub gh, codex, grok and gitleaks), and so do the merge, push, private text and secret hooks.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh)
+  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -375,10 +375,10 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; then
-    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
+  if shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh; then
+    pass "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
   else
-    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/claude.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
+    fail "shellcheck tests/run hooks/session-start hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh"
   fi
 else
   fail "shellcheck not installed, shell scripts not checked"
