@@ -6,6 +6,8 @@
 # replays the permissions settings the review passes to Codex through the real
 # `codex sandbox` (macOS only, no model call): see "Live sandbox check" below.
 set -uo pipefail
+# Added to the live check's failure when /tmp cannot be used as the check needs.
+outside_note="this check cannot run inside an agent sandbox, so tests/run must run outside it"
 
 # Probe mode, run by the codex stub inside the review (its working directory is the
 # review worktree, which mentat removes on exit). Writes $STUB/live_results: one
@@ -17,7 +19,7 @@ live_probe() {
   control() { printf 'control|%s\n' "$1" >>"$res"; }
   # Controls first, outside the sandbox: each fixture exists and is readable here, the
   # write target is writable, the worktree is not under a path the profile denies.
-  case "$(pwd -P)" in /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies"; return 0 ;; esac
+  case "$(pwd -P)" in /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies; $outside_note"; return 0 ;; esac
   # shellcheck disable=SC2086 # the fixture names have no spaces
   for f in README $LIVE_FIXTURES; do
     { [ -f "$f" ] && [ -r "$f" ]; } || { control "fixture $f is missing or unreadable in the review worktree"; return 0; }
@@ -577,15 +579,15 @@ live_run() {
   [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
   # Controls that need no worktree.
   case "$(cd -P "$root" && pwd -P)" in
-    /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
+    /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies; $outside_note"; return 0 ;;
   esac
   outside="$(cd -P "$(dirname "$mentat")/.." && pwd -P)/tests/run"
   case "$outside" in
     /opt/homebrew/* | /usr/local/* | /tmp/* | /private/tmp/* | "$root"/*) live_fail "$outside is under a path the profile allows or denies for another reason"; return 0 ;;
   esac
   [ -r "$outside" ] || { live_fail "$outside is not readable"; return 0; }
-  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /tmp"; return 0; }
-  echo fake >"$live_tmp" || { live_fail "could not write $live_tmp"; return 0; }
+  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /tmp; $outside_note"; return 0; }
+  echo fake >"$live_tmp" || { live_fail "could not write $live_tmp; $outside_note"; return 0; }
   [ -r "$live_tmp" ] || { live_fail "$live_tmp is not readable"; return 0; }
   live_vartmp=$(mktemp /var/tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /var/tmp"; return 0; }
   echo fake >"$live_vartmp" || { live_fail "could not write $live_vartmp"; return 0; }
