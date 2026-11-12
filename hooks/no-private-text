@@ -404,6 +404,7 @@ outside() {
 sub_pat="[()\"'\\\\\`<#$nl]*"
 dq_pat="[\"\\\\\$\`]*"
 cd_re="(^|[^[:alnum:]_./-])(cd|pushd|popd)([^[:alnum:]_./-]|\$)"
+case_re="(^|[^[:alnum:]_./-])case([^[:alnum:]_./-]|\$)"
 # scan <text>: reads the shell word at the start of <text>, its length in wl. Each
 # $(...), <(...) or >(...) in it is queued for its own walk, with the directory then
 # (sub_cd=1 if a cd runs in one), and a heredoc operator outside them adds its
@@ -469,7 +470,8 @@ dq() {
   done
 }
 # sub <at>: reads the body starting at <at> to its matching ), skipping the bodies of
-# heredocs in it, queues it, and moves j past the ).
+# heredocs in it, queues it, and moves j past the ). A case in it, whose patterns end
+# in ), cannot be followed.
 sub() {
   local k=$1 depth=1 r c x
   local -a ph pt
@@ -480,6 +482,7 @@ sub() {
     # shellcheck disable=SC2295 # sub_pat is a pattern.
     r=${r%%$sub_pat}
     [[ ! $r =~ $cd_re ]] || sub_cd=1
+    [[ ! $r =~ $case_re ]] || return 1
     j=$((j + ${#r}))
     [ "$j" -lt "$n" ] || return 1
     c=${s:j:1}

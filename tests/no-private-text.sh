@@ -232,6 +232,12 @@ EOF
 check "a target after a command substitution's heredoc stands" 'skips "$c"'
 c='gh pr comment 1 -R owner/private --body "$(gh api -X POST repos/o/public/issues/1/comments -f body=stubcodename)"'
 check "a public write inside a private comment's body asks" 'asks_for o/public "$c"'
+while IFS= read -r c; do
+  check "a case in a command substitution stops the walk, and a hit asks: $c" '[ "$(decision "$c")" = ask ]'
+done <<'EOF'
+gh pr comment 1 --body "$(case x in a) echo -R owner/private;; esac) stubcodename"
+gh pr comment 1 --body $(case x in a) echo -R owner/private;; esac) stubcodename
+EOF
 
 # Each gh command has its own target, and a hit asks if any target is public.
 reset
