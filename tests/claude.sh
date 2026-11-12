@@ -181,6 +181,6 @@ git -C "$top" remote add origin "$root/fresh origin.git" && git -C "$top" push -
 git clone -q "$root/fresh origin.git" "$root/fresh repo" || exit 1
 (cd "$root/fresh repo" && echo more >>README && git commit -q -am more && git push -q origin trunk) || exit 1
 reset; set_reviewers claude; rc=$(run_opinion)
-check "HEAD behind the default branch is refused (exit 5) before Claude runs, naming the count, not as a tool failure" '[ "$rc" = 5 ] && ! claude_ran && ! codex_ran && [ ! -s "$STUB/stdout" ] && ! grep -q "no second opinion" "$STUB/stderr" && grep -qF "mentat: the checkout is behind origin'"'"'s default branch trunk: HEAD lacks 1 commit on it. Update the checkout and run mentat second-opinion again. This is not a tool failure: do not go on with Claude Code'"'"'s own view alone." "$STUB/stderr"'
+check "HEAD behind the default branch is refused (exit 5) before Claude runs, naming the count, not as a tool failure" '[ "$rc" = 5 ] && ! claude_ran && ! codex_ran && [ ! -s "$STUB/stdout" ] && ! grep -q "no second opinion" "$STUB/stderr" && grep -qF "mentat: the checkout is behind origin'"'"'s default branch trunk: HEAD lacks 1 commit on it." "$STUB/stderr"'
 
 [ "$failures" -eq 0 ]

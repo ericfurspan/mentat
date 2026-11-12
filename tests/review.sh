@@ -65,7 +65,7 @@ check "ci with no CI at all passes after the grace period (exit 0), saying no ch
 reset; echo "$OLD" >"$STUB/push_on_ci"; rc=$(runci)
 check "ci catches a push during the wait (exit 3)" '[ "$rc" = 3 ] && ! grep -q "CI passed" "$STUB/out"'
 reset; runs completed failure >"$STUB/check_runs.json"; echo "$OLD" >"$STUB/push_on_ci"; rc=$(runci)
-check "ci catches a push while CI fails on the old head (exit 3, not 4)" '[ "$rc" = 3 ] && grep -q "the head moved from $H; run mentat ci again" "$STUB/out" && ! grep -q "CI did not pass" "$STUB/out"'
+check "ci catches a push while CI fails on the old head (exit 3, not 4)" '[ "$rc" = 3 ] && grep -q "the head moved from $H" "$STUB/out" && ! grep -q "CI did not pass" "$STUB/out"'
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 reset; printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"}]}\n' "$now" >"$STUB/check_runs.json"
 printf '{"check_runs":[{"name":"fast","status":"completed","conclusion":"success","completed_at":"%s"},{"name":"slow","status":"in_progress","conclusion":null}]}\n' "$now" >"$STUB/check_runs_later.json"

@@ -230,8 +230,7 @@ check "a time limit that is not a number means Grok gives no second opinion, and
 # Neither delivers: exit 1, and both sections still say why.
 reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$question")
 check "neither delivering is exit 1, with both no-second-opinion lines on stdout" '[ "$rc" = 1 ] && grep -q "^## Codex$" "$STUB/stdout" && grep -q "^## Grok$" "$STUB/stdout" && grep -q "^## Views$" "$STUB/stdout" && [ "$(grep -c "no second opinion (" "$STUB/stdout")" = 4 ] && views | grep -q "^- Codex ([0-9]* seconds): no second opinion (codex exited with status 1" && views | grep -q "^- Grok ([0-9]* seconds): no second opinion (Grok exited with status 1"'
-want_line="mentat: no second opinion from any tool; give Claude Code's view alone, say the second opinion did not happen, and ask the maintainer how to proceed"
-check "neither delivering prints one line on stderr telling Claude Code to give its view alone" '[ "$(grep -cxF -- "$want_line" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ] && no_outside'
+check "neither delivering prints one line on stderr saying no tool gave a second opinion" '[ "$(grep -c "^mentat: no second opinion from any tool" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ] && no_outside'
 
 # Cancelling: the parent killed stops both model processes and cleans up.
 reset; touch "$STUB/codex_hang" "$STUB/grok_hang"

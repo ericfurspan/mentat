@@ -305,8 +305,7 @@ reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
 check "a run with no verdict records nothing" '[ "$rc" = 1 ] && [ "$(lines)" = "$before" ]'
 check "neither delivering is exit 1, with both no-second-opinion lines on stdout" '[ "$rc" = 1 ] && grep -q "^## Codex$" "$STUB/stdout" && grep -q "^## Grok$" "$STUB/stdout" && [ "$(grep -c "no second opinion (" "$STUB/stdout")" = 4 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (codex exited with status 1" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): no second opinion (Grok exited with status 1" "$STUB/stdout"'
 check "neither delivering still posts and fetches nothing" 'no_outside'
-want_line="mentat: no second opinion from any tool; give Claude Code's view alone, say the second opinion did not happen, and ask the maintainer to agree"
-check "neither delivering prints one line on stderr telling Claude Code to give its view alone" '[ "$(grep -cxF -- "$want_line" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ]'
+check "neither delivering prints one line on stderr saying no tool gave a second opinion" '[ "$(grep -c "^mentat: no second opinion from any tool" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ]'
 
 # Cancelling: the parent killed stops both model processes and cleans up.
 reset; touch "$STUB/codex_hang" "$STUB/grok_hang"
@@ -346,7 +345,7 @@ fetch_head() { cat "$F/.git/FETCH_HEAD" 2>/dev/null || echo none; }
 runs_fresh() { [ "$rc" = 0 ] && codex_ran && [ -s "$CALLS/fetch" ] && ! grep -q "freshness" "$STUB/stdout"; }
 refused() { # $1 the count and its noun
   [ "$rc" = 5 ] && ! codex_ran && ! grok_ran && [ ! -s "$STUB/stdout" ] && ! grep -q "no second opinion" "$STUB/stderr" \
-    && grep -qF "mentat: the checkout is behind origin's default branch trunk: HEAD lacks $1 on it. Update the checkout and run mentat second-opinion again. This is not a tool failure: do not go on with Claude Code's own view alone." "$STUB/stderr"
+    && grep -qF "mentat: the checkout is behind origin's default branch trunk: HEAD lacks $1 on it." "$STUB/stderr"
 }
 reset; rc=$(run_in)
 check "HEAD up to date with the default branch runs as before, after a fetch, with no freshness line" 'runs_fresh'

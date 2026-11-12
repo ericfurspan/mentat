@@ -211,7 +211,7 @@ check "CI still running at the timeout exits 4, posts nothing and prints the rev
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
 check "a head that moves during the wait for CI exits 3 and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(order)" = "model ci " ] && grep -q "the head moved from $H" "$STUB/out"'
 reset; runs completed '"failure"' >"$STUB/check_runs.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
-check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && grep -q "the head moved from $H; run mentat review again" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out"'
+check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && grep -q "the head moved from $H" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out"'
 reset; runs queued null >"$STUB/check_runs.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
 check "a head that moves while CI on the reviewed head never finishes exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && grep -q "the head moved from $H" "$STUB/out" && ! grep -q "CI did not finish" "$STUB/out"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)

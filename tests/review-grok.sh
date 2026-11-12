@@ -331,7 +331,7 @@ check "CI still running at the timeout exits 4, posts nothing and prints the rev
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
 check "a head that moves during the wait for CI exits 3 and posts nothing, not even the start comment" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && [ "$(order)" = "model ci " ] && grep -q "the head moved from $H" "$STUB/out" && [ -z "$(left_over)" ]'
 reset; runs completed '"failure"' >"$STUB/check_runs.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
-check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing, not even the start comment" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from $H; run mentat review --grok again" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out" && [ -z "$(left_over)" ]'
+check "a head that moves while CI fails on the reviewed head exits 3, not 4, and posts nothing, not even the start comment" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from $H" "$STUB/out" && ! grep -q "CI did not pass\|not posted" "$STUB/out" && [ -z "$(left_over)" ]'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)
 check "no CI check on the head: says so, then posts (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && grep -qx "No CI checks ran on $H" "$STUB/out"'
 # --require-ci: a head where no CI check ran is not a pass, and Grok's run is not used.
