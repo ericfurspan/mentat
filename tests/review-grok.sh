@@ -513,6 +513,8 @@ reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"
 check "--stop with a head that moves during the wait for CI exits 3, posts nothing and names the stop command to run again" '[ "$rc" = 3 ] && grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from $H; run mentat review --grok --stop again" "$STUB/out"'
 echo "$H" >"$STUB/head"; rm "$STUB/push_on_ci" "$STUB/args"; rc=$(srun)
 check "so --stop runs again after the head moved, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
+reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(srun)
+check "--stop with a head the fetch does not match exits 3, before Grok runs, and names the stop command to run again" '[ "$rc" = 3 ] && ! grok_ran && [ "$(comments)" = 0 ] && grep -q "the head moved from 4444444444444444444444444444444444444444; run mentat review --grok --stop again" "$STUB/out"'
 reset; touch "$STUB/hang"; rc=$(cd "$root/work tree" && MENTAT_GROK_TIMEOUT_SECONDS=2 "$mentat" review --grok --stop 7 >"$STUB/out" 2>&1; echo $?)
 check "--stop with a Grok timeout exits 1 before CI is read and posts nothing" '[ "$rc" = 1 ] && grep -q "not reviewed: .*did not finish within 2 seconds" "$STUB/out" && [ "$(comments)" = 0 ] && ! grep -q check-runs "$STUB/calls"'
 rm "$STUB/hang" "$STUB/args"; rc=$(srun)

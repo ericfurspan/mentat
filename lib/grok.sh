@@ -58,7 +58,7 @@ grok_not_started() { # $1 repo, $2 pull request, $3 this account's login
 
 # Reads the pull request and everything the review needs from GitHub and git, without
 # waiting for CI, and stops with "not reviewed" when something is missing. Sets the
-# caller's variables (top, info, head, base, repo, me, title, body, issues, mb, grok_bin, real_grok), and reads the caller's request and request_fp.
+# caller's variables (top, info, head, base, repo, me, title, body, issues, mb, grok_bin, real_grok), and reads the caller's request, request_fp and again.
 grok_prepare() {
   local tool fetched headref baseref
   for tool in git gh jq grok; do
@@ -90,7 +90,7 @@ grok_prepare() {
   trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$headref") >/dev/null 2>&1; git -C $(printf %q "$top") update-ref -d $(printf %q "$baseref") >/dev/null 2>&1" EXIT
   git -C "$top" fetch -q --no-write-fetch-head --refmap= origin "+pull/$pr/head:$headref" "+refs/heads/$base:$baseref" || not_reviewed "could not fetch pull request #$pr or $base"
   fetched=$(git -C "$top" rev-parse --verify "$headref") || not_reviewed "could not read the fetched head"
-  [ "$fetched" = "$head" ] || die "the head moved from $head; run mentat review again" 3
+  [ "$fetched" = "$head" ] || die "the head moved from $head; run $again again" 3
   mb=$(git -C "$top" merge-base "$head" "$baseref") || not_reviewed "could not find where #$pr branches from $base"
   git -C "$top" update-ref -d "$headref" || not_reviewed "could not remove the ref fetched for #$pr"
   git -C "$top" update-ref -d "$baseref" || not_reviewed "could not remove the ref fetched for $base"
