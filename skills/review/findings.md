@@ -1,0 +1,5 @@
+# Findings
+
+Read this when sorting review findings, and again after a compaction.
+
+Claude Code sorts every review finding. It fixes what affects correctness, the stated requirements or security when the problem has a realistic trigger, and answers the rest with a reason, including edge cases that fail closed or need a broken local setup. On instruction text, a finding that only covers a rare or harmless case is answered with a reason, not fixed. A defect Claude Code finds or agrees is real is fixed in the pull request, at any round; it goes to the maintainer only when the fix would change the agreed scope or no review round is left, never into a follow-up item on its own. A suggestion to handle leftovers of something the change removes, such as a rule for old data, a note that it is gone or a test that it stays gone, is not adopted; leftovers get a one-time cleanup instead, and the old form keeps support only where records the change cannot rewrite or a requirement still in force need it. Non-defect improvements become cheap fixes or follow-ups. Of those it disagrees with, only blocking ones go to the maintainer.
