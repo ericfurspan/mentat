@@ -252,6 +252,11 @@ check "cd <x>; cd <private> && true & gh leaves the folder unknown" 'asks "cd \"
 c="cd \"$priv\" && true &
 gh pr comment 1 --body stubcodename"
 check "a chain with a followed cd ended by & at the end of a line leaves the folder unknown" 'asks "$c" && ! looked_up'
+check "cd <private> && (true)& gh leaves the folder unknown" 'asks "cd \"$priv\" && (true)& gh pr comment 1 --body stubcodename" && ! looked_up'
+check "cd <private> && ( (true))& gh leaves the folder unknown" 'asks "cd \"$priv\" && ( (true))& gh pr comment 1 --body stubcodename" && ! looked_up'
+c="cd \"$priv\" && (true)&&
+cd \"$priv\" && gh pr comment 1 --body stubcodename"
+check "a cd on the line after (true)&& leaves the folder unknown" 'asks "$c" && ! looked_up'
 check "cd <private> && gh, then ;, stays silent" 'silent "cd \"$priv\" && gh pr comment 1 --body stubcodename; true" && looked_in "$priv"'
 check "(cd <private> && true); gh leaves the folder unknown" 'asks "(cd \"$priv\" && true); gh pr comment 1 --body stubcodename" && ! looked_up'
 # The subshell's folder is outside the home folder, so its cd text is no hit; its files

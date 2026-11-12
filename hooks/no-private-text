@@ -393,12 +393,14 @@ while [[ $rest =~ $re ]]; do
     '<<'* | [0-9]'<<'*) if heredoc "$w"; then continue; fi; rest=$m$rest; break ;;
     *'<<'*) rest=$m$rest; break ;;
     [\;\&\|\)]*)
+      # A token may join closing parens to its operator, as in )& or );.
       v=${w//[!)]/}; grp=$((grp - ${#v})); [ "$grp" -ge 0 ] || grp=0
-      cd_end "$w"; end_command; keep
-      case "$w" in '&') [ -z "$chain_cd" ] || dir="" ;; esac
-      case "$w" in *';' | '&') chain_cd="" ;; esac
-      case "$w" in *';') c_start=1 ;; *) c_start="" ;; esac
-      case "$w" in '&&' | '||' | '|' | '|&') cont=1 ;; *) cont="" ;; esac
+      op=${w//)/}
+      cd_end "$op"; end_command; keep
+      case "$op" in '&') [ -z "$chain_cd" ] || dir="" ;; esac
+      case "$op" in *';' | '&') chain_cd="" ;; esac
+      case "$op" in *';') c_start=1 ;; *) c_start="" ;; esac
+      case "$op" in '&&' | '||' | '|' | '|&') cont=1 ;; *) cont="" ;; esac
       continue
       ;;
   esac
