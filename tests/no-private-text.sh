@@ -214,7 +214,22 @@ x
 A
 B
 cd \"$pub\" && gh pr comment 1 --body stubcodename"
-check "a cd past a stop makes the folder unknown" 'asks "$c" && ! looked_up'
+check "a cd past a stop makes the remainder's target unknown" 'asks "$c" && ! looked_up'
+# Past a stop, a relative file is still read from the folder known there, even with a
+# cd in the remainder. wtpub2 is public with a clean note.md; sess's note.md has a hit.
+pub2="$HOME/wtpub2" sess="$root/sess"
+mkdir -p "$pub2" "$sess"
+printf 'clean\n' >"$pub2/note.md"; printf 'about StubCodename\n' >"$sess/note.md"
+check "past a \$( stop with a cd in it, a relative body file is read from the stop folder" 'asks "cd \"$pub\" && gh pr edit 7 --body \"\$(echo cd apps && make)\" --body-file note.md" && looked_in "$pub"'
+check "past a \$( stop with a cd in it, a clean relative body file in the stop folder stays silent" 'silent "cd \"$pub2\" && gh pr edit 7 --body \"\$(echo cd apps && make)\" --body-file note.md" "$sess" && ! looked_up'
+check "past a here-string stop with a cd in it, a relative body file is read from the stop folder" 'asks "cd \"$pub\" && gh pr edit 7 <<<\"cd x\" --body-file note.md"'
+c="cd \"$pub\" && gh pr edit 7 <<A <<B --body-file note.md
+x
+A
+cd y
+B"
+check "past a heredoc it cannot read, with a cd in it, a relative body file is read from the stop folder" 'asks "$c"'
+check "a ) closing a group before a cd lets the cd be followed" 'silent "(true); cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 check "private then public cd: the public one counts" 'asks "cd \"$priv\"; cd \"$pub\" && gh pr comment 1 --body stubcodename" && looked_in "$pub" && ! looked_in "$priv"'
 check "public then private cd: the private one counts" 'silent "cd \"$pub\"; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv" && ! looked_in "$pub"'
 check "two writes after different cds each get their own lookup" 'asks "cd \"$priv\" && gh pr comment 1 --body stubcodename; cd \"$pub\" && gh pr comment 2 --body ok" && looked_in "$priv" && looked_in "$pub"'
@@ -249,8 +264,9 @@ check "an unknown folder asks on a hit with no lookup, from a private session fo
 check "an unknown folder with no hit stays silent" 'silent "cd -; gh pr comment 1 --body ok" && ! looked_up'
 check "a cd to an absolute path after an unknown folder is followed" 'silent "cd -; cd \"$priv\" && gh pr comment 1 --body stubcodename" && looked_in "$priv"'
 check "a relative cd after an unknown folder is not followed" 'asks "cd -; cd wtpriv; gh pr comment 1 --body stubcodename" "$HOME" && ! looked_up'
+tilde='~'
 while IFS= read -r c; do
-  check "a folder change it does not follow leaves the folder unknown: ${c//"$HOME"/\~}" 'asks "$c" "$priv" && ! looked_up'
+  check "a folder change it does not follow leaves the folder unknown: ${c//"$HOME"/$tilde}" 'asks "$c" "$priv" && ! looked_up'
 done <<EOF
 cd; gh pr comment 1 --body stubcodename
 cd -P "$pub"; gh pr comment 1 --body stubcodename
