@@ -377,7 +377,7 @@ outside() {
 # chain_cd a cd followed earlier in the chain.
 repo="" targets=$'\n' unread_api="" kept="" past="" held="" hd_text=""
 o_cmd="" o_next="" o_first=0 sed_i="" sed_script="" sed_amb="" sed_unk="" subst="" late=""
-cd_on="" cd_text="" cd_n=0 cd_arg="" chain_cd="" grp=0 c_start=1 c_any="" cont=""
+cd_on="" cd_text="" cd_n=0 cd_arg="" chain_cd="" grp=0 c_start=1 c_any="" cont="" lastw=""
 arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 next_re="^[[:blank:]]*($arg)"
@@ -386,7 +386,13 @@ rest=$cmd prev="" in_gh="" in_api="" api="" is_get="" next=""
 while [[ $rest =~ $re ]]; do
   m=${BASH_REMATCH[0]} w=${BASH_REMATCH[1]}
   rest=${rest:${#m}}
+  pw=$lastw lastw=$w
   [ "$w" != $'\\\n' ] || { held+=$m; continue; }
+  # A & in a redirect (2>&1, >&2, <&3, &>file, &>>file) belongs to that redirect.
+  if [ "$w" = '&' ]; then
+    case "$m$pw" in '&'*'>' | '&'*'<') keep; continue ;; esac
+    case "$rest" in '>'*) keep; continue ;; esac
+  fi
   case "${m%"$w"}" in *$'\n'*) new_line ;; esac
   case "$w" in
     '#'*) v=${rest%%$'\n'*}; kept+=$held$m$v; held=""; rest=${rest:${#v}}; continue ;;

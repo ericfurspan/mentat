@@ -259,6 +259,17 @@ check "cd <private> && ( (true))& gh leaves the folder unknown" 'asks "cd \"$pri
 c="cd \"$priv\" && (true)&&
 cd \"$priv\" && gh pr comment 1 --body stubcodename"
 check "a cd on the line after (true)&& leaves the folder unknown" 'asks "$c" && ! looked_up'
+while IFS= read -r r; do
+  check "a redirect with & after a followed cd keeps the folder: $r" 'silent "cd \"$priv\" && npm test $r; gh pr comment 1 --body stubcodename" && looked_in "$priv"'
+done <<'EOF'
+2>&1
+>&2
+<&3
+&>/dev/null
+&>>log
+|& cat
+EOF
+check "a redirect with & on a gh command keeps its target" 'skips_private() { silent "$1" && grep -qF "repo view owner/private --json isPrivate" "$STUB/calls"; }; skips_private "gh pr comment 1 --body stubcodename 2>&1 --repo owner/private"'
 check "cd <private> && gh, then ;, stays silent" 'silent "cd \"$priv\" && gh pr comment 1 --body stubcodename; true" && looked_in "$priv"'
 check "(cd <private> && true); gh leaves the folder unknown" 'asks "(cd \"$priv\" && true); gh pr comment 1 --body stubcodename" && ! looked_up'
 # The subshell's folder is outside the home folder, so its cd text is no hit; its files
