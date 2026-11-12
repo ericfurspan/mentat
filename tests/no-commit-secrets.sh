@@ -150,6 +150,19 @@ for c in 'GIT_INDEX_FILE=other git add -A && git commit -m x' 'GIT_DIR=other git
 done
 reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'echo git commit -a -m x'
 check "echo git commit -a is not read as a commit that stages" 'quiet && [ ! -f "$STUB/calls" ]'
+# The commit that runs is scanned, not a git commit in quoted text before it.
+reset; hit "$repo/new.txt"; run "$repo" 'echo "git commit -m x" && git add new.txt && git commit -m y'
+check "a quoted git commit before git add and the real commit scans what the real one stages" 'names new.txt'
+reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'echo "git commit -am wip" && git commit -am wip'
+check "a quoted git commit before a real git commit -a scans the real one" 'names clean.txt'
+for c in "grep -n 'git commit -am' tests/run" 'echo "then run git commit -am wip"'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c commits nothing and stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
+done
+for c in '(echo "git commit -am x")' 'x=$(echo "git commit -am x")'; do
+  reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
+  check "$c, a quoted commit it cannot place, asks as a failed simulation" 'sim_failed'
+done
 reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'git commit -sam x'
 check "git commit -sam x reads -a after -s" 'names clean.txt'
 reset; stage_hit; run "$repo" 'git commit -sm x'
