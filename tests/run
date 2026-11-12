@@ -239,16 +239,19 @@ phrase_check skills/propose/SKILL.md "when the second opinion rounds stop" 'The 
 phrase_check skills/propose/SKILL.md "a later round's file with the whole revised idea and no earlier replies" "Each later round's file holds the whole revised idea, with its answers and deferred choices, and no earlier replies or summary of them."
 phrase_check skills/propose/SKILL.md "one agreement question after the last round" 'It asks the maintainer to agree once, after the last round,'
 phrase_check skills/propose/SKILL.md "the agreement question's note of a last change with no second opinion" 'says when the last adopted change had no second opinion'
-# A point the maintainer corrects twice is restated and followed; before agreement, a grill is offered only for a decision still open, as propose's one offer.
+# A point the maintainer corrects twice is restated and followed; before agreement, propose offers a grill for it only for a decision still open, as its one offer.
 phrase_check rules.md "a twice-corrected point restated in one line and followed" 'When the maintainer corrects the same point twice in a session, Claude Code restates the correction in one line and follows it.'
-phrase_check rules.md "a grill offered only before agreement and for a decision still open, as propose's one offer" "Before the work is agreed, it offers a grill (\`mentat:grill\`) only if the corrections show one of the maintainer's decisions is still open, as the one offer \`mentat:propose\` allows per request, and starts it only if the maintainer agrees."
+phrase_check skills/propose/SKILL.md "a grill offered for a twice-corrected point at any step before agreement and only for a decision still open" "At any step before the work is agreed, once the maintainer has corrected the same point twice in the session, it offers a grill only if the corrections show one of their decisions is still open."
+phrase_check skills/propose/SKILL.md "one grill offer per request whichever trigger fires" 'Whichever fires, it offers a grill at most once per request, and starts it only if the maintainer agrees.'
 # A lasting lesson from a correction is followed at once and filed in the Inbox at once with no prompt, named in one line of the reply; triage settles it and merges repeats.
 phrase_check rules.md "a correction within the agreed scope followed at once" 'Claude Code follows any correction within the agreed scope at once.'
 phrase_check rules.md "the triggers for filing a lesson" 'When the maintainer corrected the same point twice, said it should hold in later work, or stated a preference about how agents work in general,'
 phrase_check rules.md "a lesson filed at once in the Inbox with no prompt, named in one line of the reply, and a failed write said" 'Claude Code files the lesson at once in the Inbox, with no prompt, and names it in one line of its reply, which says the write failed if it did;'
 phrase_check rules.md "what does not trigger filing a lesson, and once per point" 'never for a one-off instruction for this task, a reversal already asked as a scope question or a failed check inside the review loop, and at most once per point per session.'
-phrase_check rules.md "the lesson entry names what it would change, and filing agrees nothing" "The entry names what an accepted item would change (for a working-style preference, the maintainer's own instructions); filing agrees nothing, and triage settles it."
-phrase_check rules.md "no duplicate check when filing a lesson" 'There is no duplicate check at filing; triage merges repeats.'
+phrase_check skills/backlog/lessons.md "when to read it" "Read this when filing a lesson from a correction (\`rules.md\` \"What goes to the maintainer\"), and again after a compaction."
+phrase_check skills/backlog/lessons.md "the lesson entry names what it would change, and filing agrees nothing" "The entry names what an accepted item would change (for a working-style preference, the maintainer's own instructions); filing agrees nothing, and triage settles it."
+phrase_check skills/backlog/lessons.md "no duplicate check when filing a lesson" 'There is no duplicate check at filing; triage merges repeats.'
+phrase_check skills/backlog/SKILL.md "the pointer to lessons.md" "A lesson from a correction is filed as \`lessons.md\` in this skill's folder says."
 
 # A triage sitting is started only by the maintainer, asks one decision per prompt, reads its readers again
 # after a compaction, and sends nothing it collects to Codex or Grok.
@@ -527,7 +530,7 @@ phrase_check skills/backlog/next-work.md "the offer after a build queue, none mi
 phrase_check skills/backlog/next-work.md "the offer after a merge the maintainer reports, never from a listing or mid-queue" "after the maintainer says a pull request merged, once its item is marked done (the post-merge step in \`../review/after-ready.md\`, which the Claude-only path follows), never from a backlog listing's cleanup or while a queue runs;"
 phrase_check skills/backlog/next-work.md "the offer after triage, accepted items for propose only" "after triage that ends with no question, where an accepted item is offered for \`mentat:propose\`, never for building."
 phrase_check skills/backlog/next-work.md "what a yes to the offer authorizes" 'The offer says what a yes authorizes: starting that batch, not merging open pull requests and not new scope.'
-phrase_check skills/backlog/next-work.md "the merge line first while a merge waits" '"Ready to merge: #N" stays the first line while a merge waits.'
+phrase_check skills/backlog/next-work.md "a merge still waiting named in one plain line, with no repeated merge line" 'A merge still waiting is named in one line, in plain words, without repeating a "Ready to merge: #N" line an earlier message gave.'
 phrase_check rules.md "a web-mode question file holding only the question, nothing private" "- A \`mentat second-opinion --web\` file holds only the question, nothing private."
 phrase_check skills/backlog/next-work.md "the offer's read-only lookup" "Its lookup reads the next agreed work (\`mentat:backlog\` \"The order of agreed work\") read-only, and reports one of:"
 phrase_check skills/backlog/next-work.md "the lookup result for an unreadable backlog" 'reports one of: the backlog could not be read;'
@@ -555,6 +558,9 @@ phrase_check skills/propose/SKILL.md "plan's view not repeated for the same item
 phrase_check skills/propose/SKILL.md "the advice comment posted when agreed against advice" "When Claude Code had recommended closing, shrinking or not building the item and the maintainer agreed anyway, it also posts the advice comment \`mentat:backlog\` \"Advice against\" gives."
 phrase_check skills/propose/SKILL.md "a small, clear request's one path with no second opinion" "no backlog read, grill, decisions or \`mentat second-opinion\`"
 phrase_check skills/propose/SKILL.md "a small, clear request's hand check offer" 'When the change has something to try, the one-line view also offers the hand check of step 5.'
+# A change or fix to text every session loads replaces or tightens existing text before it adds any.
+phrase_check skills/propose/SKILL.md "a change to always-loaded text that replaces or tightens before it adds" "A change to text every session loads (such as \`rules.md\` or the maintainer's own instructions) replaces or tightens existing text before it adds any: its spec names the text it replaces or tightens, and adds new text only where no existing text covers the case."
+phrase_check skills/review/findings.md "a fix to always-loaded text that replaces or tightens before it adds" "A fix to text every session loads (such as \`rules.md\` or the maintainer's own instructions) replaces or tightens existing text before it adds any: the fix names the text it replaces or tightens, and adds new text only where no existing text covers the case."
 phrase_check skills/propose/SKILL.md "the proposal's hand check offer for a change with something to try" "When the change has something the maintainer can try in a few minutes (a screen, a page, a command's output, a behavior they can trigger), the proposal offers them a hand check."
 phrase_check skills/propose/SKILL.md "what the hand check offer says" 'It says what they would try, and that a hand check they accept holds back "Ready to merge: #N" until they report it.'
 phrase_check skills/propose/SKILL.md "no hand check offer for a change with nothing to try" 'A change with nothing to try gets no offer.'
@@ -575,9 +581,14 @@ else
   pass "rules.md does not leave a follow-up unfiled"
 fi
 # A suggestion to keep handling leftovers of something a change removes is not adopted.
-phrase_check rules.md "a one-time cleanup instead of handling leftovers of what a change removes" 'leftovers get a one-time cleanup instead, and the old form keeps support only where records the change cannot rewrite or a requirement still in force need it.'
+phrase_check skills/review/findings.md "a one-time cleanup instead of handling leftovers of what a change removes" 'leftovers get a one-time cleanup instead, and the old form keeps support only where records the change cannot rewrite or a requirement still in force need it.'
 # On instruction text, a finding that only covers a rare or harmless case is answered, not fixed.
-phrase_check rules.md "a rare or harmless case on instruction text answered, not fixed" 'On instruction text, a finding that only covers a rare or harmless case is answered with a reason, not fixed.'
+phrase_check skills/review/findings.md "a rare or harmless case on instruction text answered, not fixed" 'On instruction text, a finding that only covers a rare or harmless case is answered with a reason, not fixed.'
+# Findings are sorted as skills/review/findings.md says, read when sorting and again after a compaction.
+phrase_check skills/review/findings.md "when to read it" 'Read this when sorting review findings, and again after a compaction.'
+phrase_check skills/review/SKILL.md "the pointer to findings.md in the sorting step" "3. Read \`findings.md\` in this skill's folder when sorting findings, and again after a compaction, and sort each finding as it says"
+phrase_check skills/review/SKILL.md "the pointer to findings.md for Grok's observations" "settle each like a non-defect finding (read \`findings.md\` in this skill's folder then, and again after a compaction)"
+phrase_check skills/claude-review/SKILL.md "the pointer to findings.md in the sorting step" "Read \`../review/findings.md\` (in \`mentat:review\`'s folder) when sorting findings, and again after a compaction, and sort each finding as it says."
 # The propose step's read (mentat:propose) and a planning session's read (mentat:plan) neither refine hand-made items nor clear waits: both bullets exempt both.
 if [ "$(grep -c -F "not for \`mentat:propose\`'s or \`mentat:plan\`'s read," skills/backlog/linear.md)" -eq 2 ]; then
   pass "skills/backlog/linear.md exempts the propose step's and planning session's reads from refining items and clearing waits"
@@ -893,19 +904,23 @@ else
   fail "jq not installed, SessionStart wiring not checked"
 fi
 
-# The SessionStart hook prints rules.md unchanged, within Claude Code's
-# 10,000-character limit for the output of a hook.
-if hook_out=$(hooks/session-start); then
-  if [ "$hook_out" != "$(cat rules.md)" ]; then
+# The SessionStart hook prints rules.md unchanged, and its complete output, trailing newline
+# included, stays under 9,500, leaving 500 of headroom under Claude Code's 10,000-character
+# cap on a hook's output. It counts bytes, never fewer than characters, so it is never looser than the cap.
+hook_file=$(mktemp) || exit 1
+if hooks/session-start >"$hook_file"; then
+  hook_size=$(wc -c <"$hook_file" | tr -d ' ')
+  if ! cmp -s "$hook_file" rules.md; then
     fail "hooks/session-start output differs from rules.md"
-  elif [ "${#hook_out}" -ge 10000 ]; then
-    fail "hooks/session-start prints ${#hook_out} characters (limit 10000)"
+  elif [ "$hook_size" -ge 9500 ]; then
+    fail "hooks/session-start prints $hook_size bytes, trailing newline included (limit 9500)"
   else
-    pass "hooks/session-start prints rules.md (${#hook_out} characters)"
+    pass "hooks/session-start prints rules.md, $hook_size bytes, trailing newline included (limit 9500)"
   fi
 else
   fail "hooks/session-start exited non-zero"
 fi
+rm -f "$hook_file"
 # The file is found relative to the plugin root, not the working directory.
 hook_script=$PWD/hooks/session-start
 if hook_out=$(cd /tmp && "$hook_script") && [ "$hook_out" = "$(cat rules.md)" ]; then
