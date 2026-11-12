@@ -256,6 +256,17 @@ gh pr comment 1 --body stubcodename"
 check "a chain with a followed cd ended by & at the end of a line leaves the folder unknown" 'asks "$c" && ! looked_up'
 check "cd <private> && (true)& gh leaves the folder unknown" 'asks "cd \"$priv\" && (true)& gh pr comment 1 --body stubcodename" && ! looked_up'
 check "cd <private> && ( (true))& gh leaves the folder unknown" 'asks "cd \"$priv\" && ( (true))& gh pr comment 1 --body stubcodename" && ! looked_up'
+check "cd <private> && (true; true) & gh leaves the folder unknown" 'asks "cd \"$priv\" && (true; true) & gh pr comment 1 --body stubcodename" && ! looked_up'
+check "cd <private> && (true;)& gh leaves the folder unknown" 'asks "cd \"$priv\" && (true;)& gh pr comment 1 --body stubcodename" && ! looked_up'
+c="cd \"$priv\" && (
+true
+true
+) & gh pr comment 1 --body stubcodename"
+check "a chain with a followed cd and a multi-line group, ended by &, leaves the folder unknown" 'asks "$c" && ! looked_up'
+check "a & inside a group after a followed cd keeps the folder" 'silent "cd \"$priv\" && (sleep 1 & true); gh pr comment 1 --body stubcodename" && looked_in "$priv"'
+c="gh pr comment 1 --repo owner/private --body ok
+&>/dev/null gh pr comment 2 --body stubcodename"
+check "a redirect opening the next line starts a new command with its own target" 'asks "$c" && looked_in "$root/work"'
 c="cd \"$priv\" && (true)&&
 cd \"$priv\" && gh pr comment 1 --body stubcodename"
 check "a cd on the line after (true)&& leaves the folder unknown" 'asks "$c" && ! looked_up'

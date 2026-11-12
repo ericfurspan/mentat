@@ -219,7 +219,9 @@ new_line() {
   kept+=$hd_text; hd_text=""
   cd_end nl
   end_command
-  [ -n "$cont" ] || c_start=1 chain_cd=""
+  [ -n "$cont" ] || c_start=1
+  # A newline inside a group does not end the outer chain.
+  [ -n "$cont" ] || [ "$grp" -ne 0 ] || chain_cd=""
 }
 # parens <word>: sets n, the number of ( in the word outside quotes.
 parens() {
@@ -387,24 +389,29 @@ while [[ $rest =~ $re ]]; do
   m=${BASH_REMATCH[0]} w=${BASH_REMATCH[1]}
   rest=${rest:${#m}}
   pw=$lastw lastw=$w
+  # A newline before any token ends the command first.
+  case "${m%"$w"}" in *$'\n'*) new_line ;; esac
   [ "$w" != $'\\\n' ] || { held+=$m; continue; }
   # A & in a redirect (2>&1, >&2, <&3, &>file, &>>file) belongs to that redirect.
   if [ "$w" = '&' ]; then
     case "$m$pw" in '&'*'>' | '&'*'<') keep; continue ;; esac
     case "$rest" in '>'*) keep; continue ;; esac
   fi
-  case "${m%"$w"}" in *$'\n'*) new_line ;; esac
   case "$w" in
     '#'*) v=${rest%%$'\n'*}; kept+=$held$m$v; held=""; rest=${rest:${#v}}; continue ;;
     '<<'* | [0-9]'<<'*) if heredoc "$w"; then continue; fi; rest=$m$rest; break ;;
     *'<<'*) rest=$m$rest; break ;;
     [\;\&\|\)]*)
-      # A token may join closing parens to its operator, as in )& or );.
+      # A token may join closing parens to operators, as in )&, ); or ;)&. The operator
+      # after the last ) acts at the depth left; only one at the outer depth ends or
+      # backgrounds the outer chain.
       v=${w//[!)]/}; grp=$((grp - ${#v})); [ "$grp" -ge 0 ] || grp=0
-      op=${w//)/}
+      op=${w##*)}
       cd_end "$op"; end_command; keep
-      case "$op" in '&') [ -z "$chain_cd" ] || dir="" ;; esac
-      case "$op" in *';' | '&') chain_cd="" ;; esac
+      if [ "$grp" -eq 0 ]; then
+        case "$op" in '&') [ -z "$chain_cd" ] || dir="" ;; esac
+        case "$op" in *';' | '&') chain_cd="" ;; esac
+      fi
       case "$op" in *';') c_start=1 ;; *) c_start="" ;; esac
       case "$op" in '&&' | '||' | '|' | '|&') cont=1 ;; *) cont="" ;; esac
       continue
