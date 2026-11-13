@@ -169,7 +169,8 @@ for c in "bash -c 'git commit -am x'" 'sh -c "git commit -am x"' 'eval "git comm
   "sudo bash -c 'git commit -am x'" "xargs sh -c 'git commit -am x'" "printf 'git commit -am wip\n' | bash" \
   "$(printf 'cat <<EOF | bash\ngit commit -am x\nEOF')" "echo 'git commit -am x' > s.sh; bash s.sh" \
   "echo 'git commit -am x' | /bin/echo" "x=\$(bash -c 'echo hi') && echo 'git commit -am x'" \
-  "$(printf "cat <<EOF\n\$(bash -c 'git commit -am x')\nEOF")"; do
+  "$(printf "cat <<EOF\n\$(bash -c 'git commit -am x')\nEOF")" \
+  "echo \"\${x:-\$(bash -c 'git commit -am x')}\"" "echo \"\${x:-\`bash -c 'git commit -am x'\`}\""; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c, a commit a shell may run, asks as a failed simulation" 'sim_failed'
 done
