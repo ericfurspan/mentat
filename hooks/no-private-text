@@ -6,14 +6,14 @@
 # named by --body-file, -F, --field or --notes-file, through a leading $NAME/ too. It
 # walks past heredoc and $(...) bodies, whose text stays checked, and a gh command in
 # a $(...) has its own target. A heredoc body is left out only when a lone cat writes
-# it to a literal file that no other word names. A gh file flag's value only locates
-# a file, so it is not looked at. Outside a gh command and before any $(, backtick or
-# <<, neither is another path that only locates one: a cd or git -C argument, a temp
-# or home path as a redirect target or sed -i file, a temp path after a file flag, or
-# an assignment whose variable is used only there. Each target is looked up in the
-# directory its command runs in: the session's, moved by each top-level cd the walk
-# can follow; after one it cannot, a target with no repository counts as public. It
-# asks if any target is public.
+# it to a literal file that no other word names. A gh file flag's value that runs no
+# command only locates a file, so it is not looked at. Outside a gh command and
+# before any $(, backtick or <<, neither is another path that only locates one: a cd
+# or git -C argument, a temp or home path as a redirect target or sed -i file, a temp
+# path after a file flag, or an assignment whose variable is used only there. Each
+# target is looked up in the directory its command runs in: the session's, moved by
+# each top-level cd the walk can follow; after one it cannot, a target with no
+# repository counts as public. It asks if any target is public.
 # The prompt gives the category, never the match, and approving it clears a false
 # alarm. This is a net for mistakes, not a security boundary: other routes exist. When
 # it cannot read its input or its tools are missing, it stays out of the way.
@@ -591,7 +591,7 @@ arg='([^[:space:]"'"'"'\\;&|)]|\\.|"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"')+'
 re="^[[:space:]]*($arg|[;&|)]+)"
 api_re='^/?repos/([[:alnum:]._-]+/[[:alnum:]._-]+)'
 walk() {
-  local lead t body
+  local lead t body runs
   while :; do
     if [ "${#HQ[@]}" -gt 0 ]; then
       t=${rest%%"$nl"*}
@@ -632,11 +632,15 @@ walk() {
     [ -z "$body" ] || past+=$m
     in_gh=1 o_cmd=${o_cmd:-gh}
     if [ -n "$hword" ]; then keep; continue; fi
+    # A file flag's value that runs a command names no file to read; it stays checked.
+    runs=""
+    case "$w" in *'$('* | *'<('* | *'>('* | *'`'*) runs=1 ;; esac
     value=$next next=""
     case "$value" in
       repo) set_repo "$w"; keep; continue ;;
       method) set_method "$w"; keep; continue ;;
       file | field)
+        if [ -n "$runs" ]; then keep; continue; fi
         if [ "$value" = file ]; then note_located "$w" gh; else case "$w" in *=@*) note_located "${w#*=@}" gh ;; esac; fi
         if read_file "$w" || [ "$value" = file ]; then
           held=""
@@ -656,11 +660,15 @@ walk() {
       --field | -F) next=field; held+=$m; continue ;;
       '>' | '>>' | [0-9]'>' | [0-9]'>>') next=redir ;;
       '>'* | [0-9]'>'*) v=${w#[0-9]}; v=${v#>}; note_located "${v#>}" gh ;;
-      --body-file=* | --notes-file=*) note_located "${w#*=}" gh; read_file "${w#*=}"; continue ;;
+      --body-file=* | --notes-file=*)
+        if [ -z "$runs" ]; then note_located "${w#*=}" gh; read_file "${w#*=}"; continue; fi
+        ;;
       --field=* | -F=*)
         v=${w#*=}
-        case "$v" in *=@*) note_located "${v#*=@}" gh; read_file "$v"; continue ;; esac
-        if read_file "$v"; then continue; fi
+        if [ -z "$runs" ]; then
+          case "$v" in *=@*) note_located "${v#*=@}" gh; read_file "$v"; continue ;; esac
+          if read_file "$v"; then continue; fi
+        fi
         ;;
     esac
     keep

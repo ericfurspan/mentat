@@ -401,6 +401,15 @@ check "a home path as a git -C argument is no hit" '[ -z "$(decision "git -C \"$
 check "a home path as a gh file flag's value is no hit, read or not" '[ -z "$(decision "gh pr comment 7 --body-file \"$HOME/missing.md\"")" ]'
 check "a home path as a redirect target is no hit" '[ -z "$(HOME=$outhome decision "printf x > \"$outhome/x.md\"; gh pr comment 5 --body ok")" ]'
 check "a home path in a name used only to locate is no hit" '[ -z "$(HOME=$outhome decision "S=$outhome/d; printf x >\$S/x.md; gh pr comment 5 --body-file \$S/x.md")" ]'
+while IFS= read -r c; do
+  check "a home path in a file flag's value that runs a command is a local path: $c" '[ "$(HOME=$outhome reason "$c")" = "$path_hit" ]'
+done <<EOF
+gh pr comment 1 --body-file <(printf "$outhome/x") -R o/public
+gh pr comment 1 --body-file=<(printf "$outhome/x") -R o/public
+gh api repos/o/public/issues/1/comments -F body=@<(printf "$outhome/x")
+gh api repos/o/public/issues/1/comments --field=body=@<(printf "$outhome/x")
+gh pr comment 1 --body-file "\$(printf $outhome/x)" -R o/public
+EOF
 # Past a command substitution the walk reads gh's real flags.
 check "past a stop, a file with a hit asks" '[ "$(decision "gh pr create --title \"\$(x)\" --body-file word.md")" = ask ]'
 check "past a command substitution, a real flag's clean file under the home folder is no hit" '[ -z "$(decision "gh pr create --title \"\$(x)\" --body-file \"$HOME/clean.md\"")" ]'
