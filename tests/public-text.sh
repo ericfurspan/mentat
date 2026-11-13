@@ -150,7 +150,7 @@ check "denies a hit after a leading cd" '[ "$(decision "cd \"$HOME/repo\" && gh 
 tdir="$TMPDIR/StubCodename"
 mkdir -p "$tdir"; cp "$root/work/clean.md" "$tdir/pr.md"
 while IFS= read -r c; do
-  check "allows a temp path holding a word that only locates a clean file: $c" '[ -z "$(output "$c")" ]'
+  check "allows a temp path holding a word that only locates a clean file: $c" '[ -z "$(output "$c" 2>/dev/null)" ]'
 done <<EOF
 gh pr edit 1 --body-file $tdir/pr.md
 S=$tdir; gh pr edit 1 --body-file \$S/pr.md
@@ -161,14 +161,17 @@ check "denies a temp path holding a word when it is published" '[ "$(decision "S
 
 # Only a gh write is checked: its own words but the repository and the gh api endpoint,
 # the files it reads, and the text fed to it.
-# expect <deny|allow> <command>: checks the hook's decision for the command.
+# unchecked <command> <note>: the hook allows the command with that note on stderr.
+unchecked() { out=$(output "$1" 2>"$STUB/err"); rc=$?; [ "$rc" = 0 ] && [ -z "$out" ] && grep -q "^mentat-public-text: .*$2.*allowed unchecked" "$STUB/err"; }
+# expect <deny|allow|note> <command>: checks the hook's decision for the command. allow
+# means no output at all; note means allowed with the note for a file the line changes.
 expect() {
   local want=$1 cmd=$2 label=${2//$'\n'/ \\n }
-  if [ "$want" = deny ]; then
-    check "denies: $label" '[ "$(decision "$cmd")" = deny ]'
-  else
-    check "allows: $label" '[ -z "$(output "$cmd")" ]'
-  fi
+  case "$want" in
+    deny) check "denies: $label" '[ "$(decision "$cmd")" = deny ]' ;;
+    note) check "allows with a note: $label" 'unchecked "$cmd" "a file this command changes"' ;;
+    *) check "allows: $label" '[ -z "$(output "$cmd" 2>&1)" ]' ;;
+  esac
 }
 printf '{"body": "about StubCodename"}\n' >"$root/work/word.json"
 printf 'about StubCodename\n' >"$root/work/sub/only-sub.md"
@@ -183,8 +186,6 @@ echo "gh pr edit 7 --body x" >> /Users/stubperson/notes.txt
 cat /Users/stubperson/notes.md; gh pr comment 7 --body "hello"
 git -C /Users/stubperson/r push -u origin HEAD && gh pr create --title t --body ok
 gh pr diff 7 > /Users/stubperson/d.patch; gh pr review 7 --approve
-gh pr view 7 --json body -q .body > /Users/stubperson/b.md && gh pr edit 7 --body-file /Users/stubperson/b.md
-gh pr view 7 --json body -q .body > word.md && gh pr edit 7 --body-file word.md
 (cd sub && git status) && gh pr comment 7 -F only-sub.md
 echo stubcodename && gh pr comment 7 --body ok
 GH_DEBUG=stubcodename gh pr comment 7 --body ok
@@ -212,12 +213,34 @@ gh issue create --title t --body ok --template=/Users/stubperson/t.md
 gh pr create --title t --body ok --recover /Users/stubperson/r.json
 gh release create v1 /Users/stubperson/dist/app.tgz --notes ok
 gh release view v1 --json body -q stubcodename
+while read -r l; do :; done < word.md | gh pr comment 7 -F -
+cp clean.md word.md; gh pr comment 7 --body ok
+NOPUBLISH
+# A command that can write a file makes its text unknown, so the gh write it feeds is
+# allowed with a note.
+while IFS= read -r c; do expect note "$c"; done <<'CHANGED'
+gh pr view 7 --json body -q .body > /Users/stubperson/b.md && gh pr edit 7 --body-file /Users/stubperson/b.md
+gh pr view 7 --json body -q .body > word.md && gh pr edit 7 --body-file word.md
 sed -i '' 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
 sed -i '' 's/StubCodename/it/' ./word.md && gh pr comment 7 -F word.md
+sed -i.bak 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
+sed -Ei 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
+sed -I '' 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
+sed --in-place=.bak 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
+awk -i inplace '{ print }' word.md && gh pr comment 7 -F word.md
+perl -pi -e 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
 cp clean.md word.md && gh pr comment 7 -F word.md
+mv clean.md word.md && gh pr comment 7 -F word.md
 echo clean | tee word.md && gh pr comment 7 -F word.md
-while read -r l; do :; done < word.md | gh pr comment 7 -F -
-NOPUBLISH
+dd if=clean.md of=word.md && gh pr comment 7 -F word.md
+npx prettier --write word.md && gh pr comment 7 -F word.md
+printf 'clean\n' > word.md && gh pr comment 7 -F word.md
+cp clean.md word.md; cat word.md | gh pr comment 7 -F -
+cp clean.md word.md; gh pr comment 7 --body "$(cat word.md)"
+cp clean.md word.md; gh pr comment 7 -F - < word.md
+cp clean.md word.md; cat word.md > copy.md; gh pr comment 7 -F copy.md
+cp clean.md query.graphql; gh api graphql -F query=@query.graphql
+CHANGED
 while IFS= read -r c; do expect deny "$c"; done <<'PUBLISH'
 gh pr new --title t --body "about stubcodename"
 gh issue new --title t --body "about stubcodename"
@@ -264,7 +287,35 @@ echo "ends with $' here"; gh pr comment 7 --body "it's about stubcodename"
 [ -f word.md ] && gh pr comment 7 -F word.md
 test -s word.md && gh pr comment 7 -F word.md
 grep -c x word.md; gh pr comment 7 -F word.md
+git add word.md && git commit -m x && gh pr create --title t --body-file word.md
+git commit -F word.md && gh pr create --title t --body-file word.md
+git diff --stat -- word.md; gh pr comment 7 -F word.md
+jq . word.json && gh api repos/o/r/issues/7/comments --input word.json
+sed -n 1,5p word.md; gh pr comment 7 -F word.md
+diff word.md clean.md; gh pr comment 7 -F word.md
+rg -n x word.md; gh pr comment 7 -F word.md
+awk 'NR<3' word.md; gh pr comment 7 -F word.md
+echo word.md; printf '%s\n' word.md; gh pr comment 7 -F word.md
+chmod 644 word.md; chown "$USER" word.md; touch word.md; open word.md; gh pr comment 7 -F word.md
+[[ -f word.md && -s word.md ]] && gh pr comment 7 -F word.md
+if [[ -f word.md || -s word.md ]]; then gh pr comment 7 -F word.md; fi
+[[ -f clean.md ]] && gh pr comment 7 --body "about stubcodename"
+echo [[ && gh pr comment 7 --body "about stubcodename"
+git add word.md; cat word.md | gh pr comment 7 -F -
+git add word.md; gh pr comment 7 --body "$(cat word.md)"
+git add word.md; gh pr comment 7 -F - < word.md
+cp clean.md query.graphql; gh api graphql -F query=@query.graphql -f body="about stubcodename"
+jq -n '{query: "query { x }"}' | gh api graphql --input - -f body="about stubcodename"
 PUBLISH
+expect deny "cat > x.md <<'EOF'
+about stubcodename
+EOF
+git add x.md && gh pr create -t t -F x.md"
+expect deny "cat > x.md <<'EOF'
+about stubcodename
+EOF
+chmod 644 x.md
+gh pr comment 7 -F x.md"
 expect deny 'n=$((1<<4))
 gh pr comment 7 --body "about stubcodename"'
 expect deny '(( x = 1 << 4 ))
@@ -321,7 +372,6 @@ EOF")" = deny ]'
 # allowed unchecked with a note, and a file whose text reaches no gh write is not read.
 { printf 'about StubCodename\n'; head -c 1100000 /dev/zero | tr '\0' x; } >"$root/work/big.md"
 { printf 'about StubCodename\n'; head -c 900000 /dev/zero | tr '\0' x; } >"$root/work/under.md"
-unchecked() { out=$(output "$1" 2>"$STUB/err"); rc=$?; [ "$rc" = 0 ] && [ -z "$out" ] && grep -q "^mentat-public-text: .*$2.*allowed unchecked" "$STUB/err"; }
 check "allows a gh write fed a file over 1 MB, with a note" 'unchecked "gh pr comment 7 -F big.md" "over 1 MB"'
 check "denies a hit in a file under 1 MB" '[ "$(decision "gh pr comment 7 -F under.md")" = deny ]'
 wide=$(head -c 60000 /dev/zero | tr '\0' x)
