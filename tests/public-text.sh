@@ -74,8 +74,12 @@ done <<'PATHS'
 /Users/stubperson/notes.md
 /home/stubperson/notes.md
 (/Users/stub.person/x)
+/Users/username2/x
+/home/runners/x
+/Users/Shared2/x
+see /Users/Shared/x and /Users/stubperson/x
 PATHS
-# ~/ names no person, so it is no hit.
+# ~/, a shared folder, a CI runner's home and a placeholder name name no person.
 while IFS= read -r p; do
   check "allows text that only looks like a home path: $p" '[ -z "$(output "gh pr comment 7 --body \"see $p\"")" ]'
 done <<'NOTPATHS'
@@ -85,6 +89,14 @@ https://example.com/home/stubpage/
 a~/b
 ~/notes.md
 ~/.config/mentat/private-words
+/home/runner/work/repo
+/Users/Shared/x
+/Users/you/x
+/home/me/x
+/Users/user/x
+/home/username/x
+/Users/name/x
+/Users/you/ and /home/runner/ and /Users/Shared/
 NOTPATHS
 check "allows a git -C ~/ command before gh when nothing else hits" '[ -z "$(output "git -C ~/x push && gh pr create --body ok")" ]'
 
