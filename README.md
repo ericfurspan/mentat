@@ -39,12 +39,7 @@ This writes `.claude/settings.json`, turning Mentat on for everyone there. Use `
 
 Where pull requests need approval, give the agent its own GitHub account.
 
-### Modules
-
-Optional plugins from the same marketplace, each installed like Mentat as `<module>@mentat`:
-
-- `mentat-public-text` blocks GitHub text holding a word from `~/.config/mentat/private-words` or a home path.
-- `mentat-reviewers`, `mentat-linear` and `mentat-extras` are empty for now.
+Optional modules install as `<module>@mentat`: `mentat-public-text` blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`; three others are empty.
 
 ## Usage
 
@@ -72,6 +67,10 @@ Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/l
 ## Review tools
 
 `mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt. `mentat check` reports each tool.
+
+## Git hook templates
+
+`git-templates/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy.
 
 ## Credits
 

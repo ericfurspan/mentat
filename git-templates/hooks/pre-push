@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Mentat's git pre-push template, for a core.hooksPath that names this folder. It reads
+# every ref line git sends and refuses the push when any destination is the default
+# branch of the repository pushed to, whether an update, a force push or a deletion;
+# when that repository lists no HEAD branch and no branches, and the push creates a
+# branch, which would become its default; and when the outgoing commits add a likely
+# secret or the scan cannot run. The default branch is the one git ls-remote --symref
+# <push URL> names, else refs/remotes/<remote>/HEAD when the push URL is the remote's
+# fetch URL, else main and master. A push to a local path or file:// URL, such as a test
+# suite's scratch copy, is not checked for the default branch; it is still scanned.
+# Outgoing commits are those the repository pushed to lacks: not reachable from its refs
+# that ls-remote lists and this repository has, nor from the old value git sends. When
+# ls-remote fails, every commit reachable from what is pushed is scanned.
+# Each commit is scanned on its own diff as text, root commits and files git treats as
+# binary included; a merge commit on what its resolution changed from git's own merge of
+# its parents (--diff-merges=remerge, git 2.36 or later; an older git refuses), and one
+# of three or more parents, which remerge does not show, on its diff from git's own merge
+# of its parents built with git merge-tree where it can, else from its first
+# parent. Other branches and tags pass, force pushes and deletions included. Then it runs the
+# repository's own pre-push hook (own-hook.sh) with the same arguments and ref lines.
+# Git hooks cannot ask, so each check refuses. This is a net for common mistakes, not a
+# security boundary.
+set -uo pipefail
+
+here=${0%/*}
+scan=$here/../scan
+remote=${1:-origin}
+# Git passes the URL it pushes to, which a pushurl can make another repository than
+# the one the remote fetches from.
+dest=${2:-$remote}
+refuse() { printf 'Mentat: push refused: %s\n' "$1" >&2; exit 1; }
+
+# The ref lines, read twice: once here, once by the repository's own hook. The file is
+# removed as soon as both are open.
+lines=$(mktemp "${TMPDIR:-/tmp}/mentat-pre-push.XXXXXX") || refuse "could not save the ref lines git sent."
+if ! cat >"$lines" || ! exec 3<"$lines" 4<"$lines"; then
+  rm -f "$lines"
+  refuse "could not save the ref lines git sent."
+fi
+rm -f "$lines"
+
+# A local path or file:// URL, told apart as git does: not "<transport>::" or
+# "<scheme>://", and no colon before the first slash.
+local_dest=""
+case $dest in
+  file://*) local_dest=1 ;;
+  *://* | *::*) ;;
+  *) case ${dest%%/*} in *:*) ;; *) local_dest=1 ;; esac ;;
+esac
+
+# The refs of the repository pushed to, read once: its HEAD's branch, and as "^<object>"
+# lines its refs' objects that are here, which bound the scan.
+if advert=$(git ls-remote --symref "$dest" 2>/dev/null); then listed=1; else advert="" listed=""; fi
+have=$(printf '%s\n' "$advert" | awk '$1 ~ /^[0-9a-f]+$/ && length($1) >= 40 { print $1 }' | sort -u |
+  git cat-file --batch-check='%(objectname) %(objecttype)' 2>/dev/null |
+  awk '$2 == "commit" || $2 == "tag" { print "^" $1 }') || have=""
+defaults="" empty=""
+if [ -z "$local_dest" ]; then
+  defaults=$(printf '%s\n' "$advert" |
+    awk '$1 == "ref:" && $3 == "HEAD" && sub(/^refs\/heads\//, "", $2) { print $2; exit }')
+  if [ -z "$defaults" ] && [ -n "$listed" ] &&
+    printf '%s\n' "$advert" | awk '$2 ~ /^refs\/heads\// { f = 1 } END { exit f }'; then
+    empty=1
+  fi
+  # The remote-tracking HEAD is the fetch repository's, so it counts only for its URL.
+  if [ -z "$defaults" ] && [ "$(git remote get-url "$remote" 2>/dev/null)" = "$dest" ]; then
+    defaults=$(git symbolic-ref --short "refs/remotes/$remote/HEAD" 2>/dev/null) && defaults=${defaults#"$remote"/}
+  fi
+  [ -n "$defaults" ] || defaults="main master"
+fi
+
+# auto_merge <merge>: prints the tree of git's own merge of the merge's parents, built as
+# the octopus strategy does: each parent after the first merged in turn, on its merge
+# base with those before it. Fails on a conflict, on no or several merge bases, or on a
+# git whose merge-tree --merge-base does not take trees. git merge-tree leaves the trees
+# it writes as loose objects.
+auto_merge() {
+  local parents p merged="" tree="" base
+  parents=$(git rev-parse "$1^@" 2>/dev/null) || return 1
+  for p in $parents; do
+    if [ -z "$merged" ]; then tree=$p merged=$p; continue; fi
+    # shellcheck disable=SC2086 # $merged is a list of object names.
+    base=$(git merge-base --all "$p" $merged 2>/dev/null) || return 1
+    case $base in "" | *[!0-9a-f]*) return 1 ;; esac
+    tree=$(git merge-tree --write-tree --merge-base="$base" "$tree" "$p" 2>/dev/null) || return 1
+    case $tree in "" | *[!0-9a-f]*) return 1 ;; esac
+    merged="$merged $p"
+  done
+  [ -n "$tree" ] && printf '%s\n' "$tree"
+}
+
+diffs=""
+while read -r _ lsha rref rsha <&3; do
+  [ -n "$rref" ] || continue
+  if [ -n "$empty" ] && [ "${lsha//0/}" != "" ]; then
+    case $rref in
+      refs/heads/*) refuse "the repository pushed to has no branches yet, so the first branch pushed would become its default branch; ask the maintainer to push it." ;;
+    esac
+  fi
+  for d in $defaults; do
+    if [ "$rref" = "refs/heads/$d" ]; then
+      if [ "${lsha//0/}" = "" ]; then refuse "agents never delete the default branch ($d)."; fi
+      refuse "agents never push to the default branch ($d); push a branch and open a pull request."
+    fi
+  done
+  [ "${lsha//0/}" != "" ] || continue
+  old=""
+  if [ "${rsha//0/}" != "" ] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then old=^$rsha; fi
+  # Revisions on stdin, so any number of refs fits.
+  # shellcheck disable=SC2086 # $old and $have are lists of words.
+  out=$(printf '%s\n' "$lsha" $old $have | git -c core.quotePath=false log -p --root --text --diff-merges=remerge --no-relative --no-ext-diff --no-textconv --no-color -U0 \
+    --src-prefix=a/ --dst-prefix=b/ --format='commit %H' --stdin --) ||
+    refuse "git could not list the outgoing commits of $rref, so they were not scanned for secrets."
+  [ -z "$out" ] || diffs+=$out$'\n'
+  # Remerge shows nothing for a merge of three or more parents, so each is scanned on its
+  # diff from git's own merge of its parents, else from its first parent.
+  # shellcheck disable=SC2086
+  octopi=$(printf '%s\n' "$lsha" $old $have | git rev-list --min-parents=3 --stdin --) ||
+    refuse "git could not list the outgoing merges of $rref, so they were not scanned for secrets."
+  for c in $octopi; do
+    from=$(auto_merge "$c") || from=$c^1
+    out=$(git -c core.quotePath=false diff --text --no-relative --no-ext-diff --no-textconv --no-color -U0 \
+      --src-prefix=a/ --dst-prefix=b/ "$from" "$c" --) ||
+      refuse "git could not diff the outgoing merge $c of $rref, so it was not scanned for secrets."
+    [ -z "$out" ] || diffs+=$out$'\n'
+  done
+done
+exec 3<&-
+
+hits=$(printf '%s' "$diffs" | "$scan")
+case $? in
+  0) ;;
+  1) refuse "gitleaks flags a likely secret in the outgoing commits:"$'\n'"$hits"$'\n'"Remove it from the branch's history, or ask the maintainer to push it." ;;
+  *) refuse "the secret scan of the outgoing commits could not run (run mentat check)." ;;
+esac
+# shellcheck source=/dev/null
+{ [ -f "$here/../own-hook.sh" ] && . "$here/../own-hook.sh"; } ||
+  refuse "own-hook.sh could not be loaded, so the repository's own hook could not run (run mentat check)."
+own_hook pre-push "$@" <&4 4<&-
