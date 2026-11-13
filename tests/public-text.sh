@@ -205,6 +205,18 @@ gh pr comment 7 --body 'see $HOME/x'
 gh api graphql -f query='query { repository(owner: "o", name: "stubcodename") { id } }'
 gh api graphql -F query=@query.graphql
 gh api graphql -f query='{ viewer { login } }' > /Users/stubperson/out.json
+gh api graphql -f query='query { viewer { login } }' -f note=stubcodename -f o="$OWNER"
+gh pr create --title t --body ok --template /Users/stubperson/t.md
+gh pr create --title t --body ok -T /Users/stubperson/t.md
+gh issue create --title t --body ok --template=/Users/stubperson/t.md
+gh pr create --title t --body ok --recover /Users/stubperson/r.json
+gh release create v1 /Users/stubperson/dist/app.tgz --notes ok
+gh release view v1 --json body -q stubcodename
+sed -i '' 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
+sed -i '' 's/StubCodename/it/' ./word.md && gh pr comment 7 -F word.md
+cp clean.md word.md && gh pr comment 7 -F word.md
+echo clean | tee word.md && gh pr comment 7 -F word.md
+while read -r l; do :; done < word.md | gh pr comment 7 -F -
 NOPUBLISH
 while IFS= read -r c; do expect deny "$c"; done <<'PUBLISH'
 gh pr new --title t --body "about stubcodename"
@@ -243,7 +255,23 @@ gh pr create --title t --body x --head stubcodename-branch
 gh api graphql -f query='mutation { addComment(input: {body: "stubcodename"}) { clientMutationId } }'
 gh api graphql -F query=@mutation.graphql
 f() { gh pr comment 7 --body "about stubcodename"; }; f
+gh api graphql -f query="$MUT" -f body="about stubcodename"
+gh api graphql -F query=@missing.graphql -F body=@word.md
+gh release create v1 --notes "about stubcodename"
+gh release edit v1 --notes-file word.md
+gh pr comment 7 --body "$(< word.md)"
+echo "ends with $' here"; gh pr comment 7 --body "it's about stubcodename"
+[ -f word.md ] && gh pr comment 7 -F word.md
+test -s word.md && gh pr comment 7 -F word.md
+grep -c x word.md; gh pr comment 7 -F word.md
 PUBLISH
+expect deny 'n=$((1<<4))
+gh pr comment 7 --body "about stubcodename"'
+expect deny '(( x = 1 << 4 ))
+gh pr comment 7 --body "about stubcodename"'
+expect allow 'gh pr comment 7 -F - <<EOF
+see \$HOME/x and \${HOME} and \$(pwd)
+EOF'
 expect deny 'gh pr\
  comment 7 --body "about stubcodename"'
 expect deny 'gh pr comment 7 \
@@ -285,7 +313,38 @@ reset; printf 'exact:StubExact\n' >"$LIST"
 check "a marked entry is denied only in its case and as a whole word" '[ "$(decision "gh pr comment 7 --body \"about StubExact\"")" = deny ] && [ -z "$(decision "gh pr comment 7 --body \"about stubexact\"")" ] && [ -z "$(decision "gh pr comment 7 --body \"about StubExacts\"")" ]'
 reset
 long=$(printf 'stubcodename\n%0100000d\n%0100000d' 0 0)
-check "a hit early in long text is denied under pipefail" '[ "$(decision "gh pr comment 7 --body \"$long\"")" = deny ]'
+check "a hit early in a long heredoc is denied under pipefail" '[ "$(decision "gh pr comment 7 -F - <<'"'"'EOF'"'"'
+$long
+EOF")" = deny ]'
+
+# Limits: a file over 1 MB, a command over 50 KB outside heredocs, or deep nesting is
+# allowed unchecked with a note, and a file whose text reaches no gh write is not read.
+{ printf 'about StubCodename\n'; head -c 1100000 /dev/zero | tr '\0' x; } >"$root/work/big.md"
+{ printf 'about StubCodename\n'; head -c 900000 /dev/zero | tr '\0' x; } >"$root/work/under.md"
+unchecked() { out=$(output "$1" 2>"$STUB/err"); rc=$?; [ "$rc" = 0 ] && [ -z "$out" ] && grep -q "^mentat-public-text: .*$2.*allowed unchecked" "$STUB/err"; }
+check "allows a gh write fed a file over 1 MB, with a note" 'unchecked "gh pr comment 7 -F big.md" "over 1 MB"'
+check "denies a hit in a file under 1 MB" '[ "$(decision "gh pr comment 7 -F under.md")" = deny ]'
+wide=$(head -c 60000 /dev/zero | tr '\0' x)
+check "allows a command over 50 KB outside heredocs, with a note" 'unchecked "gh pr comment 7 --body \"stubcodename $wide\"" "over 50 KB"'
+many=$(printf 'a %.0s' $(seq 7000))
+check "allows a command with too many steps to read, with a note" 'unchecked "echo $many; gh pr comment 7 --body stubcodename" "over 6000 steps"'
+deep=$(printf '%03000d' 0 | sed 's/0/$(/g')
+check "allows a command nested too deep, with a note" 'unchecked "gh pr comment 7 --body ok; echo $deep" "nested"'
+mkdir "$root/logbin"
+for t in cat head; do
+  printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"$STUB/reads"\nexec %s "$@"\n' "$(command -v "$t")" >"$root/logbin/$t"
+  chmod +x "$root/logbin/$t"
+done
+# read_word <command>: succeeds when the hook reads word.md for the command.
+read_word() { rm -f "$STUB/reads"; PATH="$root/logbin:$PATH" output "$1" >/dev/null 2>&1; grep -qF word.md "$STUB/reads" 2>/dev/null; }
+check "reads a file whose text reaches a gh write" 'read_word "cat word.md | gh pr comment 7 -F -"'
+while IFS= read -r c; do
+  check "does not read a file whose text reaches no gh write: $c" '! read_word "$c"'
+done <<'NOREAD'
+docker load < word.md # high
+cat word.md | grep -c x; gh pr comment 7 --body ok
+gh pr view 7 < word.md
+NOREAD
 
 # GitHub MCP writes: every text value but owner and repo.
 reset
@@ -301,6 +360,14 @@ done
 check "denies a home path in any MCP text value, nested ones too" '[ "$(mcp_decision mcp__plugin_x_github__issue_write "$nested_path")" = deny ]'
 check "allows a listed word that is only the MCP owner or repo" '[ -z "$(mcp mcp__github__add_issue_comment "$owner_repo")" ]'
 check "allows an MCP tool that publishes nothing" '[ -z "$(mcp mcp__github__issue_read "$word_body")" ]'
+other_server='{"title": "t", "description": "see /Users/stubperson/x and stubcodename"}'
+for t in mcp__linear__create_issue mcp__jira__update_issue mcp__gitlab__create_issue; do
+  check "allows a same-named tool with no owner and repo: $t" '[ -z "$(mcp "$t" "$other_server")" ]'
+done
+gist='{"description": "d", "files": {"a.md": {"content": "about stubcodename"}}}'
+gist_edit='{"gist_id": "1", "content": "about stubcodename"}'
+new_repo='{"name": "stubcodename"}'
+check "denies a word in a gist or a new repository, which have no owner and repo" '[ "$(mcp_decision mcp__github__create_gist "$gist")" = deny ] && [ "$(mcp_decision mcp__github__update_gist "$gist_edit")" = deny ] && [ "$(mcp_decision mcp__github__create_repository "$new_repo")" = deny ]'
 
 # What it prints: a deny with the category, never an ask, never the match.
 reset
@@ -335,15 +402,8 @@ mcp_matches() { jq -e --arg t "$1" '[.hooks.PreToolUse[] | select(.matcher != "B
 for t in $mcp_tools; do
   check "hooks.json runs it for $t under any server name" 'mcp_matches "mcp__github__$t" && mcp_matches "mcp__plugin_x_github__$t"'
 done
+check "hooks.json gives each run a timeout of at most 15 seconds" 'jq -e "[.hooks.PreToolUse[].hooks[] | .timeout] | all(type == \"number\" and . <= 15)" "$hooks" >/dev/null'
 check "hooks.json does not run it for MCP reads or lookalike names" '! mcp_matches mcp__github__issue_read && ! mcp_matches mcp__github__create_pull_request_x && ! mcp_matches create_pull_request'
 check "hooks.json never blocks a call when the hook fails" '! jq -e "[.. | objects | select(has(\"onFailure\"))] | any" "$hooks" >/dev/null'
 
 [ "$failures" -eq 0 ]
-other_server='{"title": "t", "description": "see /Users/stubperson/x and stubcodename"}'
-for t in mcp__linear__create_issue mcp__jira__update_issue mcp__gitlab__create_issue; do
-  check "allows a same-named tool with no owner and repo: $t" '[ -z "$(mcp "$t" "$other_server")" ]'
-done
-gist='{"description": "d", "files": {"a.md": {"content": "about stubcodename"}}}'
-gist_edit='{"gist_id": "1", "content": "about stubcodename"}'
-new_repo='{"name": "stubcodename"}'
-check "denies a word in a gist or a new repository, which have no owner and repo" '[ "$(mcp_decision mcp__github__create_gist "$gist")" = deny ] && [ "$(mcp_decision mcp__github__update_gist "$gist_edit")" = deny ] && [ "$(mcp_decision mcp__github__create_repository "$new_repo")" = deny ]'

@@ -3,22 +3,28 @@
 # from ~/.config/mentat/private-words or a local home path. It never asks. Turning the
 # module on in a repository is what says that repository's text is public.
 # For Bash it reads the command as the shell would and checks only gh writes: pr create,
-# new, edit, comment, review and close; issue create, new, edit, comment and close; and
-# gh api with a write method, or with fields and no GET, where graphql counts only for a
-# mutation. It checks that command's own words but its -R/--repo value and the api
-# endpoint, the files it reads (--body-file, -F, --notes-file, --input, field=@file), and
-# text fed to it by a heredoc, a here-string, < file or cat file |. $(cat file), a
-# heredoc in $( ) and a variable assigned earlier in the line count as their text, and
-# $HOME, $PWD and $(pwd) as the home folder; a cd before it in the line sets where
-# relative files are read. Other commands' words, file names, and text from other
-# variables, commands or unreadable files are not checked.
+# new, edit, comment, review and close; issue create, new, edit, comment and close;
+# release create and edit; and gh api with a write method, or with fields and no GET,
+# where graphql counts unless its query is known and is no mutation. It checks that
+# command's own words but its -R/--repo, --template and --recover values, the api
+# endpoint and a release asset's folder, the files it reads (--body-file, -F,
+# --notes-file, --input, field=@file), and text fed to it by a heredoc, a here-string,
+# < file or cat file |. $(cat file), $(< file), a heredoc in $( ) and a variable assigned
+# earlier in the line count as their text, and $HOME, $PWD and $(pwd) as the home folder;
+# a cd before it in the line sets where relative files are read. A file is read only when
+# its text reaches a gh write. Other commands' words, file names, and text from other
+# variables, commands or unreadable files are not checked, nor is a file that a command
+# before it in the line, other than cat, cd, pwd, gh or a reader such as test or grep,
+# names, since that command may change it.
 # For the GitHub MCP server's writes that carry free text (issues, pull requests, reviews,
 # comments, merges, gists, files and repositories), under current and older tool names,
 # it looks at every text value but owner and repo. A call is that server's when its input
 # has owner and repo, or when it makes a gist or a repository.
 # The reason gives the category, never the match. This is a net for mistakes, not a
-# security boundary: other routes exist. When it cannot read its input or jq is missing,
-# it allows the call and says so on stderr.
+# security boundary: other routes exist. When it cannot read its input, jq is missing, a
+# file feeding a gh write is over 1 MB, or the command is over 50 KB or 6,000 steps
+# outside heredocs or nested over 100 levels deep, it allows the call and says so on
+# stderr.
 set -uo pipefail
 
 allow() { printf 'mentat-public-text: %s; the call is allowed unchecked\n' "$1" >&2; exit 0; }
@@ -69,12 +75,6 @@ deny() {
 # server's when its input has owner and repo, or when it makes a gist or a repository.
 mcp_writes='^mcp__.+__(add_comment_to_pending_review|add_issue_comment|add_reply_to_pull_request_comment|create_gist|create_issue|create_or_update_file|create_pull_request|create_pull_request_review|create_pull_request_with_copilot|create_repository|discussion_comment_write|issue_write|merge_pull_request|pull_request_review_write|push_files|sub_issue_write|submit_pending_pull_request_review|update_gist|update_issue|update_issue_comment|update_pull_request)$'
 if [[ $tool =~ $mcp_writes ]]; then
-  text=$(printf '%s' "$input" | jq -r '[.tool_input | paths(type == "string") as $p
-    | select(($p | last) as $k | $k != "owner" and $k != "repo") | getpath($p)] | join("\n")' 2>/dev/null) ||
-    allow "could not read the tool input"
-  hit=$(private_text "$text") || exit 0
-  deny "$hit"
-fi
   case "$tool" in
     *__create_gist | *__update_gist | *__create_repository) ;;
     *)
@@ -83,14 +83,35 @@ fi
       [ "$github" = true ] || exit 0
       ;;
   esac
+  text=$(printf '%s' "$input" | jq -r '[.tool_input | paths(type == "string") as $p
+    | select(($p | last) as $k | $k != "owner" and $k != "repo") | getpath($p)] | join("\n")' 2>/dev/null) ||
+    allow "could not read the tool input"
+  hit=$(private_text "$text") || exit 0
+  deny "$hit"
+fi
 [ "$tool" = Bash ] || exit 0
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || allow "could not read the command"
-case "$cmd" in *gh*) ;; *) exit 0 ;; esac
+# The walk reads bytes, which keeps it fast on long text.
+LC_ALL=C
+re_gh='(^|[^[:alnum:]_.-])gh([^[:alnum:]_.-]|$)'
+[[ $cmd =~ $re_gh ]] || exit 0
 cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || allow "could not read the working folder"
 [ -n "$cwd" ] || cwd=$PWD
 
-# The walk reads bytes, which keeps it fast on long text.
-LC_ALL=C
+# The walk's time grows with the text it reads outside heredocs times its steps (a word,
+# quote, expansion or operator each), so it stops past this many bytes or steps, and at
+# this depth of nesting.
+walk_max=50000 step_max=6000 depth_max=100
+cmd_len=${#cmd} h_used=0 steps=0 depth=0
+case "$cmd" in *'<<'*) ;; *) [ "$cmd_len" -le "$walk_max" ] || allow "the command is over 50 KB outside heredocs" ;; esac
+# over: stops the walk once it has read more than walk_max bytes outside heredocs.
+over() { [ $((cmd_len - ${#src} - h_used)) -le "$walk_max" ] || allow "the command is over 50 KB outside heredocs"; }
+tick() {
+  steps=$((steps + 1))
+  [ "$steps" -le "$step_max" ] || allow "the command takes over $step_max steps to read outside heredocs"
+  [ $((steps % 64)) -ne 0 ] || over
+}
+
 sq="'" bq='`' nl=$'\n' tab=$'\t'
 re_blank=$'^([ \t]|\\\\\n)+'
 re_plain="^[^ $tab$nl;&|()<>$sq\"\\\\\$$bq]+"
@@ -108,7 +129,12 @@ re_redir='^(<<<|<<-|<<|<>|<&|<\(|>>|>&|>\||>\(|<|>)'
 re_fd='^([0-9]+)[<>]'
 re_mutation='(^|[^A-Za-z0-9_])mutation([^A-Za-z0-9_]|$)'
 # shellcheck disable=SC2016 # These are the literal expansions a heredoc would make.
-re_homevar='\$(HOME|PWD)([^A-Za-z0-9_]|$)|\$\{(HOME|PWD)\}|\$\(pwd\)'
+re_homevar='(^|[^\\])(\$(HOME|PWD)([^A-Za-z0-9_]|$)|\$\{(HOME|PWD)\}|\$\(pwd\))'
+re_parens='^[^()]+'
+# A file's text is read only when it reaches a gh write: until then a mark, unique to this
+# run, stands for it.
+mark="@mentat-file-$RANDOM$RANDOM@" file_max=1048576
+lz_path=() nlz=0
 
 # What the walk keeps. A word has its text as published, its text as a file name, and
 # whether that name is known (no unreadable variable or command in it). A command has
@@ -137,6 +163,16 @@ value() {
   if [ "$1" = TMPDIR ] && [ -n "${TMPDIR:-}" ]; then x_text=$TMPDIR x_path=$TMPDIR; else x_ok=""; fi
 }
 close() { [ "${src:0:1}" != ')' ] || src=${src:1}; }
+# arith: skips arithmetic from just after its (( to just after the matching )).
+arith() {
+  local open=2
+  while [ -n "$src" ] && [ "$open" -gt 0 ]; do
+    tick
+    if [[ $src =~ $re_parens ]]; then src=${src:${#BASH_REMATCH[0]}}; continue; fi
+    if [ "${src:0:1}" = '(' ]; then open=$((open + 1)); else open=$((open - 1)); fi
+    src=${src:1}
+  done
+}
 # sublist: reads a list up to its ), which runs in a subshell.
 sublist() {
   local saved=$cwd
@@ -150,7 +186,7 @@ dollar() {
   x_text="" x_path="" x_ok=1
   case "${src:1:1}" in
     '(')
-      if [ "${src:2:1}" = '(' ]; then src=${src:3}; sublist; close; x_ok=""; return; fi
+      if [ "${src:2:1}" = '(' ]; then src=${src:3}; arith; x_ok=""; return; fi
       src=${src:2}; sublist
       x_text=$l_text x_path=$l_text x_ok=$l_ok
       if [ -n "$l_pwd" ]; then value PWD; fi
@@ -173,6 +209,7 @@ backtick() { [[ $src =~ $re_bq ]]; src=${src:${#BASH_REMATCH[0]}}; }
 dquote() {
   local text="" path="" ok=1 t c
   while [ -n "$src" ]; do
+    tick
     if [[ $src =~ $re_dq ]]; then t=${BASH_REMATCH[0]}; text+=$t path+=$t src=${src:${#t}}; continue; fi
     c=${src:0:1}
     case "$c" in
@@ -185,23 +222,30 @@ dquote() {
           *) text+=\\$c path+=\\$c ;;
         esac
         ;;
-      '$') dollar; text+=$x_text path+=$x_path; [ -n "$x_ok" ] || ok="" ;;
+      '$')
+        # $' and $" are a plain $ inside double quotes.
+        case "${src:1:1}" in "$sq" | '"') text+='$' path+='$' src=${src:1}; continue ;; esac
+        dollar; text+=$x_text path+=$x_path; [ -n "$x_ok" ] || ok=""
+        ;;
       *) backtick; ok="" ;;
     esac
   done
   d_text=$text d_path=$path d_ok=$ok
 }
-# word: reads one word; $wi is its index. ~ at its start is the home folder as a file
-# name, and stays ~ as text.
+# word: reads one word; $wi is its index, and w_moved is set when it read any text. ~ at
+# its start is the home folder as a file name, and stays ~ as text.
 word() {
   local text="" path="" ok=1 quoted="" assign="" t c
+  w_moved=""
   if [[ $src =~ $re_assign ]]; then assign=1; fi
   if [ "${src:0:1}" = '~' ]; then
-    case "${src:1:1}" in '' | / | ' ' | "$tab" | "$nl" | ';' | '&' | '|' | ')' | '<' | '>') text='~' path=$home src=${src:1} ;; esac
+    case "${src:1:1}" in '' | / | ' ' | "$tab" | "$nl" | ';' | '&' | '|' | ')' | '<' | '>') text='~' path=$home src=${src:1} w_moved=1 ;; esac
   fi
   while [ -n "$src" ]; do
-    if [[ $src =~ $re_plain ]]; then t=${BASH_REMATCH[0]}; text+=$t path+=$t src=${src:${#t}}; continue; fi
+    tick
+    if [[ $src =~ $re_plain ]]; then t=${BASH_REMATCH[0]}; text+=$t path+=$t src=${src:${#t}} w_moved=1; continue; fi
     c=${src:0:1}
+    case "$c" in \\ | "$sq" | '"' | '$' | "$bq") w_moved=1 ;; *) break ;; esac
     case "$c" in
       \\) c=${src:1:1}; src=${src:2}; quoted=1; [ "$c" = "$nl" ] || { text+=$c path+=$c; } ;;
       "$sq") src=${src:1}; [[ $src =~ $re_sq ]]; t=${BASH_REMATCH[0]}; text+=$t path+=$t src=${src:$((${#t} + 1))} quoted=1 ;;
@@ -211,7 +255,6 @@ word() {
         dollar; text+=$x_text path+=$x_path; [ -n "$x_ok" ] || ok=""
         ;;
       "$bq") backtick; ok="" ;;
-      *) break ;;
     esac
   done
   wi=$nw nw=$((nw + 1))
@@ -247,7 +290,7 @@ heredocs() {
   for id in $pend; do
     body=""
     while [ -n "$src" ]; do
-      [[ $src =~ $re_line ]]; line=${BASH_REMATCH[0]}; src=${src:$((${#line} + 1))}
+      [[ $src =~ $re_line ]]; line=${BASH_REMATCH[0]}; src=${src:$((${#line} + 1))} h_used=$((h_used + ${#line} + 1))
       if [ -n "${h_strip[id]}" ]; then while [ "${line:0:1}" = "$tab" ]; do line=${line:1}; done; fi
       [ "$line" != "${h_delim[id]}" ] || break
       body+=$line$nl
@@ -267,6 +310,7 @@ end_pipe() {
 flush() {
   local p
   [ -n "$queue" ] || return 0
+  over
   while IFS= read -r p; do
     # shellcheck disable=SC2086 # p holds command numbers.
     [ -z "$p" ] || run_pipe $p
@@ -278,7 +322,10 @@ flush() {
 # what a single pipeline prints.
 parse_list() {
   local stop=$1 queue="" pipe="" cur="" npipes=0 c t saved out_text="" out_ok="" out_pwd=""
+  depth=$((depth + 1))
+  [ "$depth" -le "$depth_max" ] || allow "the command is nested over $depth_max levels deep"
   while :; do
+    tick
     if [[ $src =~ $re_blank ]]; then src=${src:${#BASH_REMATCH[0]}}; fi
     [ -n "$src" ] || break
     c=${src:0:1}
@@ -287,6 +334,8 @@ parse_list() {
       '#') [[ $src =~ $re_comment ]]; src=${src:${#BASH_REMATCH[0]}} ;;
       ')') [ "$stop" != ')' ] || break; src=${src:1}; end_pipe; [ -n "$pend" ] || flush ;;
       '(')
+        # An arithmetic command prints nothing.
+        if [ -z "$cur" ] && [ "${src:1:1}" = '(' ]; then src=${src:2}; arith; continue; fi
         # A subshell, or the () of a function definition, whose body is a new command.
         src=${src:1}; t=$cur
         [ -n "$cur" ] || new_cmd
@@ -304,9 +353,8 @@ parse_list() {
       '<' | '>') redirect ;;
       *)
         if [[ $src =~ $re_fd ]]; then src=${src:${#BASH_REMATCH[1]}}; continue; fi
-        t=${#src}
         word
-        [ "${#src}" -lt "$t" ] || src=${src:1}
+        [ -n "$w_moved" ] || src=${src:1}
         [ -n "$cur" ] || new_cmd
         c_words[cur]+=" $wi"
         ;;
@@ -316,6 +364,7 @@ parse_list() {
   [ -n "$stop" ] || heredocs
   flush
   if [ "$npipes" -eq 1 ]; then l_text=$out_text l_ok=$out_ok l_pwd=$out_pwd; else l_text="" l_ok="" l_pwd=""; fi
+  depth=$((depth - 1))
 }
 run_pipe() {
   local id s_text="" s_ok="" n=$#
@@ -326,29 +375,65 @@ run_pipe() {
   out_text=$o_text out_ok=$o_ok out_pwd=$o_pwd
 }
 
-# read_path <path>: sets rp_text to the file's text: what this line wrote to it, else
-# what it holds now. Returns 1 when that is unknown.
+# full_path <path>: sets fp to the path from /, without its ./ parts. Returns 1 when the
+# working folder is unknown.
+full_path() {
+  fp=$1
+  case "$fp" in /*) ;; *) [ -n "$cwd" ] || return 1; fp=$cwd/$fp ;; esac
+  while :; do
+    case "$fp" in
+      */./*) fp=${fp//\/.\//\/} ;;
+      */.) fp=${fp%/.} ;;
+      *) return 0 ;;
+    esac
+  done
+}
+# read_path <path>: sets rp_text to the file's text: what this line wrote to it, else a
+# mark for what it holds now. Returns 1 when that is unknown.
 read_path() {
-  local p=$1 k=$nf
-  case "$p" in /*) ;; *) [ -n "$cwd" ] || return 1; p=$cwd/$p ;; esac
+  local k=$nf
+  full_path "$1" || return 1
   while [ "$k" -gt 0 ]; do
     k=$((k - 1))
-    [ "${f_path[k]}" = "$p" ] || continue
+    [ "${f_path[k]}" = "$fp" ] || continue
     [ -n "${f_ok[k]}" ] || return 1
     rp_text=${f_text[k]}; return 0
   done
-  { [ -f "$p" ] && [ -r "$p" ]; } || return 1
-  rp_text=$(cat "$p")
+  { [ -f "$fp" ] && [ -r "$fp" ]; } || return 1
+  rp_text=$mark$nlz$mark lz_path[nlz]=$fp nlz=$((nlz + 1))
+}
+# expand <text>: sets e_text to the text with each mark replaced by its file's text. A file
+# over file_max bytes allows the call unchecked.
+expand() {
+  local t=$1 n
+  e_text=""
+  while :; do
+    case "$t" in *"$mark"*) ;; *) break ;; esac
+    n=${t%%"$mark"*}; e_text+=$n t=${t:$((${#n} + ${#mark}))}
+    n=${t%%"$mark"*}; t=${t:$((${#n} + ${#mark}))}
+    rp_text=$(head -c $((file_max + 1)) "${lz_path[n]}")
+    [ "${#rp_text}" -le "$file_max" ] || allow "a file over 1 MB feeds a gh write"
+    e_text+=$rp_text
+  done
+  e_text+=$t
 }
 # written <redirect>: notes what the command wrote to a file: known only for > after cat.
 written() {
-  local i=${r_arg[$1]} p
-  [ -n "${w_ok[i]}" ] || return 0
-  p=${w_path[i]}
-  case "$p" in /*) ;; *) [ -n "$cwd" ] || return 0; p=$cwd/$p ;; esac
-  f_path[nf]=$p f_text[nf]=$o_text f_ok[nf]=$o_ok
+  local i=${r_arg[$1]}
+  { [ -n "${w_ok[i]}" ] && full_path "${w_path[i]}"; } || return 0
+  f_path[nf]=$fp f_text[nf]=$o_text f_ok[nf]=$o_ok
   [ "${r_op[$1]}" = '>' ] || f_ok[nf]=""
   nf=$((nf + 1)) o_text="" o_ok=""
+}
+# touched <word>...: a command the walk does not follow may change the files it names, so
+# from here on their text is unknown.
+touched() {
+  local i
+  for i in "$@"; do
+    if [ -n "${w_ok[i]}" ] && [ -n "${w_path[i]}" ] && full_path "${w_path[i]}"; then
+      f_path[nf]=$fp f_text[nf]="" f_ok[nf]="" nf=$((nf + 1))
+    fi
+  done
 }
 change_dir() {
   local p
@@ -379,34 +464,48 @@ cat_out() {
   done
   [ -n "$files" ] || { o_text=$s_text o_ok=$s_ok; }
 }
-# feed <word> <text> <path>: adds the text a file flag's value names: stdin for -.
+# feed <word> <text> <path>: adds the text a file flag's value names: stdin for -. Returns
+# 1 when that text is unknown.
 feed() {
-  if [ "$2" = - ]; then [ -z "$s_ok" ] || got+=$s_text$nl; return; fi
-  if [ -n "${w_ok[$1]}" ] && read_path "$3"; then got+=$rp_text$nl; fi
+  if [ "$2" = - ]; then
+    [ -n "$s_ok" ] || return 1
+    got+=$s_text$nl; return 0
+  fi
+  { [ -n "${w_ok[$1]}" ] && read_path "$3"; } || return 1
+  got+=$rp_text$nl
 }
+# query <key=value> <known>: notes a graphql query field, and whether its text is known.
+query() { case "$1" in query=*) q_seen=1; [ -n "$2" ] || q_unknown=1 ;; esac; }
+# raw <word> <key=value>: adds a gh api raw field.
+raw() { pub+=$2$nl; query "$2" "${w_ok[$1]}"; }
 # field <word> <key=value>: adds a gh api field: the file after =@, else the text.
 field() {
+  local known=1
   case "$2" in
-    *=@-) [ -z "$s_ok" ] || got+=$s_text$nl ;;
-    *=@*) if [ -n "${w_ok[$1]}" ] && read_path "${w_path[$1]#*=@}"; then got+=$rp_text$nl; fi ;;
-    *) pub+=$2$nl ;;
+    *=@-) if [ -n "$s_ok" ]; then got+=$s_text$nl; else known=""; fi ;;
+    *=@*) if [ -n "${w_ok[$1]}" ] && read_path "${w_path[$1]#*=@}"; then got+=$rp_text$nl; else known=""; fi ;;
+    *) pub+=$2$nl known=${w_ok[$1]} ;;
   esac
+  query "$2" "$known"
 }
 # gh_write <stdin text> <stdin known> <word>...: denies a gh write whose text has a hit.
 gh_write() {
-  local s_text=$1 s_ok=$2 i t v group="" verb="" endpoint="" next="" method="" fields="" pub="" got="" hit
+  local s_text=$1 s_ok=$2 i t v group="" verb="" tag="" endpoint="" next="" method="" fields="" pub="" got="" hit
+  local q_seen="" q_unknown=""
   shift 2
   for i in "$@"; do
     t=${w_text[i]}
     case "$next" in
-      repo) next=""; continue ;;
+      skip) next=""; continue ;;
       file) next=""; feed "$i" "$t" "${w_path[i]}"; continue ;;
+      input) next="" q_seen=1; feed "$i" "$t" "${w_path[i]}" || q_unknown=1; continue ;;
       field) next=""; field "$i" "$t"; continue ;;
+      raw) next=""; raw "$i" "$t"; continue ;;
       method) next="" method=$t; continue ;;
       text) next="" pub+=$t$nl; continue ;;
     esac
     case "$t" in
-      -R | --repo) next=repo; continue ;;
+      -R | --repo) next=skip; continue ;;
       -R?* | --repo=*) continue ;;
       --body-file | --notes-file) next="file"; continue ;;
       --body-file=* | --notes-file=*) feed "$i" "${t#*=}" "${w_path[i]#*=}"; continue ;;
@@ -421,20 +520,31 @@ gh_write() {
         -X?* | --method=*) v=${t#--method=}; v=${v#-X}; method=${v#=}; continue ;;
         -F | --field) next=field fields=1; continue ;;
         -F?* | --field=*) v=${t#--field=}; v=${v#-F}; fields=1; field "$i" "${v#=}"; continue ;;
-        -f | --raw-field) next=text fields=1 ;;
-        -f?* | --raw-field=*) fields=1 ;;
-        --input) next=file fields=1; continue ;;
-        --input=*) fields=1; feed "$i" "${t#*=}" "${w_path[i]#*=}"; continue ;;
+        -f | --raw-field) next=raw fields=1; continue ;;
+        -f?* | --raw-field=*) v=${t#--raw-field=}; v=${v#-f}; fields=1; raw "$i" "$v"; continue ;;
+        --input) next=input fields=1; continue ;;
+        --input=*) fields=1 q_seen=1; feed "$i" "${t#*=}" "${w_path[i]#*=}" || q_unknown=1; continue ;;
         -H | --header | -q | --jq | -t | --template | --cache | -p | --preview | --hostname) next=text ;;
         -*) ;;
         *) if [ -z "$endpoint" ]; then endpoint=$t; continue; fi ;;
       esac
     else
+      # A template and a recover file only fill in the form; a release's assets publish
+      # only their names.
       case "$t" in
         -F) next="file"; continue ;;
         -F?*) v=${w_path[i]#-F}; feed "$i" "${t#-F}" "${v#=}"; continue ;;
+        -T | --template | --recover) next=skip; continue ;;
+        -T?* | --template=* | --recover=*) continue ;;
+        -t | --title | -n | --notes | --target | --discussion-category | --notes-start-tag) [ "$group" != release ] || next=text ;;
         -*) ;;
-        *) if [ -z "$verb" ]; then verb=$t; continue; fi ;;
+        *)
+          if [ -z "$verb" ]; then verb=$t; continue; fi
+          if [ "$group" = release ]; then
+            if [ -n "$tag" ]; then pub+=${t##*/}$nl; continue; fi
+            tag=1
+          fi
+          ;;
       esac
     fi
     pub+=$t$nl
@@ -442,33 +552,46 @@ gh_write() {
   case "$group" in
     pr) case "$verb" in create | new | edit | comment | review | close) ;; *) return 0 ;; esac ;;
     issue) case "$verb" in create | new | edit | comment | close) ;; *) return 0 ;; esac ;;
+    release) case "$verb" in create | edit) ;; *) return 0 ;; esac ;;
     api)
       case "$method" in
         "") [ -n "$fields" ] || return 0 ;;
         [Pp][Oo][Ss][Tt] | [Pp][Uu][Tt] | [Pp][Aa][Tt][Cc][Hh] | [Dd][Ee][Ll][Ee][Tt][Ee]) ;;
         *) return 0 ;;
       esac
-      if [ "$endpoint" = graphql ] && ! [[ $pub$got =~ $re_mutation ]]; then return 0; fi
       ;;
     *) return 0 ;;
   esac
-  hit=$(private_text "$pub$got") || return 0
+  expand "$pub$got"
+  # A graphql call is a write only for a mutation, so a query fully known to be
+  # something else publishes nothing.
+  if [ "$group" = api ] && [ "$endpoint" = graphql ] && [ -n "$q_seen" ] && [ -z "$q_unknown" ] &&
+    ! [[ $e_text =~ $re_mutation ]]; then
+    return 0
+  fi
+  hit=$(private_text "$e_text") || return 0
   deny "$hit"
 }
 # run_cmd <command> <stdin text> <stdin known> <pipeline length>: runs what the walk
-# follows: assignments, cd, pwd, cat, gh and writes to files. It sets o_text, o_ok and
-# o_pwd to what the command prints.
+# follows: assignments, cd, pwd, cat, gh, < file alone, and writes to files. Other
+# commands but a few that only read make the files they name unknown. It sets o_text,
+# o_ok and o_pwd to what the command prints.
 run_cmd() {
-  local id=$1 s_text=$2 s_ok=$3 n=$4 r i name assigns=""
+  local id=$1 s_text=$2 s_ok=$3 n=$4 r i name assigns="" from=""
   o_text="" o_ok="" o_pwd=""
   for r in ${c_redirs[id]}; do
     i=${r_arg[r]}
     case "${r_op[r]}" in
-      '<') if [ -n "${w_ok[i]}" ] && read_path "${w_path[i]}"; then s_text=$rp_text s_ok=1; else s_text="" s_ok=""; fi ;;
-      '<<') s_text=${h_body[i]} s_ok=1 ;;
-      '<<<') s_text=${w_text[i]}$nl s_ok=1 ;;
+      '<')
+        from=1
+        if [ -n "${w_ok[i]}" ] && read_path "${w_path[i]}"; then s_text=$rp_text s_ok=1; else s_text="" s_ok=""; fi
+        ;;
+      '<<') s_text=${h_body[i]} s_ok=1 from="" ;;
+      '<<<') s_text=${w_text[i]}$nl s_ok=1 from="" ;;
     esac
   done
+  # $(< file) prints the file.
+  if [ -z "${c_words[id]}" ] && [ -n "$from" ]; then o_text=$s_text o_ok=$s_ok; fi
   # shellcheck disable=SC2086 # The list holds word numbers.
   set -- ${c_words[id]}
   while [ $# -gt 0 ]; do
@@ -491,7 +614,11 @@ run_cmd() {
       pwd) o_text=$cwd o_ok=1 o_pwd=1 ;;
       cat) cat_out "$s_text" "$s_ok" "$@" ;;
       gh) gh_write "$s_text" "$s_ok" "$@" ;;
+      '[' | '[[' | test | ls | wc | grep | head | tail | stat) ;;
+      *) touched "$@" ;;
     esac
+  else
+    shift; touched "$@"
   fi
   for r in ${c_redirs[id]}; do
     case "${r_op[r]}" in '>' | '>>') written "$r" ;; esac
