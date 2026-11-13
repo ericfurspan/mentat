@@ -375,6 +375,13 @@ about stubcodename
 EOF
 gh pr comment 5 --body-file f'
 check "a heredoc written to a file a later flag reads stays checked" '[ "$(decision "$c")" = ask ]'
+for g in '--body "$(cat *.txt)"' '--body-file draf?.txt' '--body-file "$F"'; do
+  c="cat >draft.txt <<EOF
+about stubcodename
+EOF
+gh pr comment 5 $g"
+  check "a heredoc written to a file a later word may name stays checked: $g" '[ "$(decision "$c")" = ask ]'
+done
 c='cat <<EOF | gh pr comment 5 --body-file -
 about stubcodename
 EOF'
