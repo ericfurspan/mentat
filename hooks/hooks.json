@@ -11,7 +11,7 @@
       {
         "matcher": "Bash|mcp__ccd_pr__set_auto_merge",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-merge" }
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-merge", "timeout": 30, "onFailure": "block" }
         ]
       },
       {
