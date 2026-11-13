@@ -155,7 +155,8 @@ reset; hit "$repo/new.txt"; run "$repo" 'echo "git commit -m x" && git add new.t
 check "a quoted git commit before git add and the real commit scans what the real one stages" 'names new.txt'
 reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'echo "git commit -am wip" && git commit -am wip'
 check "a quoted git commit before a real git commit -a scans the real one" 'names clean.txt'
-for c in "grep -n 'git commit -am' tests/run" 'echo "then run git commit -am wip"' "grep -n 'git commit -am' f | head"; do
+for c in "grep -n 'git commit -am' tests/run" 'echo "then run git commit -am wip"' "grep -n 'git commit -am' f | head" \
+  "git log --grep 'git commit -am'"; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c commits nothing and stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
 done
@@ -170,7 +171,10 @@ for c in "bash -c 'git commit -am x'" 'sh -c "git commit -am x"' 'eval "git comm
   "$(printf 'cat <<EOF | bash\ngit commit -am x\nEOF')" "echo 'git commit -am x' > s.sh; bash s.sh" \
   "echo 'git commit -am x' | /bin/echo" "x=\$(bash -c 'echo hi') && echo 'git commit -am x'" \
   "$(printf "cat <<EOF\n\$(bash -c 'git commit -am x')\nEOF")" \
-  "echo \"\${x:-\$(bash -c 'git commit -am x')}\"" "echo \"\${x:-\`bash -c 'git commit -am x'\`}\""; do
+  "echo \"\${x:-\$(bash -c 'git commit -am x')}\"" "echo \"\${x:-\`bash -c 'git commit -am x'\`}\"" \
+  "git submodule foreach 'git commit -am wip'" "git rebase -x 'git commit -am wip' main" \
+  "git rebase --exec 'git commit -am wip' main" "git bisect run sh -c 'git commit -am wip'" \
+  "gh alias set x 'git commit -am wip'"; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c, a commit a shell may run, asks as a failed simulation" 'sim_failed'
 done
