@@ -39,6 +39,13 @@ This writes `.claude/settings.json`, turning Mentat on for everyone there. Use `
 
 Where pull requests need approval, give the agent its own GitHub account.
 
+### Modules
+
+Optional plugins from the same marketplace, each installed like Mentat as `<module>@mentat`:
+
+- `mentat-public-text` blocks GitHub text holding a word from `~/.config/mentat/private-words` or a home path.
+- `mentat-reviewers`, `mentat-linear` and `mentat-extras` are empty for now.
+
 ## Usage
 
 Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:

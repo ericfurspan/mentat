@@ -10,7 +10,8 @@
 # organization member or collaborator, to compare them with the list, and prints only
 # how many are missing. With no list, it says nothing about it.
 # When claude is installed, it reads its version and the local plugin list, and prints
-# only the Claude Code version and the scope and version of each copy of the Mentat plugin.
+# only the Claude Code version, the scope and version of each copy of the Mentat plugin,
+# and the names of the Mentat modules installed.
 KEPT_BRANCHES_FILE="$HOME/.config/mentat/warn-kept-branches"
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
@@ -49,20 +50,40 @@ c_word_list_covers_repos() {
 # no claude command. The variable keeps the list off the network and out of the plugin
 # cache's in-use markers: without it, claude does both. jq -e fails on empty output, and
 # a scope or version that is not one plain word counts as unreadable, so a path cannot print.
+# A list it could read is kept in plugin_list for c_modules.
+plugin_list=""
 c_plugin_copies() {
-  local copies
+  local copies list
   command -v claude >/dev/null 2>&1 || return 0
-  if ! copies=$(CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude plugin list --json </dev/null 2>/dev/null | jq -er '
+  if ! list=$(CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude plugin list --json </dev/null 2>/dev/null) ||
+    ! copies=$(printf '%s' "$list" | jq -er '
     def word: if type == "string" and test("^[A-Za-z0-9._+-]+$") then . else error("unreadable") end;
     if type == "array" then . else error("not a list") end
     | [.[] | select(.id == "mentat@mentat") | {scope: (.scope | word), version: (.version | word)}]
     | if (map(.version) | unique | length) > 1 then map(.scope + " " + .version) | join(", ") else "" end
   ' 2>/dev/null); then
     c_warn "could not compare the installed Mentat plugin copies"
-  elif [ -n "$copies" ]; then
-    c_warn "the Mentat plugin is installed at different versions: $copies"
   else
-    c_ok "no Mentat plugin copies at different versions"
+    plugin_list=$list
+    if [ -n "$copies" ]; then
+      c_warn "the Mentat plugin is installed at different versions: $copies"
+    else
+      c_ok "no Mentat plugin copies at different versions"
+    fi
+  fi
+}
+# Names the optional Mentat modules installed at any scope, from the list c_plugin_copies
+# read. Says nothing when it read none.
+c_modules() {
+  local on
+  [ -n "$plugin_list" ] || return 0
+  on=$(printf '%s' "$plugin_list" | jq -r '[.[] | .id | strings
+    | select(test("^mentat-(reviewers|linear|extras|public-text)@mentat$")) | sub("@mentat$"; "")]
+    | unique | join(", ")' 2>/dev/null) || return 0
+  if [ -n "$on" ]; then
+    c_ok "Mentat modules installed: $on"
+  else
+    c_ok "no Mentat modules installed (optional: mentat-reviewers, mentat-linear, mentat-extras, mentat-public-text)"
   fi
 }
 # Claude Code 2.1.295 or later, which honors the merge hook's onFailure block; an older
@@ -110,6 +131,7 @@ check() {
   else c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
   c_claude_version
   c_plugin_copies
+  c_modules
   # The publish check still looks for the home path without the list. No list is not a warning.
   if [ ! -e "$PRIVATE_WORDS" ]; then :
   elif [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1

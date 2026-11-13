@@ -58,7 +58,8 @@
 #     Same time limits and effort variables. Grok has web search alone; its
 #     local fetch tool is denied.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools,
-#     gh signed in, the repository readable; prints the codex and grok versions, and warns
+#     gh signed in, the repository readable; prints the codex and grok versions and the
+#     Mentat modules installed, and warns
 #     when the private word list is unreadable, the list misses a private repository
 #     this account can reach, by count only, the Mentat plugin is installed at different
 #     versions, or, with ~/.config/mentat/warn-kept-branches present, the repository keeps
