@@ -22,7 +22,7 @@ user-invocable: false
 
 ## Decisions
 
-- <One line of about 12 words per key design choice, marked agreed or made in the build.>
+- <The choice, in about 12 words> (agreed | made in the build)
 
 ## Risks
 
