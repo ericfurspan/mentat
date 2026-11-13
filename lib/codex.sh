@@ -116,7 +116,7 @@ run_codex() {
     -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c "web_search=\"$search\"" -o "$out" - <"$prompt") >"$log" 2>&1 &
-  pid=$!
+  pid=$! review_child=$!
   # $SECONDS counts whole seconds, so a limit stops Codex up to a second late, never early.
   secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
@@ -130,6 +130,8 @@ run_codex() {
   done
   wait "$pid"
   rc=$?
+  # shellcheck disable=SC2034 # read by review_stop in lib/shared.sh
+  review_child=""
   if [ "$rc" -ne 0 ]; then
     # The log is Codex's raw output and may hold a credential, so it is not
     # printed into the agent's session. A copy is kept for the maintainer.
@@ -146,6 +148,8 @@ run_codex() {
 review_local() {
   local pr="${1:-}" repo info head base title body top tmp mb fetched now issues request request_fp headref baseref
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  sweep_leftovers
+  review_traps
   read_request "$pr"
   local tool
   for tool in git codex; do

@@ -10,6 +10,36 @@ die() { printf 'mentat: %s\n' "$1" >&2; exit "${2:-1}"; }
 not_reviewed() { die "not reviewed: $1" 1; }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 
+# The one background child a review command waits on (the model, Grok's sign-in refresh
+# or the pause between CI reads), set when it starts and cleared once it is reaped.
+review_child=""
+# A background child ignores INT, so Ctrl-C would leave it running. The review commands
+# set these traps before their first EXIT trap: the signal stops the child (TERM, then
+# KILL after up to two seconds) and exits, and the EXIT trap then removes the run's files.
+review_traps() {
+  trap 'review_stop 130' INT
+  trap 'review_stop 143' TERM
+  trap 'review_stop 129' HUP
+}
+review_stop() { # $1 exit status
+  local i=0
+  if [ -n "$review_child" ]; then
+    kill "$review_child" 2>/dev/null
+    while kill -0 "$review_child" 2>/dev/null && [ "$i" -lt 20 ]; do sleep 0.1; i=$((i + 1)); done
+    kill -9 "$review_child" 2>/dev/null
+  fi
+  exit "$1"
+}
+# Deletes, at the start of a review or second opinion, what stopped runs left: Grok run
+# folders older than a day, and kept logs and held comments older than seven days. It
+# follows no symlink in those folders, and a failure is ignored.
+sweep_leftovers() {
+  local cache=${XDG_CACHE_HOME:-$HOME/.cache}
+  case "$cache" in /*) find "$cache/mentat/" -mindepth 1 -maxdepth 1 -type d \( -name 'grok-review.*' -o -name 'grok-opinion.*' -o -name 'grok-opinion-web.*' \) -mmin +1440 -exec rm -rf {} + 2>/dev/null ;; esac
+  find "${TMPDIR:-/tmp}/" -mindepth 1 -maxdepth 1 -type f \( -name 'mentat-codex-log.*' -o -name 'mentat-grok-log.*' -o -name 'mentat-held-comment.*' \) -mmin +10080 -exec rm -f {} + 2>/dev/null
+  return 0
+}
+
 # How many commits on origin's default branch HEAD lacks, so a second opinion never
 # judges a stale checkout. Sets the caller's fresh_def (the default branch), fresh_behind
 # (the count, or empty when unknown) and fresh_note (why freshness could not be checked,
@@ -135,7 +165,11 @@ wait_for_ci() { # $1 repo, $2 commit, $3 reply file or empty, $4 pull request, $
       ci_stop "$commit" "$reply"
     fi
     [ "$said" = yes ] || { printf 'Waiting for CI on %s\n' "$commit" >&2; said=yes; }
-    sleep "$REVIEW_INTERVAL_SECONDS"
+    # In the background, so that a signal's trap runs at once rather than after the pause.
+    sleep "$REVIEW_INTERVAL_SECONDS" &
+    review_child=$!
+    wait "$review_child"
+    review_child=""
     secs=$((secs + REVIEW_INTERVAL_SECONDS))
   done
 }

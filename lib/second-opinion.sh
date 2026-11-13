@@ -139,6 +139,7 @@ opinion_grok() {
 opinion_repo() {
   local idea="$1"
   [ -f "$idea" ] || die "idea file not found: $idea" 64
+  sweep_leftovers
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
   local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind fresh_note
   command -v git >/dev/null 2>&1 || die "no second opinion: git is not installed" 1
@@ -244,6 +245,7 @@ opinion_web_grok() {
 opinion_web() {
   local question="$1"
   [ -f "$question" ] || die "question file not found: $question" 64
+  sweep_leftovers
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
   local res="" run_pids="" tools="codex grok" t
   res=$(mktemp -d) || die "no second opinion: could not create a temporary directory" 1

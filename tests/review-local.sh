@@ -6,6 +6,8 @@
 # replays the permissions settings the review passes to Codex through the real
 # `codex sandbox` (macOS only, no model call): see "Live sandbox check" below.
 set -uo pipefail
+# Added to the live check's failure when /tmp cannot be used as the check needs.
+outside_note="this check cannot run inside an agent sandbox, so tests/run must run outside it"
 
 # Probe mode, run by the codex stub inside the review (its working directory is the
 # review worktree, which mentat removes on exit). Writes $STUB/live_results: one
@@ -17,7 +19,7 @@ live_probe() {
   control() { printf 'control|%s\n' "$1" >>"$res"; }
   # Controls first, outside the sandbox: each fixture exists and is readable here, the
   # write target is writable, the worktree is not under a path the profile denies.
-  case "$(pwd -P)" in /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies"; return 0 ;; esac
+  case "$(pwd -P)" in /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) control "the review worktree $(pwd -P) is under /tmp, which the profile denies; $outside_note"; return 0 ;; esac
   # shellcheck disable=SC2086 # the fixture names have no spaces
   for f in README $LIVE_FIXTURES; do
     { [ -f "$f" ] && [ -r "$f" ]; } || { control "fixture $f is missing or unreadable in the review worktree"; return 0; }
@@ -83,8 +85,10 @@ trap cleanup EXIT
 export STUB="$root/stub"
 # A temporary home: the publish check reads the home path and the word list from it.
 export HOME="$root/home"
+# Kept logs and held comments, and the folders the start sweep reads, are the test's own.
+export TMPDIR="$root/tmp" XDG_CACHE_HOME="$root/cache"
 LIST="$HOME/.config/mentat/private-words"
-mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")"
+mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")" "$TMPDIR"
 failures=0
 check() { if eval "$2"; then printf 'PASS: review --local %s\n' "$1"; else printf 'FAIL: review --local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
@@ -155,6 +159,7 @@ cat >"$STUB/prompt"
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
 # @TREE@ and @TREEP@ in the reply become the checkout's path as created and resolved (macOS: /var and /private/var).
 pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
+[ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
 while [ $# -gt 0 ]; do [ "$1" = -o ] && sed -e "s|@TREE@|$(pwd)|g" -e "s|@TREEP@|$(pwd -P)|g" "$STUB/reply" >"$2"; shift; done
 STUBEOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex"
@@ -500,6 +505,61 @@ for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   check "usage error (exit 64) for: review --local $args" '[ "$rc" = 64 ]'
 done
 
+# Interrupts. mentat runs in its own process group with default INT handling (a job this
+# script starts in the background ignores INT), and is signalled once the hung model has
+# started or the wait for CI has begun. Within seconds nothing of the run is left: no
+# process in its group, no model, no worktree.
+worktrees() { git -C "$root/work" worktree list | wc -l | tr -d ' '; }
+interrupt() { # $1 model or ci, $2 signal, $3 group or pid
+  local i
+  (
+    cd "$root/work" || exit 1
+    # A long pause between CI reads, which the signal must not wait out.
+    [ "$1" = model ] || export MENTAT_REVIEW_INTERVAL_SECONDS=30 MENTAT_CI_TIMEOUT_SECONDS=120
+    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --local 7 >"$STUB/out" 2>&1
+  ) &
+  ip=$! ready=no
+  for i in $(seq 100); do
+    if [ -f "$STUB/model_pid" ] || grep -q '^Waiting for CI' "$STUB/out" 2>/dev/null; then ready=yes; break; fi
+    sleep 0.1
+  done
+  before=$(worktrees) took=$SECONDS
+  if [ "$3" = group ]; then kill -"$2" -- "-$ip"; else kill -"$2" "$ip"; fi
+  wait "$ip"
+  for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
+  took=$((SECONDS - took))
+}
+gone() { [ "$ready" = yes ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ "$(worktrees)" = 1 ] && [ -s "$STUB/tree" ] && [ ! -e "$(cat "$STUB/tree")" ]; }
+reset; touch "$STUB/hang"; interrupt model INT group
+check "INT to its process group while Codex runs stops Codex and removes the worktree within seconds" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
+reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci INT group
+check "INT to its process group during the wait for CI leaves no process and removes the worktree within seconds" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
+reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
+check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
+kill -9 -- "-$ip" 2>/dev/null
+
+# At start, Grok run folders older than a day, and kept logs and held comments older than
+# seven days, are deleted. Newer ones, other names, symlinks and their targets stay.
+ago() { touch -h -t "$(date -v-"$1"M +%Y%m%d%H%M.%S)" "$2"; } # $1 minutes ago, $2 path
+c="$XDG_CACHE_HOME/mentat" elsewhere="$root/elsewhere"
+mkdir -p "$c" "$elsewhere/dir" && echo keep >"$elsewhere/dir/f" && echo keep >"$elsewhere/file"
+for d in grok-review.old grok-opinion.old grok-opinion-web.old grok-review.new grok-reviewx; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
+ln -s "$elsewhere/dir" "$c/grok-review.link"
+for f in mentat-codex-log.old mentat-grok-log.old mentat-held-comment.old mentat-codex-log.new mentat-codex-logs; do echo x >"$TMPDIR/$f"; done
+ln -s "$elsewhere/file" "$TMPDIR/mentat-grok-log.link"
+for p in grok-review.old grok-opinion.old grok-opinion-web.old; do ago 1445 "$c/$p"; done
+ago 1435 "$c/grok-review.new"
+for p in "$c/grok-reviewx" "$c/grok-review.link" "$elsewhere/dir"; do ago 2880 "$p"; done
+for p in mentat-codex-log.old mentat-grok-log.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
+ago 10075 "$TMPDIR/mentat-codex-log.new"
+for p in "$TMPDIR/mentat-codex-logs" "$TMPDIR/mentat-grok-log.link" "$elsewhere/file"; do ago 20160 "$p"; done
+reset; rc=$(run)
+check "at start, deletes Grok run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/grok-review.old" ] && [ ! -e "$c/grok-opinion.old" ] && [ ! -e "$c/grok-opinion-web.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ] && [ ! -e "$TMPDIR/mentat-grok-log.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
+check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/grok-review.new/f" ] && [ -f "$c/grok-reviewx/f" ] && [ -L "$c/grok-review.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-codex-log.new" ] && [ -f "$TMPDIR/mentat-codex-logs" ] && [ -L "$TMPDIR/mentat-grok-log.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
+rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
+
 # Live sandbox check. Replays the -c settings the review passed to the stub through the
 # real `codex sandbox` (no model call) and runs shell probes against the review
 # worktree. It does not prove that `codex exec --ignore-user-config --strict-config`
@@ -523,15 +583,15 @@ live_run() {
   [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
   # Controls that need no worktree.
   case "$(cd -P "$root" && pwd -P)" in
-    /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies"; return 0 ;;
+    /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies; $outside_note"; return 0 ;;
   esac
   outside="$(cd -P "$(dirname "$mentat")/.." && pwd -P)/tests/run"
   case "$outside" in
     /opt/homebrew/* | /usr/local/* | /tmp/* | /private/tmp/* | "$root"/*) live_fail "$outside is under a path the profile allows or denies for another reason"; return 0 ;;
   esac
   [ -r "$outside" ] || { live_fail "$outside is not readable"; return 0; }
-  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /tmp"; return 0; }
-  echo fake >"$live_tmp" || { live_fail "could not write $live_tmp"; return 0; }
+  live_tmp=$(mktemp /tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /tmp; $outside_note"; return 0; }
+  echo fake >"$live_tmp" || { live_fail "could not write $live_tmp; $outside_note"; return 0; }
   [ -r "$live_tmp" ] || { live_fail "$live_tmp is not readable"; return 0; }
   live_vartmp=$(mktemp /var/tmp/mentat-live.XXXXXX 2>/dev/null) || { live_fail "could not create a file under /var/tmp"; return 0; }
   echo fake >"$live_vartmp" || { live_fail "could not write $live_vartmp"; return 0; }

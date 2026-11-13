@@ -163,7 +163,7 @@ grok_refresh() {
   (umask 077 && exec env -i PATH="$PATH" HOME="$HOME" GROK_HOME="$real_grok" TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-en_US.UTF-8}" \
     GROK_AUTH_EARLY_INVALIDATION_SECS=$((10#$GROK_TIMEOUT_SECONDS + 360)) "${GROK_RUN_ENV[@]}" \
     "$grok_bin" models) >/dev/null 2>&1 </dev/null &
-  pid=$!
+  pid=$! review_child=$!
   # $SECONDS counts whole seconds, so the limit ends up to a second late, never early.
   secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
@@ -176,6 +176,7 @@ grok_refresh() {
     sleep 0.1
   done
   wait "$pid" 2>/dev/null || true
+  review_child=""
 }
 
 # The per-run folder and Grok's home inside it, checked against the folders the
@@ -346,7 +347,7 @@ grok_exec() {
   # The environment is rebuilt for Grok alone: nothing else of the agent's reaches it.
   (cd "$run/export" && exec env -i PATH="$PATH" HOME="$HOME" GROK_HOME="$ghome" TMPDIR="$run/tmp" LANG="${LANG:-en_US.UTF-8}" \
     "${GROK_RUN_ENV[@]}" "$grok_bin" "${args[@]}") >"$out" 2>"$err" </dev/null &
-  pid=$!
+  pid=$! review_child=$!
   # $SECONDS counts whole seconds, so a limit stops Grok up to a second late, never early.
   secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
@@ -360,6 +361,8 @@ grok_exec() {
   done
   wait "$pid"
   rc=$?
+  # shellcheck disable=SC2034 # read by review_stop in lib/shared.sh
+  review_child=""
   [ "$rc" -eq 0 ] || "$fail" "Grok exited with status $rc"
 }
 
@@ -447,6 +450,8 @@ review_grok() {
   local web_search="" again="mentat review --grok"
   [ "${grok_stop:-no}" = no ] || again="mentat review --grok --stop"
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--stop] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  sweep_leftovers
+  review_traps
   read_request "$pr"
   grok_prepare
   grok_run_folder
