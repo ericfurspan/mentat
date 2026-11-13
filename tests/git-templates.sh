@@ -5,8 +5,9 @@
 # chain-only templates, the scanner and own-hook.sh) and the session-start check of the
 # installed copy. An agent's git names the templates' folder in core.hooksPath through
 # GIT_CONFIG_* entries; the maintainer's git has no such entries. A stub gitleaks and
-# local bare repositories stand in for the real ones. Prints PASS/FAIL per case; exits
-# 1 on any FAIL.
+# local bare repositories stand in for the real ones; pushes reach them through git's
+# ext transport, which the pre-push template treats as a remote, unless a case names a
+# local path. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,7 +23,9 @@ unset XDG_CONFIG_HOME GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS MENTAT_OWN_HOOK MEN
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$tmp/gitconfig"
 mkdir -p "$STUB" "$tmp/bin" "$HOME" "$tmp/tmpdir"
 export TMPDIR="$tmp/tmpdir"
-printf '[user]\n\tname = t\n\temail = t@t\n[init]\n\tdefaultBranch = main\n' >"$GIT_CONFIG_GLOBAL"
+printf '[user]\n\tname = t\n\temail = t@t\n[init]\n\tdefaultBranch = main\n[protocol "ext"]\n\tallow = always\n' >"$GIT_CONFIG_GLOBAL"
+# ext <path>: a URL for the repository at <path> through git's ext transport.
+ext() { printf 'ext::git %%s %s' "$(printf '%s' "$1" | sed -e 's/%/%%/g' -e 's/ /% /g')"; }
 
 # gitleaks: records its arguments and stdin, prints text that must never reach the
 # output, and writes a JSON report to --report-path. Each stdin line holding
@@ -63,6 +66,7 @@ git -C "$tmp/seed" commit -q -m first
 git -C "$tmp/seed" push -q "$tmp/origin.git" main
 git clone -q "$tmp/origin.git" "$tmp/repo"
 repo="$tmp/repo"
+git -C "$repo" remote set-url origin "$(ext "$tmp/origin.git")"
 git -C "$repo" checkout -q -b feat/x
 
 # A <args>: git in an agent's shell, from $repo (or $in), with the templates' folder as
@@ -139,7 +143,7 @@ check "the default branch after another destination refuses the whole push" '[ "
 reset; git -C "$repo" branch -q -f main feat/x; A push -q --all origin; rc=$?
 check "push --all with a changed local main is refused" '[ "$rc" != 0 ] && [ "$(remote_head main)" = "$main" ]'
 git -C "$repo" branch -q -f main "$main"
-reset; A push -q "$tmp/origin.git" feat/x:main; rc=$?
+reset; A push -q "$(ext "$tmp/origin.git")" feat/x:main; rc=$?
 check "a push to the default branch by URL is refused" '[ "$rc" != 0 ] && [ "$(remote_head main)" = "$main" ] && grep -q "default branch (main)" "$STUB/out"'
 reset; A push -q -n origin feat/x:main; rc=$?
 check "push -n stays a dry run and is still refused for the default branch" '[ "$rc" != 0 ] && grep -q "default branch (main)" "$STUB/out"'
@@ -232,7 +236,7 @@ g checkout -q -f feat/x
 git init -q --bare "$tmp/trunk.git"
 git -C "$repo" push -q "$tmp/trunk.git" feat/x:trunk feat/x:main
 git --git-dir="$tmp/trunk.git" symbolic-ref HEAD refs/heads/trunk
-git -C "$repo" remote add trunk "$tmp/trunk.git"
+git -C "$repo" remote add trunk "$(ext "$tmp/trunk.git")"
 reset; A commit -q --allow-empty -m "another"
 A push -q trunk feat/x:trunk; rc=$?
 check "a push to the remote's HEAD branch (trunk) is refused" '[ "$rc" != 0 ] && grep -q "default branch (trunk)" "$STUB/out"'
@@ -244,7 +248,7 @@ git init -q --bare "$tmp/fetch.git"; git init -q --bare "$tmp/pushto.git"
 git -C "$repo" push -q "$tmp/fetch.git" feat/x:main feat/x:trunk
 git -C "$repo" push -q "$tmp/pushto.git" feat/x:main feat/x:trunk
 git --git-dir="$tmp/pushto.git" symbolic-ref HEAD refs/heads/trunk
-git -C "$repo" remote add split "$tmp/fetch.git"; git -C "$repo" remote set-url --push split "$tmp/pushto.git"
+git -C "$repo" remote add split "$(ext "$tmp/fetch.git")"; git -C "$repo" remote set-url --push split "$(ext "$tmp/pushto.git")"
 pushed_trunk=$(git --git-dir="$tmp/pushto.git" rev-parse refs/heads/trunk)
 reset; A commit -q --allow-empty -m "split"
 A push -q split feat/x:trunk; rc=$?
@@ -258,6 +262,39 @@ g push -q "$tmp/fetch.git" feat/fetched; g fetch -q split; g checkout -q feat/x
 reset; A push -q split feat/fetched:refs/heads/feat/fetched-new; rc=$?
 check "with a pushurl, a secret the fetch repository has but the one pushed to lacks is refused" \
   '[ "$rc" != 0 ] && ! git --git-dir="$tmp/pushto.git" rev-parse -q --verify refs/heads/feat/fetched-new >/dev/null && grep -qF "stub-rule in fetched.txt" "$STUB/out"'
+# A remote whose HEAD names no branch: the tracking HEAD here counts only when the push
+# goes to the URL the remote fetches from; else main and master.
+git init -q --bare "$tmp/dangle.git"
+git -C "$repo" push -q "$tmp/dangle.git" feat/x:main feat/x:trunk
+git --git-dir="$tmp/dangle.git" symbolic-ref HEAD refs/heads/gone
+git -C "$repo" remote add dangle "$(ext "$tmp/dangle.git")"; g fetch -q dangle; g remote set-head dangle trunk
+reset; A commit -q --allow-empty -m "dangle"
+A push -q dangle feat/x:trunk; rc=$?
+check "with no HEAD branch on the remote, the branch its tracking HEAD names is refused" '[ "$rc" != 0 ] && grep -q "default branch (trunk)" "$STUB/out"'
+git -C "$repo" remote add dangle-split "$(ext "$tmp/trunk.git")"; git -C "$repo" remote set-url --push dangle-split "$(ext "$tmp/dangle.git")"
+g fetch -q dangle-split; g remote set-head -a dangle-split
+pushed_main=$(git --git-dir="$tmp/dangle.git" rev-parse refs/heads/main)
+reset; A push -q dangle-split feat/x:main; rc=$?
+check "with a pushurl to a remote with no HEAD branch, main is refused, not the fetch repository's default branch" \
+  '[ "$(git -C "$repo" symbolic-ref --short refs/remotes/dangle-split/HEAD)" = dangle-split/trunk ] && [ "$rc" != 0 ] && grep -q "default branch (main)" "$STUB/out" && [ "$(git --git-dir="$tmp/dangle.git" rev-parse refs/heads/main)" = "$pushed_main" ]'
+# A remote with no branches yet: the first branch pushed would become its default, so a
+# push that creates any branch is refused.
+for spec in feat/x:trunk feat/x:feat/first; do
+  rm -rf "$tmp/empty.git"; git init -q --bare -b trunk "$tmp/empty.git"
+  reset; A push -q "$(ext "$tmp/empty.git")" "$spec"; rc=$?
+  check "the first push to a remote with no branches is refused: $spec" '[ "$rc" != 0 ] && [ -z "$(git --git-dir="$tmp/empty.git" for-each-ref)" ] && grep -q "has no branches yet" "$STUB/out"'
+done
+# A local path or file:// URL, such as a test suite's scratch copy, may take any branch;
+# the secret scan still runs.
+git init -q "$tmp/scratch"; git -C "$tmp/scratch" commit -q --allow-empty -m scratch
+git init -q --bare "$tmp/scratch.git"; git clone -q --bare "$tmp/origin.git" "$tmp/local.git"
+in=$tmp/scratch; reset; A push -q "$tmp/scratch.git" main; rc=$?; in=$repo
+check "a first push of main to an empty repository at a local path goes through" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/scratch.git" rev-parse main)" = "$(git -C "$tmp/scratch" rev-parse main)" ]'
+reset; A push -q "file://$tmp/local.git" feat/x:main; rc=$?
+check "a push to the default branch of a repository at a file:// URL goes through" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/local.git" rev-parse main)" = "$(head_of)" ]'
+reset; A push -q "$tmp/local.git" feat/leak; rc=$?
+check "a secret pushed to a repository at a local path is refused" \
+  '[ "$rc" != 0 ] && ! git --git-dir="$tmp/local.git" rev-parse -q --verify refs/heads/feat/leak >/dev/null && grep -qF "stub-rule in leak.txt" "$STUB/out"'
 # When the refs of the repository pushed to cannot be read, commits it may have are
 # scanned too: here kept.txt's secret, which origin has.
 reset; (cd "$repo" && printf 'refs/heads/feat/x %s refs/heads/feat/unread %040d\n' "$(head_of)" 0 | "$tpl/pre-push" origin "$tmp/unreadable.git") >"$STUB/out" 2>&1; rc=$?
