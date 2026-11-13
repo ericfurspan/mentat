@@ -58,11 +58,17 @@ cat >"$root/bin/grok" <<'STUBEOF'
 [ "$1" = --version ] && [ ! -f "$STUB/no_grok_version" ] && echo "grok 9.9.9 (stub) [stable]"
 exit 0
 STUBEOF
-# claude: prints $STUB/plugins, by default one Mentat copy; exits 1 too if $STUB/claude_fail
-# exists. Any call but the list is recorded in $STUB/writes and fails. Stands in for a real
-# claude, whose copies would change these results. Stderr carries a path that must not print.
+# claude: --version prints $STUB/claude_version, by default 2.1.295; otherwise prints
+# $STUB/plugins, by default one Mentat copy; exits 1 too if $STUB/claude_fail exists. Any call
+# but these is recorded in $STUB/writes and fails. Stands in for a real claude, whose version
+# and copies would change these results. Stderr carries a path that must not print.
 cat >"$root/bin/claude" <<'STUBEOF'
 #!/usr/bin/env bash
+if [ "$*" = --version ]; then
+  echo "/stubleakedpath/stubprojectname" >&2
+  if [ -f "$STUB/claude_version" ]; then cat "$STUB/claude_version"; else echo "2.1.295 (Claude Code)"; fi
+  exit 0
+fi
 printf 'claude %s traffic=%s\n' "$*" "${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-}" >>"$STUB/calls"
 [ "$*" = "plugin list --json" ] || { echo "$*" >>"$STUB/writes"; exit 99; }
 echo "/stubleakedpath/stubprojectname" >&2
@@ -272,6 +278,24 @@ check "signed out of gh, the copies are still compared" '[ "$rc" = 1 ] && grep -
 mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/gitleaks" "$root/noclaude/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "no claude command says nothing about copies and adds no warning" '[ "$rc" = 0 ] && ! grep -qi -e claude -e plugin "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+
+# The Claude Code version: the merge hook's onFailure block needs 2.1.295 or later.
+reset; rc=$(run)
+check "Claude Code 2.1.295 is OK" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code 2.1.295 is installed (2.1.295 or later, which the merge hook needs)" "$STUB/out" && no_leak'
+for v in 2.1.1000 2.2.0 3.0.0; do
+  reset; printf '%s (Claude Code)\n' "$v" >"$STUB/claude_version"; rc=$(run)
+  check "Claude Code $v is OK" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code $v is installed (2.1.295 or later, which the merge hook needs)" "$STUB/out"'
+done
+for v in 2.1.294 2.0.999 1.9.400; do
+  reset; printf '%s (Claude Code)\n' "$v" >"$STUB/claude_version"; rc=$(run)
+  check "Claude Code $v is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails: update Claude Code" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+done
+reset; printf '2.1.300/stubleakedpath/stubprojectname\n' >"$STUB/claude_version"; rc=$(run)
+check "a version followed by a path prints only the version" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code 2.1.300 is installed (2.1.295 or later, which the merge hook needs)" "$STUB/out" && no_leak'
+for v in "" "/stubleakedpath/stubprojectname 2.1.300" "2.1" "2.1.300.4"; do
+  reset; printf '%s\n' "$v" >"$STUB/claude_version"; rc=$(run)
+  check "an unreadable Claude Code version ($v) is a problem that prints none of it" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: could not read the Claude Code version: the merge hook needs Claude Code 2.1.295 or later" "$STUB/out" && ! grep -q "OK: Claude Code" "$STUB/out" && no_leak'
+done
 
 # A list that fails is not read, even when what it printed would compare.
 reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.1.0)" >"$STUB/plugins"; touch "$STUB/claude_fail"; rc=$(run)

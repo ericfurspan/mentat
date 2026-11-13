@@ -9,10 +9,11 @@
 # names of the private repositories the signed-in account can reach, as owner,
 # organization member or collaborator, to compare them with the list, and prints only
 # how many are missing. With no list, it says nothing about it.
-# When claude is installed, it reads the local plugin list, and prints only the scope
-# and version of each copy of the Mentat plugin. It warns when agents' git does not use
-# the git hook templates (lib/templates.sh), and when it does, a missing or changed
-# installed copy, or a missing gitleaks or jq, is a problem.
+# When claude is installed, it reads its version and the local plugin list, and prints
+# only the Claude Code version and the scope and version of each copy of the Mentat plugin.
+# It warns when agents' git does not use the git hook templates (lib/templates.sh), and
+# when it does, a missing or changed installed copy, or a missing gitleaks or jq, is a
+# problem.
 KEPT_BRANCHES_FILE="$HOME/.config/mentat/warn-kept-branches"
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
@@ -84,6 +85,26 @@ c_templates() {
   for p in $problems; do c_problem "$p"; done
   set +f
 }
+# Claude Code 2.1.295 or later, which honors the merge hook's onFailure block; an older
+# one lets the hook's failure through. Says nothing with no claude command. Prints only
+# the version's leading numbers, never the rest of what claude prints.
+c_claude_version() {
+  local v a b c
+  command -v claude >/dev/null 2>&1 || return 0
+  v=$(CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude --version </dev/null 2>/dev/null | head -n 1 |
+    sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)\([^0-9.].*\)\{0,1\}$/\1/p')
+  if [ -z "$v" ]; then
+    c_problem "could not read the Claude Code version: the merge hook needs Claude Code 2.1.295 or later"
+    return 0
+  fi
+  a=${v%%.*} c=${v##*.}
+  b=${v#*.} b=${b%.*}
+  if [ "$a" -gt 2 ] || { [ "$a" -eq 2 ] && { [ "$b" -gt 1 ] || { [ "$b" -eq 1 ] && [ "$c" -ge 295 ]; }; }; }; then
+    c_ok "Claude Code $v is installed (2.1.295 or later, which the merge hook needs)"
+  else
+    c_problem "Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails: update Claude Code"
+  fi
+}
 # The review tools: Codex, and Grok where installed (it is optional).
 c_review_tools() {
   local v
@@ -109,6 +130,7 @@ check() {
   # With the git hook templates in use, c_templates reports a missing gitleaks as a problem.
   elif ! templates_dir >/dev/null; then c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
   c_templates
+  c_claude_version
   c_plugin_copies
   # The publish check still looks for the home path without the list. No list is not a warning.
   if [ ! -e "$PRIVATE_WORDS" ]; then :
