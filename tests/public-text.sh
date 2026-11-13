@@ -291,7 +291,7 @@ check "a hit early in long text is denied under pipefail" '[ "$(decision "gh pr 
 reset
 word_body='{"owner": "o", "repo": "r", "body": "about stubcodename"}'
 clean_body='{"owner": "o", "repo": "r", "body": "about nothing"}'
-nested_path='{"title": "t", "issue_fields": [{"value": "see /home/stubperson/x"}]}'
+nested_path='{"owner": "o", "repo": "r", "title": "t", "issue_fields": [{"value": "see /home/stubperson/x"}]}'
 owner_repo='{"owner": "stubcodename", "repo": "stubcodename", "body": "ok"}'
 mcp_tools="add_comment_to_pending_review add_issue_comment add_reply_to_pull_request_comment create_gist create_issue create_or_update_file create_pull_request create_pull_request_review create_pull_request_with_copilot create_repository discussion_comment_write issue_write merge_pull_request pull_request_review_write push_files sub_issue_write submit_pending_pull_request_review update_gist update_issue update_issue_comment update_pull_request"
 for t in $mcp_tools; do
@@ -326,15 +326,24 @@ mkdir "$root/nojq"; ln -s "$root/bin/gh" "$root/nojq/gh"
 json=$(jq -n '{tool_name: "Bash", tool_input: {command: "gh pr comment 7 --body stubcodename"}}')
 check "allows without jq, with a note" 'out=$(PATH="$root/nojq:/bin" "$hook" <<<"$json" 2>"$STUB/err"); [ $? = 0 ] && [ -z "$out" ] && grep -q "jq is not installed" "$STUB/err"'
 
-# The wiring: Bash and the listed MCP tools, from any server name, run the hook.
+# The wiring: Bash and the listed MCP tool names, under any server name, run the hook,
+# which then checks only the GitHub server's calls.
 hooks="$module/hooks/hooks.json"
 check "hooks.json runs it on PreToolUse for Bash" \
   'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | endswith(\"/hooks/public-text\")] | any" "$hooks" >/dev/null'
 mcp_matches() { jq -e --arg t "$1" '[.hooks.PreToolUse[] | select(.matcher != "Bash") | select(.hooks | map(.command | endswith("/hooks/public-text")) | any) | .matcher as $m | $t | test($m)] | any' "$hooks" >/dev/null; }
 for t in $mcp_tools; do
-  check "hooks.json runs it for $t from any MCP server" 'mcp_matches "mcp__github__$t" && mcp_matches "mcp__plugin_x_github__$t"'
+  check "hooks.json runs it for $t under any server name" 'mcp_matches "mcp__github__$t" && mcp_matches "mcp__plugin_x_github__$t"'
 done
 check "hooks.json does not run it for MCP reads or lookalike names" '! mcp_matches mcp__github__issue_read && ! mcp_matches mcp__github__create_pull_request_x && ! mcp_matches create_pull_request'
 check "hooks.json never blocks a call when the hook fails" '! jq -e "[.. | objects | select(has(\"onFailure\"))] | any" "$hooks" >/dev/null'
 
 [ "$failures" -eq 0 ]
+other_server='{"title": "t", "description": "see /Users/stubperson/x and stubcodename"}'
+for t in mcp__linear__create_issue mcp__jira__update_issue mcp__gitlab__create_issue; do
+  check "allows a same-named tool with no owner and repo: $t" '[ -z "$(mcp "$t" "$other_server")" ]'
+done
+gist='{"description": "d", "files": {"a.md": {"content": "about stubcodename"}}}'
+gist_edit='{"gist_id": "1", "content": "about stubcodename"}'
+new_repo='{"name": "stubcodename"}'
+check "denies a word in a gist or a new repository, which have no owner and repo" '[ "$(mcp_decision mcp__github__create_gist "$gist")" = deny ] && [ "$(mcp_decision mcp__github__update_gist "$gist_edit")" = deny ] && [ "$(mcp_decision mcp__github__create_repository "$new_repo")" = deny ]'

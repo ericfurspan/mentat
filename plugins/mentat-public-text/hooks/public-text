@@ -14,7 +14,8 @@
 # variables, commands or unreadable files are not checked.
 # For the GitHub MCP server's writes that carry free text (issues, pull requests, reviews,
 # comments, merges, gists, files and repositories), under current and older tool names,
-# it looks at every text value but owner and repo.
+# it looks at every text value but owner and repo. A call is that server's when its input
+# has owner and repo, or when it makes a gist or a repository.
 # The reason gives the category, never the match. This is a net for mistakes, not a
 # security boundary: other routes exist. When it cannot read its input or jq is missing,
 # it allows the call and says so on stderr.
@@ -64,7 +65,8 @@ deny() {
   exit 0
 }
 
-# The GitHub MCP server's writes, by tool name, from any server name.
+# The GitHub MCP server's writes, by tool name under any server name. A call is the GitHub
+# server's when its input has owner and repo, or when it makes a gist or a repository.
 mcp_writes='^mcp__.+__(add_comment_to_pending_review|add_issue_comment|add_reply_to_pull_request_comment|create_gist|create_issue|create_or_update_file|create_pull_request|create_pull_request_review|create_pull_request_with_copilot|create_repository|discussion_comment_write|issue_write|merge_pull_request|pull_request_review_write|push_files|sub_issue_write|submit_pending_pull_request_review|update_gist|update_issue|update_issue_comment|update_pull_request)$'
 if [[ $tool =~ $mcp_writes ]]; then
   text=$(printf '%s' "$input" | jq -r '[.tool_input | paths(type == "string") as $p
@@ -73,6 +75,14 @@ if [[ $tool =~ $mcp_writes ]]; then
   hit=$(private_text "$text") || exit 0
   deny "$hit"
 fi
+  case "$tool" in
+    *__create_gist | *__update_gist | *__create_repository) ;;
+    *)
+      github=$(printf '%s' "$input" | jq -r '.tool_input | type == "object" and has("owner") and has("repo")' 2>/dev/null) ||
+        allow "could not read the tool input"
+      [ "$github" = true ] || exit 0
+      ;;
+  esac
 [ "$tool" = Bash ] || exit 0
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || allow "could not read the command"
 case "$cmd" in *gh*) ;; *) exit 0 ;; esac
