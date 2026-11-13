@@ -1,12 +1,32 @@
 {
   "name": "mentat",
   "owner": { "name": "ericfurspan" },
-  "description": "Mentat's own marketplace: the plugin, served from its repository.",
+  "description": "Mentat's own marketplace: the core plugin and its opt-in modules, served from its repository.",
   "plugins": [
     {
       "name": "mentat",
       "source": "./",
       "description": "Workflow rules, skills and hooks for Claude Code on GitHub repositories: a repository's maintainer requests a change, Claude Code proposes a plan and has a builder make it once the maintainer agrees, Codex reviews pull requests with Grok as a second reviewer, and the maintainer merges."
+    },
+    {
+      "name": "mentat-reviewers",
+      "source": "./plugins/mentat-reviewers",
+      "description": "Mentat module, empty for now: will hold the Codex and Grok reviewers and the outside-model second opinion."
+    },
+    {
+      "name": "mentat-linear",
+      "source": "./plugins/mentat-linear",
+      "description": "Mentat module, empty for now: will hold the Linear backlog adapter, project-comment triage and the intake readers."
+    },
+    {
+      "name": "mentat-extras",
+      "source": "./plugins/mentat-extras",
+      "description": "Mentat module, empty for now: will hold the grill and retro skills."
+    },
+    {
+      "name": "mentat-public-text",
+      "source": "./plugins/mentat-public-text",
+      "description": "Mentat module: blocks GitHub text an agent is about to publish when it holds a word from ~/.config/mentat/private-words or a local home path."
     }
   ]
 }

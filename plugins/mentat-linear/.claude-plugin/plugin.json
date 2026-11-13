@@ -1,0 +1,6 @@
+{
+  "name": "mentat-linear",
+  "description": "Mentat module, empty for now: will hold the Linear backlog adapter, project-comment triage and the intake readers.",
+  "author": { "name": "ericfurspan" },
+  "repository": "https://github.com/ericfurspan/mentat"
+}

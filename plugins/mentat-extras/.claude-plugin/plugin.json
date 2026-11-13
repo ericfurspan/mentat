@@ -1,0 +1,6 @@
+{
+  "name": "mentat-extras",
+  "description": "Mentat module, empty for now: will hold the grill and retro skills.",
+  "author": { "name": "ericfurspan" },
+  "repository": "https://github.com/ericfurspan/mentat"
+}
