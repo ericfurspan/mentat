@@ -23,8 +23,9 @@ input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || allow "could not read the hook input"
 
 PRIVATE_WORDS="${HOME:-}/.config/mentat/private-words"
-# A home folder written out, as /Users/<name>/, /home/<name>/ or ~/, or this machine's.
-home_re='(^|[^[:alnum:]_.-])(/Users|/home)/[[:alnum:]_.-]+/|(^|[^[:alnum:]_~])~/'
+# A home folder written out with a name, as /Users/<name>/ or /home/<name>/, or this
+# machine's. ~/ names no one, so it is no hit.
+home_re='(^|[^[:alnum:]_.-])(/Users|/home)/[[:alnum:]_.-]+/'
 
 # Prints the category of the first hit in text $1, or returns 1 with none. Each line of
 # the word list is a fixed string, ignoring case. A line starting with exact: matches

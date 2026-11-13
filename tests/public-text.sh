@@ -74,9 +74,8 @@ done <<'PATHS'
 /Users/stubperson/notes.md
 /home/stubperson/notes.md
 (/Users/stub.person/x)
-~/notes.md
-at ~/.config/x
 PATHS
+# ~/ names no person, so it is no hit.
 while IFS= read -r p; do
   check "allows text that only looks like a home path: $p" '[ -z "$(output "gh pr comment 7 --body \"see $p\"")" ]'
 done <<'NOTPATHS'
@@ -84,7 +83,10 @@ done <<'NOTPATHS'
 https://example.com/home/stubpage/
 /Users
 a~/b
+~/notes.md
+~/.config/mentat/private-words
 NOTPATHS
+check "allows a git -C ~/ command before gh when nothing else hits" '[ -z "$(output "git -C ~/x push && gh pr create --body ok")" ]'
 
 # Commands that publish nothing, or are not listed, and other tools.
 while IFS= read -r cmd; do
@@ -141,7 +143,7 @@ check "denies a temp path holding a word when it is published" '[ "$(decision "S
 reset; rm "$LIST"
 check "a missing list: a word is allowed with no output, a home path is still denied" '[ -z "$(output "gh pr comment 7 --body stubcodename" 2>&1)" ] && [ "$(decision "gh pr comment 7 --body \"at /Users/stubperson/x\"")" = deny ]'
 reset; : >"$LIST"
-check "an empty list: a word is allowed, a home path is still denied" '[ -z "$(output "gh pr comment 7 --body stubcodename" 2>&1)" ] && [ "$(decision "gh pr comment 7 --body \"at ~/x\"")" = deny ]'
+check "an empty list: a word is allowed, a home path is still denied" '[ -z "$(output "gh pr comment 7 --body stubcodename" 2>&1)" ] && [ "$(decision "gh pr comment 7 --body \"at /home/stubperson/x\"")" = deny ]'
 reset; printf 'exact:StubExact\n' >"$LIST"
 check "a marked entry is denied only in its case and as a whole word" '[ "$(decision "gh pr comment 7 --body \"about StubExact\"")" = deny ] && [ -z "$(decision "gh pr comment 7 --body \"about stubexact\"")" ] && [ -z "$(decision "gh pr comment 7 --body \"about StubExacts\"")" ]'
 reset
