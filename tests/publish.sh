@@ -17,8 +17,6 @@ mkdir -p "$STUB" "$root/bin" "$TMPDIR" "$HOME/.config/mentat"
 cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$PWD: $*" >>"$STUB/calls"
-[ -f "$STUB/lookup_fails" ] && exit 1
-case "$*" in *owner/private*) echo true; exit ;; *o/public*) echo false; exit ;; esac
 [ -f "$STUB/private" ] && echo true || echo false
 STUBEOF
 chmod +x "$root/bin/gh"
