@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for git-templates/ (the pre-commit and pre-push templates, the scanner
-# and own-hook.sh) and the session-start check of the installed copy. An agent's git
-# names the templates' folder in core.hooksPath through GIT_CONFIG_* entries; the
-# maintainer's git has no such entries. A stub gitleaks and local bare repositories
-# stand in for the real ones. Prints PASS/FAIL per case; exits 1 on any FAIL.
+# Behavior tests for git-templates/ (the pre-commit and pre-push templates, the
+# chain-only templates, the scanner and own-hook.sh) and the session-start check of the
+# installed copy. An agent's git names the templates' folder in core.hooksPath through
+# GIT_CONFIG_* entries; the maintainer's git has no such entries. A stub gitleaks and
+# local bare repositories stand in for the real ones. Prints PASS/FAIL per case; exits
+# 1 on any FAIL.
 set -uo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -231,6 +232,35 @@ check "in a linked worktree, the own hook in the main .git/hooks runs" '[ "$rc" 
 reset; A push -q origin feat/wt; rc=$?
 check "in a linked worktree, a push runs the own pre-push hook" '[ "$rc" = 0 ] && [ -e "$STUB/gitdir-push.args" ]'
 in=$repo
+
+# The chain-only templates: one for every other client-side hook git runs from
+# core.hooksPath, each running only the repository's own hook of its name.
+chain="applypatch-msg pre-applypatch post-applypatch pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge post-rewrite pre-auto-gc reference-transaction sendemail-validate post-index-change push-to-checkout"
+# shellcheck disable=SC2086 # $chain is a list of words.
+want_hooks=$(printf '%s\n' pre-commit pre-push $chain | sort | tr '\n' ' ')
+check "the templates' hooks folder holds pre-commit, pre-push and the chain-only templates, nothing else" '[ "$(ls "$tpl" | sort | tr "\n" " ")" = "$want_hooks" ]'
+printf 'line one\nline two\n' >"$tmp/chain-stdin"
+for name in $chain; do
+  own "$repo/.git/hooks/$name" "chain-$name"
+  rm -rf "${STUB:?}"/*; echo 5 >"$STUB/chain-$name.exit"
+  (cd "$repo" && "$tpl/$name" "first arg" second <"$tmp/chain-stdin") >"$STUB/out" 2>&1; rc=$?
+  check "the $name template runs the repository's own hook with its arguments, stdin and exit status" \
+    '[ "$rc" = 5 ] && [ "$(cat "$STUB/chain-$name.args")" = "[first arg][second]" ] && cmp -s "$STUB/chain-$name.stdin" "$tmp/chain-stdin"'
+  rm "$repo/.git/hooks/$name"
+done
+own "$repo/.git/hooks/commit-msg" own-commit-msg
+own "$repo/.git/hooks/post-checkout" own-post-checkout
+reset; stage_clean msg; echo 1 >"$STUB/own-commit-msg.exit"; h=$(head_of)
+A commit -q -m "refused by commit-msg"; rc=$?
+check "a repository commit-msg hook that refuses still refuses an agent's commit" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ] && [ "$(cat "$STUB/own-commit-msg.args")" = "[.git/COMMIT_EDITMSG]" ] && [ -s "$STUB/calls" ]'
+reset; stage_clean msg2; h=$(head_of)
+A commit -q -m "passed by commit-msg"; rc=$?
+check "a repository commit-msg hook that passes lets an agent's commit through" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -e "$STUB/own-commit-msg.args" ]'
+reset; A checkout -q -b feat/pc; rc=$?
+check "a repository post-checkout hook still runs for an agent's checkout, with git's arguments" \
+  '[ "$rc" = 0 ] && grep -qE "^\[[0-9a-f]{40}\]\[[0-9a-f]{40}\]\[1\]$" "$STUB/own-post-checkout.args"'
+git -C "$repo" checkout -q feat/x
+rm "$repo/.git/hooks/commit-msg" "$repo/.git/hooks/post-checkout"
 
 # A repository with its own local core.hooksPath, relative and absolute. Its hooks run,
 # and those in .git/hooks do not.

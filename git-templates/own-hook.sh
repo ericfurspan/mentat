@@ -1,5 +1,6 @@
 # shellcheck shell=bash
-# Sourced by Mentat's git hook templates after their own checks pass.
+# Sourced by Mentat's git hook templates after their own checks pass, and by the
+# chain-only templates, which have none.
 
 # own_hook <name> [arguments]: replaces this process with the repository's own <name>
 # hook, from its local core.hooksPath, else the hooks folder in its git directory, so
