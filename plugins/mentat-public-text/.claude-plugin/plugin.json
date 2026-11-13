@@ -1,0 +1,6 @@
+{
+  "name": "mentat-public-text",
+  "description": "Mentat module: blocks GitHub text an agent is about to publish when it holds a word from ~/.config/mentat/private-words or a local home path.",
+  "author": { "name": "ericfurspan" },
+  "repository": "https://github.com/ericfurspan/mentat"
+}

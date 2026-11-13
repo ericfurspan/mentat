@@ -39,6 +39,8 @@ This writes `.claude/settings.json`, turning Mentat on for everyone there. Use `
 
 Where pull requests need approval, give the agent its own GitHub account.
 
+Optional modules install as `<module>@mentat`: `mentat-public-text` blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`; three others are empty.
+
 ## Usage
 
 Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
@@ -68,7 +70,7 @@ Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/l
 
 ## Git hook templates
 
-`git-templates/` holds hooks for agents' git: they refuse likely secrets (with `gitleaks`) and non-local default-branch pushes, then run the repository's own hooks, except `reference-transaction` and `post-index-change`. An installer copies the folder and points agents' `core.hooksPath` at its `hooks` folder through `GIT_CONFIG_*`; `mentat check` reports problems.
+`git-templates/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy.
 
 ## Credits
 

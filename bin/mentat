@@ -60,8 +60,8 @@
 #   mentat check  Checks, read-only, what Mentat itself needs: tools, the git hook
 #     templates installed and the same as this copy when agents' git uses them
 #     (lib/templates.sh), gh signed in, the repository readable; prints the codex and grok
-#     versions, and warns when agents' git does not use the templates,
-#     the private word list is unreadable, the list misses a private repository
+#     versions and the Mentat modules installed, and warns when agents' git does not use
+#     the templates, the private word list is unreadable, the list misses a private repository
 #     this account can reach, by count only, the Mentat plugin is installed at different
 #     versions, or, with ~/.config/mentat/warn-kept-branches present, the repository keeps
 #     head branches after merge.

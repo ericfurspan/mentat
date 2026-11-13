@@ -275,9 +275,21 @@ check "no Mentat copy gives no warning" 'ready_no_warning'
 reset; printf '[%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat@mentat project 1.1.0)" >"$STUB/plugins"; touch "$STUB/signed_out"; rc=$(run)
 check "signed out of gh, the copies are still compared" '[ "$rc" = 1 ] && grep -q "^WARN: the Mentat plugin is installed at different versions" "$STUB/out"'
 
+# The Mentat modules installed, by name only, from the same list.
+NO_MODULES="OK: no Mentat modules installed (optional: mentat-reviewers, mentat-linear, mentat-extras, mentat-public-text)"
+reset; rc=$(run)
+check "no module installed names the optional modules, with no warning" '[ "$rc" = 0 ] && grep -qxF "$NO_MODULES" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; printf '[%s,%s,%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat-reviewers@mentat project 1.0.0)" "$(entry mentat-public-text@mentat user 1.0.0)" "$(entry mentat-public-text@mentat project 1.0.0)" >"$STUB/plugins"; rc=$(run)
+check "installed modules are named once each, with no path, project or warning" '[ "$rc" = 0 ] && grep -qxF "OK: Mentat modules installed: mentat-public-text, mentat-reviewers" "$STUB/out" && ! grep -qxF "$NO_MODULES" "$STUB/out" && ready_no_warning'
+reset; printf '[%s,%s,%s,%s]\n' "$(entry mentat@mentat user 1.0.0)" "$(entry mentat-linear@other user 1.0.0)" "$(entry mentat-extra@mentat user 1.0.0)" "$(entry Mentat-extras@mentat user 1.0.0)" >"$STUB/plugins"; rc=$(run)
+check "plugins with ids like a module's are not modules" 'grep -qxF "$NO_MODULES" "$STUB/out"'
+reset; printf '[%s]\n' "$(entry mentat-extras@mentat user 1.0.0)" >"$STUB/plugins"; touch "$STUB/claude_fail"; rc=$(run)
+check "a failed list names no modules" '! grep -qi "modules" "$STUB/out"'
+
 mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/gitleaks" "$root/noclaude/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "no claude command says nothing about copies and adds no warning" '[ "$rc" = 0 ] && ! grep -qi -e claude -e plugin "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+check "no claude command says nothing about modules" '! grep -qi modules "$STUB/out"'
 
 # The Claude Code version: the merge hook's onFailure block needs 2.1.295 or later.
 reset; rc=$(run)

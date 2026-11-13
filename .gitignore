@@ -1,8 +1,9 @@
 # Finder
 .DS_Store
 
-# Claude Code settings and worktrees
-.claude/
+# Claude Code's local settings and worktrees; the shared project settings are tracked
+.claude/*
+!.claude/settings.json
 
 # Working files: plans, audits and trial kits (see AGENTS.md)
 work/

@@ -1,0 +1,6 @@
+{
+  "name": "mentat-reviewers",
+  "description": "Mentat module, empty for now: will hold the Codex and Grok reviewers and the outside-model second opinion.",
+  "author": { "name": "ericfurspan" },
+  "repository": "https://github.com/ericfurspan/mentat"
+}

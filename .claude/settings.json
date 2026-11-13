@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "mentat-reviewers@mentat": true,
+    "mentat-public-text@mentat": true
+  }
+}
