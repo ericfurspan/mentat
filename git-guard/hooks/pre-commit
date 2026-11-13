@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Mentat's git pre-commit hook, run for agents through the git wrapper: refuses a
+# commit whose staged changes add a likely secret, or when the scan cannot run. Git
+# hands it the index the commit will use, so git commit -a and a commit naming paths
+# are scanned for what they commit. This is a net for common mistakes, not a security
+# boundary.
+set -uo pipefail
+
+scan=${0%/*}/../scan
+diff=$(git -c core.quotePath=false diff --cached --no-relative --no-ext-diff --no-textconv \
+  --no-color -U0 --src-prefix=a/ --dst-prefix=b/) || {
+  printf 'Mentat: commit refused: git could not list the staged changes, so they were not scanned for secrets.\n' >&2
+  exit 1
+}
+hits=$(printf '%s' "${diff:+$diff$'\n'}" | "$scan")
+case $? in
+  0) exit 0 ;;
+  1) printf 'Mentat: commit refused: gitleaks flags a likely secret in the staged changes:\n%s\nRemove it, or ask the maintainer to commit it.\n' "$hits" >&2 ;;
+  *) printf 'Mentat: commit refused: the secret scan of the staged changes could not run (run mentat check).\n' >&2 ;;
+esac
+exit 1

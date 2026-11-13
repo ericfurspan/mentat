@@ -57,13 +57,23 @@
 #     answer line. Nothing is posted. 0 at least one tool answered, 1 none did, 64 usage.
 #     Same time limits and effort variables. Grok has web search alone; its
 #     local fetch tool is denied.
-#   mentat check  Checks, read-only, what Mentat itself needs: tools,
-#     gh signed in, the repository readable; prints the codex and grok versions, and warns
-#     when the private word list is unreadable, the list misses a private repository
+#   mentat check  Checks, read-only, what Mentat itself needs: tools (gitleaks
+#     included, which the git guard's hooks need), gh signed in, the repository readable;
+#     prints the codex and grok versions, and warns when mentat guard status finds the
+#     guard or wrapper not installed or not current, when, with CLAUDECODE set, git on
+#     PATH is not the installed wrapper, when the private word list is unreadable, the list misses a private repository
 #     this account can reach, by count only, the Mentat plugin is installed at different
 #     versions, or, with ~/.config/mentat/warn-kept-branches present, the repository keeps
 #     head branches after merge.
 #     0 Mentat can work (warnings printed), 1 it cannot.
+#   mentat guard install  Copies git-guard/ (the git hooks, scanner and wrapper) into the
+#     trusted folder ${XDG_DATA_HOME:-~/.local/share}/mentat/git-guard and the wrapper to
+#     ~/.local/bin/git, mode 755, printing each file it wrote. In an agent's shell
+#     (CLAUDECODE set) the wrapper runs git with that folder's hooks, which scan commits
+#     and pushes for likely secrets and refuse pushes to the default branch and pushes
+#     from a dirty tree. 0 written, 1 a file could not be written, 64 usage.
+#   mentat guard status  Prints, read-only, whether the guard folder and the wrapper are
+#     installed and the same as this copy of Mentat. 0 both are, 1 not, 64 usage.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -75,7 +85,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish codex grok parallel second-opinion check status; do
+for lib in shared publish codex grok parallel second-opinion check status guard; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -114,5 +124,6 @@ case "${1:-}" in
   status) shift; status "$@" ;;
   second-opinion) shift; second_opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
+  guard) shift; guard "$@" ;;
+  *) die "usage: mentat review [--local | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check | mentat guard install | mentat guard status" 64 ;;
 esac

@@ -11,7 +11,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 failures=0
 check() { if eval "$2"; then printf 'PASS: hook-contract %s\n' "$1"; else printf 'FAIL: hook-contract %s\n' "$1"; failures=$((failures + 1)); fi; }
 
-hooks="no-merge no-repo-admin no-session-tools no-guard-edits no-private-text"
+hooks="no-merge no-repo-admin no-session-tools no-guard-edits no-hook-bypass no-private-text"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

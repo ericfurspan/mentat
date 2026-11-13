@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Mentat's git wrapper.
+# Installed first on PATH as ~/.local/bin/git by mentat guard install. Without
+# CLAUDECODE (the maintainer's own shell) it runs the real git untouched. In an agent's
+# shell it drops --no-verify (and its abbreviations --no-veri and --no-verif), commit's
+# -n (alone or in a bundle such as -an, never an option's value), every -c or
+# --config-env setting core.hooksPath and every GIT_CONFIG_KEY_<n> entry for it, then
+# runs the real git with -c core.hooksPath=<guard>/hooks as the last config option,
+# right before the subcommand, where <guard> is ${XDG_DATA_HOME:-$HOME/.local/share}/
+# mentat/git-guard. An agent's commit or push with the guard's hooks or scanner missing
+# exits 1, saying to run mentat guard install. The real git is the next git on PATH
+# that is neither this file nor another copy of it, else /usr/bin/git. It starts no
+# other program. This is a net for common mistakes, not a security boundary.
+
+self=${BASH_SOURCE[0]}
+marker="# Mentat's git wrapper."
+real=""
+p=${PATH:-}:
+while [ -n "$p" ]; do
+  d=${p%%:*} p=${p#*:}
+  c=${d:-.}/git
+  if [ -f "$c" ] && [ -x "$c" ] && ! [ "$c" -ef "$self" ]; then
+    l2=""
+    { IFS= read -r _ && IFS= read -r l2; } <"$c" 2>/dev/null
+    if [ "$l2" != "$marker" ]; then real=$c; break; fi
+  fi
+done
+[ -n "$real" ] || real=/usr/bin/git
+
+[ -n "${CLAUDECODE:-}" ] || exec "$real" "$@"
+
+set -u
+guard=${XDG_DATA_HOME:-${HOME:-}/.local/share}/mentat/git-guard
+
+# hooks_key <key>: the config key is core.hooksPath, in any case.
+hooks_key() {
+  case "$1" in [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]) return 0 ;; esac
+  return 1
+}
+no_verify() {
+  case "$1" in --no-veri | --no-verif | --no-verify) return 0 ;; esac
+  return 1
+}
+
+# GIT_CONFIG_COUNT entries for core.hooksPath go; the rest are renumbered.
+if [ -n "${GIT_CONFIG_COUNT:-}" ] && [ -z "${GIT_CONFIG_COUNT//[0-9]/}" ]; then
+  keys=() vals=()
+  j=0
+  while [ "$j" -lt "$GIT_CONFIG_COUNT" ]; do
+    kn=GIT_CONFIG_KEY_$j vn=GIT_CONFIG_VALUE_$j
+    if [ -n "${!kn+x}" ] && ! hooks_key "${!kn}"; then keys+=("${!kn}") vals+=("${!vn-}"); fi
+    unset "$kn" "$vn"
+    j=$((j + 1))
+  done
+  j=0
+  while [ "$j" -lt "${#keys[@]}" ]; do
+    export "GIT_CONFIG_KEY_$j=${keys[j]}" "GIT_CONFIG_VALUE_$j=${vals[j]}"
+    j=$((j + 1))
+  done
+  export GIT_CONFIG_COUNT=${#keys[@]}
+fi
+
+# git's own options, up to the subcommand.
+args=("$@")
+n=$#
+i=0
+pre=() sub="" out=()
+while [ "$i" -lt "$n" ]; do
+  w=${args[i]}
+  case "$w" in
+    -c | --config-env)
+      if [ $((i + 1)) -lt "$n" ]; then
+        v=${args[i + 1]}
+        hooks_key "${v%%=*}" || pre+=("$w" "$v")
+        i=$((i + 2))
+      else
+        pre+=("$w")
+        i=$((i + 1))
+      fi
+      continue
+      ;;
+    --config-env=*)
+      v=${w#--config-env=}
+      hooks_key "${v%%=*}" || pre+=("$w")
+      ;;
+    -C | --git-dir | --work-tree | --namespace | --super-prefix | --attr-source)
+      pre+=("$w")
+      if [ $((i + 1)) -lt "$n" ]; then pre+=("${args[i + 1]}"); fi
+      i=$((i + 2))
+      continue
+      ;;
+    -*) no_verify "$w" || pre+=("$w") ;;
+    *)
+      sub=$w
+      i=$((i + 1))
+      break
+      ;;
+  esac
+  i=$((i + 1))
+done
+
+# The subcommand's arguments: --no-verify goes everywhere; for commit, so does -n,
+# while an option's value stays as it is.
+while [ "$i" -lt "$n" ]; do
+  w=${args[i]}
+  i=$((i + 1))
+  if no_verify "$w"; then continue; fi
+  if [ "$sub" != commit ] || [ -n "${dd:-}" ]; then out+=("$w"); continue; fi
+  case "$w" in
+    --) dd=1; out+=("$w") ;;
+    --message | --file | --reuse-message | --reedit-message | --template | --author | --date | \
+      --cleanup | --fixup | --squash | --trailer | --pathspec-from-file)
+      out+=("$w")
+      if [ "$i" -lt "$n" ]; then out+=("${args[i]}"); i=$((i + 1)); fi
+      ;;
+    --*) out+=("$w") ;;
+    -?*)
+      b=${w#-} kept="" takes=""
+      while [ -n "$b" ]; do
+        l=${b:0:1} b=${b:1}
+        case "$l" in
+          n) ;;
+          [mFCct]) kept+=$l$b; [ -n "$b" ] || takes=1; b="" ;;
+          [Su]) kept+=$l$b; b="" ;;
+          *) kept+=$l ;;
+        esac
+      done
+      [ -z "$kept" ] || out+=("-$kept")
+      if [ -n "$takes" ] && [ "$i" -lt "$n" ]; then out+=("${args[i]}"); i=$((i + 1)); fi
+      ;;
+    *) out+=("$w") ;;
+  esac
+done
+
+case "$sub" in
+  commit | push)
+    ok=1
+    for f in scan hooks/pre-commit hooks/prepare-commit-msg hooks/pre-push; do
+      [ -f "$guard/$f" ] && [ -x "$guard/$f" ] || ok=""
+    done
+    if [ -z "$ok" ]; then
+      printf "mentat: git %s refused: Mentat's git guard is not installed in %s; run mentat guard install.\n" "$sub" "$guard" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+if [ -z "$sub" ]; then
+  exec "$real" -c "core.hooksPath=$guard/hooks" ${pre[@]+"${pre[@]}"}
+fi
+exec "$real" ${pre[@]+"${pre[@]}"} -c "core.hooksPath=$guard/hooks" "$sub" ${out[@]+"${out[@]}"}

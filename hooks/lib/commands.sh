@@ -16,6 +16,9 @@
 # gh_at: when the command word is gh, sets gi to its first word that is no flag (-R
 # and --repo take a value); returns 1 when the command is not gh. gh_skip moves gi past
 # flags from where it is.
+# hooks_key <key>: the git config key is core.hooksPath, in any case.
+# config_hooks_write <index>: the git config arguments from words[index] on set, unset,
+# add or replace core.hooksPath; a read of it returns 1.
 # Hooks are nets for common mistakes, not a security boundary.
 
 # The splitter reads the text one character at a time, so a long quoted body costs
@@ -243,4 +246,28 @@ gh_skip() {
       *) return 0 ;;
     esac
   done
+}
+
+hooks_key() {
+  case "$1" in [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]) return 0 ;; esac
+  return 1
+}
+
+config_hooks_write() {
+  local k=$1 w hooks="" read="" write="" count=0
+  while [ "$k" -lt "$n" ]; do
+    w=${words[k]}
+    case "$w" in
+      -f | --file | --blob | --type | --default | --comment) k=$((k + 1)) ;;
+      --get | --get-all | --get-regexp | --get-urlmatch | --get-color | --get-colorbool | -l | --list | get | list) read=1 ;;
+      --unset | --unset-all | --add | --replace-all | set | unset) write=1 ;;
+      -*) ;;
+      *)
+        count=$((count + 1))
+        if hooks_key "${w%%=*}"; then hooks=1; fi
+        ;;
+    esac
+    k=$((k + 1))
+  done
+  [ -n "$hooks" ] && [ -z "$read" ] && { [ -n "$write" ] || [ "$count" -ge 2 ]; }
 }

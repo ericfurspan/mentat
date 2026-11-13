@@ -318,10 +318,11 @@ done
 
 # mentat review, review --local, review --grok, second-opinion (both modes) and check behave as
 # specified (stub gh, codex, grok and gitleaks), and so do the merge, repository settings, session
-# tools, guard file, push, private text and secret hooks, and the contract the enforcing hooks share.
+# tools, guard file, hook bypass and private text hooks, the contract the enforcing hooks share,
+# and the git guard (its git hooks, scanner and wrapper, and mentat guard).
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-repo-admin.sh tests/no-session-tools.sh tests/no-guard-edits.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh)
+  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-repo-admin.sh tests/no-session-tools.sh tests/no-guard-edits.sh tests/no-hook-bypass.sh tests/no-private-text.sh tests/git-guard.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -381,7 +382,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-repo-admin hooks/no-session-tools hooks/no-guard-edits hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-repo-admin.sh tests/no-session-tools.sh tests/no-guard-edits.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-repo-admin hooks/no-session-tools hooks/no-guard-edits hooks/no-hook-bypass hooks/no-private-text git-guard/scan git-guard/git git-guard/hooks/pre-commit git-guard/hooks/prepare-commit-msg git-guard/hooks/pre-push bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-repo-admin.sh tests/no-session-tools.sh tests/no-guard-edits.sh tests/no-hook-bypass.sh tests/no-private-text.sh tests/git-guard.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else

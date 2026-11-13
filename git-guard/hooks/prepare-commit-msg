@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Mentat's git prepare-commit-msg hook, run for agents through the git wrapper. Git
+# runs it even when pre-commit is skipped, so it scans the staged changes again and
+# the message file ($1), and refuses the commit on a likely secret in either, or when
+# the scan cannot run. This is a net for common mistakes, not a security boundary.
+set -uo pipefail
+
+scan=${0%/*}/../scan
+refuse() { printf 'Mentat: commit refused: %s\n' "$1" >&2; exit 1; }
+diff=$(git -c core.quotePath=false diff --cached --no-relative --no-ext-diff --no-textconv \
+  --no-color -U0 --src-prefix=a/ --dst-prefix=b/) ||
+  refuse "git could not list the staged changes, so they were not scanned for secrets."
+hits=$(printf '%s' "${diff:+$diff$'\n'}" | "$scan")
+case $? in
+  0) ;;
+  1) refuse "gitleaks flags a likely secret in the staged changes:"$'\n'"$hits"$'\n'"Remove it, or ask the maintainer to commit it." ;;
+  *) refuse "the secret scan of the staged changes could not run (run mentat check)." ;;
+esac
+{ [ -n "${1:-}" ] && [ -f "$1" ] && [ -r "$1" ]; } || refuse "the commit message file could not be read, so it was not scanned for secrets."
+hits=$("$scan" --text "the commit message" <"$1")
+case $? in
+  0) exit 0 ;;
+  1) refuse "gitleaks flags a likely secret in the commit message:"$'\n'"$hits"$'\n'"Remove it, or ask the maintainer to commit it." ;;
+  *) refuse "the secret scan of the commit message could not run (run mentat check)." ;;
+esac

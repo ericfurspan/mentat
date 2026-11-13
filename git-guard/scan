@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Mentat's secret scan for its git hooks. Reads a unified diff on stdin (git diff with
+# -U0, core.quotePath=false and a/ b/ prefixes) and counts a finding only on an added
+# line, named by the file in the +++ header above it. With --text <name>, stdin is plain
+# text (a commit message) and every finding counts, named <name>. It runs gitleaks'
+# stdin scan with redaction and reads only the rule and line of each finding from its
+# JSON report; gitleaks' own output goes nowhere. Prints one "<rule> in <file>" line per
+# finding, never the match. Exit 0 clean, 1 findings, 2 gitleaks or jq missing, a
+# gitleaks error or an unreadable report. Callers refuse on any non-zero exit. This is
+# a net for common mistakes, not a security boundary.
+set -uo pipefail
+
+label=""
+if [ "${1:-}" = --text ]; then
+  [ $# -eq 2 ] && [ -n "$2" ] || { printf 'mentat scan: usage: scan [--text <name>]\n' >&2; exit 2; }
+  label=$2
+elif [ $# -ne 0 ]; then
+  printf 'mentat scan: usage: scan [--text <name>]\n' >&2
+  exit 2
+fi
+for t in gitleaks jq; do
+  command -v "$t" >/dev/null 2>&1 || { printf 'mentat scan: %s is not installed, so nothing was scanned\n' "$t" >&2; exit 2; }
+done
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/mentat-scan.XXXXXX") || exit 2
+trap 'rm -rf "$tmp"' EXIT
+cat >"$tmp/in" || exit 2
+[ -s "$tmp/in" ] || exit 0
+
+# Exit 3 is a finding; any other failure is a gitleaks error.
+gitleaks stdin --no-banner --redact --log-level fatal --exit-code 3 \
+  --report-format json --report-path "$tmp/report.json" <"$tmp/in" >/dev/null 2>&1
+rc=$?
+[ "$rc" != 0 ] || exit 0
+failed() { printf 'mentat scan: the gitleaks scan failed (%s), so nothing was checked\n' "$1" >&2; exit 2; }
+[ "$rc" = 3 ] || failed "exit $rc"
+jq -r '.[] | "\(.StartLine | tonumber | floor)\t\(.RuleID | tostring)"' "$tmp/report.json" >"$tmp/found" 2>/dev/null ||
+  failed "unreadable report"
+[ -s "$tmp/found" ] || failed "a finding with no report"
+
+if [ -n "$label" ]; then
+  cut -f 2 "$tmp/found" | LC_ALL=C awk -v f="$label" '{ print $0 " in " f }' | sort -u >"$tmp/hits" || failed "unreadable report"
+else
+  # Each finding's line in the diff, if it is an added line, gives its file from the
+  # +++ header above it. A file name with spaces ends with a tab there.
+  LC_ALL=C awk -F '\t' '
+    NR == FNR { want[$1] = (($1 in want) ? want[$1] SUBSEP : "") $2; next }
+    /^diff --git / { head = 1; next }
+    head && /^\+\+\+ / { f = substr($0, 5); sub(/\t$/, "", f); if (!sub(/^b\//, "", f)) sub(/^"b\//, "\"", f); next }
+    /^@@/ { head = 0; next }
+    !head && /^\+/ && (FNR in want) { n = split(want[FNR], r, SUBSEP); for (i = 1; i <= n; i++) print r[i] " in " f }
+  ' "$tmp/found" "$tmp/in" | sort -u >"$tmp/hits" || failed "unreadable report"
+fi
+[ -s "$tmp/hits" ] || exit 0
+cat "$tmp/hits"
+exit 1

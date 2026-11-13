@@ -65,6 +65,27 @@ c_plugin_copies() {
     c_ok "no Mentat plugin copies at different versions"
   fi
 }
+# Warns when the git guard (mentat guard status) is not installed or not current, and,
+# in an agent's shell (CLAUDECODE set), when git on PATH is not the installed wrapper.
+c_guard() {
+  local out line git_path
+  if out=$(guard_state); then
+    c_ok "the git guard and its wrapper are installed and current"
+  else
+    while [ -n "$out" ]; do
+      line=${out%%$'\n'*}
+      case "$out" in *$'\n'*) out=${out#*$'\n'} ;; *) out="" ;; esac
+      case "$line" in *": installed and current"*) ;; *) c_warn "$line: run mentat guard install" ;; esac
+    done
+  fi
+  [ -n "${CLAUDECODE:-}" ] || return 0
+  git_path=$(command -v git 2>/dev/null) || git_path=""
+  if [ -n "$git_path" ] && [ "$git_path" -ef "$(guard_wrapper)" ]; then
+    c_ok "git on PATH is the installed wrapper"
+  else
+    c_warn "git on PATH (${git_path:-none}) is not the wrapper $(guard_wrapper): put ~/.local/bin first on PATH in agent shells"
+  fi
+}
 # The review tools: Codex, and Grok where installed (it is optional).
 c_review_tools() {
   local v
@@ -87,7 +108,8 @@ check() {
   if command -v gitleaks >/dev/null 2>&1; then
     v=$(gitleaks version 2>/dev/null | head -n 1)
     c_ok "gitleaks is installed (${v:-version unknown})"
-  else c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
+  else c_problem "gitleaks is not installed: Mentat's git hooks refuse agent commits and pushes without it"; fi
+  c_guard
   c_plugin_copies
   # The publish check still looks for the home path without the list. No list is not a warning.
   if [ ! -e "$PRIVATE_WORDS" ]; then :

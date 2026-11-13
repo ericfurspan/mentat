@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Mentat's git pre-push hook, run for agents through the git wrapper. It refuses a push
+# that updates or deletes the remote's default branch (from git ls-remote --symref
+# <remote> HEAD, else refs/remotes/<remote>/HEAD, else main and master), a push while
+# git status --porcelain lists anything, and a push whose outgoing commits add a likely
+# secret, or when the scan cannot run. Each commit is scanned on its own diff; merge
+# commits show no diff. Force pushes to other branches and tags pass. Git hooks cannot
+# ask, so each check refuses. This is a net for common mistakes, not a security boundary.
+set -uo pipefail
+
+scan=${0%/*}/../scan
+remote=${1:-origin}
+refuse() { printf 'Mentat: push refused: %s\n' "$1" >&2; exit 1; }
+
+if [ "$(git rev-parse --is-bare-repository 2>/dev/null)" != true ]; then
+  status=$(git --no-optional-locks status --porcelain) ||
+    refuse "git status could not run, so the working tree could not be checked."
+  [ -z "$status" ] || refuse "git status lists uncommitted changes; agents push from a clean working tree."
+fi
+
+defaults=$(git ls-remote --symref "$remote" HEAD 2>/dev/null |
+  awk '$1 == "ref:" && $3 == "HEAD" && sub(/^refs\/heads\//, "", $2) { print $2; exit }')
+if [ -z "$defaults" ]; then
+  defaults=$(git symbolic-ref --short "refs/remotes/$remote/HEAD" 2>/dev/null) && defaults=${defaults#"$remote"/}
+fi
+[ -n "$defaults" ] || defaults="main master"
+
+diffs=""
+while read -r _ lsha rref rsha; do
+  [ -n "$rref" ] || continue
+  for d in $defaults; do
+    if [ "$rref" = "refs/heads/$d" ]; then
+      if [ "${lsha//0/}" = "" ]; then refuse "agents never delete the default branch ($d)."; fi
+      refuse "agents never push to the default branch ($d); push a branch and open a pull request."
+    fi
+  done
+  [ "${lsha//0/}" != "" ] || continue
+  if [ "${rsha//0/}" != "" ] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
+    range=("$rsha..$lsha")
+  else
+    range=("$lsha" --not "--remotes=$remote")
+  fi
+  out=$(git -c core.quotePath=false log -p --no-relative --no-ext-diff --no-textconv --no-color -U0 \
+    --src-prefix=a/ --dst-prefix=b/ --format='commit %H' "${range[@]}" --) ||
+    refuse "git could not list the outgoing commits of $rref, so they were not scanned for secrets."
+  [ -z "$out" ] || diffs+=$out$'\n'
+done
+
+hits=$(printf '%s' "$diffs" | "$scan")
+case $? in
+  0) exit 0 ;;
+  1) refuse "gitleaks flags a likely secret in the outgoing commits:"$'\n'"$hits"$'\n'"Remove it from the branch's history, or ask the maintainer to push it." ;;
+  *) refuse "the secret scan of the outgoing commits could not run (run mentat check)." ;;
+esac

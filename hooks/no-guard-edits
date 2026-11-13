@@ -147,7 +147,7 @@ into() {
 # git_words <base>: git rm, mv, checkout or restore of a guard file, or a git config
 # write naming core.hooksPath.
 git_words() {
-  local k=$((ci + 1)) gbase=$1 w hooks="" read="" write="" count=0
+  local k=$((ci + 1)) gbase=$1 w
   while [ "$k" -lt "$n" ]; do
     case "${words[k]}" in
       -C) expand "${words[k + 1]:-.}" "$gbase"; gbase=$to; k=$((k + 2)) ;;
@@ -162,24 +162,7 @@ git_words() {
       for w in ${ops[@]+"${ops[@]}"}; do target "$w" "$gbase"; done
       ;;
     config)
-      k=$((k + 1))
-      while [ "$k" -lt "$n" ]; do
-        w=${words[k]}
-        case "$w" in
-          -f | --file | --blob | --type | --default | --comment) k=$((k + 1)) ;;
-          --get | --get-all | --get-regexp | --get-urlmatch | --get-color | --get-colorbool | -l | --list | get | list) read=1 ;;
-          --unset | --unset-all | --add | --replace-all | set | unset) write=1 ;;
-          -*) ;;
-          *)
-            count=$((count + 1))
-            case "$w" in
-              [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh] | [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]=*) hooks=1 ;;
-            esac
-            ;;
-        esac
-        k=$((k + 1))
-      done
-      if [ -n "$hooks" ] && [ -z "$read" ] && { [ -n "$write" ] || [ "$count" -ge 2 ]; }; then
+      if config_hooks_write $((k + 1)); then
         verdict deny "agents never set core.hooksPath, which would skip Mentat's git guard."
       fi
       ;;

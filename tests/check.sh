@@ -80,6 +80,9 @@ chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude" "$
 export PATH="$root/bin:$PATH"
 
 export HOME="$root/home"
+unset XDG_DATA_HOME XDG_CONFIG_HOME CLAUDECODE
+# The git guard is installed and current for every case but those that change it.
+"$mentat" guard install >/dev/null || { echo "FAIL: check could not install the git guard into its temp HOME"; exit 1; }
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$(dirname "$LIST")"
 echo stubword >"$LIST"
@@ -112,10 +115,28 @@ reset; rc=$(cd "$root/cwd" && PATH="$root/nocodex:/usr/bin:/bin" "$mentat" check
 check "a missing codex is a problem (exit 1) that says what still runs without it" '[ "$rc" = 1 ] && grep -qx "PROBLEM: codex is not installed: mentat review and mentat second-opinion need it; mentat ci and mentat review --grok still run without it" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 reset; rc=$(run)
 check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
-# Without gitleaks, the commit hook does not scan: check warns and still passes.
+# Without gitleaks, the git guard's hooks refuse agent commits and pushes: check fails.
 mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/nogitleaks/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "a missing gitleaks warns, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: gitleaks is not installed: the commit hook does not scan staged changes for likely secrets" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+check "a missing gitleaks is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qx "PROBLEM: gitleaks is not installed: Mentat'"'"'s git hooks refuse agent commits and pushes without it" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+
+# The git guard: installed and current is OK; missing or changed files warn.
+GUARD_DIR="$HOME/.local/share/mentat/git-guard"
+reset; rc=$(run)
+check "an installed and current guard is OK" '[ "$rc" = 0 ] && grep -qx "OK: the git guard and its wrapper are installed and current" "$STUB/out"'
+check "without CLAUDECODE, git on PATH is not looked at" '! grep -q "git on PATH" "$STUB/out"'
+mv "$HOME/.local/bin/git" "$root/wrapper.away"
+reset; rc=$(run)
+check "a missing wrapper warns, still exit 0" '[ "$rc" = 0 ] && grep -qxF "WARN: git wrapper: not installed at $HOME/.local/bin/git: run mentat guard install" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+mv "$root/wrapper.away" "$HOME/.local/bin/git"
+cp "$GUARD_DIR/hooks/pre-push" "$root/pre-push.keep"; printf '# changed\n' >>"$GUARD_DIR/hooks/pre-push"
+reset; rc=$(run)
+check "a changed guard file warns that the guard is not current, still exit 0" '[ "$rc" = 0 ] && grep -qxF "WARN: git guard: not current in $GUARD_DIR (differs: hooks/pre-push): run mentat guard install" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+cp "$root/pre-push.keep" "$GUARD_DIR/hooks/pre-push"
+reset; rc=$(cd "$root/cwd" && CLAUDECODE=1 "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "with CLAUDECODE, git on PATH that is not the wrapper warns" '[ "$rc" = 0 ] && grep -q "^WARN: git on PATH (.*) is not the wrapper $HOME/.local/bin/git" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+reset; rc=$(cd "$root/cwd" && CLAUDECODE=1 PATH="$HOME/.local/bin:$PATH" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "with CLAUDECODE, the wrapper first on PATH is OK" '[ "$rc" = 0 ] && grep -qx "OK: git on PATH is the installed wrapper" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
