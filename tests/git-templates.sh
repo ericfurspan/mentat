@@ -248,7 +248,7 @@ own "$repo/.git/hooks/pre-push" gitdir-push
 reset; stage_clean chained; h=$(head_of)
 A commit -q -m "add chained"; rc=$?
 check "after its checks pass, the pre-commit template runs the repository's own hook in .git/hooks" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -e "$STUB/gitdir-commit.args" ] && [ -s "$STUB/calls" ]'
-check "the repository's own hook runs with MENTAT_OWN_HOOK set" '[ "$(cat "$STUB/gitdir-commit.env")" = 1 ]'
+check "the repository's own hook runs with MENTAT_OWN_HOOK naming that hook and repository" '[ "$(cat "$STUB/gitdir-commit.env")" = "pre-commit $(cd "$repo/.git" && pwd -P)" ]'
 reset; stage_clean refused; echo 1 >"$STUB/gitdir-commit.exit"; h=$(head_of)
 A commit -q -m "add refused"; rc=$?
 check "the own pre-commit hook's refusal refuses the commit" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ]'
@@ -316,6 +316,38 @@ check "a repository post-checkout hook still runs for an agent's checkout, with 
 git -C "$repo" checkout -q feat/x
 rm "$repo/.git/hooks/commit-msg" "$repo/.git/hooks/post-checkout"
 
+# One hook may run another: a repository pre-merge-commit that runs git hook run
+# pre-commit still gets the repository's own pre-commit, refusal included.
+printf '#!/bin/sh\nexec git hook run pre-commit\n' >"$repo/.git/hooks/pre-merge-commit"
+chmod +x "$repo/.git/hooks/pre-merge-commit"
+g checkout -q -b feat/d2 feat/x; g commit -q --allow-empty -m d2
+g checkout -q -b feat/d1 feat/x; g commit -q --allow-empty -m d1
+reset; h=$(head_of)
+A merge --no-ff -q -m "merge d2" feat/d2; rc=$?
+check "a repository hook that runs another hook still gets the repository's own hook of that name" \
+  '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -e "$STUB/gitdir-commit.args" ] && grep -q "^pre-merge-commit " "$STUB/gitdir-commit.env" && grep -q "^pre-commit " "$STUB/gitdir-commit.env"'
+g reset -q --hard "$h"
+reset; echo 1 >"$STUB/gitdir-commit.exit"
+A merge --no-ff -q -m "merge d2" feat/d2; rc=$?
+check "that delegated own hook's refusal refuses the merge" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ]'
+g merge --abort; g checkout -q feat/x
+rm "$repo/.git/hooks/pre-merge-commit" "$STUB/gitdir-commit.exit"
+
+# Hooks that run git: a repository pre-commit that runs git checkout -- . and a
+# post-commit that pushes a branch still get the repository's own post-checkout and pre-push.
+cp -p "$repo/.git/hooks/pre-commit" "$tmp/pre-commit.keep"
+printf '#!/bin/sh\ngit checkout -- . || exit 1\nexec "%s" "$@"\n' "$tmp/pre-commit.keep" >"$repo/.git/hooks/pre-commit"
+printf '#!/bin/sh\ngit push -q origin HEAD:refs/heads/feat/from-post-commit\n' >"$repo/.git/hooks/post-commit"
+chmod +x "$repo/.git/hooks/pre-commit" "$repo/.git/hooks/post-commit"
+own "$repo/.git/hooks/post-checkout" nested-post-checkout
+reset; stage_clean nested; h=$(head_of)
+A commit -q -m "hooks that run git"; rc=$?
+check "a repository pre-commit that runs git checkout still gets the repository's own post-checkout" \
+  '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ "$(cat "$STUB/nested-post-checkout.args" 2>/dev/null)" = "[$h][$h][0]" ]'
+check "a repository post-commit that pushes still gets the template's checks and the repository's own pre-push" \
+  '[ "$(remote_head feat/from-post-commit)" = "$(head_of)" ] && [ -e "$STUB/gitdir-push.args" ] && [ -s "$STUB/calls" ]'
+mv "$tmp/pre-commit.keep" "$repo/.git/hooks/pre-commit"; rm "$repo/.git/hooks/post-commit" "$repo/.git/hooks/post-checkout"
+
 # A repository with its own local core.hooksPath, relative and absolute. Its hooks run,
 # and those in .git/hooks do not.
 own "$repo/.githooks/pre-commit" local-commit
@@ -338,6 +370,14 @@ for hp in .githooks "$repo/.githooks"; do
   check "with core.hooksPath $hp, the maintainer's git runs its own hook alone" '[ "$rc" = 0 ] && [ -e "$STUB/local-commit.args" ] && [ ! -e "$STUB/calls" ]'
 done
 git -C "$repo" config --unset core.hooksPath
+# A local core.hooksPath set through an included file counts too.
+printf '[core]\n\thooksPath = .githooks\n' >"$repo/.git/hooks.cfg"
+git -C "$repo" config include.path hooks.cfg
+reset; stage_clean included
+A commit -q -m "included hook path"; rc=$?
+check "a core.hooksPath from an included config file names the repository's own hooks" \
+  '[ "$rc" = 0 ] && [ -e "$STUB/local-commit.args" ] && [ ! -e "$STUB/gitdir-commit.args" ]'
+git -C "$repo" config --unset include.path
 
 # No recursion: a local core.hooksPath naming the templates, or an own hook that runs
 # a template, runs Mentat's checks and ends. A loop is stopped after 20 seconds.
@@ -379,6 +419,20 @@ reset; stage_clean partial; h=$(head_of)
 check "a missing own-hook.sh refuses the commit and says so" '[ "$rc" = 1 ] && [ "$(head_of)" = "$h" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
 reset; (cd "$repo" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/partial/hooks" git push -q origin feat/x:feat/partial) >"$STUB/out" 2>&1; rc=$?
 check "a missing own-hook.sh refuses the push and says so" '[ "$rc" != 0 ] && [ -z "$(remote_head feat/partial)" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
+
+# git init runs under the templates: plain, bare and in place.
+A init -q "$tmp/new-plain"; rc=$?
+check "git init of a new repository works under the templates" '[ "$rc" = 0 ] && git -C "$tmp/new-plain" rev-parse --git-dir >/dev/null 2>&1'
+A init -q --bare "$tmp/new-bare.git"; rc=$?
+check "git init --bare works under the templates" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/new-bare.git" rev-parse --is-bare-repository)" = true ]'
+mkdir "$tmp/new-inplace"
+(cd "$tmp/new-inplace" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tpl" git init -q) >"$STUB/out" 2>&1; rc=$?
+check "git init in place works under the templates" '[ "$rc" = 0 ] && [ -d "$tmp/new-inplace/.git" ]'
+# Where git cannot tell the repository yet, as while git init creates it, GIT_DIR names it.
+mkdir -p "$tmp/half/hooks" "$tmp/elsewhere"
+own "$tmp/half/hooks/post-commit" half
+rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$tpl/post-commit" one) >"$STUB/out" 2>&1; rc=$?
+check "with no repository git can read, a template runs the own hook in GIT_DIR/hooks" '[ "$rc" = 0 ] && [ "$(cat "$STUB/half.args" 2>/dev/null)" = "[one]" ]'
 
 # The session-start check of the installed copy.
 inst="$tmp/installed"
