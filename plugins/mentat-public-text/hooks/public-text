@@ -7,27 +7,29 @@
 # release create and edit; and gh api with a write method, or with fields and no GET,
 # where graphql counts unless its query is known and is no mutation. It checks that
 # command's own words but its -R/--repo, --template and --recover values, the api
-# endpoint and a release asset's folder, the files it reads (--body-file, -F,
-# --notes-file, --input, field=@file), and text fed to it by a heredoc, a here-string,
-# < file or cat file |. $(cat file), $(< file), a heredoc in $( ) and a variable assigned
-# earlier in the line count as their text, and $HOME, $PWD and $(pwd) as the home folder;
-# a cd before it in the line sets where relative files are read. A file is read only when
-# its text reaches a gh write. Other commands' words, file names, and text from other
-# variables, commands or unreadable files are not checked. A file whose text a command
-# before it in the line may change is not checked either, with a note on stderr: one
-# written by > or >> (but cat's > from known text), or named, also after an = as in
-# of=file, by any command but cat, cd, pwd, gh, [, [[, test, ls, wc, grep, head, tail,
-# stat, git, jq, diff, echo, printf, rg, chmod, chown, touch, open, sed without -i, -I or
-# --in-place, and awk without -i or --include.
+# endpoint and api --jq and --template values, which only format the reply, and a release
+# asset's folder; the files it reads (--body-file, -F, --notes-file, --input,
+# field=@file); and text fed to it by a heredoc, a here-string, < file or cat file |.
+# $(cat file), $(< file), a heredoc in $( ) and a variable assigned earlier in the line
+# count as their text, and $HOME, $PWD and $(pwd) as the home folder; a cd before it in
+# the line sets where relative files are read. A file is read only when its text reaches
+# a gh write. Other commands' words, file names, and text from other variables, commands
+# or unreadable files are not checked. Nor, with a note on stderr, is a file a command
+# before it in the line may have changed: one written by > or >> (except cat > from known
+# text), or one named, also after = as in of=file, by any command other than cat, cd,
+# pwd, gh, [, [[, test, ls, wc, grep, head, tail, stat, git, jq, diff, echo, printf, rg,
+# chmod, chown, touch, open, sed without -i, -I or --in-place, and awk without -i or
+# --include.
 # For the GitHub MCP server's writes that carry free text (issues, pull requests, reviews,
 # comments, merges, gists, files and repositories), under current and older tool names,
 # it looks at every text value but owner and repo. A call is that server's when its input
 # has owner and repo, or when it makes a gist or a repository.
 # The reason gives the category, never the match. This is a net for mistakes, not a
 # security boundary: other routes exist. When it cannot read its input, jq is missing, or
-# the command is over 50 KB or 6,000 steps outside heredocs or nested over 100 levels
-# deep, it allows the call and says so on stderr. A file over 1 MB feeding a gh write is
-# not checked, with a note on stderr; the rest of the call is.
+# the command is over 50 KB or 6,000 steps outside heredocs or nests over 100 levels
+# below the top level (a subshell, $( ) or <( ) each counts one), it allows the call and
+# says so on stderr. A file over 1 MB feeding a gh write is not checked, with a note on
+# stderr; the rest of the call is.
 set -uo pipefail
 
 # Notes for text a gh write lets through unchecked, printed when the call is allowed.
@@ -105,10 +107,10 @@ cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || allow "could 
 [ -n "$cwd" ] || cwd=$PWD
 
 # The walk's time grows with the text it reads outside heredocs times its steps (a word,
-# quote, expansion or operator each), so it stops past this many bytes or steps, and at
-# this depth of nesting.
+# quote, expansion or operator each), so it stops past this many bytes or steps, and past
+# this many levels nested below the top.
 walk_max=50000 step_max=6000 depth_max=100
-cmd_len=${#cmd} h_used=0 steps=0 depth=0
+cmd_len=${#cmd} h_used=0 steps=0 depth=-1
 case "$cmd" in *'<<'*) ;; *) [ "$cmd_len" -le "$walk_max" ] || allow "the command is over 50 KB outside heredocs" ;; esac
 # over: stops the walk once it has read more than walk_max bytes outside heredocs.
 over() { [ $((cmd_len - ${#src} - h_used)) -le "$walk_max" ] || allow "the command is over 50 KB outside heredocs"; }
@@ -563,7 +565,10 @@ gh_write() {
         -f?* | --raw-field=*) v=${t#--raw-field=}; v=${v#-f}; fields=1; raw "$i" "$v"; continue ;;
         --input) next=input fields=1; continue ;;
         --input=*) fields=1 q_seen=1; feed "$i" "${t#*=}" "${w_path[i]#*=}" || q_unknown=1; continue ;;
-        -H | --header | -q | --jq | -t | --template | --cache | -p | --preview | --hostname) next=text ;;
+        # --jq and --template only format the reply here.
+        -q | --jq | -t | --template) next=skip; continue ;;
+        -q?* | --jq=* | -t?* | --template=*) continue ;;
+        -H | --header | --cache | -p | --preview | --hostname) next=text ;;
         -*) ;;
         *) if [ -z "$endpoint" ]; then endpoint=$t; continue; fi ;;
       esac

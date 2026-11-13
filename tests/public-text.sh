@@ -215,6 +215,13 @@ gh release create v1 /Users/stubperson/dist/app.tgz --notes ok
 gh release view v1 --json body -q stubcodename
 while read -r l; do :; done < word.md | gh pr comment 7 -F -
 cp clean.md word.md; gh pr comment 7 --body ok
+gh api -X POST repos/o/r/issues/7/comments -f body=ok --jq '.user.login | select(. != "stubcodename")'
+gh api -X POST repos/o/r/issues/7/comments -f body=ok -q .stubcodename
+gh api -X POST repos/o/r/issues/7/comments -f body=ok --jq=.stubcodename
+gh api -X POST repos/o/r/issues/7/comments -f body=ok -q.stubcodename
+gh api -X POST repos/o/r/issues/7/comments -f body=ok -t '{{.html_url}} stubcodename'
+gh api -X POST repos/o/r/issues/7/comments -f body=ok --template='{{.html_url}} stubcodename'
+gh api -X POST repos/o/r/issues/7/comments -f body=ok -t'{{.html_url}} stubcodename'
 NOPUBLISH
 # A command that can write a file makes its text unknown, so the gh write it feeds is
 # allowed with a note.
@@ -306,6 +313,7 @@ git add word.md; gh pr comment 7 --body "$(cat word.md)"
 git add word.md; gh pr comment 7 -F - < word.md
 cp clean.md query.graphql; gh api graphql -F query=@query.graphql -f body="about stubcodename"
 jq -n '{query: "query { x }"}' | gh api graphql --input - -f body="about stubcodename"
+gh pr create -t stubcodename --body x
 PUBLISH
 expect deny "cat > x.md <<'EOF'
 about stubcodename
@@ -384,6 +392,10 @@ many=$(printf 'a %.0s' $(seq 7000))
 check "allows a command with too many steps to read, with a note" 'unchecked "echo $many; gh pr comment 7 --body stubcodename" "over 6000 steps"'
 deep=$(printf '%03000d' 0 | sed 's/0/$(/g')
 check "allows a command nested too deep, with a note" 'unchecked "gh pr comment 7 --body ok; echo $deep" "nested"'
+# nested <levels>: a command with that many nested $( ) before a gh write with a hit.
+nested() { printf 'x=%s1%s; gh pr comment 7 --body stubcodename' "$(printf '$(echo %.0s' $(seq "$1"))" "$(printf ')%.0s' $(seq "$1"))"; }
+check "denies a hit after 100 nested levels" '[ "$(decision "$(nested 100)")" = deny ]'
+check "allows a command nested 101 levels deep, with a note" 'unchecked "$(nested 101)" "nested over 100 levels"'
 mkdir "$root/logbin"
 for t in cat head; do
   printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"$STUB/reads"\nexec %s "$@"\n' "$(command -v "$t")" >"$root/logbin/$t"
