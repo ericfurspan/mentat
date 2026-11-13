@@ -129,11 +129,11 @@ kill -TERM -- "-$slow" 2>/dev/null || kill -TERM "$slow" 2>/dev/null
 wait "$slow" 2>/dev/null; rc=$?
 check "a hook stopped before its verdict exits non-zero and prints nothing" '[ "$rc" != 0 ] && [ ! -s "$tmp/slow.out" ]'
 
-# Wiring: each enforcing hook runs once, synchronously, blocking on failure, with a
-# 30-second timeout.
+# Wiring: each enforcing hook runs once, synchronously (neither async nor asyncRewake,
+# with which onFailure has no effect), blocking on failure, with a 30-second timeout.
 for h in $hooks; do
-  check "hooks.json runs $h once with onFailure block, timeout 30 and no async" \
-    'jq -e --arg h "/hooks/$h" "[.hooks.PreToolUse[].hooks[] | select(.command | endswith(\$h))] | length == 1 and (.[0] | .onFailure == \"block\" and .timeout == 30 and (has(\"async\") | not))" "$root/hooks/hooks.json" >/dev/null'
+  check "hooks.json runs $h once with onFailure block, timeout 30 and neither async nor asyncRewake" \
+    'jq -e --arg h "/hooks/$h" "[.hooks.PreToolUse[].hooks[] | select(.command | endswith(\$h))] | length == 1 and (.[0] | .onFailure == \"block\" and .timeout == 30 and (has(\"async\") | not) and (has(\"asyncRewake\") | not))" "$root/hooks/hooks.json" >/dev/null'
 done
 
 [ "$failures" -eq 0 ]
