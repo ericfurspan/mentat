@@ -221,6 +221,27 @@ fi
 rm -rf "$templates_copy"
 PATH=$path_before
 unset MENTAT_GIT_TEMPLATES_DIR
+# Its worst case stays under the 10,000-character cap: rules.md at the largest size the
+# limit above allows (8,899 bytes), the templates in use at a long path with missing,
+# not executable and changed files, and neither gitleaks nor jq installed.
+worst=$(mktemp -d) || exit 1
+long=$worst
+for i in 1 2 3 4; do long=$long/$(printf '%0200d' 0); done
+mkdir -p "$worst/plugin/hooks" "$worst/plugin/lib" "$worst/bin" "$long" || exit 1
+cp hooks/session-start "$worst/plugin/hooks/" && cp lib/templates.sh "$worst/plugin/lib/" && cp -Rp git-templates "$worst/plugin/" && cp -Rp git-templates "$long/" || exit 1
+{ cat rules.md; head -c $((8899 - $(wc -c <rules.md))) /dev/zero | tr '\0' x; } >"$worst/plugin/rules.md"
+rm "$long/git-templates/scan" "$long/git-templates/hooks/commit-msg"; chmod -x "$long/git-templates/hooks/post-merge"
+for f in own-hook.sh hooks/pre-commit hooks/pre-push hooks/post-commit; do printf '# changed\n' >>"$long/git-templates/$f"; done
+for t in bash env dirname cat cmp tr; do ln -s "$(command -v "$t")" "$worst/bin/$t"; done
+worst_out=$(cd /tmp && MENTAT_GIT_TEMPLATES_DIR="$long/git-templates" PATH="$worst/bin" "$worst/plugin/hooks/session-start" | wc -c | tr -d ' ')
+worst_line=$(cd /tmp && MENTAT_GIT_TEMPLATES_DIR="$long/git-templates" PATH="$worst/bin" "$worst/plugin/hooks/session-start" | head -n 1)
+case $worst_line in
+  "Mentat PROBLEM: the git hook templates agents' git uses have problems (3 missing or not executable, 4 changed, not installed: gitleaks jq)"*)
+    if [ "$worst_out" -lt 10000 ]; then pass "hooks/session-start's worst case prints $worst_out bytes (cap 10,000)"
+    else fail "hooks/session-start's worst case prints $worst_out bytes, over the 10,000-character cap"; fi ;;
+  *) fail "hooks/session-start's worst case did not print its problem line: $worst_line" ;;
+esac
+rm -rf "$worst"
 
 # The safety rules in rules.md match tests/fixtures/rules-safety.md exactly: the Approval and
 # "What agents never do" sections (heading to the next level-two heading, trailing blank lines
