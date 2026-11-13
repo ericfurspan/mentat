@@ -6,19 +6,19 @@ user-invocable: false
 
 1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`. With an external backlog there is no issue: read the spec from the backlog through `mentat:backlog` (its `## Spec` section, or `## Agreed request` on an older item), write no `Closes #`, and never name the backlog's workspace or item in the body.
    An issue agreed under this workflow carries a `## Spec` section in the shape `mentat:backlog` gives (one sentence of intent; numbered requirements, each checkable, and one the maintainer checks by hand says so; "Out of scope:"), written by Claude Code when the maintainer agrees and scaled to the change. Read it from the issue.
-2. Use the repository's pull request template if it has one: fill its summary section with the Summary and its test section with the Test plan and any See it line, add the Status line, Decisions, Risks and Review details only where it has no place for them, and add `Closes #` as below where it has no place for it. Otherwise use the template below. Where the repository has a `GLOSSARY.md`, use its terms. Titles follow Conventional Commits.
+2. Use the repository's pull request template if it has one: fill its summary section with the Summary and its test section with the Test plan and any See it line, put the Status line first in the body, whatever place the template gives it or none, add Decisions, Risks and Review details only where it has no place for them, and add `Closes #` as below where it has no place for it. Otherwise use the template below. Where the repository has a `GLOSSARY.md`, use its terms. Titles follow Conventional Commits.
 3. The Summary's opening sentence (in a repository's template, the opening sentence of its summary section) says what changes for the maintainer, in plain words, in about 25 words at most, with no file path, command or flag. It is the intent sentence Codex and Grok (or Claude, with Codex off) compare their own against. The second sentence says why the change is needed, in plain words: the problem it fixes for the maintainer, with no file path, command or flag, and nothing else. If you cannot state the change in one sentence, ask the maintainer before opening the pull request.
 4. Every claim matches the diff on the head commit; in a Decisions line, the chosen behavior matches the diff and an "agreed" mark matches the spec. After every push, rewrite the Status line, the Test plan and the `Head:` line in Review details for the new head commit; when the push changes what the diff does, update the rest of the body too.
-5. Rewrite the Status line, Risks and the Test plan's results in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer goes first in the body, above `## Summary`, as `mentat:backlog` "Waits on the maintainer" says: when the wait is on a backlog item (external or a GitHub issue), only its one line saying the steps are on the backlog item; with no backlog item, the wait itself.
+5. Rewrite the Status line, Risks and the Test plan's results in place whenever the body is updated and whenever the review loop stops (`mentat:review`, `mentat:claude-review`), so they say where things stand now. A wait on the maintainer goes right below the Status line, as `mentat:backlog` "Waits on the maintainer" says: when the wait is on a backlog item (external or a GitHub issue), only its one line saying the steps are on the backlog item; with no backlog item, the wait itself.
 
 ```markdown
+**Status:** <Ready | In review | Blocked: <why> | Not reviewed: <why>>
+
 <A wait on the maintainer, when one exists (step 5).>
 
 ## Summary
 
 <What changes for the maintainer, in one plain sentence of about 25 words, with no file path, command or flag. Then one plain sentence on why the change is needed: the problem it fixes for the maintainer.>
-
-**Status:** <Ready | In review | Blocked: <why> | Not reviewed: <why>>
 
 ## Decisions
 
