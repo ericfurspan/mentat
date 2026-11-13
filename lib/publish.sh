@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The publish check: text about to be posted on GitHub holds a local path or a
 # private name. Reports a hit by category only, never the match. Sourced by
-# bin/mentat and hooks/no-private-text.
+# bin/mentat.
 
 PRIVATE_WORDS="$HOME/.config/mentat/private-words"
 
