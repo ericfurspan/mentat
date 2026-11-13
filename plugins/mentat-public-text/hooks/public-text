@@ -9,8 +9,9 @@
 # name past $( or <<. Outside a gh command and before any $(, backtick or <<, a temp path
 # that only locates a file is not looked at either: a redirect target, a sed -i file, a
 # file flag's value, or an assignment whose variable is used only there.
-# For the GitHub MCP server's issue, pull request, review and comment writes it looks at
-# every text value but owner and repo.
+# For the GitHub MCP server's writes that carry free text (issues, pull requests, reviews,
+# comments, merges, gists, files and repositories), under current and older tool names,
+# it looks at every text value but owner and repo.
 # The reason gives the category, never the match. This is a net for mistakes, not a
 # security boundary: other routes exist. When it cannot read its input or jq is missing,
 # it allows the call and says so on stderr.
@@ -54,7 +55,7 @@ deny() {
 }
 
 # The GitHub MCP server's writes, by tool name, from any server name.
-mcp_writes='^mcp__.+__(add_comment_to_pending_review|add_issue_comment|add_reply_to_pull_request_comment|create_pull_request|create_pull_request_with_copilot|discussion_comment_write|issue_write|pull_request_review_write|update_issue_comment|update_pull_request)$'
+mcp_writes='^mcp__.+__(add_comment_to_pending_review|add_issue_comment|add_reply_to_pull_request_comment|create_gist|create_issue|create_or_update_file|create_pull_request|create_pull_request_review|create_pull_request_with_copilot|create_repository|discussion_comment_write|issue_write|merge_pull_request|pull_request_review_write|push_files|sub_issue_write|submit_pending_pull_request_review|update_gist|update_issue|update_issue_comment|update_pull_request)$'
 if [[ $tool =~ $mcp_writes ]]; then
   text=$(printf '%s' "$input" | jq -r '[.tool_input | paths(type == "string") as $p
     | select(($p | last) as $k | $k != "owner" and $k != "repo") | getpath($p)] | join("\n")' 2>/dev/null) ||

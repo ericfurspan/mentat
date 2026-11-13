@@ -156,7 +156,8 @@ word_body='{"owner": "o", "repo": "r", "body": "about stubcodename"}'
 clean_body='{"owner": "o", "repo": "r", "body": "about nothing"}'
 nested_path='{"title": "t", "issue_fields": [{"value": "see /home/stubperson/x"}]}'
 owner_repo='{"owner": "stubcodename", "repo": "stubcodename", "body": "ok"}'
-for t in add_comment_to_pending_review add_issue_comment add_reply_to_pull_request_comment create_pull_request create_pull_request_with_copilot discussion_comment_write issue_write pull_request_review_write update_issue_comment update_pull_request; do
+mcp_tools="add_comment_to_pending_review add_issue_comment add_reply_to_pull_request_comment create_gist create_issue create_or_update_file create_pull_request create_pull_request_review create_pull_request_with_copilot create_repository discussion_comment_write issue_write merge_pull_request pull_request_review_write push_files sub_issue_write submit_pending_pull_request_review update_gist update_issue update_issue_comment update_pull_request"
+for t in $mcp_tools; do
   check "denies a word in the MCP tool $t" '[ "$(mcp_decision "mcp__github__$t" "$word_body")" = deny ]'
   check "allows clean text in the MCP tool $t" '[ -z "$(mcp "mcp__github__$t" "$clean_body")" ]'
 done
@@ -193,7 +194,7 @@ hooks="$module/hooks/hooks.json"
 check "hooks.json runs it on PreToolUse for Bash" \
   'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | endswith(\"/hooks/public-text\")] | any" "$hooks" >/dev/null'
 mcp_matches() { jq -e --arg t "$1" '[.hooks.PreToolUse[] | select(.matcher != "Bash") | select(.hooks | map(.command | endswith("/hooks/public-text")) | any) | .matcher as $m | $t | test($m)] | any' "$hooks" >/dev/null; }
-for t in add_comment_to_pending_review add_issue_comment add_reply_to_pull_request_comment create_pull_request create_pull_request_with_copilot discussion_comment_write issue_write pull_request_review_write update_issue_comment update_pull_request; do
+for t in $mcp_tools; do
   check "hooks.json runs it for $t from any MCP server" 'mcp_matches "mcp__github__$t" && mcp_matches "mcp__plugin_x_github__$t"'
 done
 check "hooks.json does not run it for MCP reads or lookalike names" '! mcp_matches mcp__github__issue_read && ! mcp_matches mcp__github__create_pull_request_x && ! mcp_matches create_pull_request'
