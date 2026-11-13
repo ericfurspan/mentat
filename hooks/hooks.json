@@ -11,7 +11,25 @@
       {
         "matcher": "Bash|mcp__ccd_pr__set_auto_merge",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-merge" }
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-merge", "timeout": 30, "onFailure": "block" }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-repo-admin", "timeout": 30, "onFailure": "block" }
+        ]
+      },
+      {
+        "matcher": "mcp__ccd_session_mgmt__archive_session|mcp__ccd_session__move_to_cloud|mcp__ccd_session__start_session",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-session-tools", "timeout": 30, "onFailure": "block" }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-guard-edits", "timeout": 30, "onFailure": "block" }
         ]
       },
       {
@@ -23,7 +41,7 @@
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-private-text" }
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/no-private-text", "timeout": 30, "onFailure": "block" }
         ]
       },
       {

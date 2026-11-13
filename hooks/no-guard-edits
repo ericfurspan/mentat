@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+# PreToolUse hook: agents never change the files Mentat's guards and privacy policy
+# rest on. It denies an Edit, Write, MultiEdit or NotebookEdit of them, and a real Bash
+# command (never text in quotes, a comment or a heredoc body) that writes to them: a >
+# or >> redirect, tee, mv, cp, rm, ln, sed -i, chmod, or git rm, mv, checkout or
+# restore. The files: .mentat-privacy in any directory; ~/.config/mentat/pinned-remotes;
+# the trusted guard folder ~/.local/share/mentat/git-guard and all in it; the wrapper
+# ~/.local/bin/git; and git config files (.git/config, .git/config.worktree,
+# .git/worktrees/*/config.worktree, ~/.gitconfig, ~/.config/git/config). An rm or mv of
+# a folder holding one of the home files or the guard folder is denied too, and so is
+# a git config write that sets or unsets core.hooksPath. XDG_CONFIG_HOME and
+# XDG_DATA_HOME, when set, add their own copies of the home paths. Reads pass. ~, $HOME
+# and ${HOME} are expanded, a relative path is taken from the input's cwd, a cd or
+# git -C moves it, and . and .. are resolved by text, without following links. It
+# follows the contract in hooks/lib/verdict.sh, so it fails closed. This is a net for
+# common mistakes, not a security boundary: other routes exist.
+# shellcheck disable=SC2016,SC2088,SC2329 # ~/, $HOME and ${HOME} below are literal command text; run_hook calls check.
+set -uo pipefail
+
+# shellcheck source=hooks/lib/verdict.sh
+. "${0%/*}/lib/verdict.sh" 2>/dev/null || {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Mentat: no-guard-edits could not load hooks/lib/verdict.sh, so it blocks this call."}}'
+  exit 0
+}
+# shellcheck source=hooks/lib/commands.sh
+. "${0%/*}/lib/commands.sh" 2>/dev/null || {
+  deny_literal "no-guard-edits could not load hooks/lib/commands.sh, so it blocks this call."
+  exit 0
+}
+
+guard="agents never change Mentat's guard files (the privacy file, pinned remotes, the git guard and its wrapper, git config); the maintainer does."
+
+# norm <path>: sets $to, the path with ., .. and repeated / resolved by text.
+norm() {
+  local IFS=/ seg m=0 k=0 segs=() out=()
+  read -r -a segs <<<"$1"
+  for seg in ${segs[@]+"${segs[@]}"}; do
+    case "$seg" in
+      "" | .) ;;
+      ..) [ "$m" -eq 0 ] || m=$((m - 1)) ;;
+      *) out[m]=$seg; m=$((m + 1)) ;;
+    esac
+  done
+  to=""
+  while [ "$k" -lt "$m" ]; do to+=/${out[k]}; k=$((k + 1)); done
+  [ -n "$to" ] || to=/
+}
+
+# expand <word> <base>: sets $to, the absolute path the word names from base.
+expand() {
+  local p=$1
+  case "$p" in
+    "~" | '$HOME' | '${HOME}') p=$HOME ;;
+    "~/"*) p=$HOME/${p#\~/} ;;
+    '$HOME/'*) p=$HOME/${p#\$HOME/} ;;
+    '${HOME}/'*) p=$HOME/${p#\$\{HOME\}/} ;;
+  esac
+  case "$p" in /*) ;; *) p=$2/$p ;; esac
+  norm "$p"
+}
+
+# The home files and the guard folders, each resolved once.
+files="" dirs=""
+add_home() {
+  norm "$2"
+  if [ "$1" = file ]; then files+=$to$'\n'; else dirs+=$to$'\n'; fi
+}
+load_home() {
+  add_home file "$HOME/.config/mentat/pinned-remotes"
+  add_home file "$HOME/.local/bin/git"
+  add_home file "$HOME/.gitconfig"
+  add_home file "$HOME/.config/git/config"
+  add_home dir "$HOME/.local/share/mentat/git-guard"
+  if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+    add_home file "$XDG_CONFIG_HOME/mentat/pinned-remotes"
+    add_home file "$XDG_CONFIG_HOME/git/config"
+  fi
+  [ -z "${XDG_DATA_HOME:-}" ] || add_home dir "$XDG_DATA_HOME/mentat/git-guard"
+}
+
+# protected <path> [tree]: the resolved path is a guard file or in the guard folder;
+# with tree, also a folder above a home file or the guard folder.
+protected() {
+  local p=$1 f
+  case "$p" in
+    */.mentat-privacy | */.git/config | */.git/config.worktree | */.git/worktrees/*/config.worktree) return 0 ;;
+  esac
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ "$p" != "$f" ] || return 0
+    if [ -n "${2:-}" ]; then
+      [ "$p" != / ] || return 0
+      case "$f" in "$p"/*) return 0 ;; esac
+    fi
+  done <<<"$files"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    case "$p" in "$f" | "$f"/*) return 0 ;; esac
+    if [ -n "${2:-}" ]; then
+      [ "$p" != / ] || return 0
+      case "$f" in "$p"/*) return 0 ;; esac
+    fi
+  done <<<"$dirs"
+  return 1
+}
+
+# target <word> <base> [tree]: denies when the word names a guard file.
+target() {
+  expand "$1" "$2"
+  if protected "$to" "${3:-}"; then verdict deny "$guard"; fi
+}
+
+# operands <from>: sets ops, the words from index <from> on that are no option.
+operands() {
+  local k=$1 rest=""
+  ops=()
+  while [ "$k" -lt "$n" ]; do
+    case "$rest${words[k]}" in
+      --) rest=1 ;;
+      -?*) ;;
+      *) ops+=("${words[k]}") ;;
+    esac
+    k=$((k + 1))
+  done
+}
+
+# into <base>: for cp, ln and mv, denies when the last operand is a folder (or ends
+# with /) and a source would land on a guard file in it, or when the last operand is one.
+into() {
+  local m=${#ops[@]} k=0 dest
+  [ "$m" -gt 0 ] || return 0
+  if [ "$m" -eq 1 ]; then
+    target "${ops[0]##*/}" "$1"
+    return
+  fi
+  dest=${ops[m - 1]}
+  target "$dest" "$1"
+  expand "$dest" "$1"
+  case "$dest" in */) ;; *) [ -d "$to" ] || return 0 ;; esac
+  dest=$to
+  while [ "$k" -lt $((m - 1)) ]; do
+    target "$dest/${ops[k]##*/}" /
+    k=$((k + 1))
+  done
+}
+
+# git_words <base>: git rm, mv, checkout or restore of a guard file, or a git config
+# write naming core.hooksPath.
+git_words() {
+  local k=$((ci + 1)) gbase=$1 w hooks="" read="" write="" count=0
+  while [ "$k" -lt "$n" ]; do
+    case "${words[k]}" in
+      -C) expand "${words[k + 1]:-.}" "$gbase"; gbase=$to; k=$((k + 2)) ;;
+      -c | --git-dir | --work-tree | --namespace | --exec-path | --config-env) k=$((k + 2)) ;;
+      -*) k=$((k + 1)) ;;
+      *) break ;;
+    esac
+  done
+  case "${words[k]:-}" in
+    rm | mv | checkout | restore)
+      operands $((k + 1))
+      for w in ${ops[@]+"${ops[@]}"}; do target "$w" "$gbase"; done
+      ;;
+    config)
+      k=$((k + 1))
+      while [ "$k" -lt "$n" ]; do
+        w=${words[k]}
+        case "$w" in
+          -f | --file | --blob | --type | --default | --comment) k=$((k + 1)) ;;
+          --get | --get-all | --get-regexp | --get-urlmatch | --get-color | --get-colorbool | -l | --list | get | list) read=1 ;;
+          --unset | --unset-all | --add | --replace-all | set | unset) write=1 ;;
+          -*) ;;
+          *)
+            count=$((count + 1))
+            case "$w" in
+              [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh] | [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]=*) hooks=1 ;;
+            esac
+            ;;
+        esac
+        k=$((k + 1))
+      done
+      if [ -n "$hooks" ] && [ -z "$read" ] && { [ -n "$write" ] || [ "$count" -ge 2 ]; }; then
+        verdict deny "agents never set core.hooksPath, which would skip Mentat's git guard."
+      fi
+      ;;
+  esac
+}
+
+bash_check() {
+  local cmd line base k w name inplace
+  cmd=$(field '.tool_input.command') || verdict deny "no-guard-edits could not read the command, so it blocks this call."
+  case "$cmd" in *'>'* | *tee* | *mv* | *cp* | *rm* | *ln* | *sed* | *chmod* | *git*) ;; *) verdict pass ;; esac
+  shell_commands "$cmd" || verdict deny "no-guard-edits could not split the command, so it blocks this call."
+  base=$cwd
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    split_words "$line"
+    k=0
+    while [ "$k" -lt "${#redir_op[@]}" ]; do
+      case "${redir_op[k]}" in *'>' | *'>|' | *'>&') target "${redir_to[k]}" "$base" ;; esac
+      k=$((k + 1))
+    done
+    command_at
+    [ "$ci" -lt "$n" ] || continue
+    name=${words[ci]##*/}
+    case "$name" in
+      cd)
+        operands $((ci + 1))
+        case "${ops[0]:-}" in
+          "") base=$HOME ;;
+          -) ;;
+          *) expand "${ops[0]}" "$base"; base=$to ;;
+        esac
+        ;;
+      tee | chmod)
+        operands $((ci + 1))
+        for w in ${ops[@]+"${ops[@]}"}; do target "$w" "$base"; done
+        ;;
+      rm)
+        operands $((ci + 1))
+        for w in ${ops[@]+"${ops[@]}"}; do target "$w" "$base" tree; done
+        ;;
+      mv)
+        operands $((ci + 1))
+        k=0
+        while [ "$k" -lt $((${#ops[@]} - 1)) ]; do target "${ops[k]}" "$base" tree; k=$((k + 1)); done
+        into "$base"
+        ;;
+      cp | ln)
+        operands $((ci + 1))
+        into "$base"
+        ;;
+      sed | gsed)
+        inplace=""
+        k=$((ci + 1))
+        while [ "$k" -lt "$n" ]; do
+          case "${words[k]}" in --in-place*) inplace=1 ;; --*) ;; -*i*) inplace=1 ;; esac
+          k=$((k + 1))
+        done
+        if [ -n "$inplace" ]; then
+          operands $((ci + 1))
+          for w in ${ops[@]+"${ops[@]}"}; do target "$w" "$base"; done
+        fi
+        ;;
+      git) git_words "$base" ;;
+    esac
+  done <<<"$commands"
+  verdict pass
+}
+
+check() {
+  local p
+  cwd=$(field '.cwd') || cwd=""
+  [ -n "$cwd" ] || cwd=$PWD
+  load_home
+  case "$tool" in
+    Edit | Write | MultiEdit) p=$(field '.tool_input.file_path') || verdict deny "no-guard-edits could not read the file path, so it blocks this call." ;;
+    NotebookEdit) p=$(field '.tool_input.notebook_path') || verdict deny "no-guard-edits could not read the notebook path, so it blocks this call." ;;
+    Bash) bash_check ;;
+    *) verdict pass ;;
+  esac
+  [ -z "$p" ] || target "$p" "$cwd"
+  verdict pass
+}
+
+run_hook check

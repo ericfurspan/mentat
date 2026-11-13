@@ -1,31 +1,37 @@
 #!/usr/bin/env bash
 # PreToolUse hook: the maintainer merges. A command that would merge a pull
 # request (gh pr merge, including --auto, or the merge API through gh api) and
-# the desktop app's auto-merge tool get a permission prompt, so the maintainer
-# decides. This is a net for mistakes, not a security boundary: other routes
-# exist. When it cannot read its input, it stays out of the way.
+# the desktop app's auto-merge tool are denied. It follows the contract in
+# hooks/lib/verdict.sh, so it fails closed. This is a net for common mistakes,
+# not a security boundary: other routes exist.
+# shellcheck disable=SC2329 # run_hook calls check.
 set -uo pipefail
 
-command -v jq >/dev/null 2>&1 || exit 0
-input=$(cat)
-tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
-
-ask() {
-  jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask",
-    permissionDecisionReason: "Mentat: the maintainer merges. Approve only if you want this pull request merged now."}}'
+# shellcheck source=hooks/lib/verdict.sh
+. "${0%/*}/lib/verdict.sh" 2>/dev/null || {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Mentat: no-merge could not load hooks/lib/verdict.sh, so it blocks this call."}}'
   exit 0
 }
 
-case "$tool" in
-  Bash)
-    cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
-    # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
-    flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
-    if printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)"; then ask; fi
-    api='(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|$)'
-    if printf '%s\n' "$cmd" | grep -Eq "$api"; then ask; fi
-    exit 0
-    ;;
-  mcp__ccd_pr__set_auto_merge) ask ;;
-  *) exit 0 ;;
-esac
+merge="the maintainer merges; agents never merge a pull request or turn on auto-merge."
+
+check() {
+  local cmd flags api
+  case "$tool" in
+    Bash)
+      cmd=$(field '.tool_input.command') || verdict deny "no-merge could not read the command, so it blocks this call."
+      # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
+      flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
+      if printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)"; then
+        verdict deny "$merge"
+      fi
+      api='(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|$)'
+      if printf '%s\n' "$cmd" | grep -Eq "$api"; then verdict deny "$merge"; fi
+      verdict pass
+      ;;
+    mcp__ccd_pr__set_auto_merge) verdict deny "$merge" ;;
+    *) verdict pass ;;
+  esac
+}
+
+run_hook check

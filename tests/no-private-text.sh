@@ -78,7 +78,7 @@ grep stubcodename README
 PASS
 check "a blank line and a comment in the list match nothing" '[ -z "$(decision "gh pr comment 7 --body \"about commentword\"")" ] && [ -z "$(decision "gh pr comment 7 --body \"# a b\"")" ]'
 other_tool() { jq -n '{tool_name: "Other", tool_input: {command: "gh pr comment 7 --body stubcodename"}}' | "$hook"; }
-check "a non-Bash tool is left alone" '[ -z "$(other_tool)" ]'
+check "a non-Bash tool is left alone" '[ "$(other_tool)" = "{}" ]'
 
 # A file the command names.
 printf 'about StubCodename\n' >"$root/work/word.md"
@@ -501,9 +501,9 @@ check "nothing printed repeats the match" '! output "gh pr comment 7 --body \"St
 
 # A missing list never blocks, and the path check still runs.
 reset; rm "$LIST"
-check "a missing list: a word is no hit, the home path still is, nothing is printed about the list" '[ -z "$(output "gh pr comment 7 --body stubcodename" 2>&1)" ] && [ "$(decision "gh pr comment 7 --body \"at $HOME/x\"")" = ask ]'
+check "a missing list: a word is no hit, the home path still is, nothing is printed about the list" '[ "$(output "gh pr comment 7 --body stubcodename" 2>&1)" = "{}" ] && [ "$(decision "gh pr comment 7 --body \"at $HOME/x\"")" = ask ]'
 reset; chmod 000 "$LIST"
-check "an unreadable list: the same" '[ -z "$(output "gh pr comment 7 --body stubcodename" 2>&1)" ] && [ "$(decision "gh pr comment 7 --body \"at $HOME/x\"")" = ask ]'
+check "an unreadable list: the same" '[ "$(output "gh pr comment 7 --body stubcodename" 2>&1)" = "{}" ] && [ "$(decision "gh pr comment 7 --body \"at $HOME/x\"")" = ask ]'
 chmod 600 "$LIST"
 reset; : >"$LIST"
 check "an empty list matches nothing" '[ -z "$(decision "gh pr comment 7 --body stubcodename")" ]'
@@ -512,11 +512,44 @@ check "an empty list matches nothing" '[ -z "$(decision "gh pr comment 7 --body 
 reset
 mkdir "$root/nogh"; ln -s "$(command -v jq)" "$root/nogh/jq"
 json=$(jq -n '{tool_name: "Bash", tool_input: {command: "gh pr comment 7 --body stubcodename"}}')
-check "does nothing without gh" '[ -z "$(PATH="$root/nogh:/bin" "$hook" <<<"$json" 2>&1)" ]'
+check "passes without gh" '[ "$(PATH="$root/nogh:/bin" "$hook" <<<"$json" 2>&1)" = "{}" ]'
 mkdir "$root/nojq"; ln -s "$root/bin/gh" "$root/nojq/gh"
-check "does nothing without jq" '[ -z "$(PATH="$root/nojq:/bin" "$hook" <<<"$json" 2>&1)" ]'
+check "denies without jq, naming the hook" '[ "$(PATH="$root/nojq:/bin" "$hook" <<<"$json" 2>/dev/null | jq -r ".hookSpecificOutput | .permissionDecision + \" \" + .permissionDecisionReason")" = "deny Mentat: no-private-text needs jq, which is missing, so it blocks this call." ]'
 check "hooks.json runs it on PreToolUse for Bash" \
   'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | endswith(\"/hooks/no-private-text\")] | any" "$root_dir/hooks/hooks.json" >/dev/null'
+
+# Only a real gh command counts: a gh write inside quotes, a heredoc body or a commit
+# message is text, even with a hit, and so is one after a comment sign.
+reset
+while IFS= read -r c; do
+  check "leaves alone a gh write that is only text: $c" 'rm -f "$STUB/calls"; [ "$(output "$c")" = "{}" ] && ! looked_up'
+done <<'TEXT'
+echo "gh pr comment 7 --body stubcodename"
+echo 'gh issue create --title stubcodename'
+git commit -m "docs: run gh pr create --body stubcodename"
+git commit -m "gh api -X POST repos/o/r/issues -f body=stubcodename"
+ls # done; gh pr comment 7 --body stubcodename
+printf '%s\n' "a; gh pr edit 7 --body stubcodename" | grep gh
+TEXT
+c='git commit -m "$(cat <<'"'"'EOF'"'"'
+fix: gh pr comment 7 --body stubcodename
+EOF
+)"'
+check "leaves alone a gh write in a commit message heredoc" '[ "$(output "$c")" = "{}" ]'
+c='cat >notes.md <<EOF
+gh pr create --body stubcodename
+EOF'
+check "leaves alone a gh write in a heredoc body" '[ "$(output "$c")" = "{}" ]'
+while IFS= read -r c; do
+  check "a real gh write still asks: $c" '[ "$(decision "$c")" = ask ]'
+done <<'REAL'
+echo start && gh pr comment 7 --body stubcodename
+X=1 gh pr comment 7 --body stubcodename
+/usr/local/bin/gh pr comment 7 --body stubcodename
+echo "$(gh pr comment 7 --body stubcodename)"
+echo `gh issue comment 7 --body stubcodename`
+git commit -m "gh pr view" && gh pr comment 7 --body stubcodename
+REAL
 
 # The shared check, called directly.
 reset

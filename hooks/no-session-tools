@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# PreToolUse hook: agents never archive a session or attach a repository to a cloud
+# session. The desktop app's archive and move-to-cloud tools are denied, and so is
+# its start-session tool with target "cloud": Mentat is on for every repository
+# through the user-scope install, so any cloud start would attach a Mentat
+# repository. Any other start passes. It follows the contract in
+# hooks/lib/verdict.sh, so it fails closed. This is a net for common mistakes, not
+# a security boundary.
+# shellcheck disable=SC2329 # run_hook calls check.
+set -uo pipefail
+
+# shellcheck source=hooks/lib/verdict.sh
+. "${0%/*}/lib/verdict.sh" 2>/dev/null || {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Mentat: no-session-tools could not load hooks/lib/verdict.sh, so it blocks this call."}}'
+  exit 0
+}
+
+check() {
+  local target
+  case "$tool" in
+    mcp__ccd_session_mgmt__archive_session)
+      verdict deny "agents never archive a session; archiving is the maintainer's step."
+      ;;
+    mcp__ccd_session__move_to_cloud)
+      verdict deny "agents never move a session to the cloud, which would attach a Mentat repository to a cloud session."
+      ;;
+    mcp__ccd_session__start_session)
+      target=$(field '.tool_input.target') || verdict deny "no-session-tools could not read the target, so it blocks this call."
+      case "$target" in
+        [Cc][Ll][Oo][Uu][Dd]) verdict deny "agents never start a cloud session, which would attach a Mentat repository to it." ;;
+      esac
+      verdict pass
+      ;;
+    *) verdict pass ;;
+  esac
+}
+
+run_hook check

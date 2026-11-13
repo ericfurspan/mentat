@@ -8,20 +8,68 @@
 # at, except a name past $( or <<. Outside a gh command and before any $(, backtick or
 # <<, a temp path that only locates a file is not looked at either: a redirect target, a
 # sed -i file, a file flag's value, or an assignment whose variable is used only there.
-# With several gh commands, it asks if any target is public.
+# With several gh commands, it asks if any target is public. It acts only when one of
+# those writes is a real gh command (hooks/lib/commands.sh), never a gh inside quotes,
+# a heredoc body or a commit message; without gh installed it passes.
 # The prompt gives the category, never the match, and approving it clears a false
-# alarm. This is a net for mistakes, not a security boundary: other routes exist. When
-# it cannot read its input or its tools are missing, it stays out of the way.
-# shellcheck disable=SC2016,SC2088 # ~/ and $HOME below are literal command text.
+# alarm. It follows the contract in hooks/lib/verdict.sh, so it fails closed. This is a
+# net for common mistakes, not a security boundary: other routes exist.
+# shellcheck disable=SC2016,SC2088,SC2329 # ~/ and $HOME below are literal command text; run_hook calls check.
 set -uo pipefail
 
-command -v jq >/dev/null 2>&1 || exit 0
-command -v gh >/dev/null 2>&1 || exit 0
-input=$(cat)
-tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
-[ "$tool" = Bash ] || exit 0
-cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
-case "$cmd" in *gh*) ;; *) exit 0 ;; esac
+# shellcheck source=hooks/lib/verdict.sh
+. "${0%/*}/lib/verdict.sh" 2>/dev/null || {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Mentat: no-private-text could not load hooks/lib/verdict.sh, so it blocks this call."}}'
+  exit 0
+}
+# shellcheck source=hooks/lib/commands.sh
+. "${0%/*}/lib/commands.sh" 2>/dev/null || {
+  deny_literal "no-private-text could not load hooks/lib/commands.sh, so it blocks this call."
+  exit 0
+}
+
+# real_write: a real gh command is one of the listed writes, or gh api with a write
+# method or fields.
+real_write() {
+  local line w k
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    split_words "$line"
+    command_at
+    gh_at || continue
+    w=${words[gi]:-}
+    gi=$((gi + 1))
+    if [ "$w" = api ]; then
+      k=$gi
+      while [ "$k" -lt "$n" ]; do
+        case "${words[k]}" in
+          -X | --method) case "${words[k + 1]:-}" in [Pp][Oo][Ss][Tt] | [Pp][Uu][Tt] | [Pp][Aa][Tt][Cc][Hh] | [Dd][Ee][Ll][Ee][Tt][Ee]) return 0 ;; esac ;;
+          -X* | --method=*)
+            case "${words[k]#-X}" in
+              *[Pp][Oo][Ss][Tt] | *[Pp][Uu][Tt] | *[Pp][Aa][Tt][Cc][Hh] | *[Dd][Ee][Ll][Ee][Tt][Ee]) return 0 ;;
+            esac
+            ;;
+          -f | -F | --field | --raw-field | --input | -f=* | -F=* | --field=* | --raw-field=* | --input=*) return 0 ;;
+        esac
+        k=$((k + 1))
+      done
+      continue
+    fi
+    gh_skip
+    case "$w ${words[gi]:-}" in
+      "pr create" | "pr edit" | "pr comment" | "pr review" | "issue create" | "issue edit" | "issue comment") return 0 ;;
+    esac
+  done <<<"$commands"
+  return 1
+}
+
+check() {
+command -v gh >/dev/null 2>&1 || verdict pass
+[ "$tool" = Bash ] || verdict pass
+cmd=$(field '.tool_input.command') || verdict deny "no-private-text could not read the command, so it blocks this call."
+case "$cmd" in *gh*) ;; *) verdict pass ;; esac
+shell_commands "$cmd" || verdict deny "no-private-text could not split the command, so it blocks this call."
+real_write || verdict pass
 
 # gh api with a write method, or with fields, which gh sends as a POST unless the walk
 # below finds a real GET.
@@ -39,15 +87,15 @@ flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"
 forms="(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+(pr${flags}[[:space:]]+(create|edit|comment|review)|issue${flags}[[:space:]]+(create|edit|comment))([[:space:]]|\$)"
 fields_only=""
 if ! grep -Eq "$forms" <<<"$cmd" && ! api_write; then
-  api_fields || exit 0
+  api_fields || verdict pass
   fields_only=1
 fi
 
 # shellcheck source=/dev/null
-. "$(dirname "$0")/../lib/publish.sh" || exit 0
+. "$(dirname "$0")/../lib/publish.sh" || verdict deny "no-private-text could not load lib/publish.sh, so it blocks this call."
 
-cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || exit 0
-[ -z "$cwd" ] || cd "$cwd" 2>/dev/null || exit 0
+cwd=$(field '.cwd') || verdict deny "no-private-text could not read the cwd, so it blocks this call."
+[ -z "$cwd" ] || cd "$cwd" 2>/dev/null || verdict pass
 
 # A word of the command with its quotes off, and ~/ or $HOME/ at its start expanded.
 word='("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:];&|)]+)'
@@ -368,7 +416,7 @@ while [ "$k" -lt "${#a_name[@]}" ]; do
 done
 
 # Fields go out as a POST unless each gh api command has a real GET.
-if [ -n "$fields_only" ] && [ -z "$unread_api" ] && ! grep -Eq "$gh_api" <<<"$past"; then exit 0; fi
+if [ -n "$fields_only" ] && [ -z "$unread_api" ] && ! grep -Eq "$gh_api" <<<"$past"; then verdict pass; fi
 
 # A real flag may sit in past: its file is read too, and nothing leaves the text. A
 # flag outside gh was read where it stood; read here, a name assigned more than once,
@@ -386,7 +434,8 @@ hit=""
 while IFS= read -r t; do
   hit=$(publish_hit "$kept$files" "$t") && break
 done <<<"${targets%$'\n'}"
-[ -n "$hit" ] || exit 0
-jq -n --arg r "Mentat: this text for a public repository holds $hit. Approve only if it is meant to be public." \
-  '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
-exit 0
+[ -n "$hit" ] || verdict pass
+verdict ask "Mentat: this text for a public repository holds $hit. Approve only if it is meant to be public."
+}
+
+run_hook check

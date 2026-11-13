@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# PreToolUse hook: agents never publish releases or change secrets, variables or
+# repository settings. A real gh command (never text in quotes, a comment or a heredoc
+# body) is denied when it is gh release create, edit, delete, upload or delete-asset;
+# gh secret or gh variable set or delete; gh repo edit, delete, rename, archive or
+# unarchive; a gh ruleset command other than list, view or check; or gh api with a
+# write method (-X or --method POST, PUT, PATCH or DELETE, or fields with no GET) to
+# repos/<owner>/<repo> itself or, under it, to branches/<branch>/protection, rulesets,
+# actions/secrets, actions/variables, environments, collaborators, hooks, keys,
+# releases, pages, vulnerability-alerts or automated-security-fixes. It follows the
+# contract in hooks/lib/verdict.sh, so it fails closed. This is a net for common
+# mistakes, not a security boundary: other routes exist.
+# shellcheck disable=SC2329 # run_hook calls check.
+set -uo pipefail
+
+# shellcheck source=hooks/lib/verdict.sh
+. "${0%/*}/lib/verdict.sh" 2>/dev/null || {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Mentat: no-repo-admin could not load hooks/lib/verdict.sh, so it blocks this call."}}'
+  exit 0
+}
+# shellcheck source=hooks/lib/commands.sh
+. "${0%/*}/lib/commands.sh" 2>/dev/null || {
+  deny_literal "no-repo-admin could not load hooks/lib/commands.sh, so it blocks this call."
+  exit 0
+}
+
+admin="agents never publish releases or change secrets, variables or repository settings; the maintainer does."
+
+# listed <path under the repository>: the path is one of the settings paths, or under one.
+listed() {
+  case "/$1/" in
+    /branches/*/protection/* | /rulesets/* | /actions/secrets/* | /actions/variables/* | /environments/* | \
+      /collaborators/* | /hooks/* | /keys/* | /releases/* | /pages/* | /vulnerability-alerts/* | \
+      /automated-security-fixes/*) return 0 ;;
+  esac
+  return 1
+}
+
+# settings_path <path>: the gh api path is the repository itself or a settings path
+# under it. An owner segment holding a $ may stand for owner/repo, so then the path
+# after it is read both ways, and the repository itself counts only when nothing
+# follows it.
+settings_path() {
+  local p=$1 owner after sub
+  case "$p" in http://* | https://*) p=${p#*://}; p=${p#*/} ;; esac
+  p=${p#/}; p=${p%%\?*}; p=${p%/}
+  [[ $p =~ ^repos/([^/]+)(/(.*))?$ ]] || return 1
+  owner=${BASH_REMATCH[1]} after=${BASH_REMATCH[3]}
+  case "$after" in */*) sub=${after#*/} ;; *) sub="" ;; esac
+  case "$owner" in
+    *'$'*)
+      [ -n "$after" ] || return 0
+      listed "$after" || { [ -n "$sub" ] && listed "$sub"; }
+      ;;
+    *)
+      [ -n "$after" ] || return 1
+      [ -z "$sub" ] || listed "$sub"
+      ;;
+  esac
+}
+
+# api_write <index>: gh api, from the word after api, writes to a settings path.
+api_write() {
+  local k=$1 w method="" fields="" path=""
+  while [ "$k" -lt "$n" ]; do
+    w=${words[k]}
+    case "$w" in
+      -X | --method) method=${words[k + 1]:-}; k=$((k + 2)); continue ;;
+      --method=*) method=${w#--method=} ;;
+      -X*) method=${w#-X}; method=${method#=} ;;
+      -f | -F | --field | --raw-field | --input) fields=1; k=$((k + 2)); continue ;;
+      -f* | -F* | --field=* | --raw-field=* | --input=*) fields=1 ;;
+      -H | --header | -q | --jq | -t | --template | --hostname | --cache | -p | --preview) k=$((k + 2)); continue ;;
+      -*) ;;
+      *) [ -n "$path" ] || path=$w ;;
+    esac
+    k=$((k + 1))
+  done
+  case "$method" in
+    [Pp][Oo][Ss][Tt] | [Pp][Uu][Tt] | [Pp][Aa][Tt][Cc][Hh] | [Dd][Ee][Ll][Ee][Tt][Ee]) ;;
+    "") [ -n "$fields" ] || return 1 ;;
+    *) return 1 ;;
+  esac
+  settings_path "$path"
+}
+
+check() {
+  local cmd line g1 g2
+  [ "$tool" = Bash ] || verdict pass
+  cmd=$(field '.tool_input.command') || verdict deny "no-repo-admin could not read the command, so it blocks this call."
+  case "$cmd" in *gh*) ;; *) verdict pass ;; esac
+  shell_commands "$cmd" || verdict deny "no-repo-admin could not split the command, so it blocks this call."
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    split_words "$line"
+    command_at
+    gh_at || continue
+    g1=${words[gi]:-}
+    gi=$((gi + 1))
+    if [ "$g1" = api ]; then
+      if api_write "$gi"; then verdict deny "$admin"; fi
+      continue
+    fi
+    gh_skip
+    g2=${words[gi]:-}
+    case "$g1 $g2" in
+      "release create" | "release edit" | "release delete" | "release upload" | "release delete-asset" | \
+        "secret set" | "secret delete" | "secret remove" | "variable set" | "variable delete" | "variable remove" | \
+        "repo edit" | "repo delete" | "repo rename" | "repo archive" | "repo unarchive")
+        verdict deny "$admin"
+        ;;
+      "ruleset "* | "rs "*)
+        case "$g2" in "" | list | ls | view | check) ;; *) verdict deny "$admin" ;; esac
+        ;;
+    esac
+  done <<<"$commands"
+  verdict pass
+}
+
+run_hook check
