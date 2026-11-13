@@ -4,7 +4,22 @@
 # Claude Code caps a hook's output at 10,000 characters; tests/run holds this
 # hook's output under a limit just above its current size, raised only in the
 # pull request that grows past it, with the maintainer's agreement in the spec.
-# Finds rules.md relative to this script, never the working directory, so it
+# When agents' git uses the git hook templates (lib/templates.sh), it first prints one
+# problem line of counts, with no names, when the installed copy has problems or cannot
+# be checked; tests/run holds that worst case under the cap.
+# Finds its files relative to this script, never the working directory, so it
 # also runs outside a plugin.
 set -euo pipefail
-cat "$(dirname "$0")/../rules.md"
+root=$(cd "$(dirname "$0")/.." && pwd)
+problem=""
+# Bash 3.2 exits when . finds no file, so the file is looked for first.
+# shellcheck source=/dev/null
+if [ -f "$root/lib/templates.sh" ] && . "$root/lib/templates.sh" 2>/dev/null; then
+  if dir=$(templates_dir); then problem=$(templates_summary "$root" "$dir" 2>/dev/null) || true; fi
+else
+  problem="the installed git hook templates could not be checked"
+fi
+if [ -n "$problem" ]; then
+  printf 'Mentat PROBLEM: %s. Tell the maintainer before anything else, and run mentat check.\n\n' "$problem"
+fi
+cat "$root/rules.md"

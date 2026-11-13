@@ -57,9 +57,11 @@
 #     answer line. Nothing is posted. 0 at least one tool answered, 1 none did, 64 usage.
 #     Same time limits and effort variables. Grok has web search alone; its
 #     local fetch tool is denied.
-#   mentat check  Checks, read-only, what Mentat itself needs: tools,
-#     gh signed in, the repository readable; prints the codex and grok versions, and warns
-#     when the private word list is unreadable, the list misses a private repository
+#   mentat check  Checks, read-only, what Mentat itself needs: tools, the git hook
+#     templates installed and the same as this copy when agents' git uses them
+#     (lib/templates.sh), gh signed in, the repository readable; prints the codex and grok
+#     versions, and warns when agents' git does not use the templates,
+#     the private word list is unreadable, the list misses a private repository
 #     this account can reach, by count only, the Mentat plugin is installed at different
 #     versions, or, with ~/.config/mentat/warn-kept-branches present, the repository keeps
 #     head branches after merge.
@@ -75,7 +77,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish codex grok parallel second-opinion check status; do
+for lib in shared publish codex grok parallel second-opinion templates check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1

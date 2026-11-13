@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Mentat's git pre-commit template, for a core.hooksPath that names this folder:
+# refuses a commit whose staged changes add a likely secret, or when the scan cannot
+# run, then runs the repository's own pre-commit hook (own-hook.sh). Git hands it the
+# index the commit will use, so git commit -a and a commit naming paths are scanned for
+# what they commit, as text, files git treats as binary included. This is a net for
+# common mistakes, not a security boundary.
+set -uo pipefail
+
+here=${0%/*}
+scan=$here/../scan
+diff=$(git -c core.quotePath=false diff --cached --text --no-relative --no-ext-diff --no-textconv \
+  --no-color -U0 --src-prefix=a/ --dst-prefix=b/) || {
+  printf 'Mentat: commit refused: git could not list the staged changes, so they were not scanned for secrets.\n' >&2
+  exit 1
+}
+hits=$(printf '%s' "${diff:+$diff$'\n'}" | "$scan")
+case $? in
+  0) ;;
+  1) printf 'Mentat: commit refused: gitleaks flags a likely secret in the staged changes:\n%s\nRemove it, or ask the maintainer to commit it.\n' "$hits" >&2; exit 1 ;;
+  *) printf 'Mentat: commit refused: the secret scan of the staged changes could not run (run mentat check).\n' >&2; exit 1 ;;
+esac
+# shellcheck source=/dev/null
+{ [ -f "$here/../own-hook.sh" ] && . "$here/../own-hook.sh"; } || {
+  printf 'Mentat: commit refused: own-hook.sh could not be loaded, so the repository'"'"'s own hook could not run (run mentat check).\n' >&2
+  exit 1
+}
+own_hook pre-commit "$@"

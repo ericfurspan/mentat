@@ -66,6 +66,10 @@ Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/l
 
 `mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt. `mentat check` reports each tool.
 
+## Git hook templates
+
+`git-templates/` holds hooks for agents' git: they refuse likely secrets (with `gitleaks`) and non-local default-branch pushes, then run the repository's own hooks, except `reference-transaction` and `post-index-change`. An installer copies the folder and points agents' `core.hooksPath` at its `hooks` folder through `GIT_CONFIG_*`; `mentat check` reports problems.
+
 ## Credits
 
 Third-party licenses are in `skills/*/CREDITS.md`.
