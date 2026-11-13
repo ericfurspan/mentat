@@ -42,6 +42,12 @@ gh api -X PUT repos/o/r/pulls/7/merge -f sha=abc1234 -f merge_method=squash
 gh api -X PUT repos/{owner}/{repo}/pulls/7/merge -f sha=abc1234
 gh api -X PUT repos/o/r/pulls/7/merge; gh api -X PUT repos/o/r/pulls/8/merge
 DENY
+# A merge followed by more than a pipe buffer of text (over 100 KB) is still denied.
+long=$(i=0; while [ "$i" -lt 8000 ]; do printf 'echo line %d\n' "$i"; i=$((i + 1)); done)
+cmd=$(printf "gh pr merge 7 --squash --body-file - <<'EOF'\n%s\nEOF" "$long")
+check "denies gh pr merge with a body over 100 KB" '[ "${#cmd}" -gt 100000 ] && [ "$(decision Bash "$cmd")" = deny ]'
+cmd=$(printf 'gh api -X PUT repos/o/r/pulls/7/merge\n%s' "$long")
+check "denies the merge API followed by a script over 100 KB" '[ "${#cmd}" -gt 100000 ] && [ "$(decision Bash "$cmd")" = deny ]'
 while IFS= read -r cmd; do
   check "passes with {}: $cmd" '[ "$(output Bash "$cmd")" = "{}" ]'
 done <<'PASS'

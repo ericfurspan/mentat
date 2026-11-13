@@ -22,11 +22,13 @@ check() {
       cmd=$(field '.tool_input.command') || verdict deny "no-merge could not read the command, so it blocks this call."
       # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
       flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
-      if printf '%s\n' "$cmd" | grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)"; then
+      # A here-string, not a pipe: grep -q stops at the first match, and under pipefail
+      # the writer's broken pipe on a long command would fail the test and pass a merge.
+      if grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)" <<<"$cmd"; then
         verdict deny "$merge"
       fi
       api='(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|$)'
-      if printf '%s\n' "$cmd" | grep -Eq "$api"; then verdict deny "$merge"; fi
+      if grep -Eq "$api" <<<"$cmd"; then verdict deny "$merge"; fi
       verdict pass
       ;;
     mcp__ccd_pr__set_auto_merge) verdict deny "$merge" ;;
