@@ -65,6 +65,8 @@ check "a list of exact: and blank lines matches nothing" 'misses "exact: anythin
 # The list's comment and blank lines, and an empty or unreadable list.
 reset
 check "a comment line and blank lines in the list match nothing, beside entries that do" 'misses "about # a comment names commentword" && misses "# a b" && hits "about stubcodename"'
+check "an entry with a space matches as a whole, not word by word" 'hits "say TWO WORDS here" && misses "two" && misses "words"'
+check "a last line with no trailing newline still matches" 'hits "about LastWord"'
 : >"$LIST"
 check "an empty list matches nothing" 'misses "about stubcodename" && misses "anything"'
 reset; chmod 000 "$LIST"
