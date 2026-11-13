@@ -232,6 +232,21 @@ EOF
 check "a target after a command substitution's heredoc stands" 'skips "$c"'
 c='gh pr comment 1 -R owner/private --body "$(gh api -X POST repos/o/public/issues/1/comments -f body=stubcodename)"'
 check "a public write inside a private comment's body asks" 'asks_for o/public "$c"'
+for d in EOF "'EOF'"; do
+  c="gh pr comment 1 -R owner/private --body \"\$(cat <<$d
+\$(gh api -X POST repos/o/public/issues/1/comments -f body=stubcodename)
+EOF
+)\""
+  if [ "$d" = EOF ]; then
+    check "a command substitution in a heredoc that expands stops the walk, and a hit asks" '[ "$(decision "$c")" = ask ]'
+  else
+    check "a command substitution in a quoted heredoc runs nothing" 'skips "$c"'
+  fi
+done
+c='gh pr comment 1 -R owner/private --body-file - <<EOF
+`gh api -X POST repos/o/public/issues/1/comments -f body=stubcodename`
+EOF'
+check "backticks in a heredoc that expands stop the walk, and a hit asks" '[ "$(decision "$c")" = ask ]'
 while IFS= read -r c; do
   check "a case in a command substitution stops the walk, and a hit asks: $c" '[ "$(decision "$c")" = ask ]'
 done <<'EOF'
