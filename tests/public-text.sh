@@ -164,6 +164,8 @@ expect() {
 }
 printf '{"body": "about StubCodename"}\n' >"$root/work/word.json"
 printf 'about StubCodename\n' >"$root/work/sub/only-sub.md"
+printf 'mutation { addComment(input: {body: "StubCodename"}) { clientMutationId } }\n' >"$root/work/mutation.graphql"
+printf 'query { repository(owner: "o", name: "StubCodename") { id } }\n' >"$root/work/query.graphql"
 while IFS= read -r c; do expect allow "$c"; done <<'NOPUBLISH'
 git -C /Users/stubperson/repo commit -m "fix: handle gh pr comment in the hook"
 git commit -m "docs: say gh issue create needs a title" && git -C /Users/stubperson/r push
@@ -192,6 +194,8 @@ gh pr comment 7 --body "$NOTES"
 jq -n '{body: "stubcodename"}' | gh api repos/o/r/issues/7/comments --input -
 gh pr comment 7 --body ok <<< "stubcodename"
 gh pr comment 7 --body 'see $HOME/x'
+gh api graphql -f query='query { repository(owner: "o", name: "stubcodename") { id } }'
+gh api graphql -F query=@query.graphql
 gh api graphql -f query='{ viewer { login } }' > /Users/stubperson/out.json
 NOPUBLISH
 while IFS= read -r c; do expect deny "$c"; done <<'PUBLISH'
@@ -228,6 +232,8 @@ gh api repos/o/r/issues/7/comments -f body=ok -X GET; gh api repos/o/r/issues/7/
 command gh pr comment 7 -F word.md
 env GH_PAGER= gh pr comment 7 -F word.md
 gh pr create --title t --body x --head stubcodename-branch
+gh api graphql -f query='mutation { addComment(input: {body: "stubcodename"}) { clientMutationId } }'
+gh api graphql -F query=@mutation.graphql
 f() { gh pr comment 7 --body "about stubcodename"; }; f
 PUBLISH
 expect deny 'gh pr\

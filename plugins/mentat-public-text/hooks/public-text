@@ -4,9 +4,9 @@
 # module on in a repository is what says that repository's text is public.
 # For Bash it reads the command as the shell would and checks only gh writes: pr create,
 # new, edit, comment, review and close; issue create, new, edit, comment and close; and
-# gh api with a write method, or with fields and no GET. It checks that command's own
-# words but its -R/--repo value and the api endpoint, the files it reads (--body-file,
-# -F, --notes-file, --input, field=@file), and
+# gh api with a write method, or with fields and no GET, where graphql counts only for a
+# mutation. It checks that command's own words but its -R/--repo value and the api
+# endpoint, the files it reads (--body-file, -F, --notes-file, --input, field=@file), and
 # text fed to it by a heredoc, a here-string, < file or cat file |. $(cat file), a
 # heredoc in $( ) and a variable assigned earlier in the line count as their text, and
 # $HOME, $PWD and $(pwd) as the home folder; a cd before it in the line sets where
@@ -93,6 +93,7 @@ re_brace='^\$\{([^}]*)\}'
 re_op='^(&&|\|\||\|&|;;|&>>|&>|[;&|])'
 re_redir='^(<<<|<<-|<<|<>|<&|<\(|>>|>&|>\||>\(|<|>)'
 re_fd='^([0-9]+)[<>]'
+re_mutation='(^|[^A-Za-z0-9_])mutation([^A-Za-z0-9_]|$)'
 # shellcheck disable=SC2016 # These are the literal expansions a heredoc would make.
 re_homevar='\$(HOME|PWD)([^A-Za-z0-9_]|$)|\$\{(HOME|PWD)\}|\$\(pwd\)'
 
@@ -434,6 +435,7 @@ gh_write() {
         [Pp][Oo][Ss][Tt] | [Pp][Uu][Tt] | [Pp][Aa][Tt][Cc][Hh] | [Dd][Ee][Ll][Ee][Tt][Ee]) ;;
         *) return 0 ;;
       esac
+      if [ "$endpoint" = graphql ] && ! [[ $pub$got =~ $re_mutation ]]; then return 0; fi
       ;;
     *) return 0 ;;
   esac
