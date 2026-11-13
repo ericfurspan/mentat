@@ -22,5 +22,6 @@ own_hook() {
     dir=$dir/hooks
   fi
   [ -f "$dir/$name" ] && [ -x "$dir/$name" ] || exit 0
+  # Git commands the hook runs inherit MENTAT_OWN_HOOK; clearing it would drop the guard.
   MENTAT_OWN_HOOK=1 exec "$dir/$name" "$@"
 }
