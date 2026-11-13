@@ -389,6 +389,17 @@ A commit -q -m "included hook path"; rc=$?
 check "a core.hooksPath from an included config file names the repository's own hooks" \
   '[ "$rc" = 0 ] && [ -e "$STUB/local-commit.args" ] && [ ! -e "$STUB/gitdir-commit.args" ]'
 git -C "$repo" config --unset include.path
+# With extensions.worktreeConfig on, a linked worktree's core.hooksPath in its
+# config.worktree names its own hooks.
+git -C "$repo" config extensions.worktreeConfig true
+git -C "$repo" worktree add -q "$tmp/wt" -b feat/wt feat/x
+git -C "$tmp/wt" config --worktree core.hooksPath "$tmp/wt-hooks"
+own "$tmp/wt-hooks/pre-commit" wt-commit
+reset; printf 'wt\n' >"$tmp/wt/wt.txt"; git -C "$tmp/wt" add wt.txt
+in=$tmp/wt; A commit -q -m "worktree hook path"; rc=$?; in=$repo
+check "a linked worktree's core.hooksPath in config.worktree names its own hooks" \
+  '[ "$rc" = 0 ] && [ -e "$STUB/wt-commit.args" ] && [ ! -e "$STUB/gitdir-commit.args" ]'
+git -C "$repo" worktree remove --force "$tmp/wt"; git -C "$repo" config --unset extensions.worktreeConfig
 
 # No recursion: a local core.hooksPath naming the templates, or an own hook that runs
 # a template, runs Mentat's checks and ends. A loop is stopped after 20 seconds.

@@ -21,11 +21,12 @@ own_git_dir() {
 }
 
 # own_hook <name> [arguments]: replaces this process with the repository's own <name>
-# hook, from its local core.hooksPath, else the hooks folder in its git common directory,
-# so the hook gets these arguments and this process's stdin, and its exit status is the
-# template's. Like git, it skips a hook that is missing or not executable (exit 0).
-# The local setting is read because core.hooksPath as a whole names these templates; git
-# is asked for it only when the repository's config names hooksPath or an include.
+# hook, from its worktree's or local core.hooksPath, else the hooks folder in its git
+# common directory, so the hook gets these arguments and this process's stdin, and its
+# exit status is the template's. Like git, it skips a hook that is missing or not
+# executable (exit 0). The worktree and local settings are read because core.hooksPath
+# as a whole names these templates; git is asked for them only when the worktree has a
+# config.worktree or the repository's config names hooksPath or an include.
 # MENTAT_OWN_HOOK lists, one per line, each "<name> <git common dir>" entered on the way
 # here. A hook already on the list is a re-entry of the same hook in the same repository,
 # which skips its own hook (exit 0); Mentat's checks still run each time.
@@ -43,7 +44,12 @@ own_hook() {
   common=$(cd "$common" 2>/dev/null && pwd -P) || common=$gitdir
   key="$name $common"
   case "$nl${MENTAT_OWN_HOOK:-}$nl" in *"$nl$key$nl"*) exit 0 ;; esac
-  if [ -f "$common/config" ] && grep -qi -e hookspath -e include "$common/config" 2>/dev/null; then
+  # --worktree reads this worktree's config.worktree where extensions.worktreeConfig is
+  # on, and acts as --local where it is off.
+  if [ -f "$gitdir/config.worktree" ]; then
+    dir=$(git config --worktree --includes --type=path --get core.hooksPath 2>/dev/null) || dir=""
+  fi
+  if [ -z "$dir" ] && [ -f "$common/config" ] && grep -qi -e hookspath -e include "$common/config" 2>/dev/null; then
     dir=$(git config --local --includes --type=path --get core.hooksPath 2>/dev/null) || dir=""
   fi
   [ -n "$dir" ] || dir=$common/hooks
