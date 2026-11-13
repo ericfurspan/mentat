@@ -169,8 +169,9 @@ else
 fi
 
 # Under .claude/ only the shared project settings are version-controlled; local settings
-# and worktrees are each person's own.
-if ! git ls-files .claude | grep -qvx .claude/settings.json && git check-ignore -q .claude/settings.local.json; then
+# and worktrees are each person's own. A global ignore file does not count.
+if ! git ls-files .claude | grep -qvx .claude/settings.json &&
+  git -c core.excludesFile=/dev/null check-ignore -q .claude/settings.local.json; then
   pass "under .claude/ only settings.json is version-controlled, and settings.local.json is ignored"
 else
   fail "under .claude/ only settings.json may be version-controlled, and settings.local.json must be ignored"
