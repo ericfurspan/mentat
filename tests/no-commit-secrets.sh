@@ -156,7 +156,7 @@ check "a quoted git commit before git add and the real commit scans what the rea
 reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" 'echo "git commit -am wip" && git commit -am wip'
 check "a quoted git commit before a real git commit -a scans the real one" 'names clean.txt'
 for c in "grep -n 'git commit -am' tests/run" 'echo "then run git commit -am wip"' "grep -n 'git commit -am' f | head" \
-  "git log --grep 'git commit -am'"; do
+  "git log --grep 'git commit -am'" "msg='git commit -am x' && echo ok"; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c commits nothing and stays quiet" 'quiet && [ ! -f "$STUB/calls" ]'
 done
@@ -174,7 +174,8 @@ for c in "bash -c 'git commit -am x'" 'sh -c "git commit -am x"' 'eval "git comm
   "echo \"\${x:-\$(bash -c 'git commit -am x')}\"" "echo \"\${x:-\`bash -c 'git commit -am x'\`}\"" \
   "git submodule foreach 'git commit -am wip'" "git rebase -x 'git commit -am wip' main" \
   "git rebase --exec 'git commit -am wip' main" "git bisect run sh -c 'git commit -am wip'" \
-  "gh alias set x 'git commit -am wip'"; do
+  "gh alias set x 'git commit -am wip'" "GIT_SSH_COMMAND='git commit -am x' git fetch" \
+  "PAGER='sh -c \"git commit -am x\"' git log"; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c, a commit a shell may run, asks as a failed simulation" 'sim_failed'
 done
