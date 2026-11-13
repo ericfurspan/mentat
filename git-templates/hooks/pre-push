@@ -9,8 +9,9 @@
 # ls-remote fails, every commit reachable from what is pushed is scanned.
 # Each commit is scanned on its own diff as text, root commits and files git treats as
 # binary included; a merge commit on what its resolution changed from git's own merge of
-# its parents (--diff-merges=remerge, git 2.36 or later; an older git refuses). Other
-# branches and tags pass, force pushes and deletions included. Then it runs the
+# its parents (--diff-merges=remerge, git 2.36 or later; an older git refuses), and one
+# of three or more parents, which remerge does not show, on its diff from the first
+# parent. Other branches and tags pass, force pushes and deletions included. Then it runs the
 # repository's own pre-push hook (own-hook.sh) with the same arguments and ref lines.
 # Git hooks cannot ask, so each check refuses. This is a net for common mistakes, not a
 # security boundary.
@@ -63,6 +64,13 @@ while read -r _ lsha rref rsha <&3; do
   out=$(printf '%s\n' "$lsha" $old $have | git -c core.quotePath=false log -p --root --text --diff-merges=remerge --no-relative --no-ext-diff --no-textconv --no-color -U0 \
     --src-prefix=a/ --dst-prefix=b/ --format='commit %H' --stdin --) ||
     refuse "git could not list the outgoing commits of $rref, so they were not scanned for secrets."
+  [ -z "$out" ] || diffs+=$out$'\n'
+  # Remerge shows nothing for a merge of three or more parents, so those are scanned on
+  # their diff from the first parent instead.
+  # shellcheck disable=SC2086
+  out=$(printf '%s\n' "$lsha" $old $have | git -c core.quotePath=false log -p --min-parents=3 --text --diff-merges=first-parent --no-relative --no-ext-diff --no-textconv --no-color -U0 \
+    --src-prefix=a/ --dst-prefix=b/ --format='commit %H' --stdin --) ||
+    refuse "git could not list the outgoing merges of $rref, so they were not scanned for secrets."
   [ -z "$out" ] || diffs+=$out$'\n'
 done
 exec 3<&-
