@@ -351,13 +351,13 @@ for f in skills/*/SKILL.md; do
 done
 
 # mentat review, review --local, review --grok, second-opinion (both modes) and check behave as
-# specified (stub gh, codex, grok and gitleaks), and so do the merge, push, private text and secret hooks,
+# specified (stub gh, codex, grok and gitleaks), and so do the publish check and the merge, push and secret hooks,
 # the contract the merge hook keeps through hooks/lib/verdict.sh, the git hook templates, and the
 # public-text module's hook. The marketplace lists the modules and the committed settings turn on
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh tests/git-templates.sh tests/public-text.sh tests/modules.sh)
+  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh tests/public-text.sh tests/modules.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -420,7 +420,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-private-text hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/no-private-text.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
