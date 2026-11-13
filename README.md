@@ -68,7 +68,7 @@ Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/l
 
 ## Git hook templates
 
-`git-templates/` holds hooks for agents' git: they refuse likely secrets (with `gitleaks`) and default-branch pushes, then run the repository's own hooks. An installer copies the folder where it chooses and points agents' `core.hooksPath` at its `hooks` folder through `GIT_CONFIG_*`. Session start and `mentat check` report a missing or changed copy.
+`git-templates/` holds hooks for agents' git: they refuse likely secrets (with `gitleaks`) and default-branch pushes, then run the repository's own hooks, except `reference-transaction` and `post-index-change`. An installer copies the folder and points agents' `core.hooksPath` at its `hooks` folder through `GIT_CONFIG_*`; `mentat check` reports problems.
 
 ## Credits
 

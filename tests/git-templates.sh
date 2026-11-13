@@ -289,7 +289,7 @@ in=$repo
 
 # The chain-only templates: one for every other client-side hook git runs from
 # core.hooksPath, each running only the repository's own hook of its name.
-chain="applypatch-msg pre-applypatch post-applypatch pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge post-rewrite pre-auto-gc reference-transaction sendemail-validate post-index-change push-to-checkout"
+chain="applypatch-msg pre-applypatch post-applypatch pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge post-rewrite pre-auto-gc sendemail-validate push-to-checkout"
 # shellcheck disable=SC2086 # $chain is a list of words.
 want_hooks=$(printf '%s\n' pre-commit pre-push $chain | sort | tr '\n' ' ')
 check "the templates' hooks folder holds pre-commit, pre-push and the chain-only templates, nothing else" '[ "$(ls "$tpl" | sort | tr "\n" " ")" = "$want_hooks" ]'

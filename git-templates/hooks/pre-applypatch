@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Mentat's chain-only git hook template, one copy per hook name Mentat does not check,
 # for a core.hooksPath that names this folder: it runs the repository's own hook of
-# this file's name (own-hook.sh), with the same arguments, stdin and exit status.
+# this file's name (own-hook.sh), with the same arguments, stdin and exit status. There
+# is none for reference-transaction or post-index-change: git runs them on every ref
+# update and index write, too often to start one, so a repository's own copies of those
+# two do not run for agents.
 set -uo pipefail
 
 here=${0%/*}
