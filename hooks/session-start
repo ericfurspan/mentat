@@ -4,16 +4,24 @@
 # Claude Code caps a hook's output at 10,000 characters; tests/run holds this
 # hook's output under a limit just above its current size, raised only in the
 # pull request that grows past it, with the maintainer's agreement in the spec.
-# Before the rules, it prints one problem line when the installed git hook templates
-# are missing or differ from this copy (lib/templates.sh), or cannot be checked.
+# When agents' git uses the git hook templates (lib/templates.sh), it first prints one
+# problem line for each problem with the installed copy, or one when it cannot check.
 # Finds its files relative to this script, never the working directory, so it
 # also runs outside a plugin.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-# shellcheck source=/dev/null
+problems=""
 # Bash 3.2 exits when . finds no file, so the file is looked for first.
-if ! { [ -f "$root/lib/templates.sh" ] && . "$root/lib/templates.sh" && state=$(templates_state "$root"); } 2>/dev/null; then
-  printf 'Mentat PROBLEM: %s. Tell the maintainer before anything else, and run mentat check.\n\n' \
-    "${state:-the installed git hook templates could not be checked}"
+# shellcheck source=/dev/null
+if [ -f "$root/lib/templates.sh" ] && . "$root/lib/templates.sh" 2>/dev/null; then
+  if dir=$(templates_dir); then problems=$(templates_problems "$root" "$dir" 2>/dev/null) || true; fi
+else
+  problems="the installed git hook templates could not be checked"
+fi
+if [ -n "$problems" ]; then
+  printf '%s\n' "$problems" | while IFS= read -r p; do
+    printf 'Mentat PROBLEM: %s. Tell the maintainer before anything else, and run mentat check.\n' "$p"
+  done
+  printf '\n'
 fi
 cat "$root/rules.md"

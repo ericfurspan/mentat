@@ -10,8 +10,9 @@
 # organization member or collaborator, to compare them with the list, and prints only
 # how many are missing. With no list, it says nothing about it.
 # When claude is installed, it reads the local plugin list, and prints only the scope
-# and version of each copy of the Mentat plugin. A missing or changed installed git hook
-# template (lib/templates.sh) is a problem.
+# and version of each copy of the Mentat plugin. It warns when agents' git does not use
+# the git hook templates (lib/templates.sh), and when it does, a missing or changed
+# installed copy, or a missing gitleaks or jq, is a problem.
 KEPT_BRANCHES_FILE="$HOME/.config/mentat/warn-kept-branches"
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
@@ -66,6 +67,23 @@ c_plugin_copies() {
     c_ok "no Mentat plugin copies at different versions"
   fi
 }
+# The git hook templates (lib/templates.sh): a warning when agents' git does not use
+# them; when it does, one problem per problem with the installed copy.
+c_templates() {
+  local dir problems p IFS=$'\n'
+  if ! dir=$(templates_dir); then
+    c_warn "the git hook templates are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
+    return 0
+  fi
+  # shellcheck disable=SC2154 # root, Mentat's folder, is set by bin/mentat.
+  if problems=$(templates_problems "$root" "$dir"); then
+    c_ok "the git hook templates in $dir are installed and current"
+    return 0
+  fi
+  set -f
+  for p in $problems; do c_problem "$p"; done
+  set +f
+}
 # The review tools: Codex, and Grok where installed (it is optional).
 c_review_tools() {
   local v
@@ -88,9 +106,9 @@ check() {
   if command -v gitleaks >/dev/null 2>&1; then
     v=$(gitleaks version 2>/dev/null | head -n 1)
     c_ok "gitleaks is installed (${v:-version unknown})"
-  else c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
-  # shellcheck disable=SC2154 # root, Mentat's folder, is set by bin/mentat.
-  if v=$(templates_state "$root"); then c_ok "$v"; else c_problem "$v"; fi
+  # With the git hook templates in use, c_templates reports a missing gitleaks as a problem.
+  elif ! templates_dir >/dev/null; then c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
+  c_templates
   c_plugin_copies
   # The publish check still looks for the home path without the list. No list is not a warning.
   if [ ! -e "$PRIVATE_WORDS" ]; then :

@@ -333,7 +333,23 @@ start() { MENTAT_GIT_TEMPLATES_DIR=$inst "$root/hooks/session-start" >"$STUB/sta
 problem_first() { head -n 1 "$STUB/start" | grep -qF "Mentat PROBLEM: the git hook templates in $inst $1" && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"; }
 rm -rf "${STUB:?}"/*; start; rc=$?
 check "session start: an installed and current copy prints rules.md alone" '[ "$rc" = 0 ] && cmp -s "$STUB/start" "$root/rules.md"'
-for f in scan own-hook.sh hooks/pre-commit hooks/pre-push; do
+alone() { [ "$rc" = 0 ] && cmp -s "$STUB/start" "$root/rules.md"; }
+"$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: with no templates in use, it prints rules.md alone" 'alone'
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: GIT_CONFIG_* entries that name no core.hooksPath are not a use of the templates" 'alone'
+PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: with no templates in use, a missing gitleaks prints nothing extra" 'alone'
+GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/nowhere/hooks" GIT_CONFIG_KEY_1=user.name GIT_CONFIG_VALUE_1=x \
+  GIT_CONFIG_KEY_2=Core.HooksPath GIT_CONFIG_VALUE_2="$inst/hooks/" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: the last core.hooksPath entry in GIT_CONFIG_* names a current copy, so rules.md prints alone" 'alone'
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/nowhere/hooks" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: a core.hooksPath entry naming a missing folder prints a problem line, then rules.md" \
+  '[ "$rc" = 0 ] && head -n 1 "$STUB/start" | grep -qxF "Mentat PROBLEM: the git hook templates folder $tmp/nowhere is missing, so agents'"'"' git runs no hooks. Tell the maintainer before anything else, and run mentat check." && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$inst/hooks" PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: with the templates in use, a missing gitleaks prints a problem line, then rules.md" \
+  '[ "$rc" = 0 ] && head -n 1 "$STUB/start" | grep -qxF "Mentat PROBLEM: gitleaks is not installed, so the git hook templates in $inst refuse every agent commit and push. Tell the maintainer before anything else, and run mentat check." && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
+for f in scan own-hook.sh hooks/pre-commit hooks/pre-push hooks/commit-msg hooks/reference-transaction; do
   mv "$inst/$f" "$tmp/away"; start; rc=$?; mv "$tmp/away" "$inst/$f"
   check "session start: a missing $f prints a problem line naming it, then rules.md" '[ "$rc" = 0 ] && problem_first "are missing or not executable ($f)"'
   cp -p "$inst/$f" "$tmp/keep"; printf '# changed\n' >>"$inst/$f"; start; rc=$?; mv "$tmp/keep" "$inst/$f"
@@ -342,7 +358,7 @@ done
 chmod -x "$inst/hooks/pre-push"; start; rc=$?; chmod +x "$inst/hooks/pre-push"
 check "session start: a template that is not executable is a problem" '[ "$rc" = 0 ] && problem_first "are missing or not executable (hooks/pre-push)"'
 rm -rf "$inst"; start; rc=$?
-check "session start: a missing folder names every file" '[ "$rc" = 0 ] && problem_first "are missing or not executable (scan own-hook.sh hooks/pre-commit hooks/pre-push)"'
+check "session start: a missing folder is a problem" '[ "$rc" = 0 ] && head -n 1 "$STUB/start" | grep -qF "Mentat PROBLEM: the git hook templates folder $inst is missing" && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
 # A plugin copy without lib/templates.sh still prints the rules, after a problem line.
 mkdir -p "$tmp/plugin/hooks"
 cp "$root/hooks/session-start" "$tmp/plugin/hooks/"; cp "$root/rules.md" "$tmp/plugin/"
