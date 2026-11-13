@@ -622,6 +622,9 @@ walk() {
     [[ $rest =~ $re ]] || break
     m=${BASH_REMATCH[0]} w=${BASH_REMATCH[1]} hword=""
     lead=${m:0:${#m}-${#w}}
+    # A newline ends the command before it, and moves the directory, before this
+    # word's bodies are queued with the directory they run in.
+    if [ "$w" != $'\\\n' ]; then case "$lead" in *"$nl"*) sep=$nl; end_command ;; esac; fi
     case "$w" in
       *'$('* | *'<('* | *'>('* | *'<<'*)
         scan "${rest:${#lead}}" || return 1
@@ -629,7 +632,6 @@ walk() {
     esac
     rest=${rest:${#m}}
     if [ "$w" = $'\\\n' ]; then held+=$m; continue; fi
-    case "$lead" in *"$nl"*) sep=$nl; end_command ;; esac
     case "$w" in
       [\;\&\|\)]*)
         sep=$w

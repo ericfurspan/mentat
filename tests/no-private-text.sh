@@ -305,6 +305,10 @@ printf 'about StubCodename\n' >"$pub/note.md"
 check "a cd inside a body does not move where a later file is read" '[ "$(decision "cd \"$pub\" && gh pr edit 7 --body \"\$(echo cd apps && make)\" --body-file note.md")" = ask ]'
 printf 'about StubCodename\n' >"$pub/report.md"
 check "a cd run inside a body leaves where a later file is read known" '[ "$(decision "true && cd \"$pub\" && gh pr comment 5 --body \"\$(cd app && npm test)\" --body-file report.md")" = ask ]'
+c='cd "../pub dir"
+posted=$(gh pr comment 1 --body stubcodename)
+gh pr comment 2 -R owner/private --body "$posted"'
+check "a command substitution on the line after a cd runs in the cd's directory" '[ "$(decision "$c" "$priv")" = ask ]'
 while IFS= read -r r; do
   c="gh pr comment 1 -R owner/private --body ok
 $r gh pr comment 2 --body stubcodename"
