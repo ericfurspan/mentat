@@ -56,8 +56,8 @@ gh pr create --title "fix merge logic"
 gh pr ready 7
 PASS
 check "denies the desktop auto-merge tool" '[ "$(decision mcp__ccd_pr__set_auto_merge "")" = deny ]'
-check "the reason says the maintainer merges" \
-  '[ "$(output Bash "gh pr merge 7" | jq -r .hookSpecificOutput.permissionDecisionReason)" = "Mentat: the maintainer merges; agents never merge a pull request or turn on auto-merge." ]'
+check "the reason says the maintainer merges and how to pass text that only mentions a merge" \
+  '[ "$(output Bash "gh pr merge 7" | jq -r .hookSpecificOutput.permissionDecisionReason)" = "Mentat: the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)." ]'
 check "reads nothing from GitHub" '[ ! -f "$STUB/calls" ]'
 check "hooks.json runs it on PreToolUse for Bash and the auto-merge tool" \
   'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash|mcp__ccd_pr__set_auto_merge\") | .hooks[].command | select(endswith(\"/hooks/no-merge\"))] | length == 1" "$root/hooks/hooks.json" >/dev/null'
