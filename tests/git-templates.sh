@@ -180,7 +180,7 @@ M push -q origin feat/side
 g checkout -q -b feat/m3 feat/x; g commit -q --allow-empty -m m3; g merge --no-ff -m "merge side" feat/side
 reset; A push -q origin feat/m3; rc=$?
 check "a clean merge of commits already on the remote is not refused for what they added" '[ "$rc" = 0 ] && [ "$(remote_head feat/m3)" = "$(head_of)" ]'
-# A merge of three or more parents is scanned on its diff from the first parent.
+# A merge of three or more parents is scanned on its diff from git's own merge of its parents.
 for b in o1 o2; do g checkout -q -b "feat/$b" feat/x; printf '%s\n' "$b" >"$repo/$b.txt"; g add "$b.txt"; g commit -q -m "$b"; done
 g checkout -q -b feat/o0 feat/x; g merge --no-ff --no-commit feat/o1 feat/o2
 printf 'token = stubmatchedtext\n' >"$repo/oct.txt"; g add oct.txt; g commit -q -m "octopus with a secret"
@@ -190,6 +190,17 @@ check "a secret added while completing an octopus merge is refused, naming the f
 g checkout -q -b feat/o3 feat/x; g merge --no-ff -m "clean octopus" feat/o1 feat/o2
 reset; A push -q origin feat/o3; rc=$?
 check "a clean octopus merge is pushed" '[ "$rc" = 0 ] && [ "$(remote_head feat/o3)" = "$(head_of)" ] && [ "$(git -C "$repo" rev-list --parents -n 1 HEAD | wc -w)" -eq 4 ]'
+g checkout -q -b feat/o4 feat/x; g commit -q --allow-empty -m o4; g merge --no-ff -m "octopus of a pushed side" feat/side feat/o1
+reset; A push -q origin feat/o4; rc=$?
+check "a clean octopus merge whose second parent is on the remote with a match is pushed" \
+  '[ "$rc" = 0 ] && [ "$(remote_head feat/o4)" = "$(head_of)" ] && [ "$(git -C "$repo" rev-list --parents -n 1 HEAD | wc -w)" -eq 4 ]'
+# One whose parents conflict, so git cannot merge them, is scanned on its diff from the first parent.
+for b in c1 c2; do g checkout -q -b "feat/$b" feat/x; printf '%s\n' "$b" >"$repo/c.txt"; g add c.txt; g commit -q -m "$b"; done
+printf 'token = stubmatchedtext\n' >"$repo/oct5.txt"; g add oct5.txt
+g checkout -q -b feat/o5 "$(git -C "$repo" commit-tree "$(git -C "$repo" write-tree)" -p feat/x -p feat/c1 -p feat/c2 -m "conflicted octopus")"
+reset; A push -q origin feat/o5; rc=$?
+check "a secret in an octopus merge whose parents conflict is refused, naming the file" \
+  '[ "$(git -C "$repo" rev-list --parents -n 1 feat/o5 | wc -w)" -eq 4 ] && [ "$rc" != 0 ] && [ -z "$(remote_head feat/o5)" ] && grep -qF "stub-rule in oct5.txt" "$STUB/out"'
 g checkout -q feat/x
 # Files git treats as binary (-diff, binary) are scanned as text; real binary content passes.
 g checkout -q -b feat/bin feat/x
