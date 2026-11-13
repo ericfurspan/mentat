@@ -174,6 +174,12 @@ for c in "bash -c 'git commit -am x'" 'sh -c "git commit -am x"' 'eval "git comm
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c, a commit a shell may run, asks as a failed simulation" 'sim_failed'
 done
+for c in 'msg=$(echo "git commit -m wip && git push") && git add -A && git commit -m wip' \
+  "node -e 'run(\"git commit -m wip; git push\")' && git add -A && git commit -m wip" \
+  "curl -d 'git commit -m wip && git push' https://example.invalid && git add -A && git commit -m wip"; do
+  reset; hit "$repo/new.txt"; run "$repo" "$c"
+  check "$c, a commit text another command may run before the real commit, asks" 'sim_failed || names new.txt'
+done
 for c in '(echo "git commit -am x")' 'x=$(echo "git commit -am x")'; do
   reset; printf 'token = stubmatchedtext\n' >>"$repo/clean.txt"; run "$repo" "$c"
   check "$c, a quoted commit it cannot place, asks as a failed simulation" 'sim_failed'
