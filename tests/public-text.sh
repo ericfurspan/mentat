@@ -38,8 +38,8 @@ reason() { output "$@" | jq -r '.hookSpecificOutput.permissionDecisionReason // 
 # mcp <tool> <tool_input JSON>: prints what the hook prints for an MCP tool call.
 mcp() { jq -n --arg t "$1" --argjson i "$2" '{hook_event_name: "PreToolUse", tool_name: $t, tool_input: $i}' | "$hook"; }
 mcp_decision() { mcp "$@" | jq -r '.hookSpecificOutput.permissionDecision // empty'; }
-word_hit="Mentat: this text for a public repository holds a configured private name, so it was not published. Take it out; if only a file's name or a leading command holds it, put the text in a file and run gh alone with --body-file."
-path_hit="Mentat: this text for a public repository holds a local path, so it was not published. Take it out; if only a file's name or a leading command holds it, put the text in a file and run gh alone with --body-file."
+word_hit="Mentat: this text for a public repository holds a configured private name, so it was not published. Take it out of the text, or of the file the text comes from."
+path_hit="Mentat: this text for a public repository holds a local path, so it was not published. Take it out of the text, or of the file the text comes from."
 
 reset
 # Each listed form, with a hit in its command text.
@@ -150,6 +150,117 @@ sed -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 printf x > $tdir/out.md && gh pr edit 1 --body-file $tdir/pr.md
 EOF
 check "denies a temp path holding a word when it is published" '[ "$(decision "S=$tdir; gh pr edit 1 --body \"see \$S\"")" = deny ]'
+
+# Only a gh write is checked: its own words but the repository and the gh api endpoint,
+# the files it reads, and the text fed to it.
+# expect <deny|allow> <command>: checks the hook's decision for the command.
+expect() {
+  local want=$1 cmd=$2 label=${2//$'\n'/ \\n }
+  if [ "$want" = deny ]; then
+    check "denies: $label" '[ "$(decision "$cmd")" = deny ]'
+  else
+    check "allows: $label" '[ -z "$(output "$cmd")" ]'
+  fi
+}
+printf '{"body": "about StubCodename"}\n' >"$root/work/word.json"
+printf 'about StubCodename\n' >"$root/work/sub/only-sub.md"
+while IFS= read -r c; do expect allow "$c"; done <<'NOPUBLISH'
+git -C /Users/stubperson/repo commit -m "fix: handle gh pr comment in the hook"
+git commit -m "docs: say gh issue create needs a title" && git -C /Users/stubperson/r push
+grep -rn "gh pr create --title" /Users/stubperson/x
+rg -n 'gh issue comment ' /Users/stubperson/x
+echo "gh pr edit 7 --body x" >> /Users/stubperson/notes.txt
+cat /Users/stubperson/notes.md; gh pr comment 7 --body "hello"
+git -C /Users/stubperson/r push -u origin HEAD && gh pr create --title t --body ok
+gh pr diff 7 > /Users/stubperson/d.patch; gh pr review 7 --approve
+gh pr view 7 --json body -q .body > /Users/stubperson/b.md && gh pr edit 7 --body-file /Users/stubperson/b.md
+gh pr view 7 --json body -q .body > word.md && gh pr edit 7 --body-file word.md
+(cd sub && git status) && gh pr comment 7 -F only-sub.md
+echo stubcodename && gh pr comment 7 --body ok
+GH_DEBUG=stubcodename gh pr comment 7 --body ok
+gh pr comment 7 --body ok > /Users/stubperson/out.txt
+gh pr comment 7 -R o/stubcodename --body ok
+gh pr comment 7 --repo=o/stubcodename --body ok
+gh -R o/stubcodename pr comment 7 --body ok
+gh api repos/o/stubcodename/issues/7/comments -f body=ok
+gh api -H "Accept: x" repos/o/stubcodename/issues/7/comments -f body=ok
+gh api -f body=ok repos/o/stubcodename/issues/7/comments
+gh api repos/o/r/x -f q=stubcodename -XGET
+gh pr create --title t --body-file /Users/stubperson/missing.md
+gh pr comment 7 --body "$(git log -1 --format=%s)"
+gh pr comment 7 --body "$NOTES"
+jq -n '{body: "stubcodename"}' | gh api repos/o/r/issues/7/comments --input -
+gh pr comment 7 --body ok <<< "stubcodename"
+gh pr comment 7 --body 'see $HOME/x'
+gh api graphql -f query='{ viewer { login } }' > /Users/stubperson/out.json
+NOPUBLISH
+while IFS= read -r c; do expect deny "$c"; done <<'PUBLISH'
+gh pr new --title t --body "about stubcodename"
+gh issue new --title t --body "about stubcodename"
+gh pr close 7 --comment "about stubcodename"
+gh issue close 7 -c "about stubcodename"
+gh api repos/o/r/issues/7/comments --input word.json
+gh api -X POST repos/o/r/issues/7/comments --input=word.json
+gh pr create -t t -F - < word.md
+gh pr comment 7 --body-file - < word.md
+cat word.md | gh pr comment 7 -F -
+gh api repos/o/r/issues/7/comments --input - < word.json
+cat word.json | gh api repos/o/r/issues/7/comments --input -
+gh api repos/o/r/issues/7/comments -F body=@- < word.md
+gh pr create -t t -Fword.md
+gh api repos/o/r/issues/7/comments -fbody="about stubcodename"
+gh api repos/o/r/issues/7/comments -Fbody=@word.md
+gh pr comment 7 --body "$(cat word.md)"
+B=$(cat word.md); gh pr comment 7 --body "$B"
+git add . && cd sub && gh pr create -t t -F only-sub.md
+(cd sub && gh pr comment 7 -F only-sub.md)
+gh pr comment 7 --body "see $HOME/x"
+gh pr comment 7 --body "see ${HOME}/x"
+gh pr comment 7 --body "in $PWD"
+gh pr comment 7 --body "in $(pwd)"
+gh api repos/o/r/issues/7/comments --input - <<< '{"body": "stubcodename"}'
+gh "pr" comment 7 --body "about stubcodename"
+gh p''r comment 7 --body "about stubcodename"
+gh pr comment 7 --body about\ stub\codename
+gh api --method post repos/o/r/issues/7/comments -f body="about stubcodename"
+gh api -XPOST repos/o/r/issues/7/comments -H "X-Note: about stubcodename"
+gh api repos/o/r/issues/7/comments -f body=ok -X GET; gh api repos/o/r/issues/7/comments -f body=stubcodename
+command gh pr comment 7 -F word.md
+env GH_PAGER= gh pr comment 7 -F word.md
+gh pr create --title t --body x --head stubcodename-branch
+f() { gh pr comment 7 --body "about stubcodename"; }; f
+PUBLISH
+expect deny 'gh pr\
+ comment 7 --body "about stubcodename"'
+expect deny 'gh pr comment 7 \
+  --body "about stubcodename"'
+expect deny "gh pr create -t t -F - <<'EOF'
+about stubcodename
+EOF"
+expect deny "cat <<'EOF' | gh pr comment 7 -F -
+about stubcodename
+EOF"
+expect deny 'gh pr comment 7 -F - <<EOF
+see $HOME/x
+EOF'
+expect allow "gh pr comment 7 -F - <<'EOF'
+see \$HOME/x
+EOF"
+expect deny "gh pr create --title t --body \"\$(cat <<'EOF'
+it's \"quoted\" and \`ticked\`
+about stubcodename
+EOF
+)\""
+expect deny "cat > \"\$TMPDIR/new.md\" <<'EOF'
+about stubcodename
+EOF
+gh pr create --title t --body-file \"\$TMPDIR/new.md\""
+expect allow "cat > \"\$TMPDIR/notes.md\" <<'EOF'
+run gh pr create from /Users/stubperson/repo, it's stubcodename
+EOF
+gh pr comment 7 --body ok"
+expect allow "# don't publish /Users/stubperson/x or stubcodename
+gh pr comment 7 --body ok"
 
 # The word list.
 reset; rm "$LIST"
