@@ -176,6 +176,19 @@ A push -q trunk feat/x:trunk; rc=$?
 check "a push to the remote's HEAD branch (trunk) is refused" '[ "$rc" != 0 ] && grep -q "default branch (trunk)" "$STUB/out"'
 A push -q trunk feat/x:main; rc=$?
 check "a push to main where the remote's HEAD is trunk goes through" '[ "$rc" = 0 ]'
+# A remote whose pushurl names another repository: the default branch of the repository
+# pushed to counts, here trunk, while the fetch repository's is main.
+git init -q --bare "$tmp/fetch.git"; git init -q --bare "$tmp/pushto.git"
+git -C "$repo" push -q "$tmp/fetch.git" feat/x:main feat/x:trunk
+git -C "$repo" push -q "$tmp/pushto.git" feat/x:main feat/x:trunk
+git --git-dir="$tmp/pushto.git" symbolic-ref HEAD refs/heads/trunk
+git -C "$repo" remote add split "$tmp/fetch.git"; git -C "$repo" remote set-url --push split "$tmp/pushto.git"
+pushed_trunk=$(git --git-dir="$tmp/pushto.git" rev-parse refs/heads/trunk)
+reset; A commit -q --allow-empty -m "split"
+A push -q split feat/x:trunk; rc=$?
+check "with a pushurl, the default branch of the repository pushed to is refused" '[ "$rc" != 0 ] && grep -q "default branch (trunk)" "$STUB/out" && [ "$(git --git-dir="$tmp/pushto.git" rev-parse refs/heads/trunk)" = "$pushed_trunk" ]'
+A push -q split feat/x:main; rc=$?
+check "with a pushurl, the fetch repository's default branch is not the one refused" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/pushto.git" rev-parse refs/heads/main)" = "$(head_of)" ]'
 reset; M push -q origin feat/x:main; rc=$?
 check "the maintainer's git runs no template: a push to the default branch goes through" '[ "$rc" = 0 ] && [ "$(remote_head main)" = "$(head_of)" ]'
 check "the pushes leave no temporary files" '[ -z "$(ls -A "$TMPDIR")" ]'

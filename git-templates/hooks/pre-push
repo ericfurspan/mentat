@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Mentat's git pre-push template, for a core.hooksPath that names this folder. It reads
-# every ref line git sends and refuses the push when any destination is the remote's
-# default branch (from git ls-remote --symref <remote> HEAD, else
+# every ref line git sends and refuses the push when any destination is the default
+# branch of the repository pushed to (from git ls-remote --symref <push URL> HEAD, else
 # refs/remotes/<remote>/HEAD, else main and master), whether an update, a force push or
 # a deletion, and when the outgoing commits add a likely secret or the scan cannot run.
 # Each commit is scanned on its own diff; merge commits show no diff. Other branches and
@@ -13,6 +13,9 @@ set -uo pipefail
 here=${0%/*}
 scan=$here/../scan
 remote=${1:-origin}
+# Git passes the URL it pushes to, which a pushurl can make another repository than
+# the one the remote fetches from.
+dest=${2:-$remote}
 refuse() { printf 'Mentat: push refused: %s\n' "$1" >&2; exit 1; }
 
 # The ref lines, read twice: once here, once by the repository's own hook. The file is
@@ -24,7 +27,7 @@ if ! cat >"$lines" || ! exec 3<"$lines" 4<"$lines"; then
 fi
 rm -f "$lines"
 
-defaults=$(git ls-remote --symref "$remote" HEAD 2>/dev/null |
+defaults=$(git ls-remote --symref "$dest" HEAD 2>/dev/null |
   awk '$1 == "ref:" && $3 == "HEAD" && sub(/^refs\/heads\//, "", $2) { print $2; exit }')
 if [ -z "$defaults" ]; then
   defaults=$(git symbolic-ref --short "refs/remotes/$remote/HEAD" 2>/dev/null) && defaults=${defaults#"$remote"/}
