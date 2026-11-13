@@ -63,6 +63,15 @@ printf 'exact:' >"$LIST"
 check "a list that is only exact: matches nothing" 'misses "exact: anything" && misses "exact:" && misses "nothing here"'
 printf '\nexact:\n\n   \n' >"$LIST"
 check "a list of exact: and blank lines matches nothing" 'misses "exact: anything" && misses "a b"'
+
+# The list's comment and blank lines, and an empty or unreadable list.
+reset
+check "a comment line and blank lines in the list match nothing, beside entries that do" 'misses "about # a comment names commentword" && misses "# a b" && hits "about stubcodename"'
+: >"$LIST"
+check "an empty list matches nothing" 'misses "about stubcodename" && misses "anything"'
+reset; chmod 000 "$LIST"
+check "an unreadable list counts as empty, prints nothing, and the home path still hits" '[ -z "$(private_text "about stubcodename" 2>&1)" ] && misses "about stubcodename" && [ "$(private_text "at $HOME/x")" = "a local path" ]'
+chmod 600 "$LIST"
 reset
 
 [ "$failures" -eq 0 ]
