@@ -97,7 +97,15 @@ a~/b
 /home/username/x
 /Users/name/x
 /Users/you/ and /home/runner/ and /Users/Shared/
+/Users/runner/work/r/r
+/home/linuxbrew/.linuxbrew/bin/jq
+/home/ubuntu/app
+/home/node/app
+/home/vscode/x
+/home/ec2-user/x
 NOTPATHS
+check "allows a home folder's name inside another path" '[ -z "$(HOME=/stubroot output "gh pr comment 7 --body \"see docs/stubroot.md and /stubroots/x\"")" ]'
+check "denies a home folder at the end of the text or before a non-word character" '[ "$(HOME=/stubroot decision "gh pr comment 7 --body \"in /stubroot\"")" = deny ] && [ "$(HOME=/stubroot decision "gh pr comment 7 --body \"(/STUBROOT)\"")" = deny ]'
 check "allows a git -C ~/ command before gh when nothing else hits" '[ -z "$(output "git -C ~/x push && gh pr create --body ok")" ]'
 
 # Commands that publish nothing, or are not listed, and other tools.

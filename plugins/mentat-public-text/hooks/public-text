@@ -29,10 +29,11 @@ home=${HOME:-}
 PRIVATE_WORDS="$home/.config/mentat/private-words"
 lc_set=${LC_ALL+x} lc_val=${LC_ALL-}
 # A home folder written out with a name, as /Users/<name>/ or /home/<name>/, or this
-# machine's. ~/, /Users/Shared/, /home/runner/ and a placeholder name such as
-# /Users/you/ name no one, so they are no hit.
+# machine's as a whole path. ~/, /Users/Shared/, the homes of CI runners and containers
+# such as /home/runner/, and a placeholder name such as /Users/you/ name no one, so they
+# are no hit.
 home_re='(^|[^[:alnum:]_.-])(/Users|/home)/[[:alnum:]_.-]+/'
-placeholder_re='(/Users|/home)/(you|me|user|username|name)/|/Users/Shared/|/home/runner/'
+placeholder_re='(/Users|/home)/(you|me|user|username|name|runner)/|/Users/Shared/|/home/(linuxbrew|ubuntu|node|vscode|ec2-user)/'
 
 # Prints the category of the first hit in text $1, or returns 1 with none. Each line of
 # the word list is a fixed string, ignoring case. A line starting with exact: matches
@@ -41,9 +42,11 @@ placeholder_re='(/Users|/home)/(you|me|user|username|name)/|/Users/Shared/|/home
 # word. Here-strings, not pipes: under pipefail, grep -q stopping early on long text
 # would read as no hit. It matches in the caller's locale.
 private_text() {
-  local words exact
+  local words exact this_home
   if [ -n "$lc_set" ]; then LC_ALL=$lc_val; else unset LC_ALL; fi
-  if { [ -n "$home" ] && [ "$home" != / ] && grep -aiqF -e "$home" <<<"$1"; } ||
+  # This machine's home folder, as a whole path.
+  this_home='(^|[^[:alnum:]_./~-])'$(printf '%s' "$home" | sed 's/[][\.*^$+?(){}|]/\\&/g')'([^[:alnum:]_]|$)'
+  if { [ -n "$home" ] && [ "$home" != / ] && grep -aiqE -e "$this_home" <<<"$1"; } ||
     grep -aqE -e "$home_re" <<<"$(sed -E "s#$placeholder_re#_#g" <<<"$1")"; then
     printf 'a local path'; return 0
   fi
