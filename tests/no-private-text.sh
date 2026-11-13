@@ -288,6 +288,8 @@ true; cd "$priv" && gh pr edit 1 --body "\$(printf ok)" & gh pr comment 2 --body
 EOF
 printf 'about StubCodename\n' >"$pub/note.md"
 check "a cd inside a body does not move where a later file is read" '[ "$(decision "cd \"$pub\" && gh pr edit 7 --body \"\$(echo cd apps && make)\" --body-file note.md")" = ask ]'
+printf 'about StubCodename\n' >"$pub/report.md"
+check "a cd run inside a body leaves where a later file is read known" '[ "$(decision "true && cd \"$pub\" && gh pr comment 5 --body \"\$(cd app && npm test)\" --body-file report.md")" = ask ]'
 while IFS= read -r r; do
   c="gh pr comment 1 -R owner/private --body ok
 $r gh pr comment 2 --body stubcodename"
