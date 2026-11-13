@@ -373,6 +373,10 @@ EOF")" = deny ]'
 { printf 'about StubCodename\n'; head -c 1100000 /dev/zero | tr '\0' x; } >"$root/work/big.md"
 { printf 'about StubCodename\n'; head -c 900000 /dev/zero | tr '\0' x; } >"$root/work/under.md"
 check "allows a gh write fed a file over 1 MB, with a note" 'unchecked "gh pr comment 7 -F big.md" "over 1 MB"'
+head -c 1100000 /dev/zero | tr '\0' x >"$root/work/big-clean.md"
+check "denies a hit elsewhere in a gh write fed a file over 1 MB" '[ "$(decision "gh pr create --title \"stubcodename rollout\" --body-file big-clean.md")" = deny ]'
+check "denies a hit in a later gh write after one fed a file over 1 MB" '[ "$(decision "gh pr comment 7 -F big-clean.md; gh pr comment 8 --body stubcodename")" = deny ]'
+check "denies a hit in a graphql call whose query is a file over 1 MB" '[ "$(decision "gh api graphql -F query=@big-clean.md -f body=stubcodename")" = deny ]'
 check "denies a hit in a file under 1 MB" '[ "$(decision "gh pr comment 7 -F under.md")" = deny ]'
 wide=$(head -c 60000 /dev/zero | tr '\0' x)
 check "allows a command over 50 KB outside heredocs, with a note" 'unchecked "gh pr comment 7 --body \"stubcodename $wide\"" "over 50 KB"'

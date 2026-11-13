@@ -24,10 +24,10 @@
 # it looks at every text value but owner and repo. A call is that server's when its input
 # has owner and repo, or when it makes a gist or a repository.
 # The reason gives the category, never the match. This is a net for mistakes, not a
-# security boundary: other routes exist. When it cannot read its input, jq is missing, a
-# file feeding a gh write is over 1 MB, or the command is over 50 KB or 6,000 steps
-# outside heredocs or nested over 100 levels deep, it allows the call and says so on
-# stderr.
+# security boundary: other routes exist. When it cannot read its input, jq is missing, or
+# the command is over 50 KB or 6,000 steps outside heredocs or nested over 100 levels
+# deep, it allows the call and says so on stderr. A file over 1 MB feeding a gh write is
+# not checked, with a note on stderr; the rest of the call is.
 set -uo pipefail
 
 # Notes for text a gh write lets through unchecked, printed when the call is allowed.
@@ -427,8 +427,7 @@ read_path() {
   rp_text=$mark$nlz$mark lz_path[nlz]=$fp nlz=$((nlz + 1))
 }
 # expand <text>: sets e_text to the text with each mark replaced by its file's text, and
-# e_skip to the notes for files whose text is unknown. A file over file_max bytes allows
-# the call unchecked.
+# e_skip to the notes for files whose text is unknown or over file_max bytes.
 expand() {
   local t=$1 n
   e_text="" e_skip=""
@@ -438,7 +437,7 @@ expand() {
     n=${t%%"$mark"*}; t=${t:$((${#n} + ${#mark}))}
     if [ -z "${lz_path[n]}" ]; then e_skip+="a file this command changes feeds a gh write$nl"; continue; fi
     rp_text=$(head -c $((file_max + 1)) "${lz_path[n]}")
-    [ "${#rp_text}" -le "$file_max" ] || allow "a file over 1 MB feeds a gh write"
+    if [ "${#rp_text}" -gt "$file_max" ]; then e_skip+="a file over 1 MB feeds a gh write$nl"; continue; fi
     e_text+=$rp_text
   done
   e_text+=$t
