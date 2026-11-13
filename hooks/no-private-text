@@ -6,15 +6,15 @@
 # named by --body-file, -F, --field or --notes-file, through a leading $NAME/ too. It
 # walks past heredoc and $(...) bodies, whose text stays checked, and a gh command in
 # a $(...) has its own target. A heredoc body is left out only when a lone cat writes
-# it to a literal file that no other word names and no text outside the body holds a
-# glob character or an expansion. A gh file flag's value that runs no command only
-# locates a file, so it is not looked at. Outside a gh command and before any $(,
-# backtick or <<, neither is another path that only locates one: a cd or git -C
-# argument, a temp or home path as a redirect target or sed -i file, a temp path
-# after a file flag, or an assignment whose variable is used only there. Each target
-# is looked up in the directory its command runs in: the session's, moved by each
-# top-level cd the walk can follow; after one it cannot, a target with no repository
-# counts as public. It asks if any target is public.
+# it to a literal file and the text outside the body holds the file's last path part,
+# in any case, only there, and no glob character or expansion. A gh file flag's value
+# that runs no command only locates a file, so it is not looked at. Outside a gh
+# command and before any $(, backtick or <<, neither is another path that only
+# locates one: a cd or git -C argument, a temp or home path as a redirect target or
+# sed -i file, a temp path after a file flag, or an assignment whose variable is used
+# only there. Each target is looked up in the directory its command runs in: the
+# session's, moved by each top-level cd the walk can follow; after one it cannot, a
+# target with no repository counts as public. It asks if any target is public.
 # The prompt gives the category, never the match, and approving it clears a false
 # alarm. This is a net for mistakes, not a security boundary: other routes exist. When
 # it cannot read its input or its tools are missing, it stays out of the way.
@@ -211,7 +211,7 @@ end_command() {
     if [ -z "$in_gh" ] && [ -z "$nest" ] && [ "$o_cmd" = cat ] && [ "$st_nred" = 1 ] &&
       [ "${#HQ[@]}" = $((st_hq + 1)) ] && [ "$st_n" = $((st_rw + 2)) ] &&
       case "$sepb$sep" in *'|'*) false ;; *) true ;; esac && lone "$st_target"; then
-      HP[k]=0
+      HP[k]=0 HN[k]=${v##*/}
     fi
     k=$((k + 1))
   done
@@ -567,8 +567,9 @@ dfind() {
 # bodies: from just after the newline that ends the line of the pending heredocs,
 # skips their bodies, each to its delimiter line. A published body stays in the
 # checked text and in past. A body is published unless end_command found a lone cat
-# writing it and no text outside it holds a glob character or an expansion, which
-# could name the file. Returns 1 when a delimiter line is missing.
+# writing it and the text outside it holds no glob character or expansion and the
+# file's last path part (HN), in any case, only once, any of which could name the
+# file. Returns 1 when a delimiter line is missing.
 glob_re='[[*?$`]'
 bodies() {
   local x=0 t
@@ -580,13 +581,18 @@ bodies() {
     dfind "$rest" "${HQ[x]}" "${HT[x]}" || return 1
     if [ "${HP[x]}" = 0 ]; then
       t=$((${#cmd} - ${#rest}))
-      if [[ ${cmd:0:t} =~ $glob_re ]] || [[ ${cmd:t+bl} =~ $glob_re ]]; then HP[x]=1; fi
+      if [[ ${cmd:0:t} =~ $glob_re ]] || [[ ${cmd:t+bl} =~ $glob_re ]] ||
+        [ "$(awk -v b="${HN[x]}" 'BEGIN { b = tolower(b) }
+          { s = tolower($0); while ((i = index(s, b)) > 0) { c++; s = substr(s, i + length(b)) } }
+          END { print c + 0 }' <<<"${cmd:0:t}$nl${cmd:t+bl}")" -gt 1 ]; then
+        HP[x]=1
+      fi
     fi
     if [ "${HP[x]}" != 0 ]; then kept+=${rest:0:bl+dl} past+=$nl${rest:0:bl}; fi
     rest=${rest:bl+dl}
     x=$((x + 1))
   done
-  HQ=() HT=() HP=()
+  HQ=() HT=() HP=() HN=()
 }
 
 # walk: reads the commands in rest: each one's target (the first it names; empty is
@@ -701,7 +707,7 @@ run_walk() {
     targets+=U$nl
     kept+=$held$rest past+=$rest held=""
   fi
-  HQ=() HT=() HP=()
+  HQ=() HT=() HP=() HN=()
 }
 
 # The command's own walk. Directories: edir, where the walk is; dunk=1 once it cannot
@@ -709,7 +715,7 @@ run_walk() {
 # cd joined by && to the step before it.
 targets=$nl unread_api="" kept="" past="" held="" late="" nest="" subst=""
 edir=$PWD dunk="" compound="" cdif="" sepb="" sep=""
-QB=() QE=() QU=() HQ=() HT=() HP=()
+QB=() QE=() QU=() HQ=() HT=() HP=() HN=()
 fresh
 rest=$text
 run_walk

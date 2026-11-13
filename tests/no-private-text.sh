@@ -367,7 +367,7 @@ check "a file flag before gh is no flag of gh" '[ "$(HOME=$outhome reason "echo 
 check "a file named only in a body is not read" '[ -z "$(decision "gh pr comment 5 --body \"see --body-file word.md\"")" ]'
 c="gh pr comment 5 --body 'don'\\''t see --body-file \"$HOME/clean.md\"'"
 check "a home path after a file flag in a single-quoted body with an escaped quote is a local path" '[ "$(reason "$c")" = "$path_hit" ]'
-c="cat >f <<EOF
+c="cat >draft.md <<EOF
 gh pr comment 5 --body-file \"$HOME/clean.md\"
 EOF
 gh pr comment 5 --body-file clean.md"
@@ -383,6 +383,13 @@ about stubcodename
 EOF
 gh pr comment 5 $g"
   check "a heredoc written to a file a later word may name stays checked: $g" '[ "$(decision "$c")" = ask ]'
+done
+for g in 'body.md:-Fbody.md' 'Body.md:--body-file body.md'; do
+  c="cat >${g%%:*} <<EOF
+about stubcodename
+EOF
+gh pr comment 5 ${g#*:}"
+  check "a heredoc written to ${g%%:*} and read by ${g#*:} stays checked" '[ "$(decision "$c")" = ask ]'
 done
 c='cat <<EOF | gh pr comment 5 --body-file -
 about stubcodename
