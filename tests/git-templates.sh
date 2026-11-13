@@ -230,6 +230,17 @@ A push -q split feat/x:trunk; rc=$?
 check "with a pushurl, the default branch of the repository pushed to is refused" '[ "$rc" != 0 ] && grep -q "default branch (trunk)" "$STUB/out" && [ "$(git --git-dir="$tmp/pushto.git" rev-parse refs/heads/trunk)" = "$pushed_trunk" ]'
 A push -q split feat/x:main; rc=$?
 check "with a pushurl, the fetch repository's default branch is not the one refused" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/pushto.git" rev-parse refs/heads/main)" = "$(head_of)" ]'
+# A commit the fetch repository has, and so a remote-tracking ref here, but the one
+# pushed to lacks, is scanned.
+g checkout -q -b feat/fetched feat/x; printf 'token = stubmatchedtext\n' >"$repo/fetched.txt"; g add fetched.txt; g commit -q -m fetched
+g push -q "$tmp/fetch.git" feat/fetched; g fetch -q split; g checkout -q feat/x
+reset; A push -q split feat/fetched:refs/heads/feat/fetched-new; rc=$?
+check "with a pushurl, a secret the fetch repository has but the one pushed to lacks is refused" \
+  '[ "$rc" != 0 ] && ! git --git-dir="$tmp/pushto.git" rev-parse -q --verify refs/heads/feat/fetched-new >/dev/null && grep -qF "stub-rule in fetched.txt" "$STUB/out"'
+# When the refs of the repository pushed to cannot be read, commits it may have are
+# scanned too: here kept.txt's secret, which origin has.
+reset; (cd "$repo" && printf 'refs/heads/feat/x %s refs/heads/feat/unread %040d\n' "$(head_of)" 0 | "$tpl/pre-push" origin "$tmp/unreadable.git") >"$STUB/out" 2>&1; rc=$?
+check "when the refs of the repository pushed to cannot be read, every commit reachable from the push is scanned" '[ "$rc" != 0 ] && grep -qF "stub-rule in kept.txt" "$STUB/out"'
 reset; M push -q origin feat/x:main; rc=$?
 check "the maintainer's git runs no template: a push to the default branch goes through" '[ "$rc" = 0 ] && [ "$(remote_head main)" = "$(head_of)" ]'
 check "the pushes leave no temporary files" '[ -z "$(ls -A "$TMPDIR")" ]'
