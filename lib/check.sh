@@ -10,7 +10,8 @@
 # organization member or collaborator, to compare them with the list, and prints only
 # how many are missing. With no list, it says nothing about it.
 # When claude is installed, it reads the local plugin list, and prints only the scope
-# and version of each copy of the Mentat plugin.
+# and version of each copy of the Mentat plugin. A missing or changed installed git hook
+# template (lib/templates.sh) is a problem.
 KEPT_BRANCHES_FILE="$HOME/.config/mentat/warn-kept-branches"
 check_problems=0 check_warnings=0
 c_ok() { printf 'OK: %s\n' "$1"; }
@@ -88,6 +89,8 @@ check() {
     v=$(gitleaks version 2>/dev/null | head -n 1)
     c_ok "gitleaks is installed (${v:-version unknown})"
   else c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
+  # shellcheck disable=SC2154 # root, Mentat's folder, is set by bin/mentat.
+  if v=$(templates_state "$root"); then c_ok "$v"; else c_problem "$v"; fi
   c_plugin_copies
   # The publish check still looks for the home path without the list. No list is not a warning.
   if [ ! -e "$PRIVATE_WORDS" ]; then :

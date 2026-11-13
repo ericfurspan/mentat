@@ -2,10 +2,10 @@
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for git-templates/ (the pre-commit and pre-push templates, the scanner
-# and own-hook.sh). An agent's git names the templates' folder in core.hooksPath
-# through GIT_CONFIG_* entries; the maintainer's git has no such entries. A stub
-# gitleaks and local bare repositories stand in for the real ones. Prints PASS/FAIL per
-# case; exits 1 on any FAIL.
+# and own-hook.sh) and the session-start check of the installed copy. An agent's git
+# names the templates' folder in core.hooksPath through GIT_CONFIG_* entries; the
+# maintainer's git has no such entries. A stub gitleaks and local bare repositories
+# stand in for the real ones. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -295,5 +295,29 @@ reset; stage_clean partial; h=$(head_of)
 check "a missing own-hook.sh refuses the commit and says so" '[ "$rc" = 1 ] && [ "$(head_of)" = "$h" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
 reset; (cd "$repo" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/partial/hooks" git push -q origin feat/x:feat/partial) >"$STUB/out" 2>&1; rc=$?
 check "a missing own-hook.sh refuses the push and says so" '[ "$rc" != 0 ] && [ -z "$(remote_head feat/partial)" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
+
+# The session-start check of the installed copy.
+inst="$tmp/installed"
+cp -Rp "$root/git-templates" "$inst"
+start() { MENTAT_GIT_TEMPLATES_DIR=$inst "$root/hooks/session-start" >"$STUB/start" 2>&1; }
+problem_first() { head -n 1 "$STUB/start" | grep -qF "Mentat PROBLEM: the git hook templates in $inst $1" && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"; }
+rm -rf "${STUB:?}"/*; start; rc=$?
+check "session start: an installed and current copy prints rules.md alone" '[ "$rc" = 0 ] && cmp -s "$STUB/start" "$root/rules.md"'
+for f in scan own-hook.sh hooks/pre-commit hooks/pre-push; do
+  mv "$inst/$f" "$tmp/away"; start; rc=$?; mv "$tmp/away" "$inst/$f"
+  check "session start: a missing $f prints a problem line naming it, then rules.md" '[ "$rc" = 0 ] && problem_first "are missing or not executable ($f)"'
+  cp -p "$inst/$f" "$tmp/keep"; printf '# changed\n' >>"$inst/$f"; start; rc=$?; mv "$tmp/keep" "$inst/$f"
+  check "session start: a changed $f prints a problem line naming it, then rules.md" '[ "$rc" = 0 ] && problem_first "differ from this copy of Mentat ($f)"'
+done
+chmod -x "$inst/hooks/pre-push"; start; rc=$?; chmod +x "$inst/hooks/pre-push"
+check "session start: a template that is not executable is a problem" '[ "$rc" = 0 ] && problem_first "are missing or not executable (hooks/pre-push)"'
+rm -rf "$inst"; start; rc=$?
+check "session start: a missing folder names every file" '[ "$rc" = 0 ] && problem_first "are missing or not executable (scan own-hook.sh hooks/pre-commit hooks/pre-push)"'
+# A plugin copy without lib/templates.sh still prints the rules, after a problem line.
+mkdir -p "$tmp/plugin/hooks"
+cp "$root/hooks/session-start" "$tmp/plugin/hooks/"; cp "$root/rules.md" "$tmp/plugin/"
+"$tmp/plugin/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+check "session start: a check that cannot run says so, then prints rules.md" \
+  '[ "$rc" = 0 ] && [ "$(head -n 1 "$STUB/start")" = "Mentat PROBLEM: the installed git hook templates could not be checked. Tell the maintainer before anything else, and run mentat check." ] && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
 
 [ "$failures" -eq 0 ]

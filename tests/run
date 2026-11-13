@@ -189,8 +189,12 @@ fi
 # included, stays under a limit just above its current size, well under Claude Code's
 # 10,000-character cap on a hook's output. Growth past the limit raises it in the same pull
 # request, with the maintainer's agreement in the spec. It counts bytes, never fewer than
-# characters, so it is never looser than the cap.
+# characters, so it is never looser than the cap. These runs see an installed and current
+# copy of the git hook templates; tests/git-templates.sh covers the problem line.
 hook_file=$(mktemp) || exit 1
+templates_copy=$(mktemp -d) || exit 1
+cp -Rp git-templates "$templates_copy/" || exit 1
+export MENTAT_GIT_TEMPLATES_DIR="$templates_copy/git-templates"
 if hooks/session-start >"$hook_file"; then
   hook_size=$(wc -c <"$hook_file" | tr -d ' ')
   if ! cmp -s "$hook_file" rules.md; then
@@ -211,6 +215,8 @@ if hook_out=$(cd /tmp && "$hook_script") && [ "$hook_out" = "$(cat rules.md)" ];
 else
   fail "hooks/session-start differs when run from another directory"
 fi
+rm -rf "$templates_copy"
+unset MENTAT_GIT_TEMPLATES_DIR
 
 # The safety rules in rules.md match tests/fixtures/rules-safety.md exactly: the Approval and
 # "What agents never do" sections (heading to the next level-two heading, trailing blank lines

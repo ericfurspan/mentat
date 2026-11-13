@@ -80,6 +80,9 @@ chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude" "$
 export PATH="$root/bin:$PATH"
 
 export HOME="$root/home"
+# An installed and current copy of the git hook templates, for every case but those that change it.
+export MENTAT_GIT_TEMPLATES_DIR="$root/templates"
+cp -Rp "$(dirname "$mentat")/../git-templates" "$MENTAT_GIT_TEMPLATES_DIR"
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$(dirname "$LIST")"
 echo stubword >"$LIST"
@@ -117,6 +120,18 @@ mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/no
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a missing gitleaks warns, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: gitleaks is not installed: the commit hook does not scan staged changes for likely secrets" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 
+# The installed git hook templates: current is OK; a missing, changed or not executable file is a problem.
+TPL=$MENTAT_GIT_TEMPLATES_DIR
+reset; rc=$(run)
+check "installed and current git hook templates are OK" '[ "$rc" = 0 ] && grep -qxF "OK: the git hook templates in $TPL are installed and current" "$STUB/out"'
+mv "$TPL/scan" "$root/scan.away"; reset; rc=$(run); mv "$root/scan.away" "$TPL/scan"
+check "a missing installed scanner is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates in $TPL are missing or not executable (scan), so agents'"'"' git may run no commit or push checks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+cp -p "$TPL/hooks/pre-push" "$root/pre-push.keep"; printf '# changed\n' >>"$TPL/hooks/pre-push"; reset; rc=$(run); mv "$root/pre-push.keep" "$TPL/hooks/pre-push"
+check "a changed installed template is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates in $TPL differ from this copy of Mentat (hooks/pre-push), so agents'"'"' git runs other commit and push checks" "$STUB/out"'
+chmod -x "$TPL/hooks/pre-commit"; reset; rc=$(run); chmod +x "$TPL/hooks/pre-commit"
+check "an installed template that is not executable is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qF "are missing or not executable (hooks/pre-commit)" "$STUB/out"'
+reset; rc=$(cd "$root/cwd" && MENTAT_GIT_TEMPLATES_DIR="$root/none" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "a missing templates folder names every file" '[ "$rc" = 1 ] && grep -qF "in $root/none are missing or not executable (scan own-hook.sh hooks/pre-commit hooks/pre-push)" "$STUB/out"'
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 reset; touch "$STUB/unreadable"; rc=$(run)
