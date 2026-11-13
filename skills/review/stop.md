@@ -8,7 +8,7 @@ A stop is pending after any completed round from round three on (round two on th
 
 At the end of the round, and on resume while the answer is pending:
 
-1. Rewrite the status line with the state `Blocked: reassessing after round <n>` (Skill tool, `mentat:pr`).
+1. Rewrite the Status line with the state `Blocked: reassessing after round <n>` (Skill tool, `mentat:pr`).
 2. On the Codex path, where `grok` is installed and `mentat status <N>` shows `grok stop: none`, run `mentat review --grok --stop <N>`, with `--request <file>` and `--require-ci` as `mentat:review` "Spec" and step 1 say; exit 3 runs it again. With any other `grok stop:` value, run nothing: re-read its comment, naming its head and spec fingerprint from that field (`running on` is did not finish unless this session's own run is still going). On the Claude-only path Grok is off.
 3. Ask the question below. It is the loop's tell-the-maintainer.
 
@@ -32,11 +32,11 @@ At any round, new evidence that the change cannot meet its goal sets `Blocked: <
 
 ## Durable pause
 
-One Verification line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision.
+One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision.
 
 ## Started sessions
 
-A build session another session started sends the question to its starting session and waits (`rules.md` "Sessions"). On close, the starting session cancels the item from the maintainer's answer, then forwards "close"; the build session closes the pull request and writes the Verification line. No relayed write, no second ask.
+A build session another session started sends the question to its starting session and waits (`rules.md` "Sessions"). On close, the starting session cancels the item from the maintainer's answer, then forwards "close"; the build session closes the pull request and writes the Review details line. No relayed write, no second ask.
 
 ## Grok coverage
 
