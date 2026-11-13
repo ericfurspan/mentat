@@ -4,10 +4,13 @@
 # branch of the repository pushed to (from git ls-remote --symref <push URL> HEAD, else
 # refs/remotes/<remote>/HEAD, else main and master), whether an update, a force push or
 # a deletion, and when the outgoing commits add a likely secret or the scan cannot run.
-# Each commit is scanned on its own diff; merge commits show no diff. Other branches and
-# tags pass, force pushes and deletions included. Then it runs the repository's own
-# pre-push hook (own-hook.sh) with the same arguments and ref lines. Git hooks cannot
-# ask, so each check refuses. This is a net for common mistakes, not a security boundary.
+# Each commit is scanned on its own diff as text, root commits and files git treats as
+# binary included; a merge commit on what its resolution changed from git's own merge of
+# its parents (--diff-merges=remerge, git 2.36 or later; an older git refuses). Other
+# branches and tags pass, force pushes and deletions included. Then it runs the
+# repository's own pre-push hook (own-hook.sh) with the same arguments and ref lines.
+# Git hooks cannot ask, so each check refuses. This is a net for common mistakes, not a
+# security boundary.
 set -uo pipefail
 
 here=${0%/*}
@@ -49,7 +52,7 @@ while read -r _ lsha rref rsha <&3; do
   else
     range=("$lsha" --not "--remotes=$remote")
   fi
-  out=$(git -c core.quotePath=false log -p --no-relative --no-ext-diff --no-textconv --no-color -U0 \
+  out=$(git -c core.quotePath=false log -p --root --text --diff-merges=remerge --no-relative --no-ext-diff --no-textconv --no-color -U0 \
     --src-prefix=a/ --dst-prefix=b/ --format='commit %H' "${range[@]}" --) ||
     refuse "git could not list the outgoing commits of $rref, so they were not scanned for secrets."
   [ -z "$out" ] || diffs+=$out$'\n'

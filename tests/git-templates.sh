@@ -43,7 +43,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ ! -f "$STUB/error" ] || exit 1
-lines=$(grep -n stubmatchedtext "$STUB/stdin" | cut -d: -f1)
+lines=$(grep -an stubmatchedtext "$STUB/stdin" | cut -d: -f1)
 if [ -z "$lines" ]; then echo '[]' >"$report"; exit 0; fi
 printf '%s\n' "$lines" | jq -R 'tonumber | {RuleID: "stub-rule", StartLine: ., File: "", Secret: "stubmatchedtext", Match: "token = stubmatchedtext"}' | jq -s . >"$report"
 exit "$code"
@@ -166,6 +166,47 @@ check "an outgoing commit that adds a secret is refused, naming the file, even i
 reset; git -C "$repo" checkout -q feat/x
 A push -q origin feat/x:feat/clean; rc=$?
 check "outgoing commits already on the remote are not scanned again" '[ "$rc" = 0 ] && { [ ! -e "$STUB/stdin" ] || ! grep -q "token = stubmatchedtext" "$STUB/stdin"; }'
+# A merge commit is scanned on what its resolution changed. g: git for setup, with no templates.
+g() { git -C "$repo" "$@" >/dev/null 2>&1; }
+g checkout -q -b feat/m1 feat/x; printf 'x\n' >"$repo/m.txt"; g add m.txt; g commit -q -m "m base"
+g checkout -q -b feat/m2; printf 'two\n' >"$repo/m.txt"; g commit -q -am two
+g checkout -q feat/m1; printf 'one\n' >"$repo/m.txt"; g commit -q -am one
+g merge feat/m2; printf 'token = stubmatchedtext\n' >"$repo/m.txt"; g add m.txt; g commit -q --no-edit
+reset; A push -q origin feat/m1; rc=$?
+check "a secret added only while resolving a merge is refused, naming the file" \
+  '[ "$rc" != 0 ] && [ -z "$(remote_head feat/m1)" ] && grep -qF "stub-rule in m.txt" "$STUB/out" && no_leak'
+g checkout -q -b feat/side feat/x; printf 'token = stubmatchedtext\n' >"$repo/side.txt"; g add side.txt; g commit -q -m side
+M push -q origin feat/side
+g checkout -q -b feat/m3 feat/x; g commit -q --allow-empty -m m3; g merge --no-ff -m "merge side" feat/side
+reset; A push -q origin feat/m3; rc=$?
+check "a clean merge of commits already on the remote is not refused for what they added" '[ "$rc" = 0 ] && [ "$(remote_head feat/m3)" = "$(head_of)" ]'
+g checkout -q feat/x
+# Files git treats as binary (-diff, binary) are scanned as text; real binary content passes.
+g checkout -q -b feat/bin feat/x
+printf '*.lock -diff\n*.dat binary\n' >"$repo/.gitattributes"; g add .gitattributes; g commit -q -m attributes
+for f in a.lock b.dat; do
+  reset; printf 'one\ntoken = stubmatchedtext\n' >"$repo/$f"; git -C "$repo" add "$f"; h=$(head_of)
+  A commit -q -m "add $f"; rc=$?
+  check "a staged secret in $f, which .gitattributes marks as binary, is refused" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ] && grep -qF "stub-rule in $f" "$STUB/out"'
+done
+reset; head -c 4096 /dev/urandom >"$repo/random.bin"; printf 'x\0y\n' >>"$repo/random.bin"; git -C "$repo" add random.bin; h=$(head_of)
+A commit -q -m "add random.bin"; rc=$?
+check "a binary file with no secret commits" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ]'
+reset; printf 'token = stubmatchedtext\n' >"$repo/c.lock"; g add c.lock; g commit -q -m "c.lock"
+A push -q origin feat/bin; rc=$?
+check "an outgoing secret in a file .gitattributes marks as binary is refused" '[ "$rc" != 0 ] && [ -z "$(remote_head feat/bin)" ] && grep -qF "stub-rule in c.lock" "$STUB/out"'
+g reset -q --hard HEAD~1
+reset; A push -q origin feat/bin; rc=$?
+check "outgoing binary content with no secret is pushed" '[ "$rc" = 0 ] && [ "$(remote_head feat/bin)" = "$(head_of)" ]'
+g checkout -q feat/x
+# A root commit is scanned even with log.showRoot off.
+g config log.showRoot false
+g checkout -q --orphan feat/root; g rm -rq --cached .; g clean -fdxq
+printf 'token = stubmatchedtext\n' >"$repo/root.txt"; g add root.txt; g commit -q -m root
+reset; A push -q origin feat/root; rc=$?
+check "with log.showRoot off, a secret in a root commit is refused" '[ "$rc" != 0 ] && [ -z "$(remote_head feat/root)" ] && grep -qF "stub-rule in root.txt" "$STUB/out"'
+g config --unset log.showRoot
+g checkout -q -f feat/x
 # The remote's own HEAD names the default branch: here trunk, not main.
 git init -q --bare "$tmp/trunk.git"
 git -C "$repo" push -q "$tmp/trunk.git" feat/x:trunk feat/x:main

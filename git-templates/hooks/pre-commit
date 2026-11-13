@@ -3,12 +3,13 @@
 # refuses a commit whose staged changes add a likely secret, or when the scan cannot
 # run, then runs the repository's own pre-commit hook (own-hook.sh). Git hands it the
 # index the commit will use, so git commit -a and a commit naming paths are scanned for
-# what they commit. This is a net for common mistakes, not a security boundary.
+# what they commit, as text, files git treats as binary included. This is a net for
+# common mistakes, not a security boundary.
 set -uo pipefail
 
 here=${0%/*}
 scan=$here/../scan
-diff=$(git -c core.quotePath=false diff --cached --no-relative --no-ext-diff --no-textconv \
+diff=$(git -c core.quotePath=false diff --cached --text --no-relative --no-ext-diff --no-textconv \
   --no-color -U0 --src-prefix=a/ --dst-prefix=b/) || {
   printf 'Mentat: commit refused: git could not list the staged changes, so they were not scanned for secrets.\n' >&2
   exit 1
