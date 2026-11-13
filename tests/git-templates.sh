@@ -431,7 +431,7 @@ check "git init in place works under the templates" '[ "$rc" = 0 ] && [ -d "$tmp
 # Where git cannot tell the repository yet, as while git init creates it, GIT_DIR names it.
 mkdir -p "$tmp/half/hooks" "$tmp/elsewhere"
 own "$tmp/half/hooks/post-commit" half
-rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$tpl/post-commit" one) >"$STUB/out" 2>&1; rc=$?
+rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$tpl/post-commit" one) </dev/null >"$STUB/out" 2>&1; rc=$?
 check "with no repository git can read, a template runs the own hook in GIT_DIR/hooks" '[ "$rc" = 0 ] && [ "$(cat "$STUB/half.args" 2>/dev/null)" = "[one]" ]'
 
 # The session-start check of the installed copy.
