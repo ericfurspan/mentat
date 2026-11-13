@@ -15,7 +15,7 @@
 # binary included; a merge commit on what its resolution changed from git's own merge of
 # its parents (--diff-merges=remerge, git 2.36 or later; an older git refuses), and one
 # of three or more parents, which remerge does not show, on its diff from git's own merge
-# of its parents built with git merge-tree (git 2.40 or later), else from its first
+# of its parents built with git merge-tree where it can, else from its first
 # parent. Other branches and tags pass, force pushes and deletions included. Then it runs the
 # repository's own pre-push hook (own-hook.sh) with the same arguments and ref lines.
 # Git hooks cannot ask, so each check refuses. This is a net for common mistakes, not a
@@ -72,7 +72,8 @@ fi
 # auto_merge <merge>: prints the tree of git's own merge of the merge's parents, built as
 # the octopus strategy does: each parent after the first merged in turn, on its merge
 # base with those before it. Fails on a conflict, on no or several merge bases, or on a
-# git older than 2.40. git merge-tree leaves the trees it writes as loose objects.
+# git whose merge-tree --merge-base does not take trees. git merge-tree leaves the trees
+# it writes as loose objects.
 auto_merge() {
   local parents p merged="" tree="" base
   parents=$(git rev-parse "$1^@" 2>/dev/null) || return 1
