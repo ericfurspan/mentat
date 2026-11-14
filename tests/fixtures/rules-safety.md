@@ -4,9 +4,9 @@ Read every applicable AGENTS.md first; it wins only on commit and title format, 
 The maintainer merges every pull request.
 
 ## What agents never do
-Merge pull requests, turn on auto-merge, use `--admin`, or work around a merge refusal.
+Merge pull requests, turn on auto-merge, use `--admin`, or bypass a merge refusal.
 
-Create releases, deploy, publish, change secrets, run production migrations or destructive outside operations; agents only prepare these.
+Create releases, deploy, publish, change secrets, run production migrations or destructive outside operations, beyond preparing them.
 
 Commit secrets. Exposed ones are reported to the maintainer at once, for rotation, not just deletion.
 
