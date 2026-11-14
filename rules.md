@@ -2,7 +2,7 @@
 
 The maintainer owns the repository; Claude Code plans and builds; fresh-context Claude reviews.
 
-Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels and templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
+Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels, templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
 Call `mentat:propose` before giving a view on or suggesting a change.
 
@@ -31,7 +31,7 @@ Restate a repeated correction in one line, then follow it.
 The maintainer merges every pull request.
 
 ## What agents never do
-Merge pull requests, turn on auto-merge, use `--admin`, or bypass a merge refusal.
+Merge pull requests, turn on auto-merge, use `--admin`, or work around a merge refusal.
 
 Create releases, deploy, publish, change secrets, run production migrations or destructive outside operations, beyond preparing them.
 
