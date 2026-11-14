@@ -1,6 +1,6 @@
 # Reading an item
 
-With either tracker, read this before reading an item to plan, propose, triage or build it, or to record an answer on it, and again after a compaction. Tracker details are as the tracker's adapter says (`linear.md` "Reading an item", `github.md`).
+With either tracker, read this before reading an item to plan, propose, triage or build it, or to record an answer on it, and again after a compaction. Tracker details are as the tracker's adapter says (`mentat-linear:linear` "Reading an item", `github.md`).
 
 ## The full read
 

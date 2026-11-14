@@ -16,7 +16,7 @@
     {
       "name": "mentat-linear",
       "source": "./plugins/mentat-linear",
-      "description": "Mentat module, empty for now: will hold the Linear backlog adapter, project-comment triage and the intake readers."
+      "description": "Mentat module: the Linear backlog adapter, for a repository whose AGENTS.md names a Linear project."
     },
     {
       "name": "mentat-extras",

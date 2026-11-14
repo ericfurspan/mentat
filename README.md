@@ -60,7 +60,7 @@ Mentat reads these from AGENTS.md:
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
-Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/linear.md#moving-to-linear).
+Moving a repository's backlog to Linear is a hand step: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
 
 ## Review tools
 

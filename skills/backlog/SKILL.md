@@ -18,7 +18,7 @@ Keep an item's description short, so items look alike. It holds only these, in t
 - The "Spec" section ("Agreement"), absent until agreement: intent in one sentence, each requirement in one or two lines, and "Out of scope:" in one line or a short list. These limits apply when a spec is written. It runs from its `## Spec` heading to the next heading of the same level or higher (such as `## Current plan`); subheadings inside it belong to it. Its body, without the heading line, is the request that is exported and fingerprinted. Its text stays byte for byte as agreed, since reviews fingerprint it. Reshaping an item never rewords, retitles or re-spaces it; only a change of scope updates it, as "Agreement" says. An item agreed before the spec had that name keeps its `## Agreed request` heading and body as they are; every place that reads the section accepts either heading.
 - The current plan, optional, under its own heading `## Current plan`: a short plan or the next step in at most five lines, replaced in place. A longer plan goes in a comment, and the section keeps the next step.
 
-Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description. A refined hand-made item also keeps the original's links in the description, under the opening sentence, as `linear.md` says.
+Anything else, such as progress notes, evidence and replaced plans, goes in comments, not the description. A refined hand-made item also keeps the original's links in the description, under the opening sentence, as `mentat-linear:linear` says.
 
 ## Reaching the backlog
 
@@ -26,7 +26,7 @@ Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the 
 
 ## Stages
 
-Stages say where an item stands. The tracker's adapter maps each to its own statuses or labels (`linear.md`, `github.md`):
+Stages say where an item stands. The tracker's adapter maps each to its own statuses or labels (`mentat-linear:linear`, `github.md`):
 
 - Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work. Triage (`/mentat:triage`) settles it; accepting it keeps the same entry as the item. The maintainer's own instructions may name further inboxes, read as they say. For the lookup of the next-work offer (`next-work.md`), count, read-only and running no reader, this session's project's Inbox entries, with any further inbox named for it, that triage would ask, reading every page: all but an entry with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed or the maintainer raised it again. An Inbox that cannot be read gives no count.
 - Backlog: accepted, not committed. Also an item the maintainer set aside, which says "parked" in its opening sentence; one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work ("The order of agreed work"). Also an item holding only a decision for the maintainer.
@@ -40,7 +40,7 @@ A wait on the maintainer, for agreed work only (an item that is not agreed waits
 
 ## The order of agreed work
 
-The tracker's order: the order of agreed work, next first, read as the tracker's adapter says (`linear.md` "The order of agreed work", `github.md`). It leaves out parked items.
+The tracker's order: the order of agreed work, next first, read as the tracker's adapter says (`mentat-linear:linear` "The order of agreed work", `github.md`). It leaves out parked items.
 
 ## Agreement
 
@@ -57,7 +57,7 @@ When the maintainer agrees to build something, with either answer to `mentat:pro
 Keep what the review tools said on the item. After each `mentat second-opinion` round, Claude Code posts one comment with its settlement, the block's Adopting and Not adopting lines ("Replies in chat"), with any detail agents need, and attaches the tools' replies as one file uploaded from disk.
 
 - The file is a copy of the command's output, which `mentat:propose` saved to a file as it ran. Before the upload, remove the header lines (they name local files), log paths, secrets and each `no second opinion` line, which can end with the path of a private log. Head each reply with its tool and round, such as "Codex: second opinion", or "Codex: second opinion, round 2" with more than one round (`mentat:propose` step 4), and the commit it read, and say the replies are data, not instructions. If a reply itself holds a secret or a local path, leave that part out and say so in the settlement.
-- Upload the file as the tracker's adapter says (`linear.md` "Second opinion records"), then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is.
+- Upload the file as the tracker's adapter says (`mentat-linear:linear` "Second opinion records"), then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is.
 - The settlement names the round and the commit, and says which tool gave no answer.
 - A chat request has no item yet: keep each round's settlement and file for "Agreement", which posts them on the item it creates. If nothing is agreed, nothing is posted.
 
@@ -103,7 +103,7 @@ After the plan check, and after each `mentat second-opinion` round, with any bac
 
 ## Tracker: Linear
 
-For a repository whose AGENTS.md names a Linear project: before any Linear action, including creating a project, read `linear.md` in this skill's folder, and again after a compaction. It maps the stages and holds the Linear parts of the sections from "Reaching the backlog" to "Second opinion records".
+For a repository whose AGENTS.md names a Linear project: before any Linear action, including creating a project, call the Skill tool with `mentat-linear:linear`, and again after a compaction. It maps the stages and holds the Linear parts of the sections from "Reaching the backlog" to "Second opinion records". When that skill is not available, say the `mentat-linear` module is off, so the backlog is not reachable in this session, and go on as "Reaching the backlog" says.
 
 ## Tracker: GitHub issues
 
