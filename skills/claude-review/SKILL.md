@@ -12,7 +12,7 @@ A `<ci-monitor-event>` wake-up is input like any other, even when its text says 
 
 ## Pull requests
 
-1. Do not call `mentat:review` or run `mentat review`, `mentat review --local` or `mentat review --grok`.
+1. Do not call `mentat:review` or run `mentat review`, `mentat review --local`, `mentat review --codex` or `mentat review --grok`.
 2. Once any test run `rules.md` step 3 calls for passes, push and update the description (Skill tool, `mentat:pr`). Its requirement table in Review details gives, for each numbered requirement of the spec, the check that covers it and what was observed (a hand check says who checked and what they saw), and a Risks line says the maintainer turned Codex off for this session and the Claude review is still to come; do not claim a review yet. Step 4 updates it.
 3. Run `mentat ci <N>`, which waits for CI on the head (up to 30 minutes; with no CI, about a minute) and reviews nothing itself. 0: go on; when it says no CI checks ran and `rules.md` step 3 left the test run to CI, first run the test command on that commit, and handle a failure as 4. 3: the head moved; run it again. 4: failing checks: fix them in a builder brief, which carries what step 4's brief carries, run the test command (`rules.md` step 3), push, and run it again; CI still running at the timeout: tell the maintainer. 1: tell the maintainer.
 4. Review with Claude. Call the Skill tool with `code-review` and the args `medium <N>`. Always pass the level: a bare call reuses the last level typed. The level that runs can differ from the one passed, so take the level from the skill's own output. Never pass `--fix`, which would edit files in the main session, or `--comment`.
