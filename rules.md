@@ -2,7 +2,7 @@
 
 The maintainer owns the repository. Claude Code plans and builds; a fresh-context Claude reviews.
 
-Read every applicable AGENTS.md first; it wins on preferences. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
+Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels and templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
 Call `mentat:propose` before giving a view on or suggesting a change.
 

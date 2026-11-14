@@ -1,4 +1,4 @@
-Read every applicable AGENTS.md first; it wins on preferences. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
+Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels and templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
 ## Approval
 The maintainer merges every pull request.
