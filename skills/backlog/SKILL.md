@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Plan check record".
+With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Filing", "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Plan check record".
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -46,7 +46,7 @@ The tracker's order: the order of agreed work, next first, read as the tracker's
 
 When the maintainer agrees to build something, with either answer to `mentat:propose`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item. Then:
 
-- Write a `## Spec` section in the item, as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable; and "Out of scope:", what is left alone. Scale it to the change: a bug fix is a few lines. Each requirement is a line the requirement table in the pull request's Review details cites by number, and one the maintainer checks by hand says so. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: the `rules.md` record rules apply, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
+- Write a `## Spec` section in the item, as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable; and "Out of scope:", what is left alone. Scale it to the change: a bug fix is a few lines. Each requirement is a line the requirement table in the pull request's Review details cites by number, and one the maintainer checks by hand says so. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: `records.md` in this skill's folder applies, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
 - On an item created here, post the plan check record kept for it as "Plan check record" says, and post Claude Code's settlement and upload the replies file of each second opinion round kept for it as "Second opinion records" says.
 - Record the spec's fingerprint. Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as `mentat:review` "Spec" computes it (the same span, the same command), never from the text written, and post one comment on the item: `Spec fingerprint: <12 hex>; build: now` or `Spec fingerprint: <12 hex>; build: later`, after the answer to `mentat:propose`'s agreement question, citing the agreement. Do it again, with that agreement's answer, whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint and answer.
 - A change of scope updates the section, in the same words. Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the section only once agreed through `mentat:propose`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, linking the item.
@@ -65,6 +65,10 @@ Keep what the review tools said on the item. After each `mentat second-opinion` 
 
 With an external backlog, after the plan check, post one comment on the item as `replies.md` "Plan check record" says. A chat request has no item yet: keep the record for "Agreement", which posts it on the item it creates; if nothing is agreed, nothing is posted.
 
+## Filing
+
+With either tracker, before filing an entry or item, read `filing.md` in this skill's folder, and again after a compaction.
+
 ## Titles
 
 With either tracker, when an item's or issue's agreed spec, or a not-agreed item's current plan, changes so the title no longer says what the item does, the same write rewrites the item's title, keeping its identifier. Scope triage merged in but not yet agreed does not change the title until `mentat:propose` agrees it.
@@ -75,7 +79,7 @@ With either tracker, when Claude Code recommended closing, shrinking or not buil
 
 `Advised against: <close|shrink|not build>; reason: <one line>`
 
-It follows the `rules.md` "Records" rules. The latest such comment stands. `mentat:review` "Final check" says how "Ready to merge: #N" quotes it.
+It follows `records.md`. The latest such comment stands. `mentat:review` "Final check" says how "Ready to merge: #N" quotes it.
 
 ## Material assumptions
 
