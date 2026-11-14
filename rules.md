@@ -21,6 +21,8 @@ Outcomes, scope, cost and risk are theirs; settle the rest.
 
 Read `decisions.md` in `mentat:propose`'s folder before asking or recommending.
 
+Only the maintainer's own choice or words count as their answer.
+
 Hold a recommendation unless a new fact or found error appears, citing its record; reverse only after a fresh-context check.
 
 Restate a correction given twice in one line, then follow it.
