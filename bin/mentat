@@ -66,7 +66,8 @@
 #     (never in review); the local fetch tool is denied.
 #   mentat second-opinion --web <question file>  Has Codex and Grok
 #     each answer any question, in parallel, each in an empty folder with no files and no
-#     repository (it works outside git), with web search on. Prints each reply with its
+#     repository (it works outside git), with web search on. The file holds only the
+#     question, nothing private. Prints each reply with its
 #     answer line. Nothing is posted. 0 at least one tool answered, 1 none did, 64 usage.
 #     Same time limits and effort variables. Grok has web search alone; its
 #     local fetch tool is denied.

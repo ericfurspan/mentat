@@ -14,7 +14,7 @@
 
 # --web is read before anything else, so the web mode never runs a git step.
 second_opinion() {
-  local web=no usage="usage: mentat second-opinion [--web] <file>"
+  local web=no usage="usage: mentat second-opinion [--web] <file> (a --web file holds only the question, nothing private)"
   if [ "${1:-}" = --web ]; then web=yes; shift; fi
   [ $# -eq 1 ] || die "$usage" 64
   if [ "$web" = yes ]; then opinion_web "$1"; else opinion_repo "$1"; fi
