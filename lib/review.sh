@@ -7,12 +7,15 @@ REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 # The reviewer runs in a fresh context that never saw the build, on a configurable model.
 MENTAT_REVIEW_MODEL_DEFAULT=opus
 REVIEW_MODEL="${MENTAT_REVIEW_MODEL:-$MENTAT_REVIEW_MODEL_DEFAULT}"
+# Set and not empty, a pull request's first local Claude round runs on this model instead.
+FIRST_REVIEW_MODEL="${MENTAT_FIRST_REVIEW_MODEL:-}"
 # Read tools only, and no shell: the runner hands the diff and the commit log over as files.
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 
 # Runs Claude in directory $1 on prompt file $2 and writes its reply to $3. On any
 # failure it calls $4 with the reason, which exits. $5 is the folder holding the
-# diff and the log, outside $1, which Claude may also read. Sets the caller's
+# diff and the log, outside $1, which Claude may also read. $6 is the model and $7
+# the setting that chose it, which a failure names. Sets the caller's
 # claude_models to the models that ran, from Claude's own report.
 # --safe-mode loads no CLAUDE.md, hooks, skills or installed plugins, but still lists
 # a plugin folder named in CLAUDE_CODE_PLUGIN_DIRS (Claude Code 2.1.322), so claude
@@ -22,9 +25,9 @@ CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 # denied too (Claude Code 2.1.322). A denied tool call, an error or output that is
 # not Claude's JSON result is not a review.
 run_claude() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" json log rc secs=0 pid n why
-  local hint="the review model is set with MENTAT_REVIEW_MODEL (now $REVIEW_MODEL)"
-  local args=(-p --safe-mode --restricted --add-dir "$data" --model "$REVIEW_MODEL" --permission-mode dontAsk
+  local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" model="$6" key="$7" json log rc secs=0 pid n why
+  local hint="the review model is set with $key (now $model)"
+  local args=(-p --safe-mode --restricted --add-dir "$data" --model "$model" --permission-mode dontAsk
     --tools "$CLAUDE_REVIEW_TOOLS" --allowedTools "$CLAUDE_REVIEW_TOOLS" --output-format json)
   json="${out%/*}/claude.json" log="${out%/*}/claude.log"
   (cd "$dir" && unset CLAUDE_CODE_PLUGIN_DIRS && exec claude "${args[@]}" <"$prompt") >"$json" 2>"$log" &
@@ -77,11 +80,37 @@ review_prep_claude() {
   printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s, and you have no shell. ' "$pr" "$head"
   printf 'Review the change from %s to %s: the diff is in %s and its commits are in %s; read them and the files around the change with your file tools. Do not modify files.\n\n' "$mb" "$head" "$tmp/data/diff" "$tmp/data/log"
 }
-review_run_claude() { run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data"; }
+# Sets the caller's claude_model, the model to review on, and claude_key, the setting
+# that chose it: FIRST_REVIEW_MODEL when it is set and the pull request has no local
+# round yet, counted as mentat status counts them (lib/status.sh), else REVIEW_MODEL.
+# A run that posted no round leaves the next one the first.
+review_model_claude() {
+  # shellcheck disable=SC2034 # status_rounds sets last and last_fp too; local keeps them here
+  local me lines rounds last last_fp
+  claude_model=$REVIEW_MODEL claude_key=MENTAT_REVIEW_MODEL
+  [ -n "$FIRST_REVIEW_MODEL" ] || return 0
+  if ! me=$(gh api user --jq .login) || [ -z "$me" ] || ! lines=$(status_comments "$repo" "$pr" "$me"); then
+    not_reviewed "could not read this account's comments on #$pr, which MENTAT_FIRST_REVIEW_MODEL needs to tell the first round"
+  fi
+  status_rounds "$lines"
+  [ "$rounds" -eq 0 ] || return 0
+  claude_model=$FIRST_REVIEW_MODEL claude_key=MENTAT_FIRST_REVIEW_MODEL
+}
+review_run_claude() {
+  review_model_claude
+  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$claude_model" "$claude_key"
+}
 review_meta_claude() {
-  # The models that ran, from Claude's report, and the one asked for when none of them is it (a fallback).
+  # The models that ran, from Claude's report; the one asked for when none of them is it (a
+  # fallback); and the first-round setting when it chose the model.
+  local asked=$claude_model first=""
+  if [ "$claude_key" = MENTAT_FIRST_REVIEW_MODEL ]; then asked="$claude_key=$claude_model" first="first round, "; fi
   printf -- '- Claude Code: %s\n- Model: %s' "$(claude --version 2>/dev/null | head -n 1 | sed -n 's/^\([0-9][0-9.]*\).*/\1/p')" "$claude_models"
-  case "$claude_models" in *"$REVIEW_MODEL"*) printf '\n' ;; *) printf ' (asked for %s)\n' "$REVIEW_MODEL" ;; esac
+  case "$claude_models" in
+    *"$claude_model"*) [ -z "$first" ] || printf ' (%s%s)' "$first" "$asked" ;;
+    *) printf ' (%sasked for %s)' "$first" "$asked" ;;
+  esac
+  printf '\n'
 }
 
 # A local review reads the pull request's head as GitHub has it, never this
@@ -90,7 +119,7 @@ review_meta_claude() {
 # passed there and the head has not moved since. $1 is the reviewer: claude, the
 # default, or one whose functions (above) a module defines.
 review_local() {
-  local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models=""
+  local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models="" claude_model="" claude_key=""
   "review_name_$reviewer"
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   sweep_leftovers

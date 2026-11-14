@@ -36,9 +36,22 @@ status_comments() { # $1 repo, $2 pull request, $3 this account's login
     else empty end'
 }
 
+# The local rounds in status_comments lines $1: completed Local Claude reviews. An
+# incomplete local review is not a round (skills/review), and a Codex review never is.
+# Sets the caller's rounds (the count), last (the head the last one reviewed) and
+# last_fp (its spec fingerprint). Also read by mentat review.
+status_rounds() {
+  local kind sha res lfp
+  rounds=0 last="" last_fp=""
+  while read -r kind sha res lfp; do
+    [ "$kind" = local ] && [ "$res" != incomplete ] || continue
+    rounds=$((rounds + 1)) last=$sha last_fp=$lfp
+  done <<<"$1"
+}
+
 status() {
   local pr="" request_file="" request fp repo me head lines ci kind sha res lfp
-  local rounds=0 last="" last_fp="" grok=none grok_stop_state=none codex_state=none reviewed out
+  local rounds last last_fp grok=none grok_stop_state=none codex_state=none reviewed out
   [ $# -ge 1 ] && pr=$1
   case "$#:${2:-}" in
     1:) ;;
@@ -60,15 +73,12 @@ status() {
   if ! me=$(gh api user --jq .login) || [ -z "$me" ]; then die "could not read which GitHub account gh is signed in as"; fi
   if ! head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$head" ]; then die "could not read pull request #$pr"; fi
   lines=$(status_comments "$repo" "$pr" "$me") || die "could not read the comments on #$pr"
-  # Completed Local Claude reviews are the rounds, and the last one names the head
-  # reviewed and its spec fingerprint. An incomplete local review is not
-  # a round (skills/review), and a Codex review never is. Grok's start comment
-  # and its result or did-not-finish comment are one run, and the last one says where it stands.
+  status_rounds "$lines"
+  # Grok's start comment and its result or did-not-finish comment are one run, and the last one says where it stands.
   # An incomplete Grok result is posted without a did-not-finish comment (plugins/mentat-reviewers/lib/grok.sh).
   # The Grok stop review is read the same way, naming its head, and its spec fingerprint when done.
   while read -r kind sha res lfp; do
     case "$kind" in
-      local) [ "$res" = incomplete ] && continue; rounds=$((rounds + 1)); last=$sha last_fp=$lfp ;;
       grok-started) grok=running ;;
       grok-done) if [ "$res" = incomplete ]; then grok="did not finish"; else grok='done'; fi ;;
       grok-unfinished) grok="did not finish" ;;
