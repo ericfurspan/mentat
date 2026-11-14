@@ -2,9 +2,10 @@
 # mentat status. Sourced by bin/mentat.
 
 # Status prints one line of a pull request's review state, read from the comments
-# the review commands post (lib/review.sh, lib/grok.sh) and the Claude review rounds
-# skills/claude-review posts. It posts, edits and pushes nothing. Only comments by the
-# account gh is signed in as count: anyone who can comment could post the same text.
+# the review commands post (lib/review.sh, and plugins/mentat-reviewers/lib/codex.sh and
+# grok.sh) and the Claude review rounds skills/claude-review posts. It posts, edits and
+# pushes nothing. Only comments by the account gh is signed in as count: anyone who can
+# comment could post the same text.
 # tests/run fails when a heading these match changes where it is written.
 
 # One line per review comment by $3 on pull request $2 of repository $1, oldest
@@ -66,7 +67,7 @@ status() {
   lines=$(status_comments "$repo" "$pr" "$me") || die "could not read the comments on #$pr"
   # An incomplete local review is not a round (skills/review); Grok's start comment
   # and its result or did-not-finish comment are one run, and the last one says where it stands.
-  # An incomplete Grok result is posted without a did-not-finish comment (lib/grok.sh).
+  # An incomplete Grok result is posted without a did-not-finish comment (plugins/mentat-reviewers/lib/grok.sh).
   # The Grok stop review is read the same way, naming its head, and its spec fingerprint when done.
   while read -r kind sha res lfp; do
     case "$kind" in

@@ -2,7 +2,7 @@
 # shellcheck disable=SC2154 # res, tool and run_pids are the caller's variables
 # The plumbing both modes of mentat second-opinion share: each review tool (Codex,
 # Grok) runs in a background subshell, in parallel, and the result is printed
-# for the maintainer. Sourced by bin/mentat.
+# for the maintainer. Sourced by this module's bin/mentat-second-opinion.
 
 # Each tool runs in its own background subshell, so a failure (which exits) and the
 # EXIT trap that cleans up its folder stay inside it. A runner leaves its result in

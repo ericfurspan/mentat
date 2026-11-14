@@ -128,18 +128,9 @@ c_claude_version() {
     c_problem "Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails and the tool limits of mentat review may not hold: update Claude Code"
   fi
 }
-# The review tools: Claude Code, which mentat review needs, and Codex and Grok, which
-# are optional.
+# The review tool: Claude Code, which mentat review needs.
 c_review_tools() {
-  local v
   command -v claude >/dev/null 2>&1 || c_problem "claude is not installed: mentat review needs Claude Code"
-  if command -v codex >/dev/null 2>&1; then
-    v=$(codex --version 2>/dev/null | head -n 1)
-    c_ok "codex is installed (${v:-version unknown})"
-  else c_ok "codex is not installed (optional: mentat review --codex and mentat second-opinion use it)"; fi
-  command -v grok >/dev/null 2>&1 || return 0
-  v=$(grok --version 2>/dev/null | head -n 1)
-  c_ok "grok is installed (${v:-version unknown})"
 }
 check() {
   local repo tool v d list_ok=""

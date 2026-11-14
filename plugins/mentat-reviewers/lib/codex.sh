@@ -1,11 +1,28 @@
 # shellcheck shell=bash
 # The Codex side of mentat: the Codex sandbox profile and run_codex, which the
-# local review's --codex mode (lib/review.sh) and the second opinion use, with the
-# time limit REVIEW_TIMEOUT_SECONDS. Sourced by bin/mentat.
+# local review's --codex mode (core's lib/review.sh, through the reviewer functions
+# below) and the second opinion use, with core's time limit REVIEW_TIMEOUT_SECONDS.
+# Sourced by this module's bin/ entries.
 
 # Codex runs its own default model, so no model name lives here and a new release
 # needs no change. Effort is pinned.
 CODEX_EFFORT="high"
+
+# Codex as the reviewer of core's review_local (`mentat review --codex`): the functions
+# it calls for reviewer codex, beside Claude's in lib/review.sh. They read review_local's
+# variables.
+# shellcheck disable=SC2034 # name is review_local's
+review_name_codex() { name=Codex; }
+# shellcheck disable=SC2154 # pr, head and mb are review_local's
+review_prep_codex() {
+  printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
+  printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
+}
+# shellcheck disable=SC2154 # tmp and out are review_local's
+review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled; }
+review_meta_codex() {
+  printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT"
+}
 
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory (outside the checkout for a

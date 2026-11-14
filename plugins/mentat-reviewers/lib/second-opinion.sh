@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # mentat second-opinion: the review tools, Codex and Grok, each give a second opinion,
 # in parallel and apart from Claude Code's own view, and the result is printed for the
-# maintainer. Sourced by bin/mentat.
+# maintainer. Sourced by this module's bin/mentat-second-opinion.
 
 # Two modes, each with its own runners behind the shared parallel code in
 # lib/parallel.sh (the runs, their result files, the stop and cancel handlers and the

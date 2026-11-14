@@ -1,6 +1,7 @@
 # shellcheck shell=bash
-# The local review (`mentat review`, `--local` and `--codex`) and its default
-# reviewer, a headless Claude: run_claude. Sourced by bin/mentat.
+# The local review (`mentat review` and `--local`, and the reviewers module's
+# `--codex`) and its default reviewer, a headless Claude: run_claude. Sourced by
+# bin/mentat and by the reviewers module's entries.
 
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 # The reviewer runs in a fresh context that never saw the build, on a configurable model.
@@ -64,54 +65,33 @@ run_claude() {
   [ -s "$out" ] || "$fail" "Claude returned no reply"
 }
 
-# The reviewer's own parts of the local review, for reviewer $1 (claude or codex).
-# review_prep writes the prompt's opening (where to look) to stdout and any files
-# the reviewer reads; review_run runs it; review_meta prints the record's lines on
-# the tool and the model.
-review_prep() { # $1 reviewer
-  case "$1" in
-    claude)
-      git -C "$top" diff --no-ext-diff --no-textconv --no-color "$mb" "$head" >"$tmp/data/diff" || not_reviewed "could not diff $mb..$head"
-      git -C "$top" log --no-color --format=medium "$mb..$head" >"$tmp/data/log" || not_reviewed "could not read the commits $mb..$head"
-      printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s, and you have no shell. ' "$pr" "$head"
-      printf 'Review the change from %s to %s: the diff is in %s and its commits are in %s; read them and the files around the change with your file tools. Do not modify files.\n\n' "$mb" "$head" "$tmp/data/diff" "$tmp/data/log"
-      ;;
-    codex)
-      printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
-      printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
-      ;;
-  esac
+# The reviewer's own parts of the local review, as functions named for reviewer r:
+# review_name_r sets the caller's name, which the heading shows; review_prep_r writes
+# the prompt's opening (where to look) to stdout and any files the reviewer reads;
+# review_run_r runs it; review_meta_r prints the record's lines on the tool and the
+# model. Claude's are here; another reviewer's come with the module that runs it.
+review_name_claude() { name=Claude; }
+review_prep_claude() {
+  git -C "$top" diff --no-ext-diff --no-textconv --no-color "$mb" "$head" >"$tmp/data/diff" || not_reviewed "could not diff $mb..$head"
+  git -C "$top" log --no-color --format=medium "$mb..$head" >"$tmp/data/log" || not_reviewed "could not read the commits $mb..$head"
+  printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s, and you have no shell. ' "$pr" "$head"
+  printf 'Review the change from %s to %s: the diff is in %s and its commits are in %s; read them and the files around the change with your file tools. Do not modify files.\n\n' "$mb" "$head" "$tmp/data/diff" "$tmp/data/log"
 }
-review_run() { # $1 reviewer
-  case "$1" in
-    claude) run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" ;;
-    codex) run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled ;;
-  esac
-}
-review_meta() { # $1 reviewer
-  case "$1" in
-    claude)
-      # The models that ran, from Claude's report, and the one asked for when none of them is it (a fallback).
-      printf -- '- Claude Code: %s\n- Model: %s' "$(claude --version 2>/dev/null | head -n 1 | sed -n 's/^\([0-9][0-9.]*\).*/\1/p')" "$claude_models"
-      case "$claude_models" in *"$REVIEW_MODEL"*) printf '\n' ;; *) printf ' (asked for %s)\n' "$REVIEW_MODEL" ;; esac
-      ;;
-    codex)
-      printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT"
-      ;;
-  esac
+review_run_claude() { run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data"; }
+review_meta_claude() {
+  # The models that ran, from Claude's report, and the one asked for when none of them is it (a fallback).
+  printf -- '- Claude Code: %s\n- Model: %s' "$(claude --version 2>/dev/null | head -n 1 | sed -n 's/^\([0-9][0-9.]*\).*/\1/p')" "$claude_models"
+  case "$claude_models" in *"$REVIEW_MODEL"*) printf '\n' ;; *) printf ' (asked for %s)\n' "$REVIEW_MODEL" ;; esac
 }
 
 # A local review reads the pull request's head as GitHub has it, never this
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, then waits for CI on that commit, and posts the result only once CI
 # passed there and the head has not moved since. $1 is the reviewer: claude, the
-# default, or codex (`mentat review --codex`).
+# default, or one whose functions (above) a module defines.
 review_local() {
   local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models=""
-  case "$reviewer" in
-    claude) name=Claude ;;
-    codex) name=Codex ;;
-  esac
+  "review_name_$reviewer"
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   sweep_leftovers
   review_traps
@@ -154,14 +134,14 @@ review_local() {
   mkdir "$tmp/data" || not_reviewed "could not create a temporary directory"
 
   {
-    review_prep "$reviewer"
+    "review_prep_$reviewer"
     review_criteria ""
     review_requirements "$issues" "$title" "$body" "$request"
     review_result_line
   } >"$tmp/prompt" || not_reviewed "could not write the prompt"
 
   local out="$tmp/review.md" result url held
-  review_run "$reviewer"
+  "review_run_$reviewer"
   localize_review_paths "$out" "$repo" "$head" "$tmp/tree" "$tmp/data" || not_reviewed "could not rewrite the paths in $name's reply"
   result=$(last_line "$out")
   case "$result" in
@@ -177,7 +157,7 @@ review_local() {
     printf '<details><summary>Full review</summary>\n\n'
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
-    review_meta "$reviewer"
+    "review_meta_$reviewer"
     printf -- '- Time: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '\n---\n\n'
     cat "$out"

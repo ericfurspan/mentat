@@ -128,10 +128,10 @@ else
 fi
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
-if grep -l FETCH_HEAD lib/*.sh; then
-  fail "a script under lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"
+if grep -l FETCH_HEAD lib/*.sh plugins/mentat-reviewers/lib/*.sh; then
+  fail "a script under lib/ or the reviewers module's lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"
 else
-  pass "no script under lib/ reads FETCH_HEAD"
+  pass "no script under lib/ or the reviewers module's lib/ reads FETCH_HEAD"
 fi
 
 # mentat status reads review state from the headings the review commands write. Each heading it
@@ -145,14 +145,14 @@ status_heading() {
   fi
 }
 status_heading lib/review.sh "printf '## Local %s review of %s: %s, spec fingerprint %s\n\n' \"\$name\" \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading lib/review.sh "claude) name=Claude ;;"
-status_heading lib/review.sh "codex) name=Codex ;;"
-status_heading lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
-status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
-status_heading lib/grok.sh "printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review started on \$head\""
-status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review did not finish on \$head: \$1\""
+status_heading lib/review.sh "review_name_claude() { name=Claude; }"
+status_heading plugins/mentat-reviewers/lib/codex.sh "review_name_codex() { name=Codex; }"
+status_heading plugins/mentat-reviewers/lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
+status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
+status_heading plugins/mentat-reviewers/lib/grok.sh "printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review started on \$head\""
+status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review did not finish on \$head: \$1\""
 status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
@@ -422,7 +422,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else

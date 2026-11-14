@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# mentat-review-grok: `mentat review --grok`, which bin/mentat hands over with the
+# arguments after --grok. Takes --stop, the stop review, at most once, among the flags
+# every review takes. Usage and exit codes are bin/mentat's.
+set -uo pipefail
+
+module=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
+# shellcheck disable=SC2034 # read by lib/load.sh
+entry=mentat-review-grok via="mentat review --grok" core_libs="shared publish" module_libs=grok
+# shellcheck source=/dev/null
+. "$module/lib/load.sh" || exit 1
+
+grok_stop=no
+grok_flag() { [ "$1" = --stop ] && [ "$grok_stop" = no ] || return 1; grok_stop=yes; }
+review_args grok_flag "$@"
+# shellcheck disable=SC2154 # pr is set by review_args
+review_grok "$pr"
