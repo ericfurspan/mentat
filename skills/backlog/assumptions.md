@@ -13,7 +13,7 @@ Material assumptions:
 - <assumption>; state: <unchecked|holds|false>; evidence: <one line>
 ```
 
-Evidence is in public-safe words (`rules.md` "Records"). When a state changes, including from a builder's report, the main session posts the whole list again in that shape before the next brief. The latest such comment stands.
+Evidence is in public-safe words (`records.md`). When a state changes, including from a builder's report, the main session posts the whole list again in that shape before the next brief. The latest such comment stands.
 
 A builder's brief for an item carries its latest assumptions comment as given, when one exists, read right before the brief. The comment alone never holds an item out of a build queue.
 

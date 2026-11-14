@@ -3,19 +3,16 @@
 
 # Status prints one line of a pull request's review state, read from the comments
 # the review commands post (lib/review.sh, and plugins/mentat-reviewers/lib/codex.sh and
-# grok.sh) and the Claude review rounds skills/claude-review posts. It posts, edits and
-# pushes nothing. Only comments by the account gh is signed in as count: anyone who can
-# comment could post the same text.
+# grok.sh). It posts, edits and pushes nothing. Only comments by the account gh is
+# signed in as count: anyone who can comment could post the same text.
 # tests/run fails when a heading these match changes where it is written.
 
 # One line per review comment by $3 on pull request $2 of repository $1, oldest
 # first: "local <sha> <no-findings|findings|incomplete> <fingerprint>" for a Local
 # Claude review, "codex <sha> <result> <fingerprint>" for a Local Codex review,
-# "claude <sha> <fingerprint or none>", "grok-done <sha> <result> <fingerprint>",
-# "grok-started <sha>", "grok-unfinished <sha>", or the same three for the Grok stop
-# review as "grok-stop-done", "grok-stop-started" and "grok-stop-unfinished". A Claude
-# round's fingerprint is its last line holding only "Agreed request fingerprint: <value>",
-# so findings that quote one do not count.
+# "grok-done <sha> <result> <fingerprint>", "grok-started <sha>", "grok-unfinished <sha>",
+# or the same three for the Grok stop review as "grok-stop-done", "grok-stop-started"
+# and "grok-stop-unfinished".
 status_comments() { # $1 repo, $2 pull request, $3 this account's login
   gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg me "$3" '
     def review($who): capture("^## Local " + $who + " review of (?<sha>[0-9a-f]{40}): (?<res>no findings|findings|incomplete), spec fingerprint (?<fp>[^ ]+)$");
@@ -36,14 +33,12 @@ status_comments() { # $1 repo, $2 pull request, $3 this account's login
       "grok-stop-started \($h | ltrimstr("Grok stop review started on "))"
     elif ($h | test("^Grok stop review did not finish on [0-9a-f]{40}: ")) then
       "grok-stop-unfinished \($h | capture("^Grok stop review did not finish on (?<sha>[0-9a-f]{40}): ").sha)"
-    elif ($h | test("^(#+ +)?Claude review round [0-9]+ on [0-9a-f]{7,40}\\b")) then
-      "claude \($h | capture("Claude review round [0-9]+ on (?<sha>[0-9a-f]{7,40})").sha) \([$b | split("\n")[] | capture("^\\s*(?:[-*] )?`?Agreed request fingerprint: `?(?<fp>[0-9a-f]{12}|none)`?\\s*$").fp] | last // "none")"
     else empty end'
 }
 
 status() {
   local pr="" request_file="" request fp repo me head lines ci kind sha res lfp
-  local rounds=0 claude=0 last="" last_fp="" grok=none grok_stop_state=none codex_state=none reviewed out
+  local rounds=0 last="" last_fp="" grok=none grok_stop_state=none codex_state=none reviewed out
   [ $# -ge 1 ] && pr=$1
   case "$#:${2:-}" in
     1:) ;;
@@ -65,8 +60,8 @@ status() {
   if ! me=$(gh api user --jq .login) || [ -z "$me" ]; then die "could not read which GitHub account gh is signed in as"; fi
   if ! head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$head" ]; then die "could not read pull request #$pr"; fi
   lines=$(status_comments "$repo" "$pr" "$me") || die "could not read the comments on #$pr"
-  # Completed Local Claude reviews and Claude review rounds are the rounds, and the last
-  # one names the head reviewed and its spec fingerprint. An incomplete local review is not
+  # Completed Local Claude reviews are the rounds, and the last one names the head
+  # reviewed and its spec fingerprint. An incomplete local review is not
   # a round (skills/review), and a Codex review never is. Grok's start comment
   # and its result or did-not-finish comment are one run, and the last one says where it stands.
   # An incomplete Grok result is posted without a did-not-finish comment (plugins/mentat-reviewers/lib/grok.sh).
@@ -74,7 +69,6 @@ status() {
   while read -r kind sha res lfp; do
     case "$kind" in
       local) [ "$res" = incomplete ] && continue; rounds=$((rounds + 1)); last=$sha last_fp=$lfp ;;
-      claude) claude=$((claude + 1)); last=$sha last_fp=$res ;;
       grok-started) grok=running ;;
       grok-done) if [ "$res" = incomplete ]; then grok="did not finish"; else grok='done'; fi ;;
       grok-unfinished) grok="did not finish" ;;
@@ -85,13 +79,11 @@ status() {
       grok-stop-unfinished) grok_stop_state="did not finish on ${sha:0:7}" ;;
     esac
   done <<<"$lines"
-  # Codex's state on the last head Claude reviewed, which a Claude round may name by a
-  # short sha: the latest Codex comment on that head, read once that head is known, so
-  # the order of the two reviews' comments does not matter.
+  # Codex's state on the last head Claude reviewed: the latest Codex comment on that head,
+  # read once that head is known, so the order of the two reviews' comments does not matter.
   if [ -n "$last" ]; then
     while read -r kind sha res lfp; do
-      [ "$kind" = codex ] || continue
-      case "$sha" in "$last"*) ;; *) continue ;; esac
+      [ "$kind" = codex ] && [ "$sha" = "$last" ] || continue
       if [ "$res" = incomplete ]; then codex_state="did not finish on ${sha:0:7}"; continue; fi
       codex_state="done on ${sha:0:7} (${res//-/ }, spec fingerprint $lfp"
       if [ -n "$request_file" ]; then
@@ -102,16 +94,14 @@ status() {
   fi
   if [ -z "$last" ]; then reviewed="no (no review yet)"
   else
-    case "$head" in "$last"*) reviewed=yes ;; *) reviewed="no (last reviewed ${last:0:7})" ;; esac
+    if [ "$head" = "$last" ]; then reviewed=yes; else reviewed="no (last reviewed ${last:0:7})"; fi
   fi
   lines=$(ci_lines "$repo" "$head") || die "could not read CI on $head"
   if [ -z "$lines" ]; then ci=none
   elif grep -q '^fail ' <<<"$lines"; then ci=failed
   elif grep -q '^pending ' <<<"$lines"; then ci=running
   else ci=passed; fi
-  out="head ${head:0:7}, local rounds $rounds"
-  [ "$claude" -eq 0 ] || out="$out, claude rounds $claude"
-  out="$out, head reviewed: $reviewed, grok: $grok, grok stop: $grok_stop_state, codex: $codex_state, ci: $ci"
+  out="head ${head:0:7}, local rounds $rounds, head reviewed: $reviewed, grok: $grok, grok stop: $grok_stop_state, codex: $codex_state, ci: $ci"
   if [ -n "$request_file" ]; then
     if [ -z "$last" ]; then out="$out, spec: no review yet"
     elif [ "$last_fp" = "$fp" ]; then out="$out, spec: matches"

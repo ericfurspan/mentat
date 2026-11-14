@@ -96,7 +96,7 @@ out=$(PATH="$tmp/installed:$sys" "$core/bin/mentat" second-opinion "a b" 2>&1); 
 check "with an entry on PATH too, second-opinion goes to the module's copy in the checkout" 'handed mentat-second-opinion "$core" "a b"'
 # This checkout's own entries: each reads its arguments (a usage error).
 out=$(PATH="$sys" bin/mentat second-opinion 2>&1); rc=$?
-check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat second-opinion [--web] <file>" ]'
+check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat second-opinion [--web] <file> (a --web file holds only the question, nothing private)" ]'
 for args in "--codex --stop 7" "--grok --stop --stop 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   out=$(PATH="$sys" bin/mentat review $args 2>&1); rc=$?

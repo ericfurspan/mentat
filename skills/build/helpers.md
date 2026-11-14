@@ -1,6 +1,14 @@
 # Helper builds
 
-Read this before briefing a builder, and again after a compaction or a resume. It covers every builder run: the initial build, CI fixes, review fixes and work after a hold alike.
+Read this before briefing a builder and before each push, and again after a compaction or a resume. It covers every builder run: the initial build, CI fixes, review fixes and work after a hold alike.
+
+## Briefs
+
+The builder is the `mentat:builder` subagent. A brief names any existing design the change keeps that could affect its goal.
+
+Before fixing a raised problem, Claude Code checks likely related cases in proportion to its scope and reports a shared cause when found, keeping the fix within the agreed scope. A fix it recommends targets the cause the evidence supports; when the cause is unknown, it recommends finding the cause first.
+
+A correction during agreed work does not reopen the spec; a change of scope goes to the maintainer as one question. Claude Code follows any correction within the agreed scope at once, and files it as an item only when the maintainer asks.
 
 ## Worktree
 
@@ -15,6 +23,10 @@ Before a brief, if the worktree is locked, brief no helper and go to "Recovery".
 ## Main-checkout check
 
 Before each brief, note the main checkout's branch, `HEAD` and the output of `git status --porcelain -- ':(exclude).claude/worktrees'`. After the helper reports, that status prints nothing, and the branch and `HEAD` are what they were before the brief. If the main checkout was not clean before the brief, compare the output with the one taken then, and the run's final message says the check was weaker. On any difference, start no further helper, change nothing in the main checkout, and tell the maintainer the paths and what changed. The check does not see writes to ignored paths.
+
+## Testing
+
+Before pushing, Claude Code tests the pushed commit, with a clean working tree (`git -C <path> status --porcelain` prints nothing), not relying on the builder's report, unless the repository's AGENTS.md says CI runs the test command on every pull request. Then CI is that run, except that after CI fails on the branch, the next commit is tested this way before it is pushed; and when that run was skipped, a head with no CI check runs is not a pass: Claude Code tests that commit before any review of it counts.
 
 ## Recovery
 
