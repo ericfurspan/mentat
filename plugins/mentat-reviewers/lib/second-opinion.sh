@@ -12,56 +12,12 @@
 # gives no tool a file or a repository. Each tool runs in an empty folder with web
 # search on, so the question is all it has.
 
-# --web and --link are read before anything else, so the web mode never runs a git step.
+# --web is read before anything else, so the web mode never runs a git step.
 second_opinion() {
-  local web=no usage="usage: mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file>"
-  if [ "${1:-}" = --link ]; then
-    shift
-    [ $# -eq 2 ] || die "$usage" 64
-    opinion_link "$1" "$2"
-  fi
+  local web=no usage="usage: mentat second-opinion [--web] <file>"
   if [ "${1:-}" = --web ]; then web=yes; shift; fi
   [ $# -eq 1 ] || die "$usage" 64
   if [ "$web" = yes ]; then opinion_web "$1"; else opinion_repo "$1"; fi
-}
-
-# The record of second opinions, in the git folder worktrees share, never sent anywhere.
-# Each line: "review <date> <commit> <fingerprint>" for a run with a verdict, and
-# "link <date> <item id> <fingerprint>" for an item tied to a reviewed idea. The
-# fingerprint is of the idea file's content, as request_fingerprint computes it.
-# opinion_record_file <folder>: prints the record's path for the repository of <folder>.
-opinion_record_file() {
-  local d
-  d=$(git -C "$1" rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] || return 1
-  case "$d" in /*) ;; *) d=$1/$d ;; esac
-  printf '%s/mentat/second-opinions\n' "$d"
-}
-# opinion_record <folder> <line>: appends the line; a failure is one note on stderr.
-opinion_record() {
-  local f
-  if f=$(opinion_record_file "$1") && { mkdir -p "${f%/*}" && printf '%s\n' "$2" >>"$f"; } 2>/dev/null; then return 0; fi
-  printf 'mentat: could not write the second-opinion record\n' >&2
-  return 1
-}
-
-# The link step: no model, no network. Links only an idea file whose current content
-# has a review with a verdict on record.
-opinion_link() {
-  local id=$1 idea=$2 f fp kind sum
-  [[ $id =~ ^[A-Za-z][A-Za-z0-9]*-[0-9]+$ ]] || die "not an item id: $id" 64
-  [ -f "$idea" ] || die "idea file not found: $idea" 64
-  command -v git >/dev/null 2>&1 || die "nothing linked: git is not installed" 1
-  f=$(opinion_record_file .) || die "nothing linked: not inside a git repository" 1
-  fp=$(request_fingerprint "$(cat "$idea")") && [ -n "$fp" ] || die "nothing linked: could not read $idea" 1
-  if [ -f "$f" ]; then
-    while read -r kind _ _ sum _; do
-      [ "$kind" = review ] && [ "$sum" = "$fp" ] || continue
-      opinion_record . "link $(date +%Y-%m-%d) $(printf '%s' "$id" | tr '[:upper:]' '[:lower:]') $fp" || exit 1
-      printf 'mentat: linked %s to the design review of %s\n' "$id" "$idea"
-      exit 0
-    done <"$f"
-  fi
-  die "nothing linked: no design review on record of this idea file's current content: $idea" 1
 }
 
 # The verdict line: exactly one of these, and a reason that is not only spaces.
@@ -169,12 +125,8 @@ opinion_repo() {
   for t in $tools; do pair_report "$t"; done
   printf '## Verdicts\n\n'
   for t in $tools; do pair_line "$t"; done
-  # At least one verdict is a result, and is recorded; none is a failure.
-  for t in $tools; do
-    [ -s "$res/$t.final" ] || continue
-    opinion_record "$top" "review $(date +%Y-%m-%d) $head $(request_fingerprint "$(cat "$res/idea")")"
-    exit 0
-  done
+  # At least one verdict is a result; none is a failure.
+  for t in $tools; do [ ! -s "$res/$t.final" ] || exit 0; done
   printf 'mentat: no second opinion from any tool; give Claude Code'"'"'s view alone, say the second opinion did not happen, and ask the maintainer to agree\n' >&2
   exit 1
 }
