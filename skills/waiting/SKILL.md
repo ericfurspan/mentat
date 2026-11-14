@@ -32,10 +32,10 @@ A pull request's state is the first line of its body that opens with `**Status:*
 - Act: a `Blocked:` state with a wait right below its Status line, such as a hand check (`../backlog/waits.md`).
 - Hold: every other pull request, with its reason: any other `Blocked:` or `Not reviewed:` state; `Blocked: reassessing after round <n>` with the answer `pending`, as awaiting go on, shrink or close; state `In review` with no locked worktree here and no run in this session, as "in review, nothing running seen here"; a draft in a Merge state; a state outside the four, quoted; a body with no Status line, saying so.
 
-A pull request and the items it carries, or whose merge wait names it, are one line, sorted as above. Every other item collected gets one line:
+A pull request and the items whose merge wait names it are one line, sorted as above. Every other wait or decision on an item, an item a pull request carries included, gets its own line, in the first of these that applies:
 
+- Decide: each decision collected above, once; a review stop already shown with its pull request is not listed again.
 - Act: an item's wait block on agreed work (`../backlog/waits.md`); an item whose merge wait names a pull request that merged or closed, as "may be done" with that ending; any other wait on the maintainer the tracker's adapter or the maintainer's own instructions mark, with what its record says, or "reason not recorded".
-- Decide: each decision collected above.
 
 A pull request is named `owner/repo#N`, an item by its id.
 
