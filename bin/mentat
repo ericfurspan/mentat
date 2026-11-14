@@ -50,7 +50,8 @@
 #     sets enabledPlugins "mentat-reviewers@mentat" to true; off when that is false or
 #     absent; unknown when it cannot be read or is anything else, or the default branch
 #     cannot be found or fetched. It fetches that branch into a private ref, deleted once
-#     read, leaving origin/<default> and FETCH_HEAD as they are. Calls no gh. Exits 0.
+#     read, leaving origin/<default> and FETCH_HEAD as they are. Calls no gh. 0 for each
+#     state, 64 usage.
 #   mentat second-opinion <idea file>  Has Codex and Grok each
 #     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
 #     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
