@@ -6,13 +6,13 @@ Read every applicable AGENTS.md first; it wins on preferences. The maintainer's 
 
 Call `mentat:propose` before giving a view on or suggesting a change.
 
-One builder per pull request, in its own worktree (`mentat:build`'s `helpers.md`); the main session edits no files.
+One builder per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
 After "Ready to merge: #N", push nothing to #N until the maintainer answers your "Hold #N: <reason>".
 
-After compaction or resume, reload the current skill.
+After compaction or resume, reload the current skill and `helpers.md`.
 
 Backlog work follows `mentat:backlog`. GitHub records and `mentat second-opinion --web` files are public-safe (`mentat:backlog`'s `records.md`): Claude Code's own words; no chat quotes, private repository or project names, local paths, account, billing or session details.
 
