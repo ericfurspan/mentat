@@ -214,6 +214,12 @@ reset; printf '{"type":"result","subtype":"success","is_error":false,"result":"R
 check "JSON without the denials and the models that ran is not reviewed" 'closed "Claude'"'"'s output is not the JSON result it gives with --output-format json"'
 reset; echo error_max_turns >"$STUB/subtype"; rc=$(run)
 check "a run that did not end in success is not reviewed, and says how to set the model" 'closed "Claude'"'"'s run ended with error_max_turns, not success; the review model is set with MENTAT_REVIEW_MODEL (now opus)"'
+# Such a run, as Claude Code prints it: no result text, and exit 1.
+ENDED='{"type":"result","subtype":"error_max_turns","is_error":true,"permission_denials":[],"modelUsage":{"claude-opus-4-9":{}}}'
+reset; printf '%s\n' "$ENDED" >"$STUB/raw"; echo 1 >"$STUB/exit"; rc=$(run)
+check "a run that ended without success and exited 1 says how it ended" 'closed "claude exited with status 1: the run ended with error_max_turns; the review model is set with MENTAT_REVIEW_MODEL (now opus)"'
+reset; printf '%s\n' "$ENDED" >"$STUB/raw"; rc=$(run)
+check "a run that ended without success and with no result text, exiting 0, says how it ended" 'closed "Claude'"'"'s run ended with error_max_turns, not success"'
 reset; printf '{"type":"result","subtype":"success","is_error":true,"result":"Prompt is too long","permission_denials":[],"modelUsage":{"claude-opus-4-9":{}}}\n' >"$STUB/raw"; rc=$(run)
 check "a result marked as an error is not reviewed" 'closed "Claude reported an error: Prompt is too long; the review model is set with MENTAT_REVIEW_MODEL (now opus)"'
 reset; echo '[{"tool_name":"Read","tool_use_id":"t1","tool_input":{"file_path":"/outside/secret"}},{"tool_name":"Read","tool_use_id":"t2","tool_input":{}}]' >"$STUB/denials"; rc=$(run)

@@ -40,15 +40,18 @@ run_claude() {
   rc=$?
   # shellcheck disable=SC2034 # read by review_stop in lib/shared.sh
   review_child=""
-  # Claude's own error text, first line only, when its output says one.
-  why=$(jq -r 'if type == "object" and (.result | type) == "string" then .result | split("\n")[0] | .[0:200] else empty end' "$json" 2>/dev/null)
+  # Claude's own error text, first line only, or else how its run ended, when its output says.
+  # A run that did not end in success, such as error_max_turns, has no result text.
+  why=$(jq -r 'if type != "object" then empty
+    elif (.result | type) == "string" then .result | split("\n")[0] | .[0:200]
+    elif (.subtype | type) == "string" then "the run ended with " + .subtype else empty end' "$json" 2>/dev/null)
   [ "$rc" -eq 0 ] || "$fail" "claude exited with status $rc${why:+: $why}; $hint"
   [ -s "$json" ] || "$fail" "Claude returned no output"
-  jq -e 'type == "object" and (.subtype | type) == "string" and (.result | type) == "string"
-    and (.permission_denials | type) == "array" and (.modelUsage | type) == "object"' "$json" >/dev/null 2>&1 ||
+  n=$(jq -er 'if type == "object" then .subtype | strings else empty end' "$json" 2>/dev/null) ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
-  n=$(jq -r .subtype "$json")
   [ "$n" = success ] || "$fail" "Claude's run ended with $n, not success; $hint"
+  jq -e '(.result | type) == "string" and (.permission_denials | type) == "array" and (.modelUsage | type) == "object"' "$json" >/dev/null 2>&1 ||
+    "$fail" "Claude's output is not the JSON result it gives with --output-format json"
   [ "$(jq -r '.is_error // false' "$json")" = false ] || "$fail" "Claude reported an error${why:+: $why}; $hint"
   n=$(jq -r '.permission_denials | length' "$json")
   [ "$n" -eq 0 ] || "$fail" "Claude was denied $n tool call(s) ($(jq -r '[.permission_denials[].tool_name | strings] | unique | join(", ")' "$json")), so the review may not have read what it needed"
