@@ -12,6 +12,8 @@
 #     opus); the record names the model that ran. Its time limit is
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200).
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
+#     --codex and --grok first read whether outside reviewers are on here, as mentat
+#     reviewers does; unless they are on, they print why, post nothing and exit 6.
 #   mentat review --grok <PR>  The same with Grok, if installed: its start comment and
 #     review are posted only once CI passed on the head it reviewed. Same exit codes.
 #     It runs once per pull request: this gh account's own start comment refuses another.
@@ -35,11 +37,22 @@
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
 #   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
 #     review state from the comments the review commands posted as this gh account: the head
-#     commit, the local rounds (Claude's or Codex's; and Claude review rounds when present), whether the head
-#     is the last reviewed commit, the Grok state (none, running, done or did not finish), the
+#     commit, the local rounds (completed Local Claude reviews; and Claude review rounds when
+#     present; a Codex review is not a round), whether the head is the last commit Claude
+#     reviewed, the Grok state (none, running, done or did not finish), the
 #     Grok stop review's (none, or running, done or did not finish on a commit, a done one
-#     with its result and spec fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
-#     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
+#     with its result and spec fingerprint), the Codex review's on the last commit Claude
+#     reviewed (none, did not finish on it, or done on it with its result and spec
+#     fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
+#     Claude review's spec fingerprint matches the file, and a done Codex review's. Posts nothing. 0 printed, 1 could not read.
+#   mentat reviewers  Prints whether outside reviewers (Codex and Grok) are on in this
+#     repository, on one line: "reviewers: on", "reviewers: off" or "reviewers: unknown -
+#     <reason>". Only .claude/settings.json on origin's default branch counts: on when it
+#     sets enabledPlugins "mentat-reviewers@mentat" to true; off when that is false or
+#     absent; unknown when it cannot be read or is anything else, or the default branch
+#     cannot be found or fetched. It fetches that branch into a private ref, deleted once
+#     read, leaving origin/<default> and FETCH_HEAD as they are. Calls no gh. 0 for each
+#     state, 64 usage.
 #   mentat second-opinion <idea file>  Has Codex and Grok each
 #     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
 #     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
@@ -66,11 +79,14 @@
 #     mentat hands each, with the arguments after its mode, to the module's entry
 #     mentat-review-codex, mentat-review-grok or mentat-second-opinion, in this checkout's
 #     plugins/mentat-reviewers/bin or else on PATH, and exits 64 with neither.
-#   mentat check  Checks, read-only, what Mentat itself needs: tools, the git hook
+#   mentat check  Checks what Mentat itself needs, changing nothing but a temporary ref
+#     (deleted after) that mentat reviewers' fetch uses: tools, the git hook
 #     templates installed and the same as this copy when agents' git uses them
 #     (lib/templates.sh), gh signed in, the repository readable, claude installed at a version
-#     the merge hook and the review need; prints the Mentat modules installed, and warns
-#     when agents' git does not use the templates, the private word list is unreadable, the
+#     the merge hook and the review need; prints the Mentat modules installed, whether
+#     outside reviewers are on here as mentat reviewers reads it, and whether codex and grok
+#     are installed, and warns when outside reviewers are unknown or are on with codex or
+#     grok missing, when agents' git does not use the templates, the private word list is unreadable, the
 #     list misses a private repository this account can reach, by count only, the Mentat
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.
@@ -122,7 +138,8 @@ case "${1:-}" in
     review_local claude "$pr" ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   status) shift; status "$@" ;;
+  reviewers) shift; reviewers_command "$@" ;;
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
 esac

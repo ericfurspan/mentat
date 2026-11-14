@@ -30,10 +30,13 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export TMPDIR="$root/tmp" XDG_CACHE_HOME="$cache"
 
 # An origin with main and pull request 7, whose head changes README and adds files
-# that archive attributes and odd names would trip up.
+# that archive attributes and odd names would trip up. Outside reviewers are on in main's
+# .claude/settings.json, so review --grok runs.
+REVIEWERS_ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
 git init -q --bare -b main "$root/origin.git"
 git init -q -b main "$root/seed"
-(cd "$root/seed" && echo base >README && git add README && git commit -qm base && git push -q "$root/origin.git" main &&
+(cd "$root/seed" && echo base >README && mkdir .claude && printf '%s\n' "$REVIEWERS_ON" >.claude/settings.json &&
+  git add README .claude/settings.json && git commit -qm base && git push -q "$root/origin.git" main &&
   git checkout -qb feature && echo change >README &&
   printf 'ignored.txt export-ignore\nsubst.txt export-subst\n' >.gitattributes &&
   echo ignored >ignored.txt && echo 'id $Format:%H$' >subst.txt &&
@@ -497,14 +500,14 @@ reset; rc=$(runq "$root/req dir/agreed request.md"); cp "$STUB/prompt" "$root/pl
 reset; rc=$(srun --request "$root/req dir/agreed request.md")
 check "--stop with no plain run before it posts its own start comment, then its own review heading (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ] && fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
 check "--stop gives Grok the same prompt as a plain run" '[ -s "$root/plain_prompt" ] && cmp -s "$STUB/prompt" "$root/plain_prompt"'
-check "--stop: status reports it in its own field, with its head and fingerprint, and grok: none" 'status | grep -qF "grok: none, grok stop: done on ${H:0:7} (no findings, spec fingerprint $REQ_FP), ci:"'
+check "--stop: status reports it in its own field, with its head and fingerprint, and grok: none" 'status | grep -qF "grok: none, grok stop: done on ${H:0:7} (no findings, spec fingerprint $REQ_FP), codex: none, ci:"'
 rm "$STUB/args"; rc=$(srun)
 check "--stop after a posted stop review is refused: exit 1, Grok does not run, nothing posted" '[ "$rc" = 1 ] && grep -q "not reviewed: Grok.s stop review already ran on #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 2 ]'
 rc=$(run)
 check "a plain --grok after a posted stop review is refused: exit 1, Grok does not run, nothing posted" '[ "$rc" = 1 ] && grep -q "not reviewed: Grok.s stop review ran on #7 .*no plain Grok review runs after it" "$STUB/out" && ! grok_ran && [ "$(comments)" = 2 ]'
 reset; rc1=$(run); rm "$STUB/args"; rc=$(srun)
 check "--stop after a plain run reviews again and posts after it (exit 0)" '[ "$rc1" = 0 ] && [ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 4 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && [ "$(cat "$STUB/comment.3")" = "Grok stop review started on $H" ] && [ "$(first 4)" = "## Local Grok stop review of $H: no findings, spec fingerprint none" ]'
-check "after both runs, status gives grok done and the stop review done, each in its own field" 'status | grep -qF "grok: done, grok stop: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
+check "after both runs, status gives grok done and the stop review done, each in its own field" 'status | grep -qF "grok: done, grok stop: done on ${H:0:7} (no findings, spec fingerprint none), codex: none, ci:"'
 reset; stop_comment agent-bot >"$STUB/issue_comments.json"; rc=$(srun)
 check "this account's stop start comment refuses --stop before Grok runs" '[ "$rc" = 1 ] && grep -q "stop review already ran on #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; stop_comment agent-bot >"$STUB/issue_comments.json"; rc=$(run)
@@ -531,7 +534,7 @@ check "--stop with a Grok timeout exits 1 before CI is read and posts nothing" '
 rm "$STUB/hang" "$STUB/args"; rc=$(srun)
 check "so --stop runs again after a timeout, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
 reset; touch "$STUB/result_fails"; rc=$(srun)
-check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, ci:"'
+check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, codex: none, ci:"'
 reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --stop --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
 check "--stop between the other flags after --grok posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ]'
 for args in "--stop 7" "--local --stop 7" "--stop --grok 7" "--grok --stop --stop 7" "--grok 7 --stop"; do
@@ -585,6 +588,38 @@ echo x >"$TMPDIR/mentat-held-comment.old" && touch -t "$(date -v-10085M +%Y%m%d%
 reset; rc=$(run)
 check "at start, deletes a Grok run folder older than a day and a held comment older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-review.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
 rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
+
+# Outside reviewers off, or unknown, on main: plain and --stop runs are refused (exit 6)
+# before anything else. Each has an origin with pull request 7 and a clone of its own,
+# which never fetched the pull request's head. Nothing is read from GitHub or posted, the
+# leftovers sweep does not run, the pull request is not fetched, Grok does not run and no
+# run folder is made.
+gate_clone() { # $1 name, $2 main's .claude/settings.json
+  git clone -q --mirror "$root/origin.git" "$root/$1 origin.git" && git clone -q "$root/$1 origin.git" "$root/$1 seed" &&
+    (cd "$root/$1 seed" && printf '%s' "$2" >.claude/settings.json && git commit -qam settings && git push -q origin HEAD:main) &&
+    git clone -q --no-local "$root/$1 origin.git" "$root/$1 work"
+}
+gate_clone off '{"enabledPlugins":{"mentat-reviewers@mentat":false}}' || exit 1
+gate_clone unknown '{"enabledPlugins":{"mentat-reviewers@mentat":"true"}}' || exit 1
+OFF_LINE="mentat: not run: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on main); Claude's review is the review here"
+UNKNOWN_LINE="mentat: not run: outside reviewers are unknown in this repository (mentat-reviewers@mentat in .claude/settings.json on main is neither true nor false); Codex and Grok run only once it reads as on"
+gate_run() { (cd "$root/$1 work" && shift && "$mentat" review --grok "$@" >"$STUB/out" 2>&1); echo $?; }
+gate_refused() { # $1 the clone, $2 the one line printed
+  [ "$rc" = 6 ] && [ "$(cat "$STUB/out")" = "$2" ] && [ ! -f "$STUB/calls" ] && ! grok_ran && [ "$(comments)" = 0 ] && [ -z "$(left_over)" ] &&
+    [ -f "$TMPDIR/mentat-grok-log.old" ] && ! git -C "$root/$1 work" cat-file -e "$H^{commit}" 2>/dev/null &&
+    [ -z "$(git -C "$root/$1 work" for-each-ref refs/mentat)" ] && [ "$(git -C "$root/$1 work" worktree list | wc -l | tr -d ' ')" = 1 ]
+}
+echo x >"$TMPDIR/mentat-grok-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-grok-log.old"
+for gate in off unknown; do
+  if [ "$gate" = off ]; then want=$OFF_LINE; else want=$UNKNOWN_LINE; fi
+  reset; rc=$(gate_run "$gate" 7)
+  check "outside reviewers $gate: exit 6, says so, and reads, posts, sweeps, fetches and runs nothing" 'gate_refused "$gate" "$want"'
+  reset; rc=$(gate_run "$gate" --stop 7)
+  check "outside reviewers $gate, --stop: the same" 'gate_refused "$gate" "$want"'
+done
+reset; rc=$(gate_run off --stop abc)
+check "outside reviewers off, a pull request that is not a number is still a usage error (exit 64), reading nothing" '[ "$rc" = 64 ] && grep -q "usage: mentat review --grok" "$STUB/out" && [ ! -f "$STUB/calls" ]'
+rm -f "$TMPDIR/mentat-grok-log.old"
 
 # Live profile check. Starts the real Grok through the review, with the sign-in removed
 # so that no model is called and nothing is sent, and reads the event Grok writes when it

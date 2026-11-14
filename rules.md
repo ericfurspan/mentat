@@ -1,6 +1,6 @@
 # How work moves in this repository (Mentat)
 
-The maintainer owns this repository. Claude Code plans and builds. A headless Claude in a fresh context reviews pull requests; where Grok is installed, it also reviews the first head.
+The maintainer owns this repository. Claude Code plans and builds. A headless Claude in a fresh context reviews pull requests; where the committed settings turn on the reviewers add-on, Codex also reviews every round and Grok, where installed, the first head.
 
 Before any work, Claude Code reads every AGENTS.md that applies. Where they differ from these rules on a preference (commit and title format, branch flow, labels, templates, or a named workflow that commits to the default branch), the repository wins and Claude Code says so once; "Approval" and "What agents never do" always hold.
 
