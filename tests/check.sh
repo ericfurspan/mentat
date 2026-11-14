@@ -110,11 +110,11 @@ check "writes nothing on GitHub, and leaves the checkout's refs, working tree an
 check "says outside reviewers are off here, from main on origin" 'grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out"'
 check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out"'
 check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
-# Without gitleaks and with the templates not in use, the commit hook does not scan: check warns and still passes.
+# Without gitleaks and with the templates not in use, nothing Mentat runs needs it: check names only the templates and still passes.
 NOT_IN_USE="WARN: the git hook templates are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
 mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/claude" "$root/nogitleaks/"
 reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "with the templates not in use, a missing gitleaks warns, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: gitleaks is not installed: the commit hook does not scan staged changes for likely secrets" "$STUB/out" && grep -qxF "$NOT_IN_USE" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ]'
+check "with the templates not in use, a missing gitleaks is not reported, exit 0" '[ "$rc" = 0 ] && ! grep -q gitleaks "$STUB/out" && grep -qxF "$NOT_IN_USE" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "with the templates in use, a missing gitleaks is a problem (exit 1), not a warning" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: gitleaks is not installed, so the git hook templates in $MENTAT_GIT_TEMPLATES_DIR refuse every agent commit and push" "$STUB/out" && ! grep -q "^WARN: gitleaks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 

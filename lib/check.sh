@@ -161,11 +161,11 @@ check() {
   done
   [ "$check_problems" = 0 ] || c_finish
   c_review_tools
+  # Only the git hook templates need gitleaks: with them in use, c_templates reports a missing one as a problem.
   if command -v gitleaks >/dev/null 2>&1; then
     v=$(gitleaks version 2>/dev/null | head -n 1)
     c_ok "gitleaks is installed (${v:-version unknown})"
-  # With the git hook templates in use, c_templates reports a missing gitleaks as a problem.
-  elif ! templates_dir >/dev/null; then c_warn "gitleaks is not installed: the commit hook does not scan staged changes for likely secrets"; fi
+  fi
   c_templates
   c_claude_version
   c_plugin_copies
