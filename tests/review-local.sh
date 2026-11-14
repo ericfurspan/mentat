@@ -20,7 +20,7 @@ failures=0
 check() { if eval "$2"; then printf 'PASS: review --local %s\n' "$1"; else printf 'FAIL: review --local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-unset MENTAT_REVIEW_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS
+unset MENTAT_REVIEW_MODEL MENTAT_FIRST_REVIEW_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS
 
 # An origin with main and pull request 7, whose head changes README.
 git init -q --bare -b main "$root/origin.git"
@@ -39,7 +39,7 @@ echo dirty >"$root/work/README"
 # check runs come from $STUB/check_runs.json (check_runs_later.json from the second
 # read on), and a file named push_on_ci holds a head to switch to when CI is read;
 # pr comment records the body, or fails when comment_fails exists, and adds it to
-# the comments mentat status reads, as this account's.
+# the comments mentat status reads, as this account's; reading them fails when comments_fail exists.
 cat >"$root/tools/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
@@ -74,7 +74,7 @@ case "$1 $2" in
         n=$(($(cat "$STUB/ci_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/ci_reads"
         [ -f "$STUB/push_on_ci" ] && cp "$STUB/push_on_ci" "$STUB/head"
         if [ "$n" -ge 2 ] && [ -f "$STUB/check_runs_later.json" ]; then cat "$STUB/check_runs_later.json"; else cat "$STUB/check_runs.json"; fi ;;
-      */comments) cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]' ;;
+      */comments) [ -f "$STUB/comments_fail" ] && exit 1; cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]' ;;
       *) exit 99 ;;
     esac ;;
   "api user") echo agent-bot ;;
@@ -242,6 +242,41 @@ reset; printf '{"type":"result","subtype":"success","is_error":false,"result":"R
 check "a result that does not say which model ran is not reviewed" 'closed "Claude'"'"'s output does not say which model ran"'
 reset; touch "$STUB/hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run); took=$((SECONDS - took))
 check "a run past the time limit is stopped and not reviewed" 'closed "Claude did not finish within 1 seconds" && [ "$took" -lt 10 ] && ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null'
+
+# MENTAT_FIRST_REVIEW_MODEL: with it set, a pull request's first local round (none yet, as
+# mentat status counts them) runs on it, and later rounds on MENTAT_REVIEW_MODEL or the default.
+run_first() { MENTAT_FIRST_REVIEW_MODEL=fable run; }
+read_comments() { grep -q '/comments$' "$STUB/calls"; }
+for unset_or_empty in unset empty; do
+  reset
+  if [ "$unset_or_empty" = unset ]; then rc=$(run); else rc=$(MENTAT_FIRST_REVIEW_MODEL='' run); fi
+  check "MENTAT_FIRST_REVIEW_MODEL $unset_or_empty: the default model, no comment read and no first-round note" '[ "$rc" = 0 ] && [ "$(arg --model)" = opus ] && folded | grep -qx -- "- Model: claude-opus-4-9" && ! read_comments'
+done
+reset; echo claude-fable-5 >"$STUB/model_ran"; rc=$(run_first)
+check "MENTAT_FIRST_REVIEW_MODEL with no earlier round: runs on it, and the record names the model and the setting" '[ "$rc" = 0 ] && [ "$(arg --model)" = fable ] && folded | grep -qx -- "- Model: claude-fable-5 (first round, MENTAT_FIRST_REVIEW_MODEL=fable)"'
+rm -f "$STUB/model_ran" "$STUB/comment"; rc=$(run_first)
+check "MENTAT_FIRST_REVIEW_MODEL after a posted round: runs on the default model, with no first-round note" '[ "$rc" = 0 ] && [ "$(arg --model)" = opus ] && folded | grep -qx -- "- Model: claude-opus-4-9"'
+rm -f "$STUB/comment"; echo claude-sonnet-4-5 >"$STUB/model_ran"; rc=$(MENTAT_REVIEW_MODEL=sonnet run_first)
+check "MENTAT_FIRST_REVIEW_MODEL after a posted round, with MENTAT_REVIEW_MODEL set: runs on MENTAT_REVIEW_MODEL" '[ "$rc" = 0 ] && [ "$(arg --model)" = sonnet ] && folded | grep -qx -- "- Model: claude-sonnet-4-5"'
+# A run that ends without a round leaves the next run the first round.
+reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc1=$(run_first); m1=$(arg --model)
+runs completed '"success"' >"$STUB/check_runs.json"; rc=$(run_first)
+check "a first round not posted for failed CI leaves the next run on MENTAT_FIRST_REVIEW_MODEL" '[ "$rc1" = 4 ] && [ "$m1" = fable ] && [ "$rc" = 0 ] && [ "$(arg --model)" = fable ]'
+reset; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc1=$(run_first); m1=$(arg --model)
+rm -f "$STUB/push_on_ci"; echo "$H" >"$STUB/head"; rc=$(run_first)
+check "a first round not posted for a moved head leaves the next run on MENTAT_FIRST_REVIEW_MODEL" '[ "$rc1" = 3 ] && [ "$m1" = fable ] && [ "$rc" = 0 ] && [ "$(arg --model)" = fable ]'
+reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; rc1=$(run_first); m1=$(arg --model)
+rm -f "$STUB/comment"; printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"; rc=$(run_first)
+check "a posted INCOMPLETE first round is no round: the next run is on MENTAT_FIRST_REVIEW_MODEL" '[ "$rc1" = 1 ] && [ "$m1" = fable ] && [ "$rc" = 0 ] && [ "$(arg --model)" = fable ]'
+reset; rc=$(run_first)
+check "a first round that reports another model posts, naming the setting asked for and the model that ran" '[ "$rc" = 0 ] && posted && folded | grep -qx -- "- Model: claude-opus-4-9 (first round, asked for MENTAT_FIRST_REVIEW_MODEL=fable)"'
+check "a first round that reports another model counts as a round" 'status | grep -q "local rounds 1,"'
+reset; touch "$STUB/comments_fail"; rc=$(run_first)
+check "MENTAT_FIRST_REVIEW_MODEL with the comments unreadable is not reviewed, names the setting, and Claude does not run" 'closed "could not read this account'"'"'s comments on #7, which MENTAT_FIRST_REVIEW_MODEL needs to tell the first round" && ! grep -qx claude "$STUB/calls"'
+reset; echo 1 >"$STUB/exit"; printf '{"type":"result","subtype":"success","is_error":true,"result":"There is an issue with the selected model (fable).","permission_denials":[],"modelUsage":{}}\n' >"$STUB/raw"; rc=$(run_first)
+check "a first-round model that cannot start is not reviewed, naming MENTAT_FIRST_REVIEW_MODEL and its value" 'closed "claude exited with status 1: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable)"'
+reset; echo error_max_turns >"$STUB/subtype"; rc=$(run_first)
+check "a first-round run that fails is not reviewed, naming MENTAT_FIRST_REVIEW_MODEL and its value" 'closed "Claude'"'"'s run ended with error_max_turns, not success; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable)"'
 
 # Without codex installed, the review runs and posts as usual. path_without prints the
 # PATH with each folder that holds $1 replaced by a folder of links to all else in it.
