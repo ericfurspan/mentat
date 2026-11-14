@@ -21,7 +21,7 @@
     {
       "name": "mentat-extras",
       "source": "./plugins/mentat-extras",
-      "description": "Mentat module, empty for now: will hold the grill and retro skills."
+      "description": "Mentat module: the grill, which asks the maintainer's open decisions one at a time, and a session retro (/mentat-extras:retro)."
     },
     {
       "name": "mentat-public-text",
