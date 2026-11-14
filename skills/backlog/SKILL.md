@@ -1,10 +1,10 @@
 ---
 name: backlog
-description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after mentat second-opinion, to record the replies (with an external backlog, post them) and show them as replies.md says."
+description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after the plan check or mentat second-opinion, to record the replies (with an external backlog, post them) and show them as replies.md says."
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Second opinion records".
+With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Plan check record".
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -47,7 +47,7 @@ The tracker's order: the order of agreed work, next first, read as the tracker's
 When the maintainer agrees to build something, with either answer to `mentat:propose`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item. Then:
 
 - Write a `## Spec` section in the item, as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable; and "Out of scope:", what is left alone. Scale it to the change: a bug fix is a few lines. Each requirement is a line the requirement table in the pull request's Review details cites by number, and one the maintainer checks by hand says so. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: the `rules.md` record rules apply, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
-- On an item created here, post Claude Code's settlement and upload the replies file of each second opinion round kept for it as "Second opinion records" says.
+- On an item created here, post the plan check record kept for it as "Plan check record" says, and post Claude Code's settlement and upload the replies file of each second opinion round kept for it as "Second opinion records" says.
 - Record the spec's fingerprint. Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as `mentat:review` "Spec" computes it (the same span, the same command), never from the text written, and post one comment on the item: `Spec fingerprint: <12 hex>; build: now` or `Spec fingerprint: <12 hex>; build: later`, after the answer to `mentat:propose`'s agreement question, citing the agreement. Do it again, with that agreement's answer, whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint and answer.
 - A change of scope updates the section, in the same words. Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the section only once agreed through `mentat:propose`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, linking the item.
 - Move the item to Todo once the maintainer agrees, to In Progress when the branch exists, and to Done when the pull request merges. Link the pull request from the item once it exists. The pull request writes no `Closes #`.
@@ -60,6 +60,10 @@ Keep what the review tools said on the item. After each `mentat second-opinion` 
 - Upload the file as the tracker's adapter says (`linear.md` "Second opinion records"), then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is.
 - The settlement names the round and the commit, and says which tool gave no answer.
 - A chat request has no item yet: keep each round's settlement and file for "Agreement", which posts them on the item it creates. If nothing is agreed, nothing is posted.
+
+## Plan check record
+
+With an external backlog, after the plan check, post one comment on the item as `replies.md` "Plan check record" says. A chat request has no item yet: keep the record for "Agreement", which posts it on the item it creates; if nothing is agreed, nothing is posted.
 
 ## Titles
 
@@ -95,7 +99,7 @@ With either tracker, before reading an item to plan, propose, triage or build it
 
 ## Replies in chat
 
-After each `mentat second-opinion` round, with any backlog, the replies go in a block. Before showing it, read `replies.md` in this skill's folder, and again after a compaction.
+After the plan check, and after each `mentat second-opinion` round, with any backlog, the replies go in a block. Before showing it, read `replies.md` in this skill's folder, and again after a compaction.
 
 ## Tracker: Linear
 

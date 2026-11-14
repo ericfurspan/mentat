@@ -17,7 +17,7 @@ The maintainer started one sitting: gather new ideas from every channel into the
 - "Stop" at any question ends the asking; what was not asked stays in the Inbox as it is. Stop is a session control, not the Later outcome: it records nothing on an item.
 - Read each reader fresh from its file when the sitting starts, and again after a compaction, with the maintainer's instructions it depends on. Never ask an answer already recorded again; the record shows it.
 
-Nothing a sitting collects goes to Codex or Grok, and no `mentat second-opinion` runs inside a sitting. Accepting an item is not a commitment to build: that stays with `mentat:propose`, after its second opinion, whose yes commits the item to Todo.
+Nothing a sitting collects goes to Codex or Grok, and no `mentat second-opinion` runs inside a sitting. Accepting an item is not a commitment to build: that stays with `mentat:propose`, after its plan check, whose yes commits the item to Todo.
 
 ## Readers
 
@@ -50,7 +50,7 @@ Record each answer before asking the next, as `mentat:backlog`, the tracker's ad
 
 - Accept: Claude Code writes the item shape through `mentat:backlog`, moves it to Backlog and reads it back, never through the tracker's own triage actions.
 - Close: one update adds the first description line `Closed <date>: <the maintainer's reason in their terms>.` and ends the item as canceled. A retry adds no line the description already opens with.
-- Merge: read the named item in full (`mentat:backlog` "Reading an item"), then mark this item a duplicate of it and comment on it, citing the answer and naming the item merged. Merged into a Todo item, that scope is not committed: it joins the spec only once agreed through `mentat:propose`, which asks for it, after its second opinion, when the item is next planned.
+- Merge: read the named item in full (`mentat:backlog` "Reading an item"), then mark this item a duplicate of it and comment on it, citing the answer and naming the item merged. Merged into a Todo item, that scope is not committed: it joins the spec only once agreed through `mentat:propose`, which asks for it, after its plan check, when the item is next planned.
 - Later: a dated note citing the answer, as a comment or on its inbox line.
 
 For an item from a reader that posts outcomes at its source, follow that reader's steps for recording it, which may put the post before the item is removed. An item with a decision that "Ask" sends to its own planning session gets that next step, `/mentat:plan <id>`, in its `## Current plan` section.
