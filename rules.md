@@ -6,13 +6,13 @@ Read every applicable AGENTS.md first; it wins on preferences. The maintainer's 
 
 Call `mentat:propose` before giving a view on or suggesting a change.
 
-One builder per pull request, in its own worktree (`mentat:build`'s `helpers.md`); the main session edits nothing.
+One builder per pull request, in its own worktree (`mentat:build`'s `helpers.md`); the main session edits no files.
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
 After "Ready to merge: #N", push nothing to #N until the maintainer answers your "Hold #N: <reason>".
 
-After compaction or resume, call the current step's skill.
+After compaction or resume, reload the current skill.
 
 Backlog work and GitHub records follow `mentat:backlog` and its `records.md`.
 
