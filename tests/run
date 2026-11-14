@@ -97,12 +97,12 @@ else
   fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
 fi
 
-# The status report is started only by a command, a build run by a command or by the session; both list their arguments.
-for s in 'name: status' 'disable-model-invocation: true'; do
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/status/SKILL.md; then
-    pass "skills/status/SKILL.md's frontmatter sets $s"
+# The waiting list is started only by a command, a build run by a command or by the session; both list their arguments.
+for s in 'name: waiting' 'disable-model-invocation: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/waiting/SKILL.md; then
+    pass "skills/waiting/SKILL.md's frontmatter sets $s"
   else
-    fail "skills/status/SKILL.md's frontmatter must set $s"
+    fail "skills/waiting/SKILL.md's frontmatter must set $s"
   fi
 done
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want='name: build' skills/build/SKILL.md; then
@@ -115,10 +115,10 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   pass "skills/build/SKILL.md's frontmatter does not set disable-model-invocation"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all\./ { found = 1; exit 0 } END { exit !found }' skills/status/SKILL.md; then
-  pass "skills/status/SKILL.md's description lists its arguments"
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all\./ { found = 1; exit 0 } END { exit !found }' skills/waiting/SKILL.md; then
+  pass "skills/waiting/SKILL.md's description lists its arguments"
 else
-  fail "skills/status/SKILL.md's description must list its arguments (Arguments: project names or all.)"
+  fail "skills/waiting/SKILL.md's description must list its arguments (Arguments: project names or all.)"
 fi
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: backlog item ids\./ { found = 1; exit 0 } END { exit !found }' skills/build/SKILL.md; then
   pass "skills/build/SKILL.md's description lists its arguments"
@@ -148,6 +148,19 @@ if [ -n "$bare" ]; then
   fail "rules.md and skills must keep every /mentat: command name in backticks (bare at: $bare)"
 else
   pass "rules.md and skills keep every /mentat: command name in backticks"
+fi
+
+# Every /mentat: command named in the README, rules.md or a skill's files is a skill that exists.
+cmd_names=$( { grep -ho '/mentat:[a-z-]*' README.md rules.md; git ls-files -z -- skills | xargs -0 grep -ho '/mentat:[a-z-]*'; } | sed 's|^/mentat:||' | sort -u)
+missing=""
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  [ -f "skills/$name/SKILL.md" ] || missing="$missing $name"
+done <<< "$cmd_names"
+if [ -z "$missing" ]; then
+  pass "every /mentat: command in README.md, rules.md and skills/ is a skill that exists"
+else
+  fail "README.md, rules.md or skills/ name a /mentat: command with no skill:$missing"
 fi
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
