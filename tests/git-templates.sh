@@ -30,7 +30,8 @@ ext() { printf 'ext::git %%s %s' "$(printf '%s' "$1" | sed -e 's/%/%%/g' -e 's/ 
 # gitleaks: records its arguments and stdin, prints text that must never reach the
 # output, and writes a JSON report to --report-path. Each stdin line holding
 # stubmatchedtext is a finding of stub-rule. Exits with --exit-code on a finding, else
-# 0. $STUB/error: fails with no report.
+# 0. $STUB/error: fails with no report. $STUB/bad_report: a finding with a report that
+# is not JSON.
 cat >"$tmp/bin/gitleaks" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
@@ -46,6 +47,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ ! -f "$STUB/error" ] || exit 1
+if [ -f "$STUB/bad_report" ]; then echo "stubmatchedtext" >"$report"; exit "$code"; fi
 lines=$(grep -an stubmatchedtext "$STUB/stdin" | cut -d: -f1)
 if [ -z "$lines" ]; then echo '[]' >"$report"; exit 0; fi
 printf '%s\n' "$lines" | jq -R 'tonumber | {RuleID: "stub-rule", StartLine: ., File: "", Secret: "stubmatchedtext", Match: "token = stubmatchedtext"}' | jq -s . >"$report"
@@ -95,12 +97,23 @@ check "a clean commit goes through" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] &
 reset; printf 'more\ntoken = stubmatchedtext\n' >>"$repo/clean.txt"; h=$(head_of)
 A commit -q -a -m "edit"; rc=$?
 check "git commit -a with nothing staged before is scanned for what it commits" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ] && grep -qF "stub-rule in clean.txt" "$STUB/out"'
+reset; printf 'more\ntoken = stubmatchedtext\n' >>"$repo/clean.txt"; h=$(head_of)
+A commit -q -m "edit" -- clean.txt; rc=$?
+check "a commit naming a path with nothing staged before is scanned for what it commits" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ] && grep -qF "stub-rule in clean.txt" "$STUB/out"'
 reset; git -C "$repo" rm -q kept.txt; h=$(head_of)
 A commit -q -m "remove kept"; rc=$?
 check "a removed line with a finding passes" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
 reset; stage_hit; touch "$STUB/error"; h=$(head_of)
 A commit -q -m "add file"; rc=$?
 check "a gitleaks error refuses as a failed scan" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ] && grep -q "could not run" "$STUB/out" && ! grep -q stub-rule "$STUB/out" && no_leak'
+reset; stage_hit; touch "$STUB/bad_report"; h=$(head_of)
+A commit -q -m "add file"; rc=$?
+check "an unreadable gitleaks report refuses as a failed scan" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ] && grep -q "could not run" "$STUB/out" && ! grep -q stub-rule "$STUB/out" && no_leak'
+git init -q "$tmp/fresh"
+in=$tmp/fresh; reset; stage_hit
+A commit -q -m first; rc=$?
+check "with no commits yet, a staged secret is refused" '[ "$rc" != 0 ] && ! git -C "$in" rev-parse -q --verify HEAD >/dev/null && grep -qF "stub-rule in file two.txt" "$STUB/out"'
+in=$repo
 reset; stage_hit; h=$(head_of)
 M commit -q -m "maintainer commit"; rc=$?
 check "the maintainer's git runs no template: a commit with the invented secret goes through unscanned" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ ! -e "$STUB/calls" ]'
@@ -277,6 +290,9 @@ pushed_main=$(git --git-dir="$tmp/dangle.git" rev-parse refs/heads/main)
 reset; A push -q dangle-split feat/x:main; rc=$?
 check "with a pushurl to a remote with no HEAD branch, main is refused, not the fetch repository's default branch" \
   '[ "$(git -C "$repo" symbolic-ref --short refs/remotes/dangle-split/HEAD)" = dangle-split/trunk ] && [ "$rc" != 0 ] && grep -q "default branch (main)" "$STUB/out" && [ "$(git --git-dir="$tmp/dangle.git" rev-parse refs/heads/main)" = "$pushed_main" ]'
+reset; A push -q dangle-split feat/x:master; rc=$?
+check "with a pushurl to a remote with no HEAD branch, master is refused too" \
+  '[ "$rc" != 0 ] && grep -q "default branch (master)" "$STUB/out" && ! git --git-dir="$tmp/dangle.git" rev-parse -q --verify refs/heads/master >/dev/null'
 # A remote with no branches yet: the first branch pushed would become its default, so a
 # push that creates any branch is refused.
 for spec in feat/x:trunk feat/x:feat/first; do

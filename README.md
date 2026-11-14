@@ -11,13 +11,13 @@
 
 Mentat is a Claude Code plugin for building software with multiple AI agents.
 
-Claude Code plans, builds and reviews each change, and you decide what gets built and merge every pull request. With `mentat-reviewers` on in committed settings, Codex reviews every round, Grok the first head. Hooks block an agent's merge and ask you before other risky commands, such as a default-branch push.
+Claude Code plans, builds and reviews each change, and you decide what gets built and merge every pull request. With `mentat-reviewers` on in committed settings, Codex reviews every round, Grok the first head. A hook blocks an agent's merge, and, where set up, the git hook templates refuse its default-branch pushes and likely secrets.
 
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
 - For `mentat-reviewers`: the Codex CLI, signed in, outside the home folder, and Grok Build (`grok`), signed in with `grok login`.
-- Optional: `gitleaks`, to catch secrets before a commit.
+- For the git hook templates: `gitleaks`.
 
 ## Install
 
@@ -66,11 +66,11 @@ Moving a backlog to Linear is a hand step: [steps](plugins/mentat-linear/skills/
 
 ## Review tools
 
-`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt.
+`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone.
 
 ## Git hook templates
 
-`git-templates/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy.
+`git-templates/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Both guards hold only where agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy; `mentat check` reports their state.
 
 ## Credits
 
