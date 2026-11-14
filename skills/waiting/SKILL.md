@@ -48,7 +48,7 @@ Answer in chat only, short, in this order, with `none` for an empty part:
 3. `Unanswered:` one line per ask. If the session was compacted and early messages survive only as a summary, say so here: asks from before it may be missing. Never shorten this part to fit.
 4. `Plan:` one line saying plainly whether the goal or the plan itself should change, not only the next step.
 5. Each further part the maintainer's own instructions name, in their order. A part they do not supply is left out.
-6. `Not read:` each record that could not be read and why, in a phrase. Left out when every record was read.
+6. `Not read:` each record or repository that could not be read and why, in a phrase. Left out when every record and repository was read.
 
 Links to the items named go on the last line.
 
