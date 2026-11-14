@@ -28,7 +28,7 @@ Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the 
 
 Stages say where an item stands. The tracker's adapter maps each to its own statuses or labels (`mentat-linear:linear`, `github.md`):
 
-- Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work. Triage (`/mentat:triage`) settles it; accepting it keeps the same entry as the item. The maintainer's own instructions may name further inboxes, read as they say. For the lookup of the next-work offer (`next-work.md`), count, read-only and running no reader, this session's project's Inbox entries, with any further inbox named for it, that triage would ask, reading every page: all but an entry with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed or the maintainer raised it again. An Inbox that cannot be read gives no count.
+- Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work. Triage (`/mentat-linear:triage`, in the `mentat-linear` module) settles it; accepting it keeps the same entry as the item. The maintainer's own instructions may name further inboxes, read as they say. For the lookup of the next-work offer (`next-work.md`), count, read-only and running no reader, this session's project's Inbox entries, with any further inbox named for it, that triage would ask, reading every page: all but an entry with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed or the maintainer raised it again. An Inbox that cannot be read gives no count.
 - Backlog: accepted, not committed. Also an item the maintainer set aside, which says "parked" in its opening sentence; one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work ("The order of agreed work"). Also an item holding only a decision for the maintainer.
 - Todo: committed, agreed with a spec. Only the maintainer's yes in `mentat:propose` commits an item and moves it from Backlog to Todo.
 - In Progress: a branch or pull request exists.
@@ -71,7 +71,7 @@ With either tracker, when an item's or issue's agreed spec, or a not-agreed item
 
 ## Advice against
 
-With either tracker, when Claude Code recommended closing, shrinking or not building an item and the maintainer goes ahead anyway, with an Agree answer in `mentat:propose` or Accept in `mentat:triage`, the session recording that answer posts one comment on the item, outside the spec, in this shape:
+With either tracker, when Claude Code recommended closing, shrinking or not building an item and the maintainer goes ahead anyway, with an Agree answer in `mentat:propose` or Accept in triage, the session recording that answer posts one comment on the item, outside the spec, in this shape:
 
 `Advised against: <close|shrink|not build>; reason: <one line>`
 

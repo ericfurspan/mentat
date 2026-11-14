@@ -1,6 +1,6 @@
 {
   "name": "mentat-linear",
-  "description": "Mentat module: the Linear backlog adapter, for a repository whose AGENTS.md names a Linear project.",
+  "description": "Mentat module: the Linear backlog adapter, for a repository whose AGENTS.md names a Linear project, and Inbox triage with the maintainer (/mentat-linear:triage).",
   "author": { "name": "ericfurspan" },
   "repository": "https://github.com/ericfurspan/mentat"
 }
