@@ -106,6 +106,7 @@ git clone -q "$root/origin.git" "$root/work"
 echo dirty >"$root/work/README"
 
 # gh: pr view serves $STUB/head (moved_head replaces it after the first read);
+# its merge state, not a head read, comes from $STUB/mergeable (MERGEABLE when absent);
 # check runs come from $STUB/check_runs.json (check_runs_later.json from the second
 # read on), and a file named push_on_ci holds a head to switch to when CI is read;
 # pr comment records the body, or fails when comment_fails exists, and adds it to
@@ -115,6 +116,7 @@ cat >"$root/tools/bin/gh" <<'STUBEOF'
 printf '%s\n' "$*" >>"$STUB/calls"
 case "$1 $2" in
   "pr view")
+    case "$*" in *mergeable*) if [ -f "$STUB/mergeable" ]; then cat "$STUB/mergeable"; else echo MERGEABLE; fi; exit 0 ;; esac
     n=$(($(cat "$STUB/head_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/head_reads"
     h=$(cat "$STUB/head"); [ "$n" -gt 1 ] && [ -f "$STUB/moved_head" ] && h=$(cat "$STUB/moved_head")
     case "$*" in
@@ -504,6 +506,9 @@ reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-c
 check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && grep -q "BEGIN AGREED REQUEST DATA" "$STUB/prompt"'
 reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
 check "--require-ci after --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment"'
+# --require-ci: a pull request that conflicts with its base branch is not a pass (tests/review-local.sh covers the rest).
+reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
+check "--require-ci with every check passed on a conflicting pull request exits 4, says it conflicts, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qxF "Pull request #7 conflicts with its base branch, so its tests did not run on $H. Resolve the conflict and push." "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
 for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   # shellcheck disable=SC2086 # the words are the arguments
   rc=$("$mentat" review --codex $args >/dev/null 2>&1; echo $?)

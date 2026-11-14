@@ -23,8 +23,9 @@
 #     unset leaves Grok's default.
 #     All take `--request <file>` and `--require-ci` after the mode, if any, in any order
 #     with --stop:
-#     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran
-#     exits 4 like failed CI, posting nothing; without it, such a head is reviewed and posted.
+#     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran,
+#     or a pull request that conflicts with its base branch or whose merge state cannot be
+#     read, exits 4 like failed CI, posting nothing; without it, such a head is reviewed and posted.
 #     The file holds the agreed request (what to build, what to leave alone, how it is checked)
 #     for a repository that keeps it outside GitHub. It is read once, before the review;
 #     a missing, unreadable or blank file is not reviewed. It goes to the reviewing tool as

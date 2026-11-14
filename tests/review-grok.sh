@@ -57,6 +57,7 @@ GH_REAL=$(cd -P "$GH_USER" && pwd -P)
 export GROK_HOME="$GH_USER" XAI_API_KEY=fake-xai-key MENTAT_CANARY=fake-canary GROK_FOLDER_TRUST=0
 
 # gh: pr view serves $STUB/head (moved_head replaces it after the first read);
+# its merge state, not a head read, comes from $STUB/mergeable (MERGEABLE when absent);
 # check runs come from $STUB/check_runs.json (check_runs_later.json from the second
 # read on), and a file named push_on_ci holds a head to switch to when CI is read;
 # pr comment records each comment as $STUB/comment.N, and adds it to the comments
@@ -67,6 +68,7 @@ cat >"$root/bin/gh" <<'STUBEOF'
 printf '%s\n' "$*" >>"$STUB/calls"
 case "$1 $2" in
   "pr view")
+    case "$*" in *mergeable*) if [ -f "$STUB/mergeable" ]; then cat "$STUB/mergeable"; else echo MERGEABLE; fi; exit 0 ;; esac
     n=$(($(cat "$STUB/head_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/head_reads"
     h=$(cat "$STUB/head"); [ "$n" -gt 1 ] && [ -f "$STUB/moved_head" ] && h=$(cat "$STUB/moved_head")
     case "$*" in
@@ -347,6 +349,10 @@ rm "$STUB/args"; rc=$(run)
 check "so a later review --grok without --require-ci is not refused, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ]'
 reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
 check "--require-ci before --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment.2"'
+# A pull request that conflicts with its base branch is not a pass either (tests/review-local.sh covers the rest).
+reset; echo CONFLICTING >"$STUB/mergeable"; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci 7 >"$STUB/out" 2>&1; echo $?)
+check "--require-ci with every check passed on a conflicting pull request exits 4, says it conflicts, prints the review and posts nothing, not even the start comment" '[ "$rc" = 4 ] && grok_ran && [ "$(comments)" = 0 ] && grep -qxF "Pull request #7 conflicts with its base branch, so its tests did not run on $H. Resolve the conflict and push." "$STUB/out" && [ "$(unposted)" = "$(jq -r .text "$STUB/out_json")" ] && [ -z "$(left_over)" ]'
+check "--require-ci: a review not posted for a conflict leaves Grok not run" 'status | grep -q "grok: none,"'
 reset; echo 4444444444444444444444444444444444444444 >"$STUB/head"; rc=$(run)
 check "a head the fetch does not match is exit 3, with no start record" '[ "$rc" = 3 ] && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; rc=$(race)

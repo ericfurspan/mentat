@@ -34,6 +34,8 @@ git clone -q "$root/origin.git" "$root/work"
 echo dirty >"$root/work/README"
 
 # gh: pr view serves $STUB/head (moved_head replaces it after the first read);
+# its merge state, not a head read, comes from $STUB/mergeable (MERGEABLE when absent,
+# mergeable_later from the second read on; fail fails the read);
 # check runs come from $STUB/check_runs.json (check_runs_later.json from the second
 # read on), and a file named push_on_ci holds a head to switch to when CI is read;
 # pr comment records the body, or fails when comment_fails exists, and adds it to
@@ -43,6 +45,14 @@ cat >"$root/tools/bin/gh" <<'STUBEOF'
 printf '%s\n' "$*" >>"$STUB/calls"
 case "$1 $2" in
   "pr view")
+    case "$*" in
+      *mergeable*)
+        n=$(($(cat "$STUB/merge_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/merge_reads"
+        m=MERGEABLE; [ -f "$STUB/mergeable" ] && m=$(cat "$STUB/mergeable")
+        [ "$n" -gt 1 ] && [ -f "$STUB/mergeable_later" ] && m=$(cat "$STUB/mergeable_later")
+        [ "$m" != fail ] || exit 1
+        echo "$m"; exit 0 ;;
+    esac
     n=$(($(cat "$STUB/head_reads" 2>/dev/null || echo 0) + 1)); echo "$n" >"$STUB/head_reads"
     h=$(cat "$STUB/head"); [ "$n" -gt 1 ] && [ -f "$STUB/moved_head" ] && h=$(cat "$STUB/moved_head")
     case "$*" in
@@ -470,6 +480,29 @@ reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-c
 check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && grep -q "BEGIN AGREED REQUEST DATA" "$STUB/prompt"'
 reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
 check "--require-ci after --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment"'
+# --require-ci: GitHub runs no pull_request workflow while a pull request conflicts with
+# its base branch, so only a mergeable one passes.
+conflict="Pull request #7 conflicts with its base branch, so its tests did not run on $H. Resolve the conflict and push."
+merge_reads() { cat "$STUB/merge_reads" 2>/dev/null || echo 0; }
+reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
+check "--require-ci with every check passed on a conflicting pull request exits 4, says it conflicts, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qxF "$conflict" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
+check "--require-ci: a review not posted for a conflict counts no round" 'status | grep -q "local rounds 0,"'
+reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
+check "--require-ci with no CI check on a conflicting pull request exits 4 with the conflict as the reason" '[ "$rc" = 4 ] && ! posted && grep -qxF "$conflict" "$STUB/out" && ! grep -q "No CI checks ran" "$STUB/out"'
+reset; echo UNKNOWN >"$STUB/mergeable"; echo MERGEABLE >"$STUB/mergeable_later"; rc=$(runrc --require-ci 7)
+check "--require-ci waits while the merge state is unknown, then posts once it is mergeable (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(merge_reads)" -ge 2 ]'
+reset; printf -- '- P2 README:1 merge state\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo UNKNOWN >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
+check "--require-ci with the merge state unknown until the timeout exits 4, says it could not be read, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qxF "The merge state of pull request #7 could not be read within 2 seconds (last read: UNKNOWN)." "$STUB/out" && ! grep -q "CI did not finish" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ]'
+reset; echo fail >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
+check "--require-ci with a merge state read that fails until the timeout exits 4 the same way" '[ "$rc" = 4 ] && ! posted && grep -qxF "The merge state of pull request #7 could not be read within 2 seconds (last read: failed)." "$STUB/out"'
+reset; rc=$(runrc --require-ci 7)
+check "--require-ci with every check passed on a mergeable pull request reads its merge state and posts (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(merge_reads)" -ge 1 ]'
+reset; echo CONFLICTING >"$STUB/mergeable"; rc=$(run)
+check "without --require-ci a conflicting pull request with every check passed posts as before, its merge state not read (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(merge_reads)" = 0 ]'
+reset; echo CONFLICTING >"$STUB/mergeable"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(runrc --require-ci 7)
+check "--require-ci on a conflicting pull request whose head moved exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(merge_reads)" -ge 1 ] && grep -q "the head moved from $H; run mentat review again" "$STUB/out" && ! grep -q "conflicts with its base branch\|not posted" "$STUB/out"'
+reset; echo UNKNOWN >"$STUB/mergeable"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(runrc --require-ci 7)
+check "--require-ci with the merge state unknown until the timeout and a head that moved exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(merge_reads)" -ge 1 ] && grep -q "the head moved from $H; run mentat review again" "$STUB/out" && ! grep -q "could not be read\|not posted" "$STUB/out"'
 for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   # shellcheck disable=SC2086 # the words are the arguments
   rc=$("$mentat" review --local $args >/dev/null 2>&1; echo $?)
