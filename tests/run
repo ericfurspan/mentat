@@ -250,15 +250,21 @@ else
   fail "under .claude/ only settings.json may be version-controlled, and settings.local.json must be ignored"
 fi
 
-# hooks.json runs the SessionStart hook once, which is what loads rules.md.
+# hooks.json runs the SessionStart hook once, which is what loads rules.md, and
+# no-merge as its one PreToolUse command, across all its matcher entries.
 if command -v jq >/dev/null 2>&1; then
   if jq -e '.hooks.SessionStart | length == 1 and (.[0].hooks | length == 1) and (.[0].hooks[0].command | endswith("/hooks/session-start"))' hooks/hooks.json >/dev/null; then
     pass "hooks.json runs hooks/session-start as its one SessionStart command"
   else
     fail "hooks.json must have exactly one SessionStart command, ending in /hooks/session-start"
   fi
+  if jq -e '[.hooks.PreToolUse[].hooks[]] | length == 1 and (.[0].command | endswith("/hooks/no-merge"))' hooks/hooks.json >/dev/null; then
+    pass "hooks.json runs hooks/no-merge as its one PreToolUse command"
+  else
+    fail "hooks.json must have exactly one PreToolUse command, ending in /hooks/no-merge"
+  fi
 else
-  fail "jq not installed, SessionStart wiring not checked"
+  fail "jq not installed, SessionStart and PreToolUse wiring not checked"
 fi
 
 # The SessionStart hook prints rules.md unchanged, and its complete output, trailing newline
@@ -453,13 +459,13 @@ for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
 done
 
 # mentat reviewers, review, review --local, review --codex, review --grok, second-opinion (both modes) and check behave as
-# specified (stub gh, claude, codex, grok and gitleaks), and so do the publish check and the merge, push and secret hooks,
+# specified (stub gh, claude, codex, grok and gitleaks), and so do the publish check, the merge hook,
 # the contract the merge hook keeps through hooks/lib/verdict.sh, the git hook templates, and the
 # public-text module's hook. The marketplace lists the modules and the committed settings turn on
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh tests/public-text.sh tests/modules.sh)
+  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-templates.sh tests/public-text.sh tests/modules.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -522,7 +528,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
