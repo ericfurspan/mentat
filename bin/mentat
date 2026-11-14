@@ -9,7 +9,9 @@
 #     `mentat review --local <PR>` is the same. A comment that holds a local path or a
 #     private name, in a public repository, is kept in a local file and not posted (exit 1).
 #     Claude runs in a fresh context, with read tools only, on MENTAT_REVIEW_MODEL (default
-#     opus); the record names the model that ran. Its time limit is
+#     opus), or, with MENTAT_FIRST_REVIEW_MODEL set, on that model while the pull request has
+#     no local round (as mentat status counts them); the record names the model that ran,
+#     and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200).
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
 #     --codex and --grok first read whether outside reviewers are on here, as mentat
