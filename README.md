@@ -43,7 +43,7 @@ Optional modules install as `<module>@mentat`: `mentat-reviewers` holds the Code
 
 Ask for a change in chat and Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
 
-- `/mentat:status [project ... | all]`: what waits on you, what is next and your unanswered asks.
+- `/mentat:waiting [project ... | all]`: what waits on you, what is next and your unanswered asks.
 - `/mentat:triage [project ... | all] | brainstorm <text or link>`: go through the Inbox with you.
 - `/mentat:plan [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
