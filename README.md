@@ -49,8 +49,6 @@ Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, To
 - `/mentat:propose [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
 
-Moved from core: `status` became `/mentat:waiting` and `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`.
-
 [`rules.md`](rules.md) holds the core rules; the skills in `skills/` hold each step's detail.
 
 ## Configuration
@@ -66,6 +64,8 @@ Moving a backlog to Linear is a hand step: [steps](plugins/mentat-linear/skills/
 ## Review tools
 
 `mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone.
+
+`MENTAT_FIRST_REVIEW_MODEL`, a model such as `fable` or `opus`, runs each pull request's first local review; unset is off. Fable on a plan without it bills credits or fails.
 
 ## Git hook templates
 
