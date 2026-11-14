@@ -38,7 +38,7 @@ Optional modules install as `<module>@mentat`:
 
 - `mentat-reviewers`: the Codex and Grok commands.
 - `mentat-public-text`: blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`.
-- `mentat-linear`: the Linear backlog adapter and `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`, Inbox triage.
+- `mentat-linear`: the Linear adapter, and Inbox triage for any backlog: `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`.
 - `mentat-extras`: grill, an interview on open decisions, and `/mentat-extras:retro`, improvements from a session.
 
 ## Usage
@@ -56,13 +56,13 @@ Moved from core: `status` became `/mentat:waiting` and `plan` became `/mentat:pr
 
 ## Configuration
 
-Mentat reads these from AGENTS.md:
+Mentat reads from AGENTS.md:
 
 - Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; else GitHub issues)
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
-Moving a repository's backlog to Linear is a hand step: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
+Moving a backlog to Linear is a hand step: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
 
 ## Review tools
 
