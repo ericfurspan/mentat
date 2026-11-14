@@ -48,7 +48,6 @@ Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, To
 - `/mentat:waiting [project ... | all]`: what waits on you, what is next and your unanswered asks.
 - `/mentat:propose [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
-- `/mentat:claude-review`: turn Codex and Grok off; Claude reviews instead.
 
 Moved from core: `status` became `/mentat:waiting` and `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`.
 

@@ -227,8 +227,6 @@ status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --bo
 status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
-status_heading skills/claude-review/SKILL.md "\`Claude review round <n> on <sha>\`"
-status_heading skills/claude-review/SKILL.md "\`Agreed request fingerprint: <12 hex>\`"
 # mentat status behaves as specified (stub gh), and its test passes shellcheck.
 if command -v jq >/dev/null 2>&1; then
   if out=$(tests/status.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/status.sh; fi
