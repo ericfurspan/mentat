@@ -37,8 +37,8 @@
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
 #   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
 #     review state from the comments the review commands posted as this gh account: the head
-#     commit, the local rounds (completed Local Claude reviews; and Claude review rounds when
-#     present; a Codex review is not a round), whether the head is the last commit Claude
+#     commit, the local rounds (completed Local Claude reviews; a Codex review is not a
+#     round), whether the head is the last commit Claude
 #     reviewed, the Grok state (none, running, done or did not finish), the
 #     Grok stop review's (none, or running, done or did not finish on a commit, a done one
 #     with its result and spec fingerprint), the Codex review's on the last commit Claude
