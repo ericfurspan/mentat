@@ -9,11 +9,11 @@ failures=0
 pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
 
-# Outside the tracker adapters, rules, skills and the builder prompt name no tracker's own statuses, fields,
-# labels or buttons. The list is the Linear adapter's own words; the core writes "triage" in lowercase.
+# Outside the tracker adapters, rules, skills (module skills included) and the builder prompt name no tracker's
+# own statuses, fields, labels or buttons. The list is the Linear adapter's own words; the core writes "triage" in lowercase.
 linear_words="Waiting on you|Priority|No priority|Urgent|Mark as duplicate|Decline|Snooze|Linear's Accept|[a-z,;(] Triage|[(]Triage|Triage status"
-tracker_words=$( { printf '%s\n' rules.md prompts/builder.md; git ls-files -- skills; } |
-  grep -v -x -e skills/backlog/linear.md -e skills/backlog/github.md | tr '\n' '\0' |
+tracker_words=$( { printf '%s\n' rules.md prompts/builder.md; git ls-files -- skills 'plugins/*/skills/*'; } |
+  grep -v -x -e plugins/mentat-linear/skills/linear/SKILL.md -e skills/backlog/github.md | tr '\n' '\0' |
   xargs -0 grep -n -E -e "$linear_words")
 if [ -z "$tracker_words" ]; then
   pass "no tracker's own words outside the tracker adapters"
@@ -31,22 +31,23 @@ else
 fi
 
 # A triage sitting is started only by the maintainer and lists its arguments.
+f=plugins/mentat-linear/skills/triage/SKILL.md
 for s in 'name: triage' 'disable-model-invocation: true'; do
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/triage/SKILL.md; then
-    pass "skills/triage/SKILL.md's frontmatter sets $s"
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" "$f"; then
+    pass "$f's frontmatter sets $s"
   else
-    fail "skills/triage/SKILL.md's frontmatter must set $s"
+    fail "$f's frontmatter must set $s"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' skills/triage/SKILL.md; then
-  pass "skills/triage/SKILL.md's description lists its arguments"
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+  pass "$f's description lists its arguments"
 else
-  fail "skills/triage/SKILL.md's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
+  fail "$f's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
 fi
 
 # The / menu shows descriptions as plain text: no skill's description holds <, > or a backtick, and a menu
-# skill's description value is one short line of at most 150 characters.
-for f in skills/*/SKILL.md; do
+# skill's description value is one short line of at most 150 characters. Module skills too.
+for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
   d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && /^description: / { print; exit }' "$f")
   if [ -z "$d" ]; then
     fail "$f's frontmatter must have a description line"
@@ -69,8 +70,7 @@ for f in skills/*/SKILL.md; do
 done
 
 # Skills only agents call stay out of the / menu and stay callable by the agent.
-for s in propose pr review backlog grill; do
-  f=skills/$s/SKILL.md
+for f in skills/pr/SKILL.md skills/review/SKILL.md skills/backlog/SKILL.md plugins/mentat-extras/skills/grill/SKILL.md plugins/mentat-linear/skills/linear/SKILL.md; do
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "user-invocable: false" { found = 1; exit 0 } END { exit !found }' "$f"; then
     pass "$f's frontmatter sets user-invocable: false"
   else
@@ -83,18 +83,28 @@ for s in propose pr review backlog grill; do
   fi
 done
 
-# A planning session is started only by the maintainer and lists its argument.
-for s in 'name: plan' 'disable-model-invocation: true'; do
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/plan/SKILL.md; then
-    pass "skills/plan/SKILL.md's frontmatter sets $s"
-  else
-    fail "skills/plan/SKILL.md's frontmatter must set $s"
-  fi
-done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: a backlog item id\./ { found = 1; exit 0 } END { exit !found }' skills/plan/SKILL.md; then
-  pass "skills/plan/SKILL.md's description lists its argument"
+# Propose starts a change when the agent calls it, and the maintainer types it to plan backlog work: it is in
+# the / menu, callable by the agent, and lists its argument.
+f=skills/propose/SKILL.md
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "user-invocable: false" { found = 1; exit 0 } END { exit !found }' "$f"; then
+  fail "$f's frontmatter must not set user-invocable: false, so the maintainer can type it"
 else
-  fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
+  pass "$f's frontmatter does not set user-invocable: false"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^disable-model-invocation:/ { found = 1; exit 0 } END { exit !found }' "$f"; then
+  fail "$f's frontmatter must not set disable-model-invocation, so the agent can call it"
+else
+  pass "$f's frontmatter does not set disable-model-invocation"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want='argument-hint: "[item id]"' "$f"; then
+  pass "$f's frontmatter sets argument-hint: \"[item id]\""
+else
+  fail "$f's frontmatter must set argument-hint: \"[item id]\""
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: a backlog item id\."$/ { found = 1; exit 0 } END { exit !found }' "$f"; then
+  pass "$f's description ends by listing its argument"
+else
+  fail "$f's description must end by listing its argument (Arguments: a backlog item id.)"
 fi
 
 # The waiting list is started only by a command, a build run by a command or by the session; both list their arguments.
@@ -143,24 +153,47 @@ else
 fi
 
 # Instruction text loads into sessions, so it describes the build command's form and never writes a slash command bare.
-bare=$(grep -nE '(^|[^`])/mentat:' rules.md skills/*/SKILL.md | cut -d: -f1,2)
+bare=$(grep -nE '(^|[^`])/mentat(-[a-z-]+)?:' rules.md skills/*/SKILL.md plugins/*/skills/*/SKILL.md | cut -d: -f1,2)
 if [ -n "$bare" ]; then
-  fail "rules.md and skills must keep every /mentat: command name in backticks (bare at: $bare)"
+  fail "rules.md and skills must keep every /mentat: or /mentat-<module>: command name in backticks (bare at: $bare)"
 else
-  pass "rules.md and skills keep every /mentat: command name in backticks"
+  pass "rules.md and skills keep every /mentat: and /mentat-<module>: command name in backticks"
 fi
 
-# Every /mentat: command named in the README, rules.md or a skill's files is a skill that exists.
-cmd_names=$( { grep -ho '/mentat:[a-z-]*' README.md rules.md; git ls-files -z -- skills | xargs -0 grep -ho '/mentat:[a-z-]*'; } | sed 's|^/mentat:||' | sort -u)
+# Every /mentat: command named in the README, rules.md or a skill's files (module skills included) is a core skill that exists.
+cmd_names=$( { grep -ho '/mentat:[a-z-]*' README.md rules.md; git ls-files -z -- skills 'plugins/*/skills/*' | xargs -0 grep -ho '/mentat:[a-z-]*'; } | sed 's|^/mentat:||' | sort -u)
 missing=""
 while IFS= read -r name; do
   [ -n "$name" ] || continue
   [ -f "skills/$name/SKILL.md" ] || missing="$missing $name"
 done <<< "$cmd_names"
 if [ -z "$missing" ]; then
-  pass "every /mentat: command in README.md, rules.md and skills/ is a skill that exists"
+  pass "every /mentat: command in README.md, rules.md, skills/ and module skills is a skill that exists"
 else
-  fail "README.md, rules.md or skills/ name a /mentat: command with no skill:$missing"
+  fail "README.md, rules.md, skills/ or a module skill name a /mentat: command with no skill:$missing"
+fi
+
+# Every module skill named there, as a command (/mentat-<module>:<name>) or a Skill tool name
+# (mentat-<module>:<name>), is a skill at plugins/mentat-<module>/skills/<name>/SKILL.md.
+mod_names=$( { grep -ho -E 'mentat-[a-z-]+:[a-z-]+' README.md rules.md; git ls-files -z -- skills 'plugins/*/skills/*' | xargs -0 grep -ho -E 'mentat-[a-z-]+:[a-z-]+'; } | sort -u)
+missing=""
+while IFS= read -r ref; do
+  [ -n "$ref" ] || continue
+  [ -f "plugins/${ref%%:*}/skills/${ref#*:}/SKILL.md" ] || missing="$missing $ref"
+done <<< "$mod_names"
+if [ -z "$missing" ]; then
+  pass "every mentat-<module>: skill in README.md, rules.md, skills/ and module skills is a module skill that exists"
+else
+  fail "README.md, rules.md, skills/ or a module skill name a mentat-<module>: skill with no module skill:$missing"
+fi
+
+# Core reaches a module only by skill name, and no skill reaches outside its own plugin by a relative path: no core
+# skill file names a module path (plugins/mentat-...), and no skill file climbs out of its plugin (../../../).
+leaks=$( { git ls-files -z -- skills | xargs -0 grep -n -E 'plugins/mentat-|\.\./\.\./\.\./'; git ls-files -z -- 'plugins/*/skills/*' | xargs -0 grep -n -E '\.\./\.\./\.\./'; } | cut -d: -f1,2)
+if [ -z "$leaks" ]; then
+  pass "no core skill file names a module path, and no skill file climbs out of its plugin"
+else
+  fail "a core skill file names a module path, or a skill file climbs out of its plugin (at: $leaks)"
 fi
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
@@ -316,23 +349,24 @@ while IFS= read -r s; do
   fi
 done <<< "$(awk '/^## / { exit } NF' "$safety")"
 
-# Each skill's name matches its folder, which is how Claude Code finds it.
-for f in skills/*/SKILL.md; do
+# Each skill's name matches its folder, which is how Claude Code finds it. Module skills too.
+for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
   [ -e "$f" ] || continue
   dir=${f%/SKILL.md}
   # Only the frontmatter block at the top of the file counts.
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="name: ${dir#skills/}" "$f"; then
-    pass "$f is named ${dir#skills/}"
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="name: ${dir##*/}" "$f"; then
+    pass "$f is named ${dir##*/}"
   else
-    fail "$f must set name: ${dir#skills/}"
+    fail "$f must set name: ${dir##*/}"
   fi
 done
 
 # rules.md names each workflow skill as a Skill tool call: every name it uses
 # has a skill, and every skill the agent can call is named there or in a skill
 # rules.md names (a step's procedure, such as mentat:propose, names the skills
-# it calls). Each skill stays under 15,000 characters, a house limit toward
-# Claude Code's budget for skill text kept after compaction.
+# it calls), a module skill by its plugin's name (mentat-linear:linear). Each
+# skill, module skills included, stays under 15,000 characters, a house limit
+# toward Claude Code's budget for skill text kept after compaction.
 named_by=rules.md
 while IFS= read -r name; do
   [ -n "$name" ] || continue
@@ -347,19 +381,23 @@ done <<< "$(grep -ho 'mentat:[a-z-]*' rules.md | sed 's/^mentat://' | sort -u)"
 is_named() {
   local g
   for g in $named_by; do
-    if grep -q "mentat:$1\`" "$g"; then return 0; fi
+    if grep -q "$1\`" "$g"; then return 0; fi
   done
   return 1
 }
-for f in skills/*/SKILL.md; do
+for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
   [ -e "$f" ] || continue
-  name=${f#skills/}; name=${name%/SKILL.md}
+  name=${f%/SKILL.md}; name=${name##*/}
+  case $f in
+    plugins/*) plugin=${f#plugins/}; plugin=${plugin%%/*} ;;
+    *) plugin=mentat ;;
+  esac
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "disable-model-invocation: true" { found = 1; exit 0 } END { exit !found }' "$f"; then
     pass "$f is started by the maintainer, not named in rules.md"
-  elif is_named "$name"; then
+  elif is_named "$plugin:$name"; then
     pass "$f is named in rules.md or a skill it names"
   else
-    fail "$f can be called by the agent but neither rules.md nor a skill it names names mentat:$name"
+    fail "$f can be called by the agent but neither rules.md nor a skill it names names $plugin:$name"
   fi
   size=$(wc -c < "$f" | tr -d ' ')
   if [ "$size" -lt 15000 ]; then
@@ -371,7 +409,10 @@ done
 
 # A supporting file a skill names in backticks (lowercase `name.md`, or `../<skill>/name.md`)
 # exists, relative to that skill's folder. A bare name found at the repository root, such as rules.md, is not one.
-for f in skills/*/SKILL.md; do
+# A file named in another plugin's skill folder ("`name.md` in `mentat:backlog`'s folder", which a module skill
+# uses for a core file) exists in that skill's folder instead. Module skills too.
+in_folder="\`[a-z][a-z0-9-]*\.md\` in \`mentat(-[a-z-]+)?:[a-z-]+\`'s folder"
+for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
   [ -e "$f" ] || continue
   dir=${f%/SKILL.md}
   while IFS= read -r ref; do
@@ -385,7 +426,20 @@ for f in skills/*/SKILL.md; do
     else
       fail "$f names $ref, but $dir/$ref is missing"
     fi
-  done <<< "$(grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" "$f" | tr -d '\`' | sort -u)"
+  done <<< "$(sed -E "s/$in_folder//g" "$f" | grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" | tr -d '\`' | sort -u)"
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    file=${ref%% *}; owner=${ref#* in }; owner=${owner%"'s folder"}
+    case $owner in
+      mentat:*) path=skills/${owner#mentat:}/$file ;;
+      *) path=plugins/${owner%%:*}/skills/${owner#*:}/$file ;;
+    esac
+    if [ -f "$path" ]; then
+      pass "$f names $file in $owner's folder, which exists"
+    else
+      fail "$f names $file in $owner's folder, but $path is missing"
+    fi
+  done <<< "$(grep -o -E "$in_folder" "$f" | tr -d '\`' | sort -u)"
 done
 
 # mentat reviewers, review, review --local, review --codex, review --grok, second-opinion (both modes) and check behave as
