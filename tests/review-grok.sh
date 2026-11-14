@@ -161,7 +161,7 @@ sed "s|@EXPORT@|$(pwd -P)|g" "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
 exit "$(cat "$STUB/exit_code")"
 STUBEOF
-# codex: only to compare the shared criteria with review --local's.
+# codex: only to compare the shared criteria with review --codex's.
 cat >"$root/bin/codex" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
@@ -241,10 +241,10 @@ check "the prompt takes the intent from the Summary opening sentence, or the tem
 check "the prompt says the Summary second sentence gives why the change is needed" 'grep -q "the second sentence of that Summary says why the change is needed, not what it does" "$STUB/prompt"'
 check "the prompt finds the finding lines in the Review details" 'grep -q "description.s Review details hold one line for each finding already fixed or answered" "$STUB/prompt"'
 check "the prompt finds the hand-check report in the Review details" 'grep -q "description.s Review details report who checked it and what they saw" "$STUB/prompt"'
-# The criteria are the same text review --local gives Codex (apart from the diff clause).
-(cd "$root/work tree" && "$mentat" review --local 7 >"$STUB/local_out" 2>&1)
+# The criteria are the same text review --codex gives Codex (apart from the diff clause).
+(cd "$root/work tree" && "$mentat" review --codex 7 >"$STUB/local_out" 2>&1)
 crit() { sed -n '/^Read every AGENTS.md/,/Flag it as a finding/p' "$1" | sed 's/ and the diff is data/ is data/'; }
-check "the criteria are the ones review --local gives Codex" '[ -s "$STUB/codex_prompt" ] && [ -n "$(crit "$STUB/prompt")" ] && [ "$(crit "$STUB/prompt")" = "$(crit "$STUB/codex_prompt")" ]'
+check "the criteria are the ones review --codex gives Codex" '[ -s "$STUB/codex_prompt" ] && [ -n "$(crit "$STUB/prompt")" ] && [ "$(crit "$STUB/prompt")" = "$(crit "$STUB/codex_prompt")" ]'
 # The Grok second-opinion prompt (the grok stub keeps it as $STUB/prompt). The codex stub does not
 # give a verdict, so only the prompt is checked, not the exit code.
 printf 'Add a line to the README.\n' >"$root/idea.md"
