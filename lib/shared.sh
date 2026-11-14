@@ -108,7 +108,12 @@ result_word() {
 # (a failed read keeps exit 4): CI on an old head often fails or never finishes
 # because of the push itself. With the caller's require_ci=yes (mentat review
 # --require-ci), a head where no check ran is not a pass: it exits 4 the same way,
-# after saying no check ran. Checks appear a little after a push,
+# after saying no check ran. Also with require_ci=yes, GitHub runs no pull_request
+# workflow while the pull request conflicts with its base branch, so before "all
+# passed" or "no checks" counts, it reads the pull request's merge state: only
+# MERGEABLE goes on; CONFLICTING exits 4 the same way, saying so; any other value or
+# a failed read is waited on like a running check, and at the timeout exits 4 the
+# same way, saying the merge state could not be read. Checks appear a little after a push,
 # and not all at once, so neither "no checks" nor "all passed" counts until
 # CI_GRACE_SECONDS have passed since the wait began or since the last check
 # finished. A failed read is a missed poll; still failing at the timeout, it is
@@ -135,16 +140,34 @@ ci_stop() { # $1 commit, $2 reply file or empty
   fi
   exit 4
 }
+# Pull request $3's merge state, which it sets in the caller's merge: returns 0 when
+# MERGEABLE, exits 4 as ci_stop does when CONFLICTING (or 3 when the head moved from
+# commit $1, saying to run $4 again), and returns 1 for any other value or a failed read.
+ci_merge() { # $1 commit, $2 reply file or empty, $3 pull request, $4 command to run again
+  merge=$(gh pr view "$3" --json mergeable --jq .mergeable) || merge=failed
+  case "$merge" in
+    MERGEABLE) return 0 ;;
+    CONFLICTING)
+      ci_moved "$1" "$3" "$4"
+      printf 'Pull request #%s conflicts with its base branch, so its tests did not run on %s. Resolve the conflict and push.\n' "$3" "$1"
+      ci_stop "$1" "$2" ;;
+  esac
+  return 1
+}
 wait_for_ci() { # $1 repo, $2 commit, $3 reply file or empty, $4 pull request, $5 command to run again
-  local repo="$1" commit="$2" reply="${3:-}" pr="${4:-}" again="${5:-}" secs=0 lines said=no last
+  local repo="$1" commit="$2" reply="${3:-}" pr="${4:-}" again="${5:-}" secs=0 lines said=no last merge merge_wait
   while :; do
+    merge_wait=no
     if lines=$(ci_lines "$repo" "$commit"); then
       if [ -z "$lines" ]; then
         if [ "$secs" -ge "$CI_GRACE_SECONDS" ]; then
           [ "${require_ci:-no}" = yes ] || { printf 'No CI checks ran on %s\n' "$commit"; return 0; }
-          ci_moved "$commit" "$pr" "$again"
-          printf 'No CI checks ran on %s\n' "$commit"
-          ci_stop "$commit" "$reply"
+          if ci_merge "$commit" "$reply" "$pr" "$again"; then
+            ci_moved "$commit" "$pr" "$again"
+            printf 'No CI checks ran on %s\n' "$commit"
+            ci_stop "$commit" "$reply"
+          fi
+          merge_wait=yes
         fi
       elif grep -q '^fail ' <<<"$lines"; then
         ci_moved "$commit" "$pr" "$again"
@@ -153,15 +176,23 @@ wait_for_ci() { # $1 repo, $2 commit, $3 reply file or empty, $4 pull request, $
         ci_stop "$commit" "$reply"
       elif ! grep -q '^pending ' <<<"$lines"; then
         last=$(awk '{ if ($2 > m) m = $2 } END { print m + 0 }' <<<"$lines")
-        [ "$secs" -lt "$CI_GRACE_SECONDS" ] && [ $(( $(date -u +%s) - last )) -lt "$CI_GRACE_SECONDS" ] || return 0
+        if ! { [ "$secs" -lt "$CI_GRACE_SECONDS" ] && [ $(( $(date -u +%s) - last )) -lt "$CI_GRACE_SECONDS" ]; }; then
+          [ "${require_ci:-no}" = yes ] || return 0
+          ci_merge "$commit" "$reply" "$pr" "$again" && return 0
+          merge_wait=yes
+        fi
       fi
     elif [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
       not_reviewed "could not read CI on $commit"
     fi
     if [ "$secs" -ge "$CI_TIMEOUT_SECONDS" ]; then
       ci_moved "$commit" "$pr" "$again"
-      printf 'CI did not finish on %s within %s seconds. Still running:\n' "$commit" "$CI_TIMEOUT_SECONDS"
-      grep '^pending ' <<<"$lines" | sed -E 's/^pending [0-9]+ /- /'
+      if [ "$merge_wait" = yes ]; then
+        printf 'The merge state of pull request #%s could not be read within %s seconds (last read: %s).\n' "$pr" "$CI_TIMEOUT_SECONDS" "${merge:-empty}"
+      else
+        printf 'CI did not finish on %s within %s seconds. Still running:\n' "$commit" "$CI_TIMEOUT_SECONDS"
+        grep '^pending ' <<<"$lines" | sed -E 's/^pending [0-9]+ /- /'
+      fi
       ci_stop "$commit" "$reply"
     fi
     [ "$said" = yes ] || { printf 'Waiting for CI on %s\n' "$commit" >&2; said=yes; }
