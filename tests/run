@@ -150,6 +150,19 @@ else
   pass "rules.md and skills keep every /mentat: command name in backticks"
 fi
 
+# Every /mentat: command named in the README, rules.md or a skill's files is a skill that exists.
+cmd_names=$( { grep -ho '/mentat:[a-z-]*' README.md rules.md; git ls-files -z -- skills | xargs -0 grep -ho '/mentat:[a-z-]*'; } | sed 's|^/mentat:||' | sort -u)
+missing=""
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  [ -f "skills/$name/SKILL.md" ] || missing="$missing $name"
+done <<< "$cmd_names"
+if [ -z "$missing" ]; then
+  pass "every /mentat: command in README.md, rules.md and skills/ is a skill that exists"
+else
+  fail "README.md, rules.md or skills/ name a /mentat: command with no skill:$missing"
+fi
+
 # Reviews that run at once in one checkout must not share its record of the last fetch.
 if grep -l FETCH_HEAD lib/*.sh plugins/mentat-reviewers/lib/*.sh; then
   fail "a script under lib/ or the reviewers module's lib/ reads FETCH_HEAD, which concurrent reviews in one checkout share"
