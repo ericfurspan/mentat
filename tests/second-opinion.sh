@@ -113,9 +113,7 @@ echo "SECRET-LOG-TEXT" >&2
 exit "$(cat "$STUB/grok_exit")"
 EOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
-# mentat hands second-opinion to the reviewers module's entry on PATH: this checkout's, ahead
-# of any copy a session with the module on has there.
-export PATH="$root/tools/bin:${mentat%/bin/mentat}/plugins/mentat-reviewers/bin:$PATH"
+export PATH="$root/tools/bin:$PATH"
 
 # A local repository with no remote, at a path with a space, and a subdirectory to run from.
 "$real_git" init -q -b trunk "$root/my repo" && cd "$root/my repo" || exit 1

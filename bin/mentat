@@ -63,8 +63,8 @@
 #     local fetch tool is denied.
 #   review --codex, review --grok and second-opinion belong to the mentat-reviewers module:
 #     mentat hands each, with the arguments after its mode, to the module's entry
-#     mentat-review-codex, mentat-review-grok or mentat-second-opinion, on PATH or else in
-#     this checkout's plugins/mentat-reviewers/bin, and exits 64 with neither.
+#     mentat-review-codex, mentat-review-grok or mentat-second-opinion, in this checkout's
+#     plugins/mentat-reviewers/bin or else on PATH, and exits 64 with neither.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools, the git hook
 #     templates installed and the same as this copy when agents' git uses them
 #     (lib/templates.sh), gh signed in, the repository readable, claude installed at a version
@@ -95,15 +95,16 @@ for lib in shared publish review templates check status; do
 done
 
 # Hands the command to the reviewers module's entry mentat-$1, with the other arguments
-# and MENTAT_ROOT set to this folder, where the entry finds the shared code: the entry
-# on PATH, where the module puts it when it is on, else the copy in this checkout. That
-# copy is a temporary fallback for repositories with the module off; step 4.1 removes it.
+# and MENTAT_ROOT set to this folder, where the entry finds the shared code: the copy that
+# ships with this core while it exists, so core and module are one version, else the
+# entry on PATH, where the module puts it when it is on, for a core that ships without
+# the module folder. Step 4.1 removes the shipped copy.
 handover() {
   local entry="mentat-$1"
   shift
   export MENTAT_ROOT="$root"
-  if command -v "$entry" >/dev/null 2>&1; then exec "$entry" "$@"; fi
   if [ -x "$root/plugins/mentat-reviewers/bin/$entry" ]; then exec "$root/plugins/mentat-reviewers/bin/$entry" "$@"; fi
+  if command -v "$entry" >/dev/null 2>&1; then exec "$entry" "$@"; fi
   die "this command needs the mentat-reviewers module, which was not found: turn it on and run again" 64
 }
 

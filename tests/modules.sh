@@ -46,14 +46,13 @@ for m in mentat-linear mentat-extras; do
 done
 
 # bin/mentat hands review --codex, review --grok and second-opinion to the reviewers module's
-# entries, with the arguments after the mode and MENTAT_ROOT set to its own folder: the entry
-# on PATH, else the copy in plugins/mentat-reviewers/bin, else it exits 64. Each stub entry
-# prints its name and MENTAT_ROOT, then each argument in brackets, and exits 7. PATH holds
-# only the system folders besides, so no copy a session with the module on has there runs.
+# entries, with the arguments after the mode and MENTAT_ROOT set to its own folder: the copy
+# in its plugins/mentat-reviewers/bin, else the entry on PATH, else it exits 64. Each stub
+# entry prints its name and MENTAT_ROOT, then each argument in brackets, and exits 7. PATH
+# holds only the system folders besides, so no copy a session with the module on has there runs.
 tmp=$(mktemp -d) || exit 1
 trap 'rm -rf "$tmp"' EXIT
-# shellcheck disable=SC2034 # here is read by the checks
-here=$(pwd -P) sys=/usr/bin:/bin
+sys=/usr/bin:/bin
 mkdir "$tmp/stubs" || exit 1
 for e in mentat-review-codex mentat-review-grok mentat-second-opinion; do
   cat >"$tmp/stubs/$e" <<'EOF'
@@ -71,14 +70,17 @@ handed() { # $1 entry, $2 MENTAT_ROOT it must get, $3... the arguments it must g
 [$a]"; done
   [ "$rc" = 7 ] && [ "$out" = "$want" ]
 }
-out=$(MENTAT_ROOT=/elsewhere PATH="$tmp/stubs:$sys" bin/mentat second-opinion --web "a b" "" 2>&1); rc=$?
-check "second-opinion goes to mentat-second-opinion on PATH, with its arguments, MENTAT_ROOT set to this folder and its exit status" 'handed mentat-second-opinion "$here" --web "a b" ""'
-out=$(PATH="$tmp/stubs:$sys" bin/mentat review --codex --request "a b" 7 2>&1); rc=$?
-check "review --codex goes to mentat-review-codex on PATH, with the arguments after --codex" 'handed mentat-review-codex "$here" --request "a b" 7'
-out=$(PATH="$tmp/stubs:$sys" bin/mentat review --grok --stop 7 2>&1); rc=$?
-check "review --grok goes to mentat-review-grok on PATH, with the arguments after --grok" 'handed mentat-review-grok "$here" --stop 7'
+# A core that ships without the module folder: a copy of core without it.
+mkdir "$tmp/bare" && cp -R bin lib "$tmp/bare/" || exit 1
+bare=$(cd -P "$tmp/bare" && pwd) || exit 1
+out=$(MENTAT_ROOT=/elsewhere PATH="$tmp/stubs:$sys" "$bare/bin/mentat" second-opinion --web "a b" "" 2>&1); rc=$?
+check "without the module folder, second-opinion goes to mentat-second-opinion on PATH, with its arguments, MENTAT_ROOT set to core's folder and its exit status" 'handed mentat-second-opinion "$bare" --web "a b" ""'
+out=$(PATH="$tmp/stubs:$sys" "$bare/bin/mentat" review --codex --request "a b" 7 2>&1); rc=$?
+check "without the module folder, review --codex goes to mentat-review-codex on PATH, with the arguments after --codex" 'handed mentat-review-codex "$bare" --request "a b" 7'
+out=$(PATH="$tmp/stubs:$sys" "$bare/bin/mentat" review --grok --stop 7 2>&1); rc=$?
+check "without the module folder, review --grok goes to mentat-review-grok on PATH, with the arguments after --grok" 'handed mentat-review-grok "$bare" --stop 7'
 
-# With none on PATH: a copy of core whose module folder holds the stubs.
+# A copy of core whose module folder holds the stubs.
 mkdir -p "$tmp/core/plugins/mentat-reviewers" && cp -R bin lib "$tmp/core/" && cp -R "$tmp/stubs" "$tmp/core/plugins/mentat-reviewers/bin" || exit 1
 core=$(cd -P "$tmp/core" && pwd) || exit 1
 out=$(PATH="$sys" "$core/bin/mentat" second-opinion "a b" 2>&1); rc=$?
@@ -87,7 +89,12 @@ out=$(PATH="$sys" "$core/bin/mentat" review --codex 7 2>&1); rc=$?
 check "with none on PATH, review --codex goes to the module's copy in the checkout" 'handed mentat-review-codex "$core" 7'
 out=$(PATH="$sys" "$core/bin/mentat" review --grok 7 2>&1); rc=$?
 check "with none on PATH, review --grok goes to the module's copy in the checkout" 'handed mentat-review-grok "$core" 7'
-# This checkout's own entries, through the fallback: each reads its arguments (a usage error).
+# With both, the copy that ships with core runs: an entry on PATH that prints something else
+# (an installed module at another version) is not used.
+mkdir "$tmp/installed" && printf '#!/bin/sh\necho installed\nexit 7\n' >"$tmp/installed/mentat-second-opinion" && chmod +x "$tmp/installed/mentat-second-opinion" || exit 1
+out=$(PATH="$tmp/installed:$sys" "$core/bin/mentat" second-opinion "a b" 2>&1); rc=$?
+check "with an entry on PATH too, second-opinion goes to the module's copy in the checkout" 'handed mentat-second-opinion "$core" "a b"'
+# This checkout's own entries: each reads its arguments (a usage error).
 out=$(PATH="$sys" bin/mentat second-opinion 2>&1); rc=$?
 check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file>" ]'
 for args in "--codex --stop 7" "--grok --stop --stop 7"; do
@@ -96,8 +103,7 @@ for args in "--codex --stop 7" "--grok --stop --stop 7"; do
   check "with none on PATH, this checkout's entry reads review $args" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" ]'
 done
 
-# With neither: a copy of core without the module.
-mkdir "$tmp/bare" && cp -R bin lib "$tmp/bare/" || exit 1
+# With neither: the copy of core without the module folder, and nothing on PATH.
 for args in "second-opinion a" "review --codex 7" "review --grok 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   out=$(PATH="$sys" "$tmp/bare/bin/mentat" $args 2>&1); rc=$?

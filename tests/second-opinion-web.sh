@@ -113,9 +113,7 @@ echo "SECRET-LOG-TEXT" >&2
 exit "$(cat "$STUB/grok_exit")"
 EOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
-# mentat hands second-opinion to the reviewers module's entry on PATH: this checkout's, ahead
-# of any copy a session with the module on has there.
-export PATH="$root/tools/bin:${mentat%/bin/mentat}/plugins/mentat-reviewers/bin:$PATH"
+export PATH="$root/tools/bin:$PATH"
 
 # A folder that is in no git repository, and a local repository to run from in one case.
 plain="$root/plain folder"
