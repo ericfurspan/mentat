@@ -1,5 +1,9 @@
 # Changelog
 
+## Skills moved out of core
+
+- `/mentat:status` is now `/mentat:waiting`, `/mentat:plan` is now `/mentat:propose [item id]` with the same behavior, triage and the Linear backlog adapter moved to the `mentat-linear` module (`/mentat-linear:triage`), and grill and retro moved to the `mentat-extras` module (`/mentat-extras:retro`).
+
 ## 2026-11-08
 
 - `/mentat:plan` splits its ready items into build groups by shared files and gives one `/mentat:work-tickets` line per group, each extra line for its own session in its own worktree.

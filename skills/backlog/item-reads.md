@@ -1,6 +1,6 @@
 # Reading an item
 
-With either tracker, read this before reading an item to plan, propose, triage or build it, or to record an answer on it, and again after a compaction. Tracker details are as the tracker's adapter says (`linear.md` "Reading an item", `github.md`).
+With either tracker, read this before reading an item to plan, propose, triage or build it, or to record an answer on it, and again after a compaction. Tracker details are as the tracker's adapter says (`mentat-linear:linear` "Reading an item", `github.md`).
 
 ## The full read
 
@@ -28,4 +28,4 @@ A reply that answers open comments opens with this line:
 
 It then names each comment it answers and its answer, and, after a decision, the recorded answer, in Claude Code's own words under `rules.md` "Records". A partial answer says what remains open. It goes where the tracker's adapter says. Spec, fingerprint, settlement and advice comments stay where `mentat:backlog` puts them.
 
-A stopped or unanswered question posts nothing. A skill that forbids writes, the grill included, posts nothing and leaves the reply to the skill that records the answer.
+A stopped or unanswered question posts nothing. A skill that forbids writes, `mentat-extras:grill` included, posts nothing and leaves the reply to the skill that records the answer.

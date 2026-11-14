@@ -13,7 +13,7 @@ Find the projects and their records as the maintainer's own instructions say: `a
 
 ## Read the records
 
-Read each covered record as the tracker's section in `mentat:backlog` says, read calls only. Its listing writes do not run: no hand-made item refined, no wait cleared, no status, label, assignee or description changed. Read waits as `../backlog/linear.md` says for a skill that forbids writes: change nothing, and name each item that looks done as "may be done". A record or repository that cannot be read (no tools, an error, no access) is noted, and the run goes on. Then read everything the maintainer said in this session. Collect:
+Read each covered record as the tracker's section in `mentat:backlog` says, read calls only. Its listing writes do not run: no hand-made item refined, no wait cleared, no status, label, assignee or description changed. For a Linear backlog, read waits as `mentat-linear:linear` "Waits left open" says for a skill that forbids writes; with any backlog, change nothing and name each item that looks done as "may be done". A record or repository that cannot be read (no tools, an error, no access) is noted, and the run goes on. Then read everything the maintainer said in this session. Collect:
 
 - Pull requests: in each covered repository, every open pull request this `gh` account opened, every page (`gh pr list -R <owner/repo> --author @me --state open --limit 500 --json number,title,url,isDraft,body,headRefName,statusCheckRollup`).
 - Waits on the maintainer, in any stage: items waiting on the maintainer, as the tracker's adapter marks them, merge waits included; with GitHub issues, issues, open or closed, that open with a wait on the maintainer as `mentat:backlog` "Marking a wait" and "Waits on the maintainer" describe it; plus any waits the maintainer's own instructions add.
@@ -54,4 +54,4 @@ Links to the items named go on the last line.
 
 ## Answers given in chat
 
-If the maintainer then answers in chat a decision whose place is elsewhere, such as an item or triage (`/mentat:triage`), record nothing and say in one line where the answer goes.
+If the maintainer then answers in chat a decision whose place is elsewhere, such as an item or triage (`/mentat-linear:triage`, where the `mentat-linear` module is on), record nothing and say in one line where the answer goes.
