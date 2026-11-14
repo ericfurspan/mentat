@@ -27,10 +27,10 @@ Read each covered record as the tracker's section in `mentat:backlog` says, read
 
 A pull request's state is the first line of its body that opens with `**Status:**` (`mentat:pr`), wherever it sits. A review requested from the maintainer on GitHub, or GitHub's review decision, never shows it is their turn. Each open pull request gets one line, in the first of these that applies:
 
-- With agents, left out of the groups: state `In review`; a branch whose worktree in this checkout is locked, or whose review or helper this session is running; state `Blocked: reassessing after round <n>` when the pull request's Review details line for that stop records the maintainer's answer, not `pending` (`../review/stop.md` "Durable pause").
+- With agents, left out of the groups: this session is running its review or helper; state `In review` and its branch's worktree in this checkout is locked; state `Blocked: reassessing after round <n>` when the pull request's Review details line for that stop records the maintainer's answer, not `pending` (`../review/stop.md` "Durable pause").
 - Merge: not a draft, in state `Ready`, `Not reviewed: fast track agreed by the maintainer` or `Not reviewed: last push waived by the maintainer`. Its line names failing or unfinished checks on its head, from the check rollup, and adds "then <n> steps after the merge" when its item's wait block holds steps for after the merge.
 - Act: a `Blocked:` state with a wait right below its Status line, such as a hand check (`../backlog/waits.md`).
-- Hold: every other pull request: any other `Blocked:` or `Not reviewed:` state, with its reason; a draft in a Merge state; a state outside the four, quoted; a body with no Status line, saying so.
+- Hold: every other pull request, with its reason: any other `Blocked:` or `Not reviewed:` state; `Blocked: reassessing after round <n>` with the answer `pending`, as awaiting go on, shrink or close; state `In review` with no locked worktree here and no run in this session, as "in review, nothing running seen here"; a draft in a Merge state; a state outside the four, quoted; a body with no Status line, saying so.
 
 A pull request and the items it carries, or whose merge wait names it, are one line, sorted as above. Every other item collected gets one line:
 
@@ -43,7 +43,7 @@ A pull request is named `owner/repo#N`, an item by its id.
 
 Answer in chat only, short, in this order, with `none` for an empty part:
 
-1. `Waits on you:` the groups in the order Merge, Hold, Act, Decide, each a label line (`Merge:`) followed by one line per entry: its name and what it needs in a few words. An empty group is left out, and the part is `none` when all are. A finished item adds its ending (done, canceled, duplicate or closed), so it reads as a leftover; one that looks done says "may be done". A last line, `With agents:`, names each open pull request left out of the groups, and is left out when there is none.
+1. `Waits on you:` the groups in the order Merge, Hold, Act, Decide, each a label line (`Merge:`) followed by one line per entry: its name and what it needs in a few words. An empty group is left out, and the part is `none` when all are. A finished item adds its ending (done, canceled, duplicate or closed), so it reads as a leftover; one that looks done says "may be done". A last line, `With agents:`, names each open pull request left out of the groups with why in a few words (this session's run, a locked worktree, or a recorded stop answer), and is left out when there is none.
 2. `Next:` one item that can start under `mentat:backlog` "Start waits", with a one-line reason and each earlier item it passed with its wait, from the next agreed work of the records that have a recorded order, and, for each record with no recorded order, a phrase saying it offers no item. Both show when the run covers both kinds.
 3. `Unanswered:` one line per ask. If the session was compacted and early messages survive only as a summary, say so here: asks from before it may be missing. Never shorten this part to fit.
 4. `Plan:` one line saying plainly whether the goal or the plan itself should change, not only the next step.
