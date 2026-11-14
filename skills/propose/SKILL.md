@@ -1,6 +1,6 @@
 ---
 name: propose
-description: "Starts a change: use before a view on any change to a repository, and after a compaction. Typed, plans backlog work. Arguments: a backlog item id."
+description: "Use before a view on or suggesting a repo change; after compaction or resume mid-proposal. Typed, plans backlog work. Arguments: a backlog item id."
 argument-hint: "[item id]"
 ---
 
