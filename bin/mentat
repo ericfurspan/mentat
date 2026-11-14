@@ -36,11 +36,14 @@
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
 #   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
 #     review state from the comments the review commands posted as this gh account: the head
-#     commit, the local rounds (Claude's or Codex's; and Claude review rounds when present), whether the head
-#     is the last reviewed commit, the Grok state (none, running, done or did not finish), the
+#     commit, the local rounds (completed Local Claude reviews; and Claude review rounds when
+#     present; a Codex review is not a round), whether the head is the last commit Claude
+#     reviewed, the Grok state (none, running, done or did not finish), the
 #     Grok stop review's (none, or running, done or did not finish on a commit, a done one
-#     with its result and spec fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
-#     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
+#     with its result and spec fingerprint), the Codex review's on the last commit Claude
+#     reviewed (none, did not finish on it, or done on it with its result and spec
+#     fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
+#     Claude review's spec fingerprint matches the file, and a done Codex review's. Posts nothing. 0 printed, 1 could not read.
 #   mentat reviewers  Prints whether outside reviewers (Codex and Grok) are on in this
 #     repository, on one line: "reviewers: on", "reviewers: off" or "reviewers: unknown -
 #     <reason>". Only .claude/settings.json on origin's default branch counts: on when it

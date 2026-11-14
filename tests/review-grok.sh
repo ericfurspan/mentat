@@ -494,14 +494,14 @@ reset; rc=$(runq "$root/req dir/agreed request.md"); cp "$STUB/prompt" "$root/pl
 reset; rc=$(srun --request "$root/req dir/agreed request.md")
 check "--stop with no plain run before it posts its own start comment, then its own review heading (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ] && fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
 check "--stop gives Grok the same prompt as a plain run" '[ -s "$root/plain_prompt" ] && cmp -s "$STUB/prompt" "$root/plain_prompt"'
-check "--stop: status reports it in its own field, with its head and fingerprint, and grok: none" 'status | grep -qF "grok: none, grok stop: done on ${H:0:7} (no findings, spec fingerprint $REQ_FP), ci:"'
+check "--stop: status reports it in its own field, with its head and fingerprint, and grok: none" 'status | grep -qF "grok: none, grok stop: done on ${H:0:7} (no findings, spec fingerprint $REQ_FP), codex: none, ci:"'
 rm "$STUB/args"; rc=$(srun)
 check "--stop after a posted stop review is refused: exit 1, Grok does not run, nothing posted" '[ "$rc" = 1 ] && grep -q "not reviewed: Grok.s stop review already ran on #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 2 ]'
 rc=$(run)
 check "a plain --grok after a posted stop review is refused: exit 1, Grok does not run, nothing posted" '[ "$rc" = 1 ] && grep -q "not reviewed: Grok.s stop review ran on #7 .*no plain Grok review runs after it" "$STUB/out" && ! grok_ran && [ "$(comments)" = 2 ]'
 reset; rc1=$(run); rm "$STUB/args"; rc=$(srun)
 check "--stop after a plain run reviews again and posts after it (exit 0)" '[ "$rc1" = 0 ] && [ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 4 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && [ "$(cat "$STUB/comment.3")" = "Grok stop review started on $H" ] && [ "$(first 4)" = "## Local Grok stop review of $H: no findings, spec fingerprint none" ]'
-check "after both runs, status gives grok done and the stop review done, each in its own field" 'status | grep -qF "grok: done, grok stop: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
+check "after both runs, status gives grok done and the stop review done, each in its own field" 'status | grep -qF "grok: done, grok stop: done on ${H:0:7} (no findings, spec fingerprint none), codex: none, ci:"'
 reset; stop_comment agent-bot >"$STUB/issue_comments.json"; rc=$(srun)
 check "this account's stop start comment refuses --stop before Grok runs" '[ "$rc" = 1 ] && grep -q "stop review already ran on #7" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ]'
 reset; stop_comment agent-bot >"$STUB/issue_comments.json"; rc=$(run)
@@ -528,7 +528,7 @@ check "--stop with a Grok timeout exits 1 before CI is read and posts nothing" '
 rm "$STUB/hang" "$STUB/args"; rc=$(srun)
 check "so --stop runs again after a timeout, and posts (exit 0)" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ]'
 reset; touch "$STUB/result_fails"; rc=$(srun)
-check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, ci:"'
+check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, codex: none, ci:"'
 reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --stop --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
 check "--stop between the other flags after --grok posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ]'
 for args in "--stop 7" "--local --stop 7" "--stop --grok 7" "--grok --stop --stop 7" "--grok 7 --stop"; do
