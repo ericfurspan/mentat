@@ -64,7 +64,7 @@ Moving a repository's backlog to Linear is a hand step: [steps](skills/backlog/l
 
 ## Review tools
 
-`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt. `mentat check` reports each tool.
+`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone. `--link <item id> <idea file>` records an item as reviewed, so its branch's pull requests skip the second-opinion prompt.
 
 ## Git hook templates
 

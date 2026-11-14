@@ -46,18 +46,6 @@ case "$1 $2" in
   *) echo "$*" >>"$STUB/writes"; exit 99 ;;
 esac
 STUBEOF
-# codex: prints a version unless $STUB/no_version exists.
-cat >"$root/bin/codex" <<'STUBEOF'
-#!/usr/bin/env bash
-[ "$1" = --version ] && [ ! -f "$STUB/no_version" ] && echo "codex-cli 9.9.9"
-exit 0
-STUBEOF
-# grok: prints a version unless $STUB/no_grok_version exists.
-cat >"$root/bin/grok" <<'STUBEOF'
-#!/usr/bin/env bash
-[ "$1" = --version ] && [ ! -f "$STUB/no_grok_version" ] && echo "grok 9.9.9 (stub) [stable]"
-exit 0
-STUBEOF
 # claude: --version prints $STUB/claude_version, by default 2.1.295; otherwise prints
 # $STUB/plugins, by default one Mentat copy; exits 1 too if $STUB/claude_fail exists. Any call
 # but these is recorded in $STUB/writes and fails. Stands in for a real claude, whose version
@@ -82,7 +70,7 @@ cat >"$root/bin/gitleaks" <<'STUBEOF'
 [ "$1" = version ] && echo "8.99.9"
 exit 0
 STUBEOF
-chmod +x "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude" "$root/bin/gitleaks"
+chmod +x "$root/bin/gh" "$root/bin/claude" "$root/bin/gitleaks"
 export PATH="$root/bin:$PATH"
 
 export HOME="$root/home"
@@ -105,26 +93,10 @@ check "a ready setup is Check OK (exit 0)" '[ "$rc" = 0 ] && [ "$(last)" = "Chec
 check "finds the repository from the checkout" 'grep -qx "repo view --json nameWithOwner --jq .nameWithOwner" "$STUB/calls"'
 check "writes nothing, there or locally" '[ ! -f "$STUB/writes" ] && [ -z "$(ls -A "$root/cwd")" ]'
 check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out"'
-check "prints the installed codex version" 'grep -qx "OK: codex is installed (codex-cli 9.9.9)" "$STUB/out"'
-reset; touch "$STUB/no_version"; rc=$(run)
-check "a codex with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: codex is installed (version unknown)" "$STUB/out"'
-
-check "prints the installed grok version" 'grep -qx "OK: grok is installed (grok 9.9.9 (stub) \[stable\])" "$STUB/out"'
-reset; touch "$STUB/no_grok_version"; rc=$(run)
-check "a grok with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: grok is installed (version unknown)" "$STUB/out"'
-# Grok is optional: without it, nothing is printed about it and there is no warning.
-mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/claude" "$root/bin/gitleaks" "$root/nogrok/"
-reset; rc=$(cd "$root/cwd" && PATH="$root/nogrok:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "a missing grok prints nothing and warns of nothing" '[ "$rc" = 0 ] && ! grep -qi grok "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-# Codex is optional: mentat review runs Claude. Without codex, check says what uses it and passes.
-mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/gh" "$root/bin/grok" "$root/bin/claude" "$root/bin/gitleaks" "$root/nocodex/"
-reset; rc=$(cd "$root/cwd" && PATH="$root/nocodex:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "a missing codex is no problem (exit 0): one line says it is optional and what uses it" '(PATH="$root/nocodex:/usr/bin:/bin"; ! command -v codex >/dev/null) && [ "$rc" = 0 ] && grep -qx "OK: codex is not installed (optional: mentat review --codex and mentat second-opinion use it)" "$STUB/out" && ! grep -q "^PROBLEM" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-reset; rc=$(run)
 check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
 # Without gitleaks and with the templates not in use, the commit hook does not scan: check warns and still passes.
 NOT_IN_USE="WARN: the git hook templates are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
-mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude" "$root/nogitleaks/"
+mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/claude" "$root/nogitleaks/"
 reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "with the templates not in use, a missing gitleaks warns, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: gitleaks is not installed: the commit hook does not scan staged changes for likely secrets" "$STUB/out" && grep -qxF "$NOT_IN_USE" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ]'
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
@@ -286,7 +258,7 @@ check "plugins with ids like a module's are not modules" 'grep -qxF "$NO_MODULES
 reset; printf '[%s]\n' "$(entry mentat-extras@mentat user 1.0.0)" >"$STUB/plugins"; touch "$STUB/claude_fail"; rc=$(run)
 check "a failed list names no modules" '! grep -qi "modules" "$STUB/out"'
 
-mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/gitleaks" "$root/noclaude/"
+mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/gitleaks" "$root/noclaude/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "no claude command is a problem (exit 1), and the one line about claude says mentat review needs it" '(PATH="$root/noclaude:/usr/bin:/bin"; ! command -v claude >/dev/null) && [ "$rc" = 1 ] && grep -qx "PROBLEM: claude is not installed: mentat review needs Claude Code" "$STUB/out" && [ "$(grep -ci -e claude -e plugin "$STUB/out")" = 1 ] && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 check "no claude command says nothing about copies, modules or the version, and adds no warning" '! grep -qi -e modules -e "plugin" -e "Claude Code [0-9]" -e "^WARN" "$STUB/out"'
