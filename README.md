@@ -18,11 +18,9 @@ Claude Code plans, builds and reviews each change, Codex and Grok add reviews an
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
-- Optional: the Codex CLI, signed in, outside the home folder, for second opinions.
+- Optional: the Codex CLI, signed in, outside the home folder, for second opinions and reviews.
 - Optional: Grok Build (`grok`), signed in with `grok login`, for a second review.
 - Optional: `gitleaks`, to catch secrets before a commit.
-
-Builder and reviewer run on Opus, which costs more.
 
 ## Install
 
