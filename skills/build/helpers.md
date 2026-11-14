@@ -10,7 +10,7 @@ The main session never changes its own directory into a worktree: it runs `git -
 
 ## One helper per branch
 
-Before a brief, if the worktree is locked, brief no helper and go to "Recovery". Otherwise run `git worktree lock --reason "mentat helper" <path>`, then brief. Run `git worktree unlock <path>` when the helper reports, done, stopped or failed. The brief names the worktree's absolute path and branch.
+Before a brief, if the worktree is locked, brief no helper and go to "Recovery". Otherwise run `git worktree lock --reason "mentat helper" <path>`, then brief the helper and start it with the Agent tool's background option, so the session stays free. When its completion notice arrives, done, stopped or failed, run `git worktree unlock <path>`, then the main-checkout check. The brief names the worktree's absolute path and branch.
 
 ## Main-checkout check
 
