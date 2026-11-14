@@ -153,11 +153,12 @@ else
 fi
 
 # Instruction text loads into sessions, so it describes the build command's form and never writes a slash command bare.
-bare=$(grep -nE '(^|[^`])/mentat(-[a-z-]+)?:' rules.md skills/*/SKILL.md plugins/*/skills/*/SKILL.md | cut -d: -f1,2)
+# That holds for rules.md and every markdown file of a skill, module skills and supporting files included.
+bare=$( { printf '%s\0' rules.md; git ls-files -z -- 'skills/*.md' 'plugins/*/skills/*.md'; } | xargs -0 grep -nE '(^|[^`])/mentat(-[a-z-]+)?:' | cut -d: -f1,2)
 if [ -n "$bare" ]; then
-  fail "rules.md and skills must keep every /mentat: or /mentat-<module>: command name in backticks (bare at: $bare)"
+  fail "rules.md and skills' markdown files must keep every /mentat: or /mentat-<module>: command name in backticks (bare at: $bare)"
 else
-  pass "rules.md and skills keep every /mentat: and /mentat-<module>: command name in backticks"
+  pass "rules.md and skills' markdown files keep every /mentat: and /mentat-<module>: command name in backticks"
 fi
 
 # Every /mentat: command named in the README, rules.md or a skill's files (module skills included) is a core skill that exists.
@@ -188,12 +189,13 @@ else
 fi
 
 # Core reaches a module only by skill name, and no skill reaches outside its own plugin by a relative path: no core
-# skill file names a module path (plugins/mentat-...), and no skill file climbs out of its plugin (../../../).
-leaks=$( { git ls-files -z -- skills | xargs -0 grep -n -E 'plugins/mentat-|\.\./\.\./\.\./'; git ls-files -z -- 'plugins/*/skills/*' | xargs -0 grep -n -E '\.\./\.\./\.\./'; } | cut -d: -f1,2)
+# skill file, rules.md or prompt names a module path (plugins/mentat-...), and none of them or any module skill file
+# climbs out of its plugin (../../../).
+leaks=$( { { printf '%s\0' rules.md; git ls-files -z -- skills prompts; } | xargs -0 grep -n -E 'plugins/mentat-|\.\./\.\./\.\./'; git ls-files -z -- 'plugins/*/skills/*' | xargs -0 grep -n -E '\.\./\.\./\.\./'; } | cut -d: -f1,2)
 if [ -z "$leaks" ]; then
-  pass "no core skill file names a module path, and no skill file climbs out of its plugin"
+  pass "no core skill file, rules.md or prompt names a module path, and no skill file climbs out of its plugin"
 else
-  fail "a core skill file names a module path, or a skill file climbs out of its plugin (at: $leaks)"
+  fail "a core skill file, rules.md or a prompt names a module path, or a skill file climbs out of its plugin (at: $leaks)"
 fi
 
 # Reviews that run at once in one checkout must not share its record of the last fetch.
@@ -406,6 +408,14 @@ for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
     fail "$f is $size characters (limit 15000)"
   fi
 done
+# The typed planning session is the text of a former skill, read in place of propose's steps, so it keeps a skill's limit.
+f=skills/propose/session.md
+size=$(wc -c < "$f" | tr -d ' ')
+if [ "$size" -lt 15000 ]; then
+  pass "$f is $size characters (limit 15000)"
+else
+  fail "$f is $size characters (limit 15000)"
+fi
 
 # A supporting file a skill names in backticks (lowercase `name.md`, or `../<skill>/name.md`)
 # exists, relative to that skill's folder. A bare name found at the repository root, such as rules.md, is not one.
