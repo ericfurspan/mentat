@@ -30,6 +30,23 @@ else
   fail "README.md is $readme_words words, over 500"
 fi
 
+# The text every session loads stays small, by wc -w: rules.md at most 250 words, and rules.md plus
+# every skill's description (core and module skills) at most 550.
+rules_words=$(wc -w <rules.md | tr -d ' ')
+if [ "$rules_words" -le 250 ]; then
+  pass "rules.md is at most 250 words ($rules_words)"
+else
+  fail "rules.md is $rules_words words, over 250"
+fi
+desc_words=$(for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
+  awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && /^description: / { sub(/^description: /, ""); print; exit }' "$f"
+done | wc -w | tr -d ' ')
+if [ $((rules_words + desc_words)) -le 550 ]; then
+  pass "rules.md and the skill descriptions are at most 550 words ($rules_words + $desc_words)"
+else
+  fail "rules.md and the skill descriptions are $((rules_words + desc_words)) words ($rules_words + $desc_words), over 550"
+fi
+
 # A triage sitting is started only by the maintainer and lists its arguments.
 f=plugins/mentat-linear/skills/triage/SKILL.md
 for s in 'name: triage' 'disable-model-invocation: true'; do
