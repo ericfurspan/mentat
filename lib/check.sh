@@ -1,7 +1,10 @@
 # shellcheck shell=bash
 # mentat check. Sourced by bin/mentat.
 
-# Check reads GitHub and changes nothing, there or locally. It looks only for
+# Check reads GitHub and changes nothing there. Locally it changes nothing but this: to
+# read whether outside reviewers are on here (reviewers_state in lib/shared.sh), it fetches
+# origin's default branch into a temporary ref of its own, deleted after; fetched objects
+# and an empty ref folder may stay. It looks only for
 # what Mentat itself needs, plus, only when ~/.config/mentat/warn-kept-branches
 # exists, one repository setting, whether merged head branches are deleted, which
 # it warns about and never changes. The rest of the repository's settings (rulesets, required approvals, merge methods) are the
@@ -128,6 +131,24 @@ c_claude_version() {
     c_problem "Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails and the tool limits of mentat review may not hold: update Claude Code"
   fi
 }
+# Whether outside reviewers are on here (reviewers_state in lib/shared.sh), then whether
+# codex and grok are installed: a missing one is a warning only when they are on.
+# shellcheck disable=SC2154 # reviewers, reviewers_why and reviewers_def are set by reviewers_here
+c_reviewers() {
+  local pair tool name
+  reviewers_here
+  case "$reviewers" in
+    on) c_ok "outside reviewers are on here (mentat-reviewers is on in .claude/settings.json on $reviewers_def)" ;;
+    off) c_ok "outside reviewers are off here (mentat-reviewers is not on in .claude/settings.json on $reviewers_def)" ;;
+    *) c_warn "outside reviewers are unknown here: $reviewers_why; Codex and Grok will not run" ;;
+  esac
+  for pair in codex:Codex grok:Grok; do
+    tool=${pair%%:*} name=${pair#*:}
+    if command -v "$tool" >/dev/null 2>&1; then c_ok "$tool is installed"
+    elif [ "$reviewers" = on ]; then c_warn "$tool is not installed: $name reviews will not run here"
+    else c_ok "$tool is not installed"; fi
+  done
+}
 # The review tool: Claude Code, which mentat review needs.
 c_review_tools() {
   command -v claude >/dev/null 2>&1 || c_problem "claude is not installed: mentat review needs Claude Code"
@@ -149,6 +170,7 @@ check() {
   c_claude_version
   c_plugin_copies
   c_modules
+  c_reviewers
   # The publish check still looks for the home path without the list. No list is not a warning.
   if [ ! -e "$PRIVATE_WORDS" ]; then :
   elif [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1

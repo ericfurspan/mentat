@@ -77,11 +77,14 @@
 #     mentat hands each, with the arguments after its mode, to the module's entry
 #     mentat-review-codex, mentat-review-grok or mentat-second-opinion, in this checkout's
 #     plugins/mentat-reviewers/bin or else on PATH, and exits 64 with neither.
-#   mentat check  Checks, read-only, what Mentat itself needs: tools, the git hook
+#   mentat check  Checks what Mentat itself needs, changing nothing but a temporary ref
+#     (deleted after) that mentat reviewers' fetch uses: tools, the git hook
 #     templates installed and the same as this copy when agents' git uses them
 #     (lib/templates.sh), gh signed in, the repository readable, claude installed at a version
-#     the merge hook and the review need; prints the Mentat modules installed, and warns
-#     when agents' git does not use the templates, the private word list is unreadable, the
+#     the merge hook and the review need; prints the Mentat modules installed, whether
+#     outside reviewers are on here as mentat reviewers reads it, and whether codex and grok
+#     are installed, and warns when outside reviewers are unknown or are on with codex or
+#     grok missing, when agents' git does not use the templates, the private word list is unreadable, the
 #     list misses a private repository this account can reach, by count only, the Mentat
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.

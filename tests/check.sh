@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for `mentat check`, using a stub gh. Prints PASS/FAIL per case;
-# exits 1 on any FAIL.
+# Behavior tests for `mentat check`, using a stub gh and a real git origin. Prints
+# PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 export STUB="$root/stub"
-mkdir -p "$STUB" "$root/bin" "$root/cwd"
+mkdir -p "$STUB" "$root/bin"
 failures=0
 check() { if eval "$2"; then printf 'PASS: check %s\n' "$1"; else printf 'FAIL: check %s\n' "$1"; failures=$((failures + 1)); fi; }
 
@@ -84,14 +84,30 @@ echo stubword >"$LIST"
 # The kept-branches warning is on for every case but those that turn it off.
 KEPT="$HOME/.config/mentat/warn-kept-branches"
 touch "$KEPT"
+# Check runs in a clone of an origin whose main has outside reviewers off, so the codex and
+# grok lines are OK whether or not they are installed. origin_has sets main's settings.
+REVIEWERS_OFF='{"enabledPlugins":{"mentat-reviewers@mentat":false}}'
+REVIEWERS_ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
+git init -q --bare -b main "$root/origin.git" && git init -q -b main "$root/seed" || exit 1
+origin_has() { # $1 main's .claude/settings.json
+  mkdir -p "$root/seed/.claude" && printf '%s\n' "$1" >"$root/seed/.claude/settings.json" &&
+    git -C "$root/seed" add -A && git -C "$root/seed" -c user.name=t -c user.email=t@example.test commit -q --allow-empty -m settings &&
+    git -C "$root/seed" push -q "$root/origin.git" HEAD:main
+}
+origin_has "$REVIEWERS_OFF" && git clone -q "$root/origin.git" "$root/cwd" || exit 1
 reset() { rm -f "$STUB"/*; }
 run() { (cd "$root/cwd" && "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 last() { tail -n 1 "$STUB/out"; }
+# The checkout's refs, working tree and top-level git files: what check leaves as it was.
+local_state() { git -C "$root/cwd" for-each-ref --format='%(refname) %(objectname)'; git -C "$root/cwd" status --porcelain --ignored; ls -A "$root/cwd/.git"; }
+REVIEWERS_OFF_LINE="OK: outside reviewers are off here (mentat-reviewers is not on in .claude/settings.json on main)"
 
+before_local=$(local_state)
 reset; rc=$(run)
 check "a ready setup is Check OK (exit 0)" '[ "$rc" = 0 ] && [ "$(last)" = "Check OK (0 warning(s))" ] && grep -q "OK: owner/repo is readable" "$STUB/out"'
 check "finds the repository from the checkout" 'grep -qx "repo view --json nameWithOwner --jq .nameWithOwner" "$STUB/calls"'
-check "writes nothing, there or locally" '[ ! -f "$STUB/writes" ] && [ -z "$(ls -A "$root/cwd")" ]'
+check "writes nothing on GitHub, and leaves the checkout's refs, working tree and last-fetch record as they were" '[ ! -f "$STUB/writes" ] && [ -n "$before_local" ] && [ "$(local_state)" = "$before_local" ] && [ ! -e "$root/cwd/.git/FETCH_HEAD" ]'
+check "says outside reviewers are off here, from main on origin" 'grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out"'
 check "never prints what gh auth status prints" '! grep -q gho_secret "$STUB/out"'
 check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
 # Without gitleaks and with the templates not in use, the commit hook does not scan: check warns and still passes.
@@ -260,7 +276,7 @@ check "a failed list names no modules" '! grep -qi "modules" "$STUB/out"'
 
 mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/gitleaks" "$root/noclaude/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "no claude command is a problem (exit 1), and the one line about claude says mentat review needs it" '(PATH="$root/noclaude:/usr/bin:/bin"; ! command -v claude >/dev/null) && [ "$rc" = 1 ] && grep -qx "PROBLEM: claude is not installed: mentat review needs Claude Code" "$STUB/out" && [ "$(grep -ci -e claude -e plugin "$STUB/out")" = 1 ] && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+check "no claude command is a problem (exit 1), and the one line about claude, besides the one naming .claude/settings.json, says mentat review needs it" '(PATH="$root/noclaude:/usr/bin:/bin"; ! command -v claude >/dev/null) && [ "$rc" = 1 ] && grep -qx "PROBLEM: claude is not installed: mentat review needs Claude Code" "$STUB/out" && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && [ "$(grep -vxF "$REVIEWERS_OFF_LINE" "$STUB/out" | grep -ci -e claude -e plugin)" = 1 ] && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 check "no claude command says nothing about copies, modules or the version, and adds no warning" '! grep -qi -e modules -e "plugin" -e "Claude Code [0-9]" -e "^WARN" "$STUB/out"'
 
 # The Claude Code version: the merge hook's onFailure block, and the review's --tools and
@@ -298,6 +314,32 @@ unreadable "a copy with no version" '[{"id":"mentat@mentat","scope":"user"}]'
 unreadable "a copy with no scope" '[{"id":"mentat@mentat","version":"1.0.0"}]'
 unreadable "a version that holds a path" "[$(entry mentat@mentat user 1.0.0),$(entry mentat@mentat project /stubleakedpath/stubprojectname)]"
 unreadable "a scope that holds a project name" "[$(entry mentat@mentat user 1.0.0),$(entry mentat@mentat "project stubprojectname" 1.1.0)]"
+
+# Outside reviewers, and the codex and grok lines. A closed PATH holds the tools check
+# needs, with no codex or grok, or with stub ones. Origin's main changes while the clone's
+# origin/main stays as cloned (off), so each read is fresh.
+mkdir "$root/noreviewers" "$root/reviewers"
+for t in git jq; do ln -s "$(command -v $t)" "$root/noreviewers/$t" && ln -s "$(command -v $t)" "$root/reviewers/$t"; done
+ln -s "$root/bin/gh" "$root/bin/claude" "$root/bin/gitleaks" "$root/noreviewers/" && ln -s "$root/bin/gh" "$root/bin/claude" "$root/bin/gitleaks" "$root/reviewers/"
+for t in codex grok; do printf '#!/bin/sh\nexit 0\n' >"$root/reviewers/$t" && chmod +x "$root/reviewers/$t"; done
+tools_run() { (cd "$root/cwd" && PATH="$1:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1); echo $?; }
+no_tools() { (PATH="$root/noreviewers:/usr/bin:/bin"; ! command -v codex >/dev/null && ! command -v grok >/dev/null); }
+REVIEWERS_ON_LINE="OK: outside reviewers are on here (mentat-reviewers is on in .claude/settings.json on main)"
+reset; rc=$(tools_run "$root/noreviewers")
+check "off, with codex and grok not installed: each is OK, with no warning" 'no_tools && [ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && grep -qx "OK: codex is not installed" "$STUB/out" && grep -qx "OK: grok is not installed" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; rc=$(tools_run "$root/reviewers")
+check "off, with codex and grok installed: each is OK" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && grep -qx "OK: codex is installed" "$STUB/out" && grep -qx "OK: grok is installed" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+origin_has "$REVIEWERS_ON" || exit 1
+reset; rc=$(tools_run "$root/noreviewers")
+check "on in main on origin, though the clone's origin/main says off; codex and grok missing warn, still exit 0" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "WARN: codex is not installed: Codex reviews will not run here" "$STUB/out" && grep -qx "WARN: grok is not installed: Grok reviews will not run here" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ] && [ "$(git -C "$root/cwd" cat-file blob refs/remotes/origin/main:.claude/settings.json)" = "$REVIEWERS_OFF" ]'
+reset; rc=$(tools_run "$root/reviewers")
+check "on, with codex and grok installed: each is OK, with no warning" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "OK: codex is installed" "$STUB/out" && grep -qx "OK: grok is installed" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; touch "$STUB/signed_out"; rc=$(run)
+check "the outside reviewers line prints though check stops at the gh sign-in" '[ "$rc" = 1 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -q "^PROBLEM: gh is not signed in" "$STUB/out"'
+origin_has '{"enabledPlugins":' || exit 1
+reset; rc=$(tools_run "$root/noreviewers")
+check "unknown: one warning says why and that Codex and Grok will not run, and codex and grok missing are OK" '[ "$rc" = 0 ] && grep -qxF "WARN: outside reviewers are unknown here: .claude/settings.json on main could not be read as JSON; Codex and Grok will not run" "$STUB/out" && grep -qx "OK: codex is not installed" "$STUB/out" && grep -qx "OK: grok is not installed" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+origin_has "$REVIEWERS_OFF" || exit 1
 
 rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)
 check "an argument is a usage error (exit 64)" '[ "$rc" = 64 ]'
