@@ -6,7 +6,7 @@ Matt Pocock's `pr` skill itself credits Dex Horthy's [`show-me`](https://github.
 
 Step 3 (ask the maintainer when the change's intent cannot be stated in one sentence) comes from Jeffallan's `code-reviewer` skill ([code-reviewer](https://jeffallan.github.io/claude-skills/skills/quality/code-reviewer/)); `skills/review/CREDITS.md` has the details.
 
-Changes for Mentat: the Summary's opening sentence states the intent, because Codex and Grok review against the body; a Status line opens the body; Risks names every item to read before merging; See it appears only when there is something to try; the review record, the requirement table and the models that built it are folded under Review details; repository templates and glossaries come first; the menu of visuals is left out.
+Changes for Mentat: the Summary's opening sentence states the intent, because the reviewers review against the body; a Status line opens the body; Risks names every item to read before merging; See it appears only when there is something to try; the review record, the requirement table and the models that built it are folded under Review details; repository templates and glossaries come first; the menu of visuals is left out.
 
 The source is under the MIT License:
 

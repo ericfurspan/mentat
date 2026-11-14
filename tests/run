@@ -144,7 +144,9 @@ status_heading() {
     fail "$file no longer writes the heading mentat status reads (missing: $s); update lib/status.sh and tests/status.sh with it"
   fi
 }
-status_heading lib/codex.sh "printf '## Local Codex review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading lib/review.sh "printf '## Local %s review of %s: %s, spec fingerprint %s\n\n' \"\$name\" \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
+status_heading lib/review.sh "claude) name=Claude ;;"
+status_heading lib/review.sh "codex) name=Codex ;;"
 status_heading lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
 status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
 status_heading lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
@@ -350,14 +352,14 @@ for f in skills/*/SKILL.md; do
   done <<< "$(grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" "$f" | tr -d '\`' | sort -u)"
 done
 
-# mentat review, review --local, review --grok, second-opinion (both modes) and check behave as
-# specified (stub gh, codex, grok and gitleaks), and so do the publish check and the merge, push and secret hooks,
+# mentat review, review --local, review --codex, review --grok, second-opinion (both modes) and check behave as
+# specified (stub gh, claude, codex, grok and gitleaks), and so do the publish check and the merge, push and secret hooks,
 # the contract the merge hook keeps through hooks/lib/verdict.sh, the git hook templates, and the
 # public-text module's hook. The marketplace lists the modules and the committed settings turn on
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh tests/public-text.sh tests/modules.sh)
+  behavior=(tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh tests/public-text.sh tests/modules.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -420,7 +422,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge hooks/no-default-push hooks/no-commit-secrets git-templates/scan git-templates/own-hook.sh git-templates/hooks/* bin/mentat lib/*.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/second-opinion-web.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/no-default-push.sh tests/publish.sh tests/no-commit-secrets.sh tests/git-templates.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else

@@ -2,13 +2,14 @@
 # mentat status. Sourced by bin/mentat.
 
 # Status prints one line of a pull request's review state, read from the comments
-# the review commands post (lib/codex.sh, lib/grok.sh) and the Claude review rounds
+# the review commands post (lib/review.sh, lib/grok.sh) and the Claude review rounds
 # skills/claude-review posts. It posts, edits and pushes nothing. Only comments by the
 # account gh is signed in as count: anyone who can comment could post the same text.
 # tests/run fails when a heading these match changes where it is written.
 
 # One line per review comment by $3 on pull request $2 of repository $1, oldest
-# first: "codex <sha> <no-findings|findings|incomplete> <fingerprint>",
+# first: "local <sha> <no-findings|findings|incomplete> <fingerprint>" for a Local
+# Claude or Local Codex review,
 # "claude <sha> <fingerprint or none>", "grok-done <sha> <result> <fingerprint>",
 # "grok-started <sha>", "grok-unfinished <sha>", or the same three for the Grok stop
 # review as "grok-stop-done", "grok-stop-started" and "grok-stop-unfinished". A Claude
@@ -18,8 +19,10 @@ status_comments() { # $1 repo, $2 pull request, $3 this account's login
   gh api --paginate "repos/$1/issues/$2/comments" | jq -rs --arg me "$3" '
     def review($who): capture("^## Local " + $who + " review of (?<sha>[0-9a-f]{40}): (?<res>no findings|findings|incomplete), spec fingerprint (?<fp>[^ ]+)$");
     .[][] | select(.user.login == $me) | .body as $b | ($b | split("\n")[0] | sub("\r$"; "")) as $h |
-    if ($h | test("^## Local Codex review of ")) then
-      $h | review("Codex") | "codex \(.sha) \(.res | gsub(" "; "-")) \(.fp)"
+    if ($h | test("^## Local Claude review of ")) then
+      $h | review("Claude") | "local \(.sha) \(.res | gsub(" "; "-")) \(.fp)"
+    elif ($h | test("^## Local Codex review of ")) then
+      $h | review("Codex") | "local \(.sha) \(.res | gsub(" "; "-")) \(.fp)"
     elif ($h | test("^## Local Grok review of ")) then
       $h | review("Grok") | "grok-done \(.sha) \(.res | gsub(" "; "-")) \(.fp)"
     elif ($h | test("^Grok review started on [0-9a-f]{40}$")) then
@@ -39,7 +42,7 @@ status_comments() { # $1 repo, $2 pull request, $3 this account's login
 
 status() {
   local pr="" request_file="" request fp repo me head lines ci kind sha res lfp
-  local codex=0 claude=0 last="" last_fp="" grok=none grok_stop_state=none reviewed out
+  local rounds=0 claude=0 last="" last_fp="" grok=none grok_stop_state=none reviewed out
   [ $# -ge 1 ] && pr=$1
   case "$#:${2:-}" in
     1:) ;;
@@ -61,13 +64,13 @@ status() {
   if ! me=$(gh api user --jq .login) || [ -z "$me" ]; then die "could not read which GitHub account gh is signed in as"; fi
   if ! head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || [ -z "$head" ]; then die "could not read pull request #$pr"; fi
   lines=$(status_comments "$repo" "$pr" "$me") || die "could not read the comments on #$pr"
-  # An incomplete Codex review is not a round (skills/review); Grok's start comment
+  # An incomplete local review is not a round (skills/review); Grok's start comment
   # and its result or did-not-finish comment are one run, and the last one says where it stands.
   # An incomplete Grok result is posted without a did-not-finish comment (lib/grok.sh).
   # The Grok stop review is read the same way, naming its head, and its spec fingerprint when done.
   while read -r kind sha res lfp; do
     case "$kind" in
-      codex) [ "$res" = incomplete ] && continue; codex=$((codex + 1)); last=$sha last_fp=$lfp ;;
+      local) [ "$res" = incomplete ] && continue; rounds=$((rounds + 1)); last=$sha last_fp=$lfp ;;
       claude) claude=$((claude + 1)); last=$sha last_fp=$res ;;
       grok-started) grok=running ;;
       grok-done) if [ "$res" = incomplete ]; then grok="did not finish"; else grok='done'; fi ;;
@@ -88,7 +91,7 @@ status() {
   elif grep -q '^fail ' <<<"$lines"; then ci=failed
   elif grep -q '^pending ' <<<"$lines"; then ci=running
   else ci=passed; fi
-  out="head ${head:0:7}, codex rounds $codex"
+  out="head ${head:0:7}, local rounds $rounds"
   [ "$claude" -eq 0 ] || out="$out, claude rounds $claude"
   out="$out, head reviewed: $reviewed, grok: $grok, grok stop: $grok_stop_state, ci: $ci"
   if [ -n "$request_file" ]; then

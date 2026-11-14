@@ -9,7 +9,7 @@ A stop is pending after any completed round from round three on (round two on th
 At the end of the round, and on resume while the answer is pending:
 
 1. Rewrite the Status line with the state `Blocked: reassessing after round <n>` (Skill tool, `mentat:pr`).
-2. On the Codex path, where `grok` is installed and `mentat status <N>` shows `grok stop: none`, run `mentat review --grok --stop <N>`, with `--request <file>` and `--require-ci` as `mentat:review` "Spec" and step 1 say; exit 3 runs it again. With any other `grok stop:` value, run nothing: re-read its comment, naming its head and spec fingerprint from that field (`running on` is did not finish unless this session's own run is still going). On the Claude-only path Grok is off.
+2. On the `mentat review` path, where `grok` is installed and `mentat status <N>` shows `grok stop: none`, run `mentat review --grok --stop <N>`, with `--request <file>` and `--require-ci` as `mentat:review` "Spec" and step 1 say; exit 3 runs it again. With any other `grok stop:` value, run nothing: re-read its comment, naming its head and spec fingerprint from that field (`running on` is did not finish unless this session's own run is still going). On the Claude-only path Grok is off.
 3. Ask the question below. It is the loop's tell-the-maintainer.
 
 Push nothing and commission no fixes until the answer. Fixes, or the final check, follow it.

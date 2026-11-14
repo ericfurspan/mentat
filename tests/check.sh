@@ -113,18 +113,18 @@ check "prints the installed grok version" 'grep -qx "OK: grok is installed (grok
 reset; touch "$STUB/no_grok_version"; rc=$(run)
 check "a grok with no version is still OK" '[ "$rc" = 0 ] && grep -qx "OK: grok is installed (version unknown)" "$STUB/out"'
 # Grok is optional: without it, nothing is printed about it and there is no warning.
-mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/gitleaks" "$root/nogrok/"
+mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/claude" "$root/bin/gitleaks" "$root/nogrok/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogrok:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a missing grok prints nothing and warns of nothing" '[ "$rc" = 0 ] && ! grep -qi grok "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-# Codex is needed for mentat review and mentat second-opinion: without it, check fails.
-mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/gh" "$root/bin/grok" "$root/bin/gitleaks" "$root/nocodex/"
+# Codex is optional: mentat review runs Claude. Without codex, check says what uses it and passes.
+mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/bin/gh" "$root/bin/grok" "$root/bin/claude" "$root/bin/gitleaks" "$root/nocodex/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/nocodex:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "a missing codex is a problem (exit 1) that says what still runs without it" '[ "$rc" = 1 ] && grep -qx "PROBLEM: codex is not installed: mentat review and mentat second-opinion need it; mentat ci and mentat review --grok still run without it" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+check "a missing codex is no problem (exit 0): one line says it is optional and what uses it" '(PATH="$root/nocodex:/usr/bin:/bin"; ! command -v codex >/dev/null) && [ "$rc" = 0 ] && grep -qx "OK: codex is not installed (optional: mentat review --codex and mentat second-opinion use it)" "$STUB/out" && ! grep -q "^PROBLEM" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 reset; rc=$(run)
 check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is installed (8.99.9)" "$STUB/out"'
 # Without gitleaks and with the templates not in use, the commit hook does not scan: check warns and still passes.
 NOT_IN_USE="WARN: the git hook templates are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
-mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/nogitleaks/"
+mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/claude" "$root/nogitleaks/"
 reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "with the templates not in use, a missing gitleaks warns, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: gitleaks is not installed: the commit hook does not scan staged changes for likely secrets" "$STUB/out" && grep -qxF "$NOT_IN_USE" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ]'
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
@@ -288,25 +288,26 @@ check "a failed list names no modules" '! grep -qi "modules" "$STUB/out"'
 
 mkdir "$root/noclaude"; for t in git jq; do ln -s "$(command -v $t)" "$root/noclaude/$t"; done; ln -s "$root/bin/gh" "$root/bin/codex" "$root/bin/grok" "$root/bin/gitleaks" "$root/noclaude/"
 reset; rc=$(cd "$root/cwd" && PATH="$root/noclaude:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "no claude command says nothing about copies and adds no warning" '[ "$rc" = 0 ] && ! grep -qi -e claude -e plugin "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-check "no claude command says nothing about modules" '! grep -qi modules "$STUB/out"'
+check "no claude command is a problem (exit 1), and the one line about claude says mentat review needs it" '(PATH="$root/noclaude:/usr/bin:/bin"; ! command -v claude >/dev/null) && [ "$rc" = 1 ] && grep -qx "PROBLEM: claude is not installed: mentat review needs Claude Code" "$STUB/out" && [ "$(grep -ci -e claude -e plugin "$STUB/out")" = 1 ] && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+check "no claude command says nothing about copies, modules or the version, and adds no warning" '! grep -qi -e modules -e "plugin" -e "Claude Code [0-9]" -e "^WARN" "$STUB/out"'
 
-# The Claude Code version: the merge hook's onFailure block needs 2.1.295 or later.
+# The Claude Code version: the merge hook's onFailure block, and the review's --tools and
+# --restricted with --safe-mode, need 2.1.295 or later.
 reset; rc=$(run)
-check "Claude Code 2.1.295 is OK" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code 2.1.295 is installed (2.1.295 or later, which the merge hook needs)" "$STUB/out" && no_leak'
+check "Claude Code 2.1.295 is OK" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code 2.1.295 is installed (2.1.295 or later, which the merge hook and the locked-down mentat review need)" "$STUB/out" && no_leak'
 for v in 2.1.1000 2.2.0 3.0.0; do
   reset; printf '%s (Claude Code)\n' "$v" >"$STUB/claude_version"; rc=$(run)
-  check "Claude Code $v is OK" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code $v is installed (2.1.295 or later, which the merge hook needs)" "$STUB/out"'
+  check "Claude Code $v is OK" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code $v is installed (2.1.295 or later, which the merge hook and the locked-down mentat review need)" "$STUB/out"'
 done
 for v in 2.1.294 2.0.999 1.9.400; do
   reset; printf '%s (Claude Code)\n' "$v" >"$STUB/claude_version"; rc=$(run)
-  check "Claude Code $v is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails: update Claude Code" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+  check "Claude Code $v is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails and the tool limits of mentat review may not hold: update Claude Code" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 done
 reset; printf '2.1.300/stubleakedpath/stubprojectname\n' >"$STUB/claude_version"; rc=$(run)
-check "a version followed by a path prints only the version" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code 2.1.300 is installed (2.1.295 or later, which the merge hook needs)" "$STUB/out" && no_leak'
+check "a version followed by a path prints only the version" '[ "$rc" = 0 ] && grep -qxF "OK: Claude Code 2.1.300 is installed (2.1.295 or later, which the merge hook and the locked-down mentat review need)" "$STUB/out" && no_leak'
 for v in "" "/stubleakedpath/stubprojectname 2.1.300" "2.1" "2.1.300.4"; do
   reset; printf '%s\n' "$v" >"$STUB/claude_version"; rc=$(run)
-  check "an unreadable Claude Code version ($v) is a problem that prints none of it" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: could not read the Claude Code version: the merge hook needs Claude Code 2.1.295 or later" "$STUB/out" && ! grep -q "OK: Claude Code" "$STUB/out" && no_leak'
+  check "an unreadable Claude Code version ($v) is a problem that prints none of it" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: could not read the Claude Code version: the merge hook and the locked-down mentat review need Claude Code 2.1.295 or later" "$STUB/out" && ! grep -q "OK: Claude Code" "$STUB/out" && no_leak'
 done
 
 # A list that fails is not read, even when what it printed would compare.
