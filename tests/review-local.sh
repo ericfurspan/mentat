@@ -76,8 +76,8 @@ case "$1 $2" in
   *) exit 99 ;;
 esac
 STUBEOF
-# claude: records its arguments, where it ran, what it read on stdin and in the folder
-# after --add-dir, and its run in the calls gh records. Then prints Claude's JSON result
+# claude: records its arguments, where it ran, whether two variables reached it, what it
+# read on stdin and in the folder after --add-dir, and its run in the calls gh records. Then prints Claude's JSON result
 # with $STUB/reply as the reply, $STUB/model_ran as the models that ran (comma-separated,
 # default claude-opus-4-9), $STUB/subtype and $STUB/denials; or $STUB/raw as it is.
 # Exits with $STUB/exit (default 0).
@@ -91,6 +91,8 @@ git rev-parse HEAD >"$STUB/model_head"; cat README >"$STUB/model_readme"
 # @TREE@, @TREEP@ and @DATA@ in the reply become the checkout's path as created and
 # resolved (macOS: /var and /private/var) and the data folder's.
 pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
+echo "CLAUDE_CODE_PLUGIN_DIRS ${CLAUDE_CODE_PLUGIN_DIRS+set}" >"$STUB/env"
+echo "ANTHROPIC_API_KEY ${ANTHROPIC_API_KEY+set}" >>"$STUB/env"
 prev=""
 for a in "$@"; do
   if [ "$prev" = --add-dir ]; then printf '%s\n' "$a" >"$STUB/data"; cp "$a/diff" "$STUB/seen_diff"; cp "$a/log" "$STUB/seen_log"; fi
@@ -190,6 +192,8 @@ check "runs on the default review model" '[ "$(arg --model)" = opus ]'
 check "runs in the head's temporary worktree, not the caller's checkout" 'tree=$(cat "$STUB/tree") && [ "$tree" != "$root/work" ] && case "$tree" in "$root/work"/*) false ;; *) true ;; esac && [ "$(git -C "$tree" rev-parse HEAD 2>/dev/null || cat "$STUB/model_head")" = "$H" ] && [ ! -e "$tree" ]'
 check "takes the prompt on stdin" 'grep -q "^Review pull request #7. " "$STUB/prompt" && ! grep -qF "Review pull request" "$STUB/args"'
 check "the diff and the commit log are files in the folder Claude may also read, outside the worktree, and the prompt names them" 'data=$(cat "$STUB/data") && [ "$(dirname "$data")" = "$(dirname "$(cat "$STUB/tree")")" ] && [ "$data" != "$(cat "$STUB/tree")" ] && [ "$(cat "$STUB/seen_diff")" = "$(git -C "$root/seed" diff "$BASE" "$H")" ] && grep -qx "    change" "$STUB/seen_log" && grep -qF "the diff is in $data/diff and its commits are in $data/log" "$STUB/prompt" && ! grep -q "run: git diff" "$STUB/prompt"'
+reset; rc=$(CLAUDE_CODE_PLUGIN_DIRS="$root/plugins" ANTHROPIC_API_KEY=stub-key run)
+check "an inherited plugin folder does not reach Claude, and the sign-in variable does" '[ "$rc" = 0 ] && grep -qx "CLAUDE_CODE_PLUGIN_DIRS " "$STUB/env" && grep -qx "ANTHROPIC_API_KEY set" "$STUB/env"'
 reset; echo claude-sonnet-4-5 >"$STUB/model_ran"; rc=$(MENTAT_REVIEW_MODEL=sonnet run)
 check "MENTAT_REVIEW_MODEL sets the review model" '[ "$rc" = 0 ] && [ "$(arg --model)" = sonnet ] && folded | grep -qx -- "- Model: claude-sonnet-4-5"'
 reset; rc=$(MENTAT_REVIEW_MODEL=sonnet run)

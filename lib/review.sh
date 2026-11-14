@@ -13,17 +13,20 @@ CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 # failure it calls $4 with the reason, which exits. $5 is the folder holding the
 # diff and the log, outside $1, which Claude may also read. Sets the caller's
 # claude_models to the models that ran, from Claude's own report.
-# --safe-mode loads no CLAUDE.md, hooks, plugins or skills; --restricted ignores
-# the settings files, the reviewed tree's included, and keeps the file tools inside
-# $1 and $5, so a read anywhere else is denied and the run fails below. A denied
-# tool call, an error or output that is not Claude's JSON result is not a review.
+# --safe-mode loads no CLAUDE.md, hooks, skills or installed plugins, but still lists
+# a plugin folder named in CLAUDE_CODE_PLUGIN_DIRS (Claude Code 2.1.322), so claude
+# runs without that variable. --restricted ignores the settings files, the reviewed
+# tree's included, and keeps the file tools inside $1 and $5, so a read anywhere else
+# is denied and the run fails below; a read through a symbolic link out of $1 is
+# denied too (Claude Code 2.1.322). A denied tool call, an error or output that is
+# not Claude's JSON result is not a review.
 run_claude() {
   local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" json log rc secs=0 pid n why
   local hint="the review model is set with MENTAT_REVIEW_MODEL (now $REVIEW_MODEL)"
   local args=(-p --safe-mode --restricted --add-dir "$data" --model "$REVIEW_MODEL" --permission-mode dontAsk
     --tools "$CLAUDE_REVIEW_TOOLS" --allowedTools "$CLAUDE_REVIEW_TOOLS" --output-format json)
   json="${out%/*}/claude.json" log="${out%/*}/claude.log"
-  (cd "$dir" && exec claude "${args[@]}" <"$prompt") >"$json" 2>"$log" &
+  (cd "$dir" && unset CLAUDE_CODE_PLUGIN_DIRS && exec claude "${args[@]}" <"$prompt") >"$json" 2>"$log" &
   pid=$! review_child=$!
   # $SECONDS counts whole seconds, so a limit stops Claude up to a second late, never early.
   secs=$SECONDS
