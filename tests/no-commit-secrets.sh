@@ -45,6 +45,8 @@ STUBEOF
 chmod +x "$tmp/bin/gitleaks"
 export PATH="$tmp/bin:$PATH"
 export TMPDIR="$tmp/tmpdir"
+# Agents' git sets core.hooksPath through GIT_CONFIG_*; its hooks must not run on this test's commits.
+unset GIT_CONFIG_COUNT
 
 g() { git -c user.name=t -c user.email=t@t -c init.defaultBranch=main "$@"; }
 repo="$tmp/repo"
