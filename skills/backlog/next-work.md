@@ -11,5 +11,5 @@ Read this when the maintainer's own instructions choose the "offer the next work
 - It says nothing is waiting, in its own words with no fixed phrase, only when Todo, In Progress, Backlog and the Inbox were all read and are empty; parked items, items just planned and Inbox entries deferred with a Later note count as not empty. When work remains but nothing can be offered, it says in one line, in its own words, what remains. When any of those reads fails, the read of agreed work included, it says which, offers nothing and never reports empty.
 - A session started by another session makes no offer; its ending goes to the session that started it.
 - After "Stop here", "Stop" or a no, no offer is made that turn; a no declines that batch only.
-- A yes to an offer of agreed work, forwarded word for word with the offered queue and its conditions, starts that build session, briefed as `mentat:propose` "Starting a build" says. The build session still runs readiness, plan usage and the quick check.
+- A yes to an offer of agreed work starts that build in this session, as `mentat:propose` "Starting a build" says; `mentat:build` still runs readiness, plan usage and the quick check.
 - A yes to a Backlog item's offer starts `mentat:propose` for that item in this session, which still asks its own agreement; no second next-work ending runs in that turn.
