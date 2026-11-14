@@ -89,6 +89,87 @@ fresh_stop() {
   die "the checkout is behind origin's default branch $fresh_def: HEAD lacks $fresh_behind $word on it. Update the checkout and run $1 again. This is not a tool failure: do not go on with Claude Code's own view alone." 5
 }
 
+# Whether outside reviewers (Codex and Grok) are on in the repository at top level $1.
+# Only .claude/settings.json on origin's default branch counts: on when its
+# enabledPlugins["mentat-reviewers@mentat"] is true; off when the file, enabledPlugins or
+# that key is absent, or the value is false; unknown otherwise. The working tree, local
+# and user settings and other branches never count. Sets the caller's reviewers (on, off
+# or unknown), reviewers_why (why it is unknown, else empty) and reviewers_def (the
+# default branch, or empty when none was found). The default branch is found and fetched
+# as fresh_check does, into a ref of this run's own deleted once read, so origin/<default>
+# and git's record of the last fetch stay as they are; a failed fetch is unknown, never a
+# stale local origin/<default>. Call it before setting an EXIT trap: it sets and clears its own.
+reviewers_state() { # $1 top level
+  local top=$1 ref="refs/mentat/reviewers-$$"
+  reviewers=unknown reviewers_why="" reviewers_def=""
+  if ! command -v jq >/dev/null 2>&1; then reviewers_why="jq is not installed"; return 0; fi
+  if ! git -C "$top" remote get-url origin >/dev/null 2>&1; then reviewers_why="the checkout has no origin remote"; return 0; fi
+  reviewers_def=$(GIT_TERMINAL_PROMPT=0 git -C "$top" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
+  if [ -z "$reviewers_def" ]; then
+    reviewers_def=$(git -C "$top" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
+    reviewers_def=${reviewers_def#refs/remotes/origin/}
+  fi
+  if [ -z "$reviewers_def" ]; then reviewers_why="origin's default branch could not be found"; return 0; fi
+  # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
+  trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$ref") >/dev/null 2>&1" EXIT
+  if GIT_TERMINAL_PROMPT=0 git -C "$top" fetch -q --no-tags --no-write-fetch-head --refmap= origin "+refs/heads/$reviewers_def:$ref" >/dev/null 2>&1; then
+    reviewers_read "$top" "$ref"
+  else
+    reviewers_why="origin's default branch $reviewers_def could not be fetched"
+  fi
+  git -C "$top" update-ref -d "$ref" >/dev/null 2>&1
+  trap - EXIT
+}
+# Reads .claude/settings.json from ref $2 in the repository at $1, for reviewers_state:
+# a regular file holding one JSON object. A pipe, not a here-string: mentat check calls it.
+reviewers_read() { # $1 top level, $2 ref
+  local entry got f=".claude/settings.json on $reviewers_def"
+  if ! entry=$(git -C "$1" ls-tree "$2" -- .claude/settings.json 2>/dev/null); then
+    reviewers_why="the files on $reviewers_def could not be listed"; return 0
+  fi
+  if [ -z "$entry" ]; then reviewers=off; return 0; fi
+  case "$entry" in
+    "100644 blob "* | "100755 blob "*) ;;
+    *) reviewers_why="$f is not a regular file"; return 0 ;;
+  esac
+  # jq -s reads every JSON value in the file into one array, so an empty file or more
+  # than one value is not one object. has() tells an absent key from a null value.
+  if ! got=$(git -C "$1" cat-file blob "$2:.claude/settings.json" 2>/dev/null | jq -rs '
+    if length != 1 or (.[0] | type) != "object" then "not-object"
+    else .[0] | if has("enabledPlugins") | not then "off"
+      elif (.enabledPlugins | type) != "object" then "plugins-not-object"
+      elif .enabledPlugins | has("mentat-reviewers@mentat") | not then "off"
+      elif .enabledPlugins["mentat-reviewers@mentat"] == true then "on"
+      elif .enabledPlugins["mentat-reviewers@mentat"] == false then "off"
+      else "not-boolean" end
+    end' 2>/dev/null); then
+    reviewers_why="$f could not be read as JSON"; return 0
+  fi
+  case "$got" in
+    on | off) reviewers=$got ;;
+    not-object) reviewers_why="$f is not one JSON object" ;;
+    plugins-not-object) reviewers_why="enabledPlugins in $f is not an object" ;;
+    not-boolean) reviewers_why="mentat-reviewers@mentat in $f is neither true nor false" ;;
+    *) reviewers_why="$f could not be read as JSON" ;;
+  esac
+}
+# reviewers_state for the top level of the current directory: unknown outside a git repository.
+reviewers_here() {
+  local top
+  if ! top=$(git rev-parse --show-toplevel 2>/dev/null) || [ -z "$top" ]; then
+    reviewers=unknown reviewers_why="not inside a git repository" reviewers_def=""
+    return 0
+  fi
+  reviewers_state "$top"
+}
+# mentat reviewers: the switch here, on one line, exit 0 for each state.
+reviewers_command() {
+  [ $# -eq 0 ] || die "usage: mentat reviewers" 64
+  reviewers_here
+  if [ "$reviewers" = unknown ]; then printf 'reviewers: unknown - %s\n' "$reviewers_why"
+  else printf 'reviewers: %s\n' "$reviewers"; fi
+}
+
 # The word a posted review's heading gives for its checked REVIEW RESULT line $1.
 result_word() {
   case "$1" in

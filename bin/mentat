@@ -39,6 +39,13 @@
 #     Grok stop review's (none, or running, done or did not finish on a commit, a done one
 #     with its result and spec fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
 #     review's spec fingerprint matches the file. Posts nothing. 0 printed, 1 could not read.
+#   mentat reviewers  Prints whether outside reviewers (Codex and Grok) are on in this
+#     repository, on one line: "reviewers: on", "reviewers: off" or "reviewers: unknown -
+#     <reason>". Only .claude/settings.json on origin's default branch counts: on when it
+#     sets enabledPlugins "mentat-reviewers@mentat" to true; off when that is false or
+#     absent; unknown when it cannot be read or is anything else, or the default branch
+#     cannot be found or fetched. It fetches that branch into a private ref, deleted once
+#     read, leaving origin/<default> and FETCH_HEAD as they are. Calls no gh. Exits 0.
 #   mentat second-opinion <idea file>  Has Codex and Grok each
 #     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
 #     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
@@ -121,7 +128,8 @@ case "${1:-}" in
     review_local claude "$pr" ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   status) shift; status "$@" ;;
+  reviewers) shift; reviewers_command "$@" ;;
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
 esac
