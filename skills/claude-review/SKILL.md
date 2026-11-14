@@ -4,7 +4,7 @@ description: "Turns Codex and Grok off for this session and has one Claude revie
 disable-model-invocation: true
 ---
 
-The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the second opinion in `mentat:propose` (`mentat second-opinion`) with nothing; Claude Code's own view of a request still runs. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say it is on; that starts no review, and the next review goes through `mentat:review`, with Grok where it has not yet run.
+The maintainer has turned Codex off for the rest of this session. Until the maintainer says in chat to turn Codex back on, these replace the Codex review loop (`mentat:review`) with one Claude review, and the second opinion in `mentat:propose` (`mentat second-opinion`) with nothing; the plan check and Claude Code's own view of a request still run. Everything else in `rules.md` holds. After a compaction or a resumed session, Codex stays off; only the maintainer turns it back on, in chat. When they do, say it is on; that starts no review, and the next review goes through `mentat:review`, with Grok where it has not yet run.
 
 When started, say in one line that Codex is off for this session. If a `mentat review` or `mentat second-opinion` is running, stop it and say so.
 
@@ -31,4 +31,4 @@ Every description update here rewrites the Status line and keeps the Summary to 
 
 ## Plans
 
-Run no second opinion (`mentat second-opinion`): give Claude Code's own view alone and say the second opinion was skipped because the maintainer turned Codex off. The Claude review does not apply to plans.
+Run no second opinion (`mentat second-opinion`): the plan check (`mentat:propose` step 4) still runs; say the second opinion was skipped because the maintainer turned Codex off. The Claude review does not apply to plans.

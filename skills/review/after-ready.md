@@ -6,7 +6,7 @@ After the answer, if #N is still open and they want the work in it, remove the i
 
 No hold is needed for a question, when #N is merged or closed, or for work that stands apart from #N; any work then goes on a new branch from the default branch, in its own pull request. When #N is closed without merging, remove the item's merge wait as above; its status stays.
 
-When the maintainer says #N merged, do the steps of the item's wait block where there is one (`mentat:backlog` "Marking a wait"), then mark the item done, which ends its merge wait, do the repository's own post-merge steps, and report in one line, then end as `rules.md` "Ending finished work" says.
+When the maintainer says #N merged, do the steps of the item's wait block where there is one (`mentat:backlog` "Marking a wait"), then mark the item done, which ends its merge wait, do the repository's own post-merge steps, remove #N's worktree and branch as `../build/helpers.md` "After merge" says, and report in one line, then end as `rules.md` "Ending finished work" says.
 
 ## Waived round
 

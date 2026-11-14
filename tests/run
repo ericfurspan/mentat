@@ -97,17 +97,24 @@ else
   fail "skills/plan/SKILL.md's description must list its argument (Arguments: a backlog item id.)"
 fi
 
-# The status report and a build run are started by a command and list their arguments.
-for k in status build; do
-  f=skills/$k/SKILL.md
-  for s in "name: $k" 'disable-model-invocation: true'; do
-    if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" "$f"; then
-      pass "$f's frontmatter sets $s"
-    else
-      fail "$f's frontmatter must set $s"
-    fi
-  done
+# The status report is started only by a command, a build run by a command or by the session; both list their arguments.
+for s in 'name: status' 'disable-model-invocation: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/status/SKILL.md; then
+    pass "skills/status/SKILL.md's frontmatter sets $s"
+  else
+    fail "skills/status/SKILL.md's frontmatter must set $s"
+  fi
 done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want='name: build' skills/build/SKILL.md; then
+  pass "skills/build/SKILL.md's frontmatter sets name: build"
+else
+  fail "skills/build/SKILL.md's frontmatter must set name: build"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^disable-model-invocation:/ { found = 1; exit 0 } END { exit !found }' skills/build/SKILL.md; then
+  fail "skills/build/SKILL.md's frontmatter must not set disable-model-invocation, so the session can call it"
+else
+  pass "skills/build/SKILL.md's frontmatter does not set disable-model-invocation"
+fi
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all\./ { found = 1; exit 0 } END { exit !found }' skills/status/SKILL.md; then
   pass "skills/status/SKILL.md's description lists its arguments"
 else
@@ -117,6 +124,22 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
   pass "skills/build/SKILL.md's description lists its arguments"
 else
   fail "skills/build/SKILL.md's description must list its arguments (Arguments: backlog item ids.)"
+fi
+
+# The plan checker is a plugin subagent that can only read.
+if command -v jq >/dev/null 2>&1; then
+  if jq -e '.agents | any(. == "./prompts/plan-checker.md")' .claude-plugin/plugin.json >/dev/null; then
+    pass ".claude-plugin/plugin.json lists ./prompts/plan-checker.md in agents"
+  else
+    fail ".claude-plugin/plugin.json must list ./prompts/plan-checker.md in agents"
+  fi
+else
+  fail "jq not installed, the plugin's agents not checked"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want='tools: Read, Grep, Glob' prompts/plan-checker.md; then
+  pass "prompts/plan-checker.md's frontmatter sets tools: Read, Grep, Glob"
+else
+  fail "prompts/plan-checker.md's frontmatter must set tools: Read, Grep, Glob"
 fi
 
 # Instruction text loads into sessions, so it describes the build command's form and never writes a slash command bare.
