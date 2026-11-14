@@ -37,7 +37,7 @@ This writes `.claude/settings.json`, turning Mentat on for everyone there. Use `
 
 Where pull requests need approval, give the agent its own GitHub account.
 
-Optional modules install as `<module>@mentat`: `mentat-public-text` blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`; three others are empty.
+Optional modules install as `<module>@mentat`: `mentat-reviewers` holds the Codex and Grok commands; `mentat-public-text` blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`; two others are empty.
 
 ## Usage
 
