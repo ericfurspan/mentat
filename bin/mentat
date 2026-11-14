@@ -61,6 +61,10 @@
 #     answer line. Nothing is posted. 0 at least one tool answered, 1 none did, 64 usage.
 #     Same time limits and effort variables. Grok has web search alone; its
 #     local fetch tool is denied.
+#   review --codex, review --grok and second-opinion belong to the mentat-reviewers module:
+#     mentat hands each, with the arguments after its mode, to the module's entry
+#     mentat-review-codex, mentat-review-grok or mentat-second-opinion, on PATH or else in
+#     this checkout's plugins/mentat-reviewers/bin, and exits 64 with neither.
 #   mentat check  Checks, read-only, what Mentat itself needs: tools, the git hook
 #     templates installed and the same as this copy when agents' git uses them
 #     (lib/templates.sh), gh signed in, the repository readable, claude installed at a version
@@ -81,7 +85,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review codex grok parallel second-opinion templates check status; do
+for lib in shared publish review templates check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -90,35 +94,33 @@ for lib in shared publish review codex grok parallel second-opinion templates ch
   . "$root/lib/$lib.sh" || exit 1
 done
 
+# Hands the command to the reviewers module's entry mentat-$1, with the other arguments
+# and MENTAT_ROOT set to this folder, where the entry finds the shared code: the entry
+# on PATH, where the module puts it when it is on, else the copy in this checkout. That
+# copy is a temporary fallback for repositories with the module off; step 4.1 removes it.
+handover() {
+  local entry="mentat-$1"
+  shift
+  export MENTAT_ROOT="$root"
+  if command -v "$entry" >/dev/null 2>&1; then exec "$entry" "$@"; fi
+  if [ -x "$root/plugins/mentat-reviewers/bin/$entry" ]; then exec "$root/plugins/mentat-reviewers/bin/$entry" "$@"; fi
+  die "this command needs the mentat-reviewers module, which was not found: turn it on and run again" 64
+}
+
 case "${1:-}" in
   review)
     shift
-    # Exactly one pull request number, after --local, --codex or --grok if given: "review 7
-    # --grok" would otherwise run the Claude review.
-    mode=claude
-    case "${1:-}" in --local) shift ;; --codex) shift; mode=codex ;; --grok) shift; mode=grok ;; esac
-    # --request <file>, --require-ci and, with --grok only, --stop, each at most once, in any order.
-    request_file="" request_given=no require_ci=no grok_stop=no
-    while :; do
-      case "${1:-}" in
-        --stop)
-          [ "$mode" = grok ] && [ "$grok_stop" = no ] || die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
-          grok_stop=yes; shift ;;
-        --request)
-          [ "$request_given" = no ] && [ $# -ge 2 ] || die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
-          # shellcheck disable=SC2034 # read by read_request in lib/shared.sh
-          request_file=$2 request_given=yes; shift 2 ;;
-        --require-ci)
-          [ "$require_ci" = no ] || die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
-          require_ci=yes; shift ;;
-        *) break ;;
-      esac
-    done
-    [ $# -eq 1 ] || die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64
-    case "$mode" in grok) review_grok "$@" ;; *) review_local "$mode" "$@" ;; esac ;;
+    case "${1:-}" in
+      --codex) shift; handover review-codex "$@" ;;
+      --grok) shift; handover review-grok "$@" ;;
+      --local) shift ;;
+    esac
+    review_args "" "$@"
+    # shellcheck disable=SC2154 # pr is set by review_args
+    review_local claude "$pr" ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;
   status) shift; status "$@" ;;
-  second-opinion) shift; second_opinion "$@" ;;
+  second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
   *) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat second-opinion [--web] <file> | mentat second-opinion --link <item id> <idea file> | mentat check" 64 ;;
 esac

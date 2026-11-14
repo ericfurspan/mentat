@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# mentat-second-opinion: `mentat second-opinion`, which bin/mentat hands over with its
+# arguments. Usage and exit codes are bin/mentat's.
+set -uo pipefail
+
+module=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
+# shellcheck disable=SC2034 # read by lib/load.sh
+entry=mentat-second-opinion via="mentat second-opinion" core_libs="shared publish review" module_libs="codex grok parallel second-opinion"
+# shellcheck source=/dev/null
+. "$module/lib/load.sh" || exit 1
+
+second_opinion "$@"

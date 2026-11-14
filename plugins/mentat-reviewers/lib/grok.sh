@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # The Grok side of mentat: review --grok and the Grok run shared with
-# second-opinion, with its sandbox profile and its isolated home. Sourced by bin/mentat.
+# second-opinion, with its sandbox profile and its isolated home. Sourced by this
+# module's bin/ entries.
 
 # A Grok review (`mentat review --grok`) runs beside the main review, once per
 # pull request; the stop review (`--stop`, the same review under its own comment

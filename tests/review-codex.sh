@@ -176,7 +176,9 @@ exit 1
 STUBEOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex" "$root/tools/bin/claude"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
-export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
+# mentat hands the review to the reviewers module's entry on PATH: this checkout's, ahead of
+# any copy a session with the module on has there.
+export PATH="$root/tools/bin:${mentat%/bin/mentat}/plugins/mentat-reviewers/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
 reset() {
   rm -f "$STUB"/*

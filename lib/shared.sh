@@ -202,6 +202,30 @@ read_issues() { # $1 pr, $2 pull request JSON
     issues="$issues"$'\n\n'
   done <<<"$(jq -r '.closingIssuesReferences[]? | "\(.repository.owner.login)/\(.repository.name) \(.number)"' <<<"$2")"
 }
+# The arguments of mentat review after its mode, for every reviewer: --request <file>
+# and --require-ci, each at most once, in any order, with any flag the function named
+# by $1 takes (it returns 1 for one it does not take), then exactly one pull request
+# number ("review 7 --local" would otherwise run the Claude review). Sets the caller's
+# request_file, request_given, require_ci and pr; anything else is a usage error.
+review_args() { # $1 function for more flags, or "", $2... the arguments
+  local more=$1 usage="usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>"
+  shift
+  request_file="" request_given=no require_ci=no
+  while :; do
+    case "${1:-}" in
+      --request)
+        [ "$request_given" = no ] && [ $# -ge 2 ] || die "$usage" 64
+        request_file=$2 request_given=yes; shift 2 ;;
+      --require-ci)
+        [ "$require_ci" = no ] || die "$usage" 64
+        require_ci=yes; shift ;;
+      *)
+        if [ -n "$more" ] && [ $# -gt 0 ] && "$more" "$1"; then shift; else break; fi ;;
+    esac
+  done
+  [ $# -eq 1 ] || die "$usage" 64
+  pr=$1
+}
 # The agreed request, for a repository with an external backlog (skills/backlog):
 # `mentat review --request <file>`. Reads the caller's request_file once,
 # before the review starts, and sets the caller's `request` (its text) and

@@ -170,7 +170,9 @@ while [ $# -gt 0 ]; do [ "$1" = -o ] && printf 'ok\n\nREVIEW RESULT: NO FINDINGS
 STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/grok" "$root/bin/codex"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
-export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
+# mentat hands the review to the reviewers module's entry on PATH: this checkout's, ahead of
+# any copy a session with the module on has there.
+export PATH="$root/bin:${mentat%/bin/mentat}/plugins/mentat-reviewers/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
 reply() { # $1 text, $2 stop reason
   jq -n --arg t "$1" --arg s "${2:-end_turn}" '{text: $t, stopReason: $s, sessionId: "s", modelUsage: {"grok-stub": {}}}' >"$STUB/out_json"

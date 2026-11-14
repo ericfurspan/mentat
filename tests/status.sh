@@ -54,7 +54,7 @@ checks() {
   done
   jq -n --argjson r "$runs" '{check_runs: $r}' >"$STUB/checks"
 }
-# The headings exactly as lib/review.sh, lib/grok.sh and skills/claude-review write them.
+# The headings exactly as lib/review.sh, plugins/mentat-reviewers/lib/grok.sh and skills/claude-review write them.
 local_review() { comment "${4:-mentat-bot}" "## Local $5 review of $1: $2, spec fingerprint ${3:-none}
 
 <details><summary>Full review</summary>
