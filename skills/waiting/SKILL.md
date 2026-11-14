@@ -54,4 +54,4 @@ Links to the items named go on the last line.
 
 ## Answers given in chat
 
-If the maintainer then answers in chat a decision whose place is elsewhere, such as an item or triage (`/mentat-linear:triage`), record nothing and say in one line where the answer goes.
+If the maintainer then answers in chat a decision whose place is elsewhere, such as an item or triage (`/mentat-linear:triage`, where the `mentat-linear` module is on), record nothing and say in one line where the answer goes.
