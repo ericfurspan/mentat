@@ -26,6 +26,6 @@ A reply that answers open comments opens with this line:
 
 `Answer to open comments:`
 
-It then names each comment it answers and its answer, and, after a decision, the recorded answer, in Claude Code's own words under `rules.md` "Records". A partial answer says what remains open. It goes where the tracker's adapter says. Spec, fingerprint, settlement and advice comments stay where `mentat:backlog` puts them.
+It then names each comment it answers and its answer, and, after a decision, the recorded answer, in Claude Code's own words under `records.md`. A partial answer says what remains open. It goes where the tracker's adapter says. Spec, fingerprint, settlement and advice comments stay where `mentat:backlog` puts them.
 
 A stopped or unanswered question posts nothing. A skill that forbids writes, `mentat-extras:grill` included, posts nothing and leaves the reply to the skill that records the answer.

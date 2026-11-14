@@ -51,7 +51,7 @@ Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, To
 
 Moved from core: `status` became `/mentat:waiting` and `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`.
 
-[`rules.md`](rules.md) has the full workflow.
+[`rules.md`](rules.md) holds the core rules; the skills in `skills/` hold each step's detail.
 
 ## Configuration
 

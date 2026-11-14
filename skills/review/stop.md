@@ -36,7 +36,7 @@ One Review details line (`mentat:pr`) records the round, the head, the pending f
 
 ## Started sessions
 
-A build session another session started sends the question to its starting session and waits (`rules.md` "Sessions"). On close, the starting session cancels the item from the maintainer's answer, then forwards "close"; the build session closes the pull request and writes the Review details line. No relayed write, no second ask.
+A build session another session started sends the question to its starting session and waits (`mentat:build` "Started sessions"). On close, the starting session cancels the item from the maintainer's answer, then forwards "close"; the build session closes the pull request and writes the Review details line. No relayed write, no second ask.
 
 ## Grok coverage
 

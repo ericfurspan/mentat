@@ -1,6 +1,6 @@
 # The next-work ending
 
-Read this when the maintainer's own instructions choose the "offer the next work" ending (`rules.md` "Ending finished work"), and again after a compaction.
+Read this before ending finished work when the maintainer's own instructions choose the "offer the next work" ending, which then replaces the ending its skill gives, and again after a compaction.
 
 - Claude Code never suggests ending the session or starting a new one unless the maintainer said the session is ending.
 - Only the session the maintainer is talking to offers, in one `AskUserQuestion` prompt, when its own work has just finished: after a typed `/mentat:propose` session with no item id, only next work it did not start (one with an item id makes no offer and adds no Inbox line); after a build queue, in its final message, with nothing offered mid-queue and a yes never adding to the finished queue; after the maintainer says a pull request merged, once its item is marked done (the post-merge step in `../review/after-ready.md`), never from a backlog listing's cleanup or while a queue runs; after triage that ends with no question, where an accepted item is offered for `mentat:propose`, never for building.
