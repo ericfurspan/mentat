@@ -20,7 +20,7 @@ The reviewers' own finding text, the spec's goal, Grok's stop review, and any di
 
 ## The question
 
-One decision, asked as `rules.md` "What goes to the maintainer" says: go on, shrink or close. Recommend close or shrink when the findings show the goal or a required safeguard is still missed; go on for ordinary defects. Each option says what it does:
+One decision, asked as `rules.md` "What goes to the maintainer" says: go on, shrink or close. Recommend close or shrink when the findings show the goal or a required safeguard is still missed; go on for ordinary defects. Each option says what it does in a few words inside the word bound; the session follows its full effects:
 
 - Go on: fixes that round's findings only, Grok's stop review findings among them (sorted as `findings.md` says), and keeps the spec (an open disproved assumption stays as it is); it adds no round past the limit and gives no Ready for an unreviewed fix. On the Claude-only path, its fixes get no further round and no Ready. Fixes left with no round end as `Not reviewed: no review round left`.
 - Shrink: asks the scope change as one question, then rewrites the spec and records its fingerprint (`mentat:backlog` "Agreement"). This is how a disproved assumption changes scope. Its rebuild needs a review round within the limit, else `Not reviewed: no review round left`.
