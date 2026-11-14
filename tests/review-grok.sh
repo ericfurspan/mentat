@@ -30,10 +30,13 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export TMPDIR="$root/tmp" XDG_CACHE_HOME="$cache"
 
 # An origin with main and pull request 7, whose head changes README and adds files
-# that archive attributes and odd names would trip up.
+# that archive attributes and odd names would trip up. Outside reviewers are on in main's
+# .claude/settings.json, so review --grok runs.
+REVIEWERS_ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
 git init -q --bare -b main "$root/origin.git"
 git init -q -b main "$root/seed"
-(cd "$root/seed" && echo base >README && git add README && git commit -qm base && git push -q "$root/origin.git" main &&
+(cd "$root/seed" && echo base >README && mkdir .claude && printf '%s\n' "$REVIEWERS_ON" >.claude/settings.json &&
+  git add README .claude/settings.json && git commit -qm base && git push -q "$root/origin.git" main &&
   git checkout -qb feature && echo change >README &&
   printf 'ignored.txt export-ignore\nsubst.txt export-subst\n' >.gitattributes &&
   echo ignored >ignored.txt && echo 'id $Format:%H$' >subst.txt &&
@@ -579,6 +582,38 @@ echo x >"$TMPDIR/mentat-held-comment.old" && touch -t "$(date -v-10085M +%Y%m%d%
 reset; rc=$(run)
 check "at start, deletes a Grok run folder older than a day and a held comment older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-review.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
 rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
+
+# Outside reviewers off, or unknown, on main: plain and --stop runs are refused (exit 6)
+# before anything else. Each has an origin with pull request 7 and a clone of its own,
+# which never fetched the pull request's head. Nothing is read from GitHub or posted, the
+# leftovers sweep does not run, the pull request is not fetched, Grok does not run and no
+# run folder is made.
+gate_clone() { # $1 name, $2 main's .claude/settings.json
+  git clone -q --mirror "$root/origin.git" "$root/$1 origin.git" && git clone -q "$root/$1 origin.git" "$root/$1 seed" &&
+    (cd "$root/$1 seed" && printf '%s' "$2" >.claude/settings.json && git commit -qam settings && git push -q origin HEAD:main) &&
+    git clone -q --no-local "$root/$1 origin.git" "$root/$1 work"
+}
+gate_clone off '{"enabledPlugins":{"mentat-reviewers@mentat":false}}' || exit 1
+gate_clone unknown '{"enabledPlugins":{"mentat-reviewers@mentat":"true"}}' || exit 1
+OFF_LINE="mentat: not run: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on main); Claude's review is the review here"
+UNKNOWN_LINE="mentat: not run: outside reviewers are unknown in this repository (mentat-reviewers@mentat in .claude/settings.json on main is neither true nor false); Codex and Grok run only once it reads as on"
+gate_run() { (cd "$root/$1 work" && shift && "$mentat" review --grok "$@" >"$STUB/out" 2>&1); echo $?; }
+gate_refused() { # $1 the clone, $2 the one line printed
+  [ "$rc" = 6 ] && [ "$(cat "$STUB/out")" = "$2" ] && [ ! -f "$STUB/calls" ] && ! grok_ran && [ "$(comments)" = 0 ] && [ -z "$(left_over)" ] &&
+    [ -f "$TMPDIR/mentat-grok-log.old" ] && ! git -C "$root/$1 work" cat-file -e "$H^{commit}" 2>/dev/null &&
+    [ -z "$(git -C "$root/$1 work" for-each-ref refs/mentat)" ] && [ "$(git -C "$root/$1 work" worktree list | wc -l | tr -d ' ')" = 1 ]
+}
+echo x >"$TMPDIR/mentat-grok-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-grok-log.old"
+for gate in off unknown; do
+  if [ "$gate" = off ]; then want=$OFF_LINE; else want=$UNKNOWN_LINE; fi
+  reset; rc=$(gate_run "$gate" 7)
+  check "outside reviewers $gate: exit 6, says so, and reads, posts, sweeps, fetches and runs nothing" 'gate_refused "$gate" "$want"'
+  reset; rc=$(gate_run "$gate" --stop 7)
+  check "outside reviewers $gate, --stop: the same" 'gate_refused "$gate" "$want"'
+done
+reset; rc=$(gate_run off --stop abc)
+check "outside reviewers off, a pull request that is not a number is still a usage error (exit 64), reading nothing" '[ "$rc" = 64 ] && grep -q "usage: mentat review --grok" "$STUB/out" && [ ! -f "$STUB/calls" ]'
+rm -f "$TMPDIR/mentat-grok-log.old"
 
 # Live profile check. Starts the real Grok through the review, with the sign-in removed
 # so that no model is called and nothing is sent, and reads the event Grok writes when it

@@ -169,6 +169,16 @@ reviewers_command() {
   if [ "$reviewers" = unknown ]; then printf 'reviewers: unknown - %s\n' "$reviewers_why"
   else printf 'reviewers: %s\n' "$reviewers"; fi
 }
+# Exits 6, posting nothing, unless outside reviewers are on here. review --codex and
+# review --grok call it before anything else, and before setting any EXIT trap.
+reviewers_gate() {
+  reviewers_here
+  case "$reviewers" in
+    on) return 0 ;;
+    off) die "not run: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on $reviewers_def); Claude's review is the review here" 6 ;;
+    *) die "not run: outside reviewers are unknown in this repository ($reviewers_why); Codex and Grok run only once it reads as on" 6 ;;
+  esac
+}
 
 # The word a posted review's heading gives for its checked REVIEW RESULT line $1.
 result_word() {

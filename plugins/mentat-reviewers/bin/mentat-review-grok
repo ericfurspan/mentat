@@ -14,4 +14,6 @@ grok_stop=no
 grok_flag() { [ "$1" = --stop ] && [ "$grok_stop" = no ] || return 1; grok_stop=yes; }
 review_args grok_flag "$@"
 # shellcheck disable=SC2154 # pr is set by review_args
+case "$pr" in '' | *[!0-9]*) die "usage: mentat review --grok [--stop] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+reviewers_gate
 review_grok "$pr"

@@ -12,6 +12,8 @@
 #     opus); the record names the model that ran. Its time limit is
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200).
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
+#     --codex and --grok first read whether outside reviewers are on here, as mentat
+#     reviewers does; unless they are on, they print why, post nothing and exit 6.
 #   mentat review --grok <PR>  The same with Grok, if installed: its start comment and
 #     review are posted only once CI passed on the head it reviewed. Same exit codes.
 #     It runs once per pull request: this gh account's own start comment refuses another.
