@@ -106,33 +106,37 @@ c_templates() {
   for p in $problems; do c_problem "$p"; done
   set +f
 }
-# Claude Code 2.1.295 or later, which honors the merge hook's onFailure block; an older
-# one lets the hook's failure through. Says nothing with no claude command. Prints only
-# the version's leading numbers, never the rest of what claude prints.
+# Claude Code 2.1.295 or later: it honors the merge hook's onFailure block, where an older
+# one lets the hook's failure through, and it applies --tools and --restricted to every
+# built-in tool, which the review's reviewer relies on with --safe-mode (2.1.169 and later).
+# Says nothing with no claude command. Prints only the version's leading numbers, never
+# the rest of what claude prints.
 c_claude_version() {
   local v a b c
   command -v claude >/dev/null 2>&1 || return 0
   v=$(CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude --version </dev/null 2>/dev/null | head -n 1 |
     sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)\([^0-9.].*\)\{0,1\}$/\1/p')
   if [ -z "$v" ]; then
-    c_problem "could not read the Claude Code version: the merge hook needs Claude Code 2.1.295 or later"
+    c_problem "could not read the Claude Code version: the merge hook and the locked-down mentat review need Claude Code 2.1.295 or later"
     return 0
   fi
   a=${v%%.*} c=${v##*.}
   b=${v#*.} b=${b%.*}
   if [ "$a" -gt 2 ] || { [ "$a" -eq 2 ] && { [ "$b" -gt 1 ] || { [ "$b" -eq 1 ] && [ "$c" -ge 295 ]; }; }; }; then
-    c_ok "Claude Code $v is installed (2.1.295 or later, which the merge hook needs)"
+    c_ok "Claude Code $v is installed (2.1.295 or later, which the merge hook and the locked-down mentat review need)"
   else
-    c_problem "Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails: update Claude Code"
+    c_problem "Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails and the tool limits of mentat review may not hold: update Claude Code"
   fi
 }
-# The review tools: Codex, and Grok where installed (it is optional).
+# The review tools: Claude Code, which mentat review needs, and Codex and Grok, which
+# are optional.
 c_review_tools() {
   local v
+  command -v claude >/dev/null 2>&1 || c_problem "claude is not installed: mentat review needs Claude Code"
   if command -v codex >/dev/null 2>&1; then
     v=$(codex --version 2>/dev/null | head -n 1)
     c_ok "codex is installed (${v:-version unknown})"
-  else c_problem "codex is not installed: mentat review and mentat second-opinion need it; mentat ci and mentat review --grok still run without it"; fi
+  else c_ok "codex is not installed (optional: mentat review --codex and mentat second-opinion use it)"; fi
   command -v grok >/dev/null 2>&1 || return 0
   v=$(grok --version 2>/dev/null | head -n 1)
   c_ok "grok is installed (${v:-version unknown})"
