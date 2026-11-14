@@ -35,7 +35,7 @@ Merge pull requests, turn on auto-merge, use `--admin`, or work around a merge r
 
 Create releases, deploy, publish, change secrets, run production migrations or destructive outside operations; agents only prepare these.
 
-Commit secrets; report exposed ones at once for rotation, not just deletion.
+Commit secrets. Exposed ones are reported to the maintainer at once, for rotation, not just deletion.
 
 Push code to the default branch, force-push shared branches, or change repository settings.
 
