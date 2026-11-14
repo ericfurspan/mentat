@@ -637,7 +637,9 @@ on_branch l-linked feat/abc-26-branch-key
 printf 'An idea.\n' >"$tmp/idea.md"
 mkdir -p "$tmp/l-linked/.git/mentat"
 printf 'review 2026-01-02 %s %s\n' "$(g -C "$tmp/l-linked" rev-parse HEAD)" "$(printf '%s' "$(cat "$tmp/idea.md")" | shasum -a 256 | cut -c1-12)" >"$tmp/l-linked/.git/mentat/second-opinions"
-(cd "$tmp/l-linked" && "$root/bin/mentat" second-opinion --link ABC-26 "$tmp/idea.md" >/dev/null)
+# mentat hands the link step to the reviewers module's entry on PATH: this checkout's, ahead of
+# any copy a session with the module on has there.
+(cd "$tmp/l-linked" && PATH="$root/plugins/mentat-reviewers/bin:$PATH" "$root/bin/mentat" second-opinion --link ABC-26 "$tmp/idea.md" >/dev/null)
 check "a branch changing instructions whose item the link step linked leaves alone: feat/abc-26-branch-key" '[ -z "$(decision "$tmp/l-linked" "gh pr create --fill")" ]'
 on_branch l-bare feat/abc-26 abc-26
 check "a branch changing instructions named by a linked id alone leaves alone: feat/abc-26" '[ -z "$(decision "$tmp/l-bare" "gh pr create --fill")" ]'
