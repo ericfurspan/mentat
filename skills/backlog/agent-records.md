@@ -4,7 +4,7 @@ Read this before writing or reading an item's agent records (its spec fingerprin
 
 ## The comment
 
-An item keeps its agent records in one comment whose first line is `Agent records`. Only the main session writes it, never a builder, in public-safe words (`records.md`). Each record sits under its own label:
+An item keeps its agent records in one comment whose first line is `Agent records`. Only the main session writes it, never a builder. The fingerprint, assumptions and advice records are in public-safe words (`records.md`); the settlements follow "Plan check" and "Second opinions" below (no local path, secret or log path) and may hold private evidence (GitHub issues hold none, so there the whole comment is public-safe). Each record sits under its own label:
 
 - `Spec fingerprint: <12 hex>; build: <now|later>`, citing the agreement ("Agreement" in `SKILL.md`).
 - `Material assumptions:` and the list, in the shape `assumptions.md` gives.
