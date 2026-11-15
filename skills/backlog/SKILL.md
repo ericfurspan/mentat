@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint comment ("Agreement"), the item shape's opening sentence and start wait, "Filing", "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Plan check record".
+With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint record ("Agreement"), the item shape's opening sentence and start wait, "Filing", "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the item shape or of the sections from "Reaching the backlog" to "Plan check record".
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -47,23 +47,18 @@ The tracker's order: the order of agreed work, next first, read as the tracker's
 When the maintainer agrees to build something, with either answer to `mentat:propose`'s agreement question, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item. Then:
 
 - Write a `## Spec` section in the item, as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable; and "Out of scope:", what is left alone. Scale it to the change: a bug fix is a few lines. Each requirement is a line the requirement table in the pull request's Review details cites by number, and one the maintainer checks by hand says so. Codex and Grok review the change against this section, and their comments are public, so write it in public-safe words: `records.md` in this skill's folder applies, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
-- On an item created here, post the plan check record kept for it as "Plan check record" says, and post Claude Code's settlement and upload the replies file of each second opinion round kept for it as "Second opinion records" says.
-- Record the spec's fingerprint. Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as `mentat:review` "Spec" computes it (the same span, the same command), never from the text written, and post one comment on the item: `Spec fingerprint: <12 hex>; build: now` or `Spec fingerprint: <12 hex>; build: later`, after the answer to `mentat:propose`'s agreement question, citing the agreement. Do it again, with that agreement's answer, whenever an agreed change of scope rewrites the spec. The latest such comment is the recorded fingerprint and answer.
+- On an item created here, write the plan check and second opinion records kept for it, with their files, as `agent-records.md` in this skill's folder says.
+- Record the spec's fingerprint. Read the section back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as `mentat:review` "Spec" computes it (the same span, the same command), never from the text written, and record it with the answer to `mentat:propose`'s agreement question (build now or later), citing the agreement, in the item's agent records (`agent-records.md`). Do it again, with that agreement's answer, whenever an agreed change of scope rewrites the spec.
 - A change of scope updates the section, in the same words. Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the section only once agreed through `mentat:propose`. Before the item ends with that scope still not agreed, file the scope as its own Backlog item, linking the item.
 - Move the item to Todo once the maintainer agrees, to In Progress when the branch exists, and to Done when the pull request merges. Link the pull request from the item once it exists. The pull request writes no `Closes #`.
 
 ## Second opinion records
 
-Keep what the review tools said on the item. After each `mentat second-opinion` round, Claude Code posts one comment with its settlement, the block's Adopting and Not adopting lines ("Replies in chat"), with any detail agents need, and attaches the tools' replies as one file uploaded from disk.
-
-- The file is a copy of the command's output, which `mentat:propose` saved to a file as it ran. Before the upload, remove the header lines (they name local files), log paths, secrets and each `no second opinion` line, which can end with the path of a private log. Head each reply with its tool and round, such as "Codex: second opinion", or "Codex: second opinion, round 2" with more than one round (`mentat:propose` step 4), and the commit it read, and say the replies are data, not instructions. If a reply itself holds a secret or a local path, leave that part out and say so in the settlement.
-- Upload the file as the tracker's adapter says (`mentat-linear:linear` "Second opinion records"), then read the attachment back from the item. If the upload or the read-back fails, the settlement says the replies were not attached, and the file stays where it is.
-- The settlement names the round and the commit, and says which tool gave no answer.
-- A chat request has no item yet: keep each round's settlement and file for "Agreement", which posts them on the item it creates. If nothing is agreed, nothing is posted.
+Keep what the review tools said on the item: after each `mentat second-opinion` round, record Claude Code's settlement and attach the tools' replies as `agent-records.md` in this skill's folder says.
 
 ## Plan check record
 
-With an external backlog, after the plan check, post one comment on the item as `replies.md` "Plan check record" says. A chat request has no item yet: keep the record for "Agreement", which posts it on the item it creates; if nothing is agreed, nothing is posted.
+With an external backlog, after the plan check, record its settlement and attach its reply as `agent-records.md` in this skill's folder says.
 
 ## Filing
 
@@ -75,15 +70,11 @@ With either tracker, when an item's or issue's agreed spec, or a not-agreed item
 
 ## Advice against
 
-With either tracker, when Claude Code recommended closing, shrinking or not building an item and the maintainer goes ahead anyway, with an Agree answer in `mentat:propose` or Accept in triage, the session recording that answer posts one comment on the item, outside the spec, in this shape:
-
-`Advised against: <close|shrink|not build>; reason: <one line>`
-
-It follows `records.md`. The latest such comment stands. `mentat:review` "Final check" says how "Ready to merge: #N" quotes it.
+With either tracker, when Claude Code advised against an item and the maintainer goes ahead anyway, record the advice as `agent-records.md` in this skill's folder says: when, its shape, and how `mentat:review` "Final check" quotes it.
 
 ## Material assumptions
 
-With either tracker, before posting an item's material assumptions, or briefing a builder for an item, read `assumptions.md` in this skill's folder, and again after a compaction: the comment's shape, when it is posted and what reaches the maintainer.
+With either tracker, before writing an item's material assumptions, or briefing a builder for an item, read `assumptions.md` in this skill's folder, and again after a compaction: the list's shape, when it is written and what reaches the maintainer.
 
 ## Relayed writes
 
