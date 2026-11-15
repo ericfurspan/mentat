@@ -40,7 +40,7 @@ For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project'
 
 ## Second opinion records
 
-Upload the replies file with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
+For `agent-records.md` in `mentat:backlog`'s folder: edit the item's `Agent records` comment in place with the connector's comment save, given that comment's id, never by posting a new one. Upload a replies file, a second opinion round's or the plan check's, with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
 
 ## Branch names
 
@@ -70,6 +70,6 @@ A new project's overview holds only what is unique to it: its short summary is o
 
 1. Create the project as "New project shape" says, with the maintainer as lead and the team's labels ("Labels").
 2. Move the open issues, holding back any with an open closing pull request or a held-back `Starts after:` prerequisite.
-3. Copy each spec and the latest assumptions comment (`assumptions.md` in `mentat:backlog`'s folder) unchanged, and rewrite `Starts after:` lines to the new item ids.
+3. Copy each spec unchanged; write one `Agent records` comment on the new item carrying the issue's current fingerprint and build answer, assumptions and advice (`agent-records.md` in `mentat:backlog`'s folder), the one exception to issue comments staying on the issue; and rewrite `Starts after:` lines to the new item ids.
 4. Change the AGENTS.md backlog line to name the project, in a pull request.
 5. Close only the moved issues once that change merges.
