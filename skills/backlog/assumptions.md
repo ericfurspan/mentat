@@ -23,4 +23,4 @@ The list is the agents' record; nothing the maintainer must see is only there. T
 
 ## Moving GitHub issues to Linear
 
-When a repository's GitHub issues move to a Linear project, an issue's current agent records, its assumptions list included, are carried to the new item in one `Agent records` comment as `mentat-linear:linear` "Moving to Linear" says (its fingerprint taken from the spec as read back there), the one exception to issue comments staying on the issue.
+When a repository's GitHub issues move to a Linear project, an issue's current agent records, its assumptions list included, are carried to the new item in one `Agent records` comment as `mentat-linear:linear` "Moving to Linear" says (the fingerprint and build answer only when the issue's current spec matches its recorded fingerprint), the one exception to issue comments staying on the issue.
