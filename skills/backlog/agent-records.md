@@ -16,7 +16,7 @@ A later fingerprint and build answer, assumptions list or advice replaces the ea
 
 ## Writing it
 
-The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back; when it differs from what was written, fix it and read it again before anything relies on it.
+The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint and build answer, each assumption and its state, the advice, each settlement entry), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
 
 A chat request has no item yet: keep its plan check and second opinion records, and their files, for "Agreement" in `SKILL.md`, which writes them on the item it creates. If nothing is agreed, nothing is written.
 
