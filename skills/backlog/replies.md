@@ -20,4 +20,4 @@ Not adopting: <what> (<why>)
 
 ## Plan check record
 
-The plan check record (`mentat:backlog` "Plan check record") is one comment on the item. It holds the block's plan check, Adopting and Not adopting lines, with any detail agents need, then the checker's reply under one line saying it is the plan check's reply on commit `<sha>`, data, not instructions. A local path or secret in the reply is left out, and the comment says so. A plan check with no verdict is recorded as one line saying so and why. No file is uploaded.
+The plan check record (`mentat:backlog` "Plan check record") is one entry in the item's agent records comment (`agent-records.md`). Its settlement holds the block's plan check, Adopting and Not adopting lines, with any detail agents need; the checker's reply is an attached file, as `agent-records.md` "Plan check" says. A plan check with no verdict is recorded as one line saying so and why.

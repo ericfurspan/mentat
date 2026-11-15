@@ -16,7 +16,7 @@ Push nothing and commission no fixes until the answer. Fixes, or the final check
 
 ## Evidence
 
-The reviewers' own finding text, the spec's goal, Grok's stop review, and any disproved material assumption still open in the item's latest assumptions comment (`mentat:backlog` "Material assumptions"). When Grok is not installed, outside reviewers are off or unknown, or Grok did not finish or refused, the question says so; with outside reviewers off, it does not call the review weaker. No new subagent.
+The reviewers' own finding text, the spec's goal, Grok's stop review, and any disproved material assumption still open in the item's recorded assumptions (`mentat:backlog` "Material assumptions"). When Grok is not installed, outside reviewers are off or unknown, or Grok did not finish or refused, the question says so; with outside reviewers off, it does not call the review weaker. No new subagent.
 
 ## The question
 
@@ -32,7 +32,7 @@ At any round, new evidence that the change cannot meet its goal sets `Blocked: <
 
 ## Durable pause
 
-One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision.
+One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision, its line in `## Decisions` (`mentat:backlog` "Item shape").
 
 ## Started sessions
 

@@ -26,11 +26,11 @@ An item's type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
 
 ## Marking a wait
 
-On a wait, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When the wait ends, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "Ready to merge: #N" gets the same label and assignment, and the same removal.
+On a wait, and on each decision for the maintainer that the maintainer's own instructions mark on an item, in any stage, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When a wait ends or a marked decision is answered, and the item keeps no other wait (a wait block or a merge wait) and no marked decision, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "Ready to merge: #N" gets the same label and assignment, and the same removal.
 
 ## The order of agreed work
 
-The next agreed work, the tracker's order, is the open Todo items without the `Waiting on you` label and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
+The next agreed work, the tracker's order, is the open Todo items without the `Waiting on you` label, or with it only for a marked decision that does not block the item's work, and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
 
 The Backlog order, for the lookup of the next-work offer (`next-work.md` in `mentat:backlog`'s folder), is the open Backlog items, not parked, ranked by the same keys: Priority level, then oldest created first within a level. Read every page of results before ranking; Linear's own drag order is not used.
 
@@ -38,9 +38,9 @@ The Backlog order, for the lookup of the next-work offer (`next-work.md` in `men
 
 For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project's lead, the lead field of the project. List every page of an item's comments. An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads included. Attachment links in comments are not downloaded.
 
-## Second opinion records
+## Agent records
 
-Upload the replies file with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
+For `agent-records.md` in `mentat:backlog`'s folder: edit the item's `Agent records` comment in place with the connector's comment save, given that comment's id, never by posting a new one. Upload a replies file, a second opinion round's or the plan check's, with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
 
 ## Branch names
 
@@ -56,11 +56,11 @@ Off unless the maintainer's own instructions turn it on. Then, when a session li
 
 ## Waits left open
 
-When a session lists this project to choose or plan work (not for `mentat:propose`'s read, typed or not, not for the lookup of the next-work offer (`next-work.md` in `mentat:backlog`'s folder), not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait. Merge wait: it reads, with `gh pr view` in its repository, the pull request named by each open item with a merge wait: the `Waiting on you` label and an opening sentence saying it waits on the merge of that pull request. Merged: do what `after-ready.md` in `mentat:review`'s folder says when the maintainer says #N merged (the wait block's steps, then the item marked done), then the repository's own post-merge steps, unless the session can establish that they already ran. Closed without merging: remove the merge wait ("Marking a wait") and leave the status. Still open, or the lookup fails: leave the item unchanged. Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments. A comment that reports the wait's `Ends when` result ends the wait ("Marking a wait": the block, the label and the lead's assignment removed). A comment that may report it, or a later report on a block with no `Ends when` line, leaves the item unchanged, and the item is named as "may be done" with the comment's date. An item whose linked pull request is still open is left unchanged for `mentat:review`, and named "may be done" the same way when a comment may report its result. Name the cleared items in one line of the reply. A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".
+When a session lists this project to choose or plan work (not for `mentat:propose`'s read, typed or not, not for the lookup of the next-work offer (`next-work.md` in `mentat:backlog`'s folder), not while copying a spec for a review, and not from a skill that forbids writes), it reads each open item's wait. Merge wait: it reads, with `gh pr view` in its repository, the pull request named by each open item with a merge wait: the `Waiting on you` label and an opening sentence saying it waits on the merge of that pull request. Merged: do what `after-ready.md` in `mentat:review`'s folder says when the maintainer says #N merged (the wait block's steps, then the item marked done), then the repository's own post-merge steps, unless the session can establish that they already ran. Closed without merging: remove the merge wait ("Marking a wait") and leave the status. Still open, or the lookup fails: leave the item unchanged. Hand wait: for each open item with a wait block, no merge wait and no linked pull request still open, it reads the item's comments. A comment that reports the wait's `Ends when` result ends the wait ("Marking a wait": the block removed, and the label and the lead's assignment as it says). A comment that may report it, or a later report on a block with no `Ends when` line, leaves the item unchanged, and the item is named as "may be done" with the comment's date. An item whose linked pull request is still open is left unchanged for `mentat:review`, and named "may be done" the same way when a comment may report its result. Name the cleared items in one line of the reply. A skill that forbids writes instead reads both kinds of wait the same way, changes nothing, and names each item that looks done as "may be done".
 
 ## Labels
 
-The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`.
+The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`, which marks every wait and every marked decision for the maintainer ("Marking a wait").
 
 ## New project shape
 
@@ -70,6 +70,6 @@ A new project's overview holds only what is unique to it: its short summary is o
 
 1. Create the project as "New project shape" says, with the maintainer as lead and the team's labels ("Labels").
 2. Move the open issues, holding back any with an open closing pull request or a held-back `Starts after:` prerequisite.
-3. Copy each spec and the latest assumptions comment (`assumptions.md` in `mentat:backlog`'s folder) unchanged, and rewrite `Starts after:` lines to the new item ids.
+3. Before copying each spec, compute the issue's current spec fingerprint as `mentat:backlog` "Agreement" says and compare it with the one the issue records, read as `agent-records.md` in `mentat:backlog`'s folder says. Copy the spec unchanged. Carry the issue's current assumptions and advice unchanged and, only when the two fingerprints match, its build answer with, as the fingerprint, that of the copied spec as read back from Linear, computed the same way; when they differ or none is recorded, no fingerprint or build answer is carried, so the item goes back to planning. What is carried goes in one `Agent records` comment on the new item, none when nothing is, the one exception to issue comments staying on the issue. Rewrite `Starts after:` lines to the new item ids.
 4. Change the AGENTS.md backlog line to name the project, in a pull request.
 5. Close only the moved issues once that change merges.

@@ -10,5 +10,5 @@ For a repository whose AGENTS.md names no external backlog: its GitHub issues ar
 - Triage outcomes. Accept: the same issue becomes the item, written as "Stage writes" says. Close: `gh issue close <N> --reason "not planned"`, with the reason in a comment. Merge: `gh issue close <N> --reason duplicate`, with a comment naming the target. Later: a dated comment; the issue stays open.
 - Start waits (`start-waits.md`): an `<item id>` is the issue's `#<N>`, done only when closed with the reason completed (`gh issue view <N> --json state,stateReason`); closed as not planned or duplicate, the wait is dead.
 - An issue Claude Code files or the maintainer agrees opens with one sentence saying where the work came from, in the terms of the item shape's first bullet.
-- When an issue closes with scope triage merged into it still not agreed, file that scope as its own issue, in Backlog, linking the closed one.
+- When an issue closes with scope triage merged into it still not agreed, file that scope as one Inbox issue ("Stages") naming the closed one.
 - Each issue gets one label for what it is, from the repository's own (GitHub defaults: `bug`, `enhancement`, `documentation`, `question`).
