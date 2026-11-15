@@ -32,7 +32,7 @@ At any round, new evidence that the change cannot meet its goal sets `Blocked: <
 
 ## Durable pause
 
-One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision.
+One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision, its line in `## Decisions` (`mentat:backlog` "Item shape").
 
 ## Started sessions
 
