@@ -16,7 +16,7 @@ Push nothing and commission no fixes until the answer. Fixes, or the final check
 
 ## Evidence
 
-The reviewers' own finding text, the spec's goal, Grok's stop review, and any disproved material assumption still open in the item's latest assumptions comment (`mentat:backlog` "Material assumptions"). When Grok is not installed, outside reviewers are off or unknown, or Grok did not finish or refused, the question says so; with outside reviewers off, it does not call the review weaker. No new subagent.
+The reviewers' own finding text, the spec's goal, Grok's stop review, and any disproved material assumption still open in the item's recorded assumptions (`mentat:backlog` "Material assumptions"). When Grok is not installed, outside reviewers are off or unknown, or Grok did not finish or refused, the question says so; with outside reviewers off, it does not call the review weaker. No new subagent.
 
 ## The question
 
