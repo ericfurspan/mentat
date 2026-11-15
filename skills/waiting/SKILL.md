@@ -37,6 +37,8 @@ A pull request and the items whose merge wait names it are one line, sorted as a
 - Decide: each decision collected above, once; a review stop already shown with its pull request is not listed again.
 - Act: an item's wait block on agreed work (`../backlog/waits.md`); an item whose merge wait names a pull request that merged or closed, as "may be done" with that ending; any other wait on the maintainer the tracker's adapter or the maintainer's own instructions mark, with what its record says, or "reason not recorded".
 
+An item whose wait mark stands only for a marked decision is listed once, under Decide, never also under Act.
+
 A pull request is named `owner/repo#N`, an item by its id.
 
 ## Answer
