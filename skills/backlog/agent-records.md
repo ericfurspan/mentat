@@ -22,7 +22,7 @@ A chat request has no item yet: keep its plan check and second opinion records, 
 
 ## Older items
 
-An item's first `Agent records` comment carries forward the latest fingerprint and build answer, advice and assumptions list from its older separate comments (`Spec fingerprint: ...`, `Advised against: ...`, `Material assumptions:`). Until it exists, those older comments count, the latest of each standing; once it exists, only it counts.
+An item's first `Agent records` comment carries forward the latest fingerprint and build answer, advice and assumptions list from its older separate comments (`Spec fingerprint: ...`, `Advised against: ...`, `Material assumptions:`). Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records. Older plan check and second opinion comments are not carried and stay on the item as they are.
 
 ## Readers
 
