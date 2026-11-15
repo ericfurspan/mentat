@@ -38,7 +38,7 @@ The Backlog order, for the lookup of the next-work offer (`next-work.md` in `men
 
 For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project's lead, the lead field of the project. List every page of an item's comments. An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads included. Attachment links in comments are not downloaded.
 
-## Second opinion records
+## Agent records
 
 For `agent-records.md` in `mentat:backlog`'s folder: edit the item's `Agent records` comment in place with the connector's comment save, given that comment's id, never by posting a new one. Upload a replies file, a second opinion round's or the plan check's, with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
 
