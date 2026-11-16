@@ -47,7 +47,7 @@ not_counted() { fail "the word budget could not count $1"; budget_counted=0; }
 rules_words=$(wc -w <rules.md | tr -d ' ') || not_counted "rules.md"
 skill_text=""
 for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
-  d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if ($0 !~ /^[A-Za-z0-9_-]+:/) multi = 1; after = 0 } NR > 1 && $0 == "disable-model-invocation: true" { skip = 1 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/ || d ~ /^[ \t]*"/ && d !~ /^[ \t]*".*"[ \t]*$/ || d ~ /^[ \t]*\047/ && d !~ /^[ \t]*\047.*\047[ \t]*$/) multi = 1 } END { if (skip) exit 0; if (!found) exit 1; if (multi) exit 3; print d }' "$f")
+  d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if ($0 !~ /^[A-Za-z0-9_-]+:/) multi = 1; after = 0 } NR > 1 && $0 == "disable-model-invocation: true" { skip = 1 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/ || d ~ /^[ \t]*"/ && d !~ /^[ \t]*"(.*[^\\])?(\\\\)*"[ \t]*$/ || d ~ /^[ \t]*\047/ && (d !~ /^[ \t]*\047.*\047[ \t]*$/ || d ~ /\047\047/)) multi = 1 } END { if (skip) exit 0; if (!found) exit 1; if (multi) exit 3; print d }' "$f")
   case $? in
     0) skill_text="$skill_text $d" ;;
     3) not_counted "$f: its description spans several lines, which the budget cannot count; write it on one line" ;;
@@ -79,7 +79,7 @@ while IFS= read -r f; do
   if [ ! -f "$f" ]; then
     not_counted "$f: a plugin manifest lists it under agents, but it does not exist"
   else
-    d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if ($0 !~ /^[A-Za-z0-9_-]+:/) multi = 1; after = 0 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/ || d ~ /^[ \t]*"/ && d !~ /^[ \t]*".*"[ \t]*$/ || d ~ /^[ \t]*\047/ && d !~ /^[ \t]*\047.*\047[ \t]*$/) multi = 1 } END { if (!found) exit 1; if (multi) exit 3; print d }' "$f")
+    d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if ($0 !~ /^[A-Za-z0-9_-]+:/) multi = 1; after = 0 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/ || d ~ /^[ \t]*"/ && d !~ /^[ \t]*"(.*[^\\])?(\\\\)*"[ \t]*$/ || d ~ /^[ \t]*\047/ && (d !~ /^[ \t]*\047.*\047[ \t]*$/ || d ~ /\047\047/)) multi = 1 } END { if (!found) exit 1; if (multi) exit 3; print d }' "$f")
     case $? in
       0) agent_text="$agent_text $d" ;;
       3) not_counted "$f: its description spans several lines, which the budget cannot count; write it on one line" ;;
