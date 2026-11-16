@@ -30,21 +30,71 @@ else
   fail "README.md is $readme_words words, over 500"
 fi
 
-# The text every session loads stays small, by wc -w: rules.md at most 300 words, and rules.md plus
-# every skill's description (core and module skills) at most 600.
-rules_words=$(wc -w <rules.md | tr -d ' ')
-if [ "$rules_words" -le 300 ]; then
-  pass "rules.md is at most 300 words ($rules_words)"
+# One word budget keeps small the text Claude Code loads into every session with every module on,
+# counted by wc -w on exactly what loads: rules.md, which hooks/session-start prints; the description
+# of every core and module skill whose frontmatter does not set disable-model-invocation: true (such a
+# skill loads nothing until the maintainer starts it); and the description of every agent a core or
+# module plugin lists under agents in its manifest or keeps in its agents/ folder, each counted once.
+# The budget was set once, on 2026-11-16, at the size counted then (591 words) plus 25%, with the
+# maintainer's agreement, so that no change needs a raise within itself. A change that reaches it
+# cuts or adds less; raising the budget is its own backlog item, never part of the change that
+# reaches it. A description counts only when its whole value sits on its description: line and the
+# next non-blank frontmatter line starts a new key or ends the frontmatter. Anything that cannot be
+# counted fails the check, which never passes on a partial count.
+word_budget=740
+budget_counted=1
+not_counted() { fail "the word budget could not count $1"; budget_counted=0; }
+rules_words=$(wc -w <rules.md | tr -d ' ') || not_counted "rules.md"
+skill_text=""
+for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
+  d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if ($0 !~ /^[A-Za-z0-9_-]+:/) multi = 1; after = 0 } NR > 1 && $0 == "disable-model-invocation: true" { skip = 1 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/ || d ~ /^[ \t]*"/ && d !~ /^[ \t]*"(.*[^\\])?(\\\\)*"[ \t]*$/ || d ~ /^[ \t]*\047/ && (d !~ /^[ \t]*\047.*\047[ \t]*$/ || d ~ /\047\047/)) multi = 1 } END { if (skip) exit 0; if (!found) exit 1; if (multi) exit 3; print d }' "$f")
+  case $? in
+    0) skill_text="$skill_text $d" ;;
+    3) not_counted "$f: its description spans several lines, which the budget cannot count; write it on one line" ;;
+    *) not_counted "$f: its frontmatter has no description line" ;;
+  esac
+done
+skill_words=$(printf '%s\n' "$skill_text" | wc -w | tr -d ' ') || not_counted "the skill descriptions"
+agent_list=""
+if command -v jq >/dev/null 2>&1; then
+  for root in "" plugins/*/; do
+    if listed=$(jq -r '[.agents // empty] | flatten | .[] | if type == "string" then . else error("agents must list paths") end' "${root}.claude-plugin/plugin.json"); then
+      while IFS= read -r p; do
+        [ -n "$p" ] && agent_list="$agent_list$root${p#./}"$'\n'
+      done <<<"$listed"
+    else
+      not_counted "the agents listed in ${root}.claude-plugin/plugin.json: jq could not read them from the manifest"
+    fi
+    for f in "$root"agents/*.md; do
+      [ -f "$f" ] && agent_list="$agent_list$f"$'\n'
+    done
+  done
 else
-  fail "rules.md is $rules_words words, over 300"
+  not_counted "the agents the plugin manifests list: jq is not installed"
 fi
-desc_words=$(for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
-  awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && /^description: / { sub(/^description: /, ""); print; exit }' "$f"
-done | wc -w | tr -d ' ')
-if [ $((rules_words + desc_words)) -le 600 ]; then
-  pass "rules.md and the skill descriptions are at most 600 words ($rules_words + $desc_words)"
-else
-  fail "rules.md and the skill descriptions are $((rules_words + desc_words)) words ($rules_words + $desc_words), over 600"
+agent_list=$(printf '%s' "$agent_list" | sort -u) || not_counted "the agent files"
+agent_text=""
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  if [ ! -f "$f" ]; then
+    not_counted "$f: a plugin manifest lists it under agents, but it does not exist"
+  else
+    d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if ($0 !~ /^[A-Za-z0-9_-]+:/) multi = 1; after = 0 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/ || d ~ /^[ \t]*"/ && d !~ /^[ \t]*"(.*[^\\])?(\\\\)*"[ \t]*$/ || d ~ /^[ \t]*\047/ && (d !~ /^[ \t]*\047.*\047[ \t]*$/ || d ~ /\047\047/)) multi = 1 } END { if (!found) exit 1; if (multi) exit 3; print d }' "$f")
+    case $? in
+      0) agent_text="$agent_text $d" ;;
+      3) not_counted "$f: its description spans several lines, which the budget cannot count; write it on one line" ;;
+      *) not_counted "$f: its frontmatter has no description line" ;;
+    esac
+  fi
+done <<<"$agent_list"
+agent_words=$(printf '%s\n' "$agent_text" | wc -w | tr -d ' ') || not_counted "the agent descriptions"
+if [ "$budget_counted" = 1 ]; then
+  loaded_words=$((rules_words + skill_words + agent_words))
+  if [ "$loaded_words" -le "$word_budget" ]; then
+    pass "the text every session loads is $loaded_words words, within the budget of $word_budget (rules $rules_words + skills $skill_words + agents $agent_words)"
+  else
+    fail "the text every session loads is $loaded_words words, over the budget of $word_budget (rules $rules_words + skills $skill_words + agents $agent_words): cut it or add less; raising the budget is its own backlog item, never part of the change that reaches it"
+  fi
 fi
 
 # A triage sitting is started only by the maintainer and lists its arguments.
@@ -283,12 +333,11 @@ else
 fi
 
 # The SessionStart hook prints rules.md unchanged, and its complete output, trailing newline
-# included, stays under a limit just above its current size, well under Claude Code's
-# 10,000-character cap on a hook's output. Growth past the limit raises it in the same pull
-# request, with the maintainer's agreement in the spec. It counts bytes, never fewer than
-# characters, so it is never looser than the cap. These runs see an installed and current
-# copy of the git hook templates and a stub gitleaks; tests/git-templates.sh covers the
-# problem lines.
+# included, stays under a fixed limit, set so that the hook's worst case below, its problem
+# line included, stays under Claude Code's 10,000-character cap on a hook's output. It counts
+# bytes, never fewer than characters, so it is never looser than the cap. These runs see an
+# installed and current copy of the git hook templates and a stub gitleaks;
+# tests/git-templates.sh covers the problem lines.
 hook_file=$(mktemp) || exit 1
 templates_copy=$(mktemp -d) || exit 1
 cp -Rp git-templates "$templates_copy/" || exit 1
