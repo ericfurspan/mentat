@@ -38,18 +38,21 @@ fi
 # The budget was set once, on 2026-11-16, at the size counted then (591 words) plus 25%, with the
 # maintainer's agreement, so that no change needs a raise within itself. A change that reaches it
 # cuts or adds less; raising the budget is its own backlog item, never part of the change that
-# reaches it. Anything that cannot be counted fails the check, which never passes on a partial count.
+# reaches it. A description is counted only when its whole value sits on its description: line, so one
+# that starts a > or | block, or goes on to an indented line (blank lines between too), cannot be
+# counted. Anything that cannot be counted fails the check, which never passes on a partial count.
 word_budget=740
 budget_counted=1
 not_counted() { fail "the word budget could not count $1"; budget_counted=0; }
 rules_words=$(wc -w <rules.md | tr -d ' ') || not_counted "rules.md"
 skill_text=""
 for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
-  if d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && $0 == "disable-model-invocation: true" { skip = 1 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1 } END { if (skip) exit 0; if (!found) exit 1; print d }' "$f"); then
-    skill_text="$skill_text $d"
-  else
-    not_counted "$f: its frontmatter has no description line"
-  fi
+  d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if (/^[ \t]/) multi = 1; after = 0 } NR > 1 && $0 == "disable-model-invocation: true" { skip = 1 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/) multi = 1 } END { if (skip) exit 0; if (!found) exit 1; if (multi) exit 3; print d }' "$f")
+  case $? in
+    0) skill_text="$skill_text $d" ;;
+    3) not_counted "$f: its description spans several lines, which the budget cannot count; write it on one line" ;;
+    *) not_counted "$f: its frontmatter has no description line" ;;
+  esac
 done
 skill_words=$(printf '%s\n' "$skill_text" | wc -w | tr -d ' ') || not_counted "the skill descriptions"
 agent_list=""
@@ -75,10 +78,13 @@ while IFS= read -r f; do
   [ -n "$f" ] || continue
   if [ ! -f "$f" ]; then
     not_counted "$f: a plugin manifest lists it under agents, but it does not exist"
-  elif d=$(awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / { sub(/^description: /, ""); print; found = 1; exit 0 } END { exit !found }' "$f"); then
-    agent_text="$agent_text $d"
   else
-    not_counted "$f: its frontmatter has no description line"
+    d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } after && $0 !~ /^[ \t]*$/ { if (/^[ \t]/) multi = 1; after = 0 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1; after = 1; if (d ~ /^[>|]/) multi = 1 } END { if (!found) exit 1; if (multi) exit 3; print d }' "$f")
+    case $? in
+      0) agent_text="$agent_text $d" ;;
+      3) not_counted "$f: its description spans several lines, which the budget cannot count; write it on one line" ;;
+      *) not_counted "$f: its frontmatter has no description line" ;;
+    esac
   fi
 done <<<"$agent_list"
 agent_words=$(printf '%s\n' "$agent_text" | wc -w | tr -d ' ') || not_counted "the agent descriptions"
