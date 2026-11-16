@@ -30,21 +30,65 @@ else
   fail "README.md is $readme_words words, over 500"
 fi
 
-# The text every session loads stays small, by wc -w: rules.md at most 300 words, and rules.md plus
-# every skill's description (core and module skills) at most 600.
-rules_words=$(wc -w <rules.md | tr -d ' ')
-if [ "$rules_words" -le 300 ]; then
-  pass "rules.md is at most 300 words ($rules_words)"
+# One word budget keeps small the text Claude Code loads into every session with every module on,
+# counted by wc -w on exactly what loads: rules.md, which hooks/session-start prints; the description
+# of every core and module skill whose frontmatter does not set disable-model-invocation: true (such a
+# skill loads nothing until the maintainer starts it); and the description of every agent a core or
+# module plugin lists under agents in its manifest or keeps in its agents/ folder, each counted once.
+# The budget was set once, on 2026-11-16, at the size counted then (591 words) plus 25%, with the
+# maintainer's agreement, so that no change needs a raise within itself. A change that reaches it
+# cuts or adds less; raising the budget is its own backlog item, never part of the change that
+# reaches it. Anything that cannot be counted fails the check, which never passes on a partial count.
+word_budget=740
+budget_counted=1
+not_counted() { fail "the word budget could not count $1"; budget_counted=0; }
+rules_words=$(wc -w <rules.md | tr -d ' ') || not_counted "rules.md"
+skill_text=""
+for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
+  if d=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && $0 == "disable-model-invocation: true" { skip = 1 } NR > 1 && !found && /^description: / { d = $0; sub(/^description: /, "", d); found = 1 } END { if (skip) exit 0; if (!found) exit 1; print d }' "$f"); then
+    skill_text="$skill_text $d"
+  else
+    not_counted "$f: its frontmatter has no description line"
+  fi
+done
+skill_words=$(printf '%s\n' "$skill_text" | wc -w | tr -d ' ') || not_counted "the skill descriptions"
+agent_list=""
+if command -v jq >/dev/null 2>&1; then
+  for root in "" plugins/*/; do
+    if listed=$(jq -r '[.agents // empty] | flatten | .[] | if type == "string" then . else error("agents must list paths") end' "${root}.claude-plugin/plugin.json"); then
+      while IFS= read -r p; do
+        [ -n "$p" ] && agent_list="$agent_list$root${p#./}"$'\n'
+      done <<<"$listed"
+    else
+      not_counted "the agents listed in ${root}.claude-plugin/plugin.json: jq could not read them from the manifest"
+    fi
+    for f in "$root"agents/*.md; do
+      [ -f "$f" ] && agent_list="$agent_list$f"$'\n'
+    done
+  done
 else
-  fail "rules.md is $rules_words words, over 300"
+  not_counted "the agents the plugin manifests list: jq is not installed"
 fi
-desc_words=$(for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
-  awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && /^description: / { sub(/^description: /, ""); print; exit }' "$f"
-done | wc -w | tr -d ' ')
-if [ $((rules_words + desc_words)) -le 600 ]; then
-  pass "rules.md and the skill descriptions are at most 600 words ($rules_words + $desc_words)"
-else
-  fail "rules.md and the skill descriptions are $((rules_words + desc_words)) words ($rules_words + $desc_words), over 600"
+agent_list=$(printf '%s' "$agent_list" | sort -u) || not_counted "the agent files"
+agent_text=""
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  if [ ! -f "$f" ]; then
+    not_counted "$f: a plugin manifest lists it under agents, but it does not exist"
+  elif d=$(awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / { sub(/^description: /, ""); print; found = 1; exit 0 } END { exit !found }' "$f"); then
+    agent_text="$agent_text $d"
+  else
+    not_counted "$f: its frontmatter has no description line"
+  fi
+done <<<"$agent_list"
+agent_words=$(printf '%s\n' "$agent_text" | wc -w | tr -d ' ') || not_counted "the agent descriptions"
+if [ "$budget_counted" = 1 ]; then
+  loaded_words=$((rules_words + skill_words + agent_words))
+  if [ "$loaded_words" -le "$word_budget" ]; then
+    pass "the text every session loads is $loaded_words words, within the budget of $word_budget (rules $rules_words + skills $skill_words + agents $agent_words)"
+  else
+    fail "the text every session loads is $loaded_words words, over the budget of $word_budget (rules $rules_words + skills $skill_words + agents $agent_words): cut it or add less; raising the budget is its own backlog item, never part of the change that reaches it"
+  fi
 fi
 
 # A triage sitting is started only by the maintainer and lists its arguments.
