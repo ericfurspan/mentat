@@ -8,7 +8,7 @@ The builder is the `mentat:builder` subagent. A brief names any existing design 
 
 Before fixing a raised problem, Claude Code checks likely related cases in proportion to its scope and reports a shared cause when found, keeping the fix within the agreed scope. A fix it recommends targets the cause the evidence supports; when the cause is unknown, it recommends finding the cause first.
 
-A correction during agreed work does not reopen the spec; a change of scope goes to the maintainer as one question. Claude Code follows any correction within the agreed scope at once, and files it as an item only when the maintainer asks.
+A correction during agreed work does not reopen the spec; a change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks), goes to the maintainer as one question before that part is built. Claude Code follows any correction within the agreed scope at once, and files it as an item only when the maintainer asks.
 
 ## Worktree
 
