@@ -78,13 +78,13 @@
 #     mentat-review-codex, mentat-review-grok or mentat-second-opinion, in this checkout's
 #     plugins/mentat-reviewers/bin or else on PATH, and exits 64 with neither.
 #   mentat check  Checks what Mentat itself needs, changing nothing but a temporary ref
-#     (deleted after) that mentat reviewers' fetch uses: tools, the git hook
-#     templates installed and the same as this copy when agents' git uses them
-#     (lib/templates.sh), gh signed in, the repository readable, claude installed at a version
+#     (deleted after) that mentat reviewers' fetch uses: tools, the git
+#     hooks installed and the same as this copy when agents' git uses them
+#     (lib/git-hooks.sh), gh signed in, the repository readable, claude installed at a version
 #     the merge hook and the review need; prints the Mentat modules installed, whether
 #     outside reviewers are on here as mentat reviewers reads it, and whether codex and grok
 #     are installed, and warns when outside reviewers are unknown or are on with codex or
-#     grok missing, when agents' git does not use the templates, the private word list is unreadable, the
+#     grok missing, when agents' git does not use the git hooks, the private word list is unreadable, the
 #     list misses a private repository this account can reach, by count only, the Mentat
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.
@@ -100,7 +100,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review templates check status; do
+for lib in shared publish review git-hooks check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1

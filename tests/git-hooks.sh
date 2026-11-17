@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for git-templates/ (the pre-commit and pre-push templates, the
-# chain-only templates, the scanner and own-hook.sh) and the session-start check of the
-# installed copy. An agent's git names the templates' folder in core.hooksPath through
+# Behavior tests for git-hooks/ (the pre-commit and pre-push hooks, the
+# chain-only hooks, the scanner and own-hook.sh) and the session-start check of the
+# installed copy. An agent's git names Mentat's hooks folder in core.hooksPath through
 # GIT_CONFIG_* entries; the maintainer's git has no such entries. A stub gitleaks and
 # local bare repositories stand in for the real ones; pushes reach them through git's
-# ext transport, which the pre-push template treats as a remote, unless a case names a
+# ext transport, which the pre-push hook treats as a remote, unless a case names a
 # local path. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 failures=0
-check() { if eval "$2"; then printf 'PASS: git-templates %s\n' "$1"; else printf 'FAIL: git-templates %s\n' "$1"; failures=$((failures + 1)); fi; }
+check() { if eval "$2"; then printf 'PASS: git-hooks %s\n' "$1"; else printf 'FAIL: git-hooks %s\n' "$1"; failures=$((failures + 1)); fi; }
 
 base=$(mktemp -d)
 trap 'rm -rf "$base"' EXIT
 tmp="$base/with space"
 export STUB="$tmp/stub"
 export HOME="$tmp/home"
-unset XDG_CONFIG_HOME GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS MENTAT_OWN_HOOK MENTAT_GIT_TEMPLATES_DIR
+unset XDG_CONFIG_HOME GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS MENTAT_OWN_HOOK MENTAT_GIT_HOOKS_DIR
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$tmp/gitconfig"
 mkdir -p "$STUB" "$tmp/bin" "$HOME" "$tmp/tmpdir"
 export TMPDIR="$tmp/tmpdir"
@@ -55,7 +55,7 @@ exit "$code"
 STUBEOF
 chmod +x "$tmp/bin/gitleaks"
 export PATH="$tmp/bin:$PATH"
-tpl="$root/git-templates/hooks"
+mentat_hooks="$root/git-hooks/hooks"
 
 # A bare origin whose HEAD is main, and a clone on a feature branch.
 git init -q --bare "$tmp/origin.git"
@@ -71,10 +71,10 @@ repo="$tmp/repo"
 git -C "$repo" remote set-url origin "$(ext "$tmp/origin.git")"
 git -C "$repo" checkout -q -b feat/x
 
-# A <args>: git in an agent's shell, from $repo (or $in), with the templates' folder as
+# A <args>: git in an agent's shell, from $repo (or $in), with Mentat's hooks folder as
 # core.hooksPath. M <args>: the maintainer's git, with no such entry.
 in=$repo
-A() { (cd "$in" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tpl" git "$@") >"$STUB/out" 2>&1; }
+A() { (cd "$in" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$mentat_hooks" git "$@") >"$STUB/out" 2>&1; }
 M() { (cd "$in" && git "$@") >"$STUB/out" 2>&1; }
 remote_head() { git --git-dir="$tmp/origin.git" rev-parse -q --verify "refs/heads/$1" 2>/dev/null; }
 head_of() { git -C "$in" rev-parse HEAD; }
@@ -86,7 +86,7 @@ stage_clean() { printf '%s\n' "$1" >"$in/$1.txt"; git -C "$in" add -A; }
 # Commits.
 reset; stage_hit; h=$(head_of)
 A commit -q -m "add file"; rc=$?
-check "a staged invented secret is refused by the pre-commit template" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ]'
+check "a staged invented secret is refused by Mentat's pre-commit hook" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ]'
 check "the refusal names the rule and the file" 'grep -qF "stub-rule in file two.txt" "$STUB/out" && grep -q "commit refused" "$STUB/out"'
 check "the refusal never shows the match or gitleaks output" 'no_leak'
 check "gitleaks runs on stdin with redaction and a JSON report" 'grep -q "^stdin --no-banner --redact --log-level fatal --exit-code 3 --report-format json --report-path " "$STUB/calls"'
@@ -116,7 +116,7 @@ check "with no commits yet, a staged secret is refused" '[ "$rc" != 0 ] && ! git
 in=$repo
 reset; stage_hit; h=$(head_of)
 M commit -q -m "maintainer commit"; rc=$?
-check "the maintainer's git runs no template: a commit with the invented secret goes through unscanned" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ ! -e "$STUB/calls" ]'
+check "the maintainer's git runs none of Mentat's hooks: a commit with the invented secret goes through unscanned" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ ! -e "$STUB/calls" ]'
 git -C "$repo" reset -q --hard "$h"
 
 # A missing scanner refuses.
@@ -172,7 +172,7 @@ reset; git -C "$repo" tag v1; A push -q origin --tags; rc=$?
 check "--tags alone is not a branch change and goes through" '[ "$rc" = 0 ] && git --git-dir="$tmp/origin.git" rev-parse -q --verify refs/tags/v1 >/dev/null'
 reset; touch "$repo/untracked.txt"; printf 'x\n' >>"$repo/clean.txt"; A push -q origin feat/x:feat/dirty; rc=$?
 check "a push from a dirty tree goes through" '[ "$rc" = 0 ] && [ "$(remote_head feat/dirty)" = "$(head_of)" ]'
-# Outgoing commits made without the templates are scanned on push, added lines only.
+# Outgoing commits made without Mentat's hooks are scanned on push, added lines only.
 reset; git -C "$repo" checkout -q -b feat/leak
 printf 'token = stubmatchedtext\n' >"$repo/leak.txt"
 git -C "$repo" add -A; git -C "$repo" commit -q -m leak
@@ -183,7 +183,7 @@ check "an outgoing commit that adds a secret is refused, naming the file, even i
 reset; git -C "$repo" checkout -q feat/x
 A push -q origin feat/x:feat/clean; rc=$?
 check "outgoing commits already on the remote are not scanned again" '[ "$rc" = 0 ] && { [ ! -e "$STUB/stdin" ] || ! grep -q "token = stubmatchedtext" "$STUB/stdin"; }'
-# A merge commit is scanned on what its resolution changed. g: git for setup, with no templates.
+# A merge commit is scanned on what its resolution changed. g: git for setup, with none of Mentat's hooks.
 g() { git -C "$repo" "$@" >/dev/null 2>&1; }
 g checkout -q -b feat/m1 feat/x; printf 'x\n' >"$repo/m.txt"; g add m.txt; g commit -q -m "m base"
 g checkout -q -b feat/m2; printf 'two\n' >"$repo/m.txt"; g commit -q -am two
@@ -313,10 +313,10 @@ check "a secret pushed to a repository at a local path is refused" \
   '[ "$rc" != 0 ] && ! git --git-dir="$tmp/local.git" rev-parse -q --verify refs/heads/feat/leak >/dev/null && grep -qF "stub-rule in leak.txt" "$STUB/out"'
 # When the refs of the repository pushed to cannot be read, commits it may have are
 # scanned too: here kept.txt's secret, which origin has.
-reset; (cd "$repo" && printf 'refs/heads/feat/x %s refs/heads/feat/unread %040d\n' "$(head_of)" 0 | "$tpl/pre-push" origin "$tmp/unreadable.git") >"$STUB/out" 2>&1; rc=$?
+reset; (cd "$repo" && printf 'refs/heads/feat/x %s refs/heads/feat/unread %040d\n' "$(head_of)" 0 | "$mentat_hooks/pre-push" origin "$tmp/unreadable.git") >"$STUB/out" 2>&1; rc=$?
 check "when the refs of the repository pushed to cannot be read, every commit reachable from the push is scanned" '[ "$rc" != 0 ] && grep -qF "stub-rule in kept.txt" "$STUB/out"'
 reset; M push -q origin feat/x:main; rc=$?
-check "the maintainer's git runs no template: a push to the default branch goes through" '[ "$rc" = 0 ] && [ "$(remote_head main)" = "$(head_of)" ]'
+check "the maintainer's git runs none of Mentat's hooks: a push to the default branch goes through" '[ "$rc" = 0 ] && [ "$(remote_head main)" = "$(head_of)" ]'
 check "the pushes leave no temporary files" '[ -z "$(ls -A "$TMPDIR")" ]'
 git --git-dir="$tmp/origin.git" update-ref refs/heads/main "$main"
 
@@ -332,31 +332,31 @@ own "$repo/.git/hooks/pre-push" gitdir-push
 
 reset; stage_clean chained; h=$(head_of)
 A commit -q -m "add chained"; rc=$?
-check "after its checks pass, the pre-commit template runs the repository's own hook in .git/hooks" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -e "$STUB/gitdir-commit.args" ] && [ -s "$STUB/calls" ]'
+check "after its checks pass, Mentat's pre-commit hook runs the repository's own hook in .git/hooks" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -e "$STUB/gitdir-commit.args" ] && [ -s "$STUB/calls" ]'
 check "the repository's own hook runs with MENTAT_OWN_HOOK naming that hook and repository" '[ "$(cat "$STUB/gitdir-commit.env")" = "pre-commit $(cd "$repo/.git" && pwd -P)" ]'
 reset; stage_clean refused; echo 1 >"$STUB/gitdir-commit.exit"; h=$(head_of)
 A commit -q -m "add refused"; rc=$?
 check "the own pre-commit hook's refusal refuses the commit" '[ "$rc" != 0 ] && [ "$(head_of)" = "$h" ]'
 reset; stage_hit; h=$(head_of)
 A commit -q -m "add file"; rc=$?
-check "the own pre-commit hook does not run when the template refuses" '[ "$rc" != 0 ] && [ ! -e "$STUB/gitdir-commit.args" ]'
+check "the own pre-commit hook does not run when Mentat's hook refuses" '[ "$rc" != 0 ] && [ ! -e "$STUB/gitdir-commit.args" ]'
 reset; stage_clean ownonly; h=$(head_of)
 M commit -q -m "maintainer, own hook only"; rc=$?
 check "the maintainer's git runs the repository's own pre-commit hook alone" '[ "$rc" = 0 ] && [ -e "$STUB/gitdir-commit.args" ] && [ ! -e "$STUB/calls" ] && [ -z "$(cat "$STUB/gitdir-commit.env")" ]'
 
-# What the own pre-push hook gets through the template is what git hands it directly.
+# What the own pre-push hook gets through Mentat's hook is what git hands it directly.
 reset; A commit -q --allow-empty -m "to push"
 M push -q --dry-run origin feat/x:feat/through feat/x:feat/through2; rc_direct=$?
 direct_args=$(cat "$STUB/gitdir-push.args"); direct_stdin=$(cat "$STUB/gitdir-push.stdin")
 reset; A push -q origin feat/x:feat/through feat/x:feat/through2; rc=$?
-check "the own pre-push hook gets the same arguments through the template" '[ "$rc_direct" = 0 ] && [ "$rc" = 0 ] && [ -n "$direct_args" ] && [ "$(cat "$STUB/gitdir-push.args")" = "$direct_args" ]'
-check "the own pre-push hook gets the same ref lines through the template" '[ -n "$direct_stdin" ] && [ "$(cat "$STUB/gitdir-push.stdin")" = "$direct_stdin" ] && [ "$(printf "%s\n" "$direct_stdin" | wc -l | tr -d " ")" = 2 ]'
-check "the template scanned before the own pre-push hook ran" '[ -s "$STUB/calls" ] && [ "$(remote_head feat/through)" = "$(head_of)" ]'
+check "the own pre-push hook gets the same arguments through Mentat's hook" '[ "$rc_direct" = 0 ] && [ "$rc" = 0 ] && [ -n "$direct_args" ] && [ "$(cat "$STUB/gitdir-push.args")" = "$direct_args" ]'
+check "the own pre-push hook gets the same ref lines through Mentat's hook" '[ -n "$direct_stdin" ] && [ "$(cat "$STUB/gitdir-push.stdin")" = "$direct_stdin" ] && [ "$(printf "%s\n" "$direct_stdin" | wc -l | tr -d " ")" = 2 ]'
+check "Mentat's hook scanned before the own pre-push hook ran" '[ -s "$STUB/calls" ] && [ "$(remote_head feat/through)" = "$(head_of)" ]'
 reset; echo 3 >"$STUB/gitdir-push.exit"; A commit -q --allow-empty -m "refused push"
 A push -q origin feat/x:feat/refused; rc=$?
 check "the own pre-push hook's refusal refuses the push" '[ "$rc" != 0 ] && [ -z "$(remote_head feat/refused)" ]'
 reset; A push -q origin feat/x:main; rc=$?
-check "the own pre-push hook does not run when the template refuses" '[ "$rc" != 0 ] && [ ! -e "$STUB/gitdir-push.args" ]'
+check "the own pre-push hook does not run when Mentat's hook refuses" '[ "$rc" != 0 ] && [ ! -e "$STUB/gitdir-push.args" ]'
 chmod -x "$repo/.git/hooks/pre-push"
 reset; A push -q origin feat/x:feat/notexec; rc=$?
 check "an own hook that is not executable is skipped, as git skips it" '[ "$rc" = 0 ] && [ ! -e "$STUB/gitdir-push.args" ] && [ "$(remote_head feat/notexec)" = "$(head_of)" ]'
@@ -372,18 +372,18 @@ reset; A push -q origin feat/wt; rc=$?
 check "in a linked worktree, a push runs the own pre-push hook" '[ "$rc" = 0 ] && [ -e "$STUB/gitdir-push.args" ]'
 in=$repo
 
-# The chain-only templates: one for every other client-side hook git runs from
+# The chain-only hooks: one for every other client-side hook git runs from
 # core.hooksPath, each running only the repository's own hook of its name.
 chain="applypatch-msg pre-applypatch post-applypatch pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge post-rewrite pre-auto-gc sendemail-validate push-to-checkout"
 # shellcheck disable=SC2086 # $chain is a list of words.
 want_hooks=$(printf '%s\n' pre-commit pre-push $chain | sort | tr '\n' ' ')
-check "the templates' hooks folder holds pre-commit, pre-push and the chain-only templates, nothing else" '[ "$(ls "$tpl" | sort | tr "\n" " ")" = "$want_hooks" ]'
+check "Mentat's hooks folder holds pre-commit, pre-push and the chain-only hooks, nothing else" '[ "$(ls "$mentat_hooks" | sort | tr "\n" " ")" = "$want_hooks" ]'
 printf 'line one\nline two\n' >"$tmp/chain-stdin"
 for name in $chain; do
   own "$repo/.git/hooks/$name" "chain-$name"
   rm -rf "${STUB:?}"/*; echo 5 >"$STUB/chain-$name.exit"
-  (cd "$repo" && "$tpl/$name" "first arg" second <"$tmp/chain-stdin") >"$STUB/out" 2>&1; rc=$?
-  check "the $name template runs the repository's own hook with its arguments, stdin and exit status" \
+  (cd "$repo" && "$mentat_hooks/$name" "first arg" second <"$tmp/chain-stdin") >"$STUB/out" 2>&1; rc=$?
+  check "Mentat's $name hook runs the repository's own hook with its arguments, stdin and exit status" \
     '[ "$rc" = 5 ] && [ "$(cat "$STUB/chain-$name.args")" = "[first arg][second]" ] && cmp -s "$STUB/chain-$name.stdin" "$tmp/chain-stdin"'
   rm "$repo/.git/hooks/$name"
 done
@@ -429,7 +429,7 @@ reset; stage_clean nested; h=$(head_of)
 A commit -q -m "hooks that run git"; rc=$?
 check "a repository pre-commit that runs git checkout still gets the repository's own post-checkout" \
   '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ "$(cat "$STUB/nested-post-checkout.args" 2>/dev/null)" = "[$h][$h][0]" ]'
-check "a repository post-commit that pushes still gets the template's checks and the repository's own pre-push" \
+check "a repository post-commit that pushes still gets Mentat's checks and the repository's own pre-push" \
   '[ "$(remote_head feat/from-post-commit)" = "$(head_of)" ] && [ -e "$STUB/gitdir-push.args" ] && [ -s "$STUB/calls" ]'
 mv "$tmp/pre-commit.keep" "$repo/.git/hooks/pre-commit"; rm "$repo/.git/hooks/post-commit" "$repo/.git/hooks/post-checkout"
 
@@ -444,13 +444,13 @@ for hp in .githooks "$repo/.githooks"; do
   git -C "$repo" config core.hooksPath "$hp"
   reset; stage_clean "local$n"
   A commit -q -m "local hook path"; rc=$?
-  check "with core.hooksPath $hp, its own pre-commit hook runs after the template, not .git/hooks'" \
+  check "with core.hooksPath $hp, its own pre-commit hook runs after Mentat's hook, not .git/hooks'" \
     '[ "$rc" = 0 ] && [ -e "$STUB/local-commit.args" ] && [ ! -e "$STUB/gitdir-commit.args" ] && [ -s "$STUB/calls" ]'
   reset; A push -q origin feat/x:feat/local; rc=$?
-  check "with core.hooksPath $hp, its own pre-push hook runs after the template" \
+  check "with core.hooksPath $hp, its own pre-push hook runs after Mentat's hook" \
     '[ "$rc" = 0 ] && [ -e "$STUB/local-push.args" ] && [ ! -e "$STUB/gitdir-push.args" ] && [ -s "$STUB/calls" ]'
   reset; A push -q origin feat/x:main; rc=$?
-  check "with core.hooksPath $hp, the template still refuses the default branch" '[ "$rc" != 0 ] && [ "$(remote_head main)" = "$main" ] && [ ! -e "$STUB/local-push.args" ]'
+  check "with core.hooksPath $hp, Mentat's hook still refuses the default branch" '[ "$rc" != 0 ] && [ "$(remote_head main)" = "$main" ] && [ ! -e "$STUB/local-push.args" ]'
   reset; stage_clean "maint$n"; M commit -q -m "maintainer, local hook path"; rc=$?
   check "with core.hooksPath $hp, the maintainer's git runs its own hook alone" '[ "$rc" = 0 ] && [ -e "$STUB/local-commit.args" ] && [ ! -e "$STUB/calls" ]'
 done
@@ -475,8 +475,8 @@ check "a linked worktree's core.hooksPath in config.worktree names its own hooks
   '[ "$rc" = 0 ] && [ -e "$STUB/wt-commit.args" ] && [ ! -e "$STUB/gitdir-commit.args" ]'
 git -C "$repo" worktree remove --force "$tmp/wt"; git -C "$repo" config --unset extensions.worktreeConfig
 
-# No recursion: a local core.hooksPath naming the templates, or an own hook that runs
-# a template, runs Mentat's checks and ends. A loop is stopped after 20 seconds.
+# No recursion: a local core.hooksPath naming Mentat's hooks, or an own hook that runs
+# one of them, runs Mentat's checks and ends. A loop is stopped after 20 seconds.
 bounded() { # bounded <command...>: runs it in its own process group, killing the group after 20 seconds; prints its exit status
   set -m
   "$@" &
@@ -488,74 +488,74 @@ bounded() { # bounded <command...>: runs it in its own process group, killing th
   kill "$sleeper" 2>/dev/null
   echo "$rc"
 }
-git -C "$repo" config core.hooksPath "$tpl"
+git -C "$repo" config core.hooksPath "$mentat_hooks"
 reset; stage_clean loop1; h=$(head_of)
-rc=$(bounded A commit -q -m "templates as own hook path")
-check "a local core.hooksPath naming the templates commits once, scanned, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
+rc=$(bounded A commit -q -m "Mentat's hooks as own hook path")
+check "a local core.hooksPath naming Mentat's hooks commits once, scanned, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
 reset; rc=$(bounded A push -q origin feat/x:feat/loop)
-check "a local core.hooksPath naming the templates pushes, with no loop" '[ "$rc" = 0 ] && [ "$(remote_head feat/loop)" = "$(head_of)" ]'
+check "a local core.hooksPath naming Mentat's hooks pushes, with no loop" '[ "$rc" = 0 ] && [ "$(remote_head feat/loop)" = "$(head_of)" ]'
 reset; rc=$(bounded A push -q origin feat/x:main)
-check "a local core.hooksPath naming the templates still refuses the default branch" '[ "$rc" != 0 ] && [ "$rc" != 143 ] && [ "$(remote_head main)" = "$main" ] && grep -q "default branch (main)" "$STUB/out"'
+check "a local core.hooksPath naming Mentat's hooks still refuses the default branch" '[ "$rc" != 0 ] && [ "$rc" != 143 ] && [ "$(remote_head main)" = "$main" ] && grep -q "default branch (main)" "$STUB/out"'
 git -C "$repo" config --unset core.hooksPath
-printf '#!/bin/sh\nexec "%s/pre-commit" "$@"\n' "$tpl" >"$repo/.git/hooks/pre-commit"
+printf '#!/bin/sh\nexec "%s/pre-commit" "$@"\n' "$mentat_hooks" >"$repo/.git/hooks/pre-commit"
 reset; stage_clean loop2; h=$(head_of)
-rc=$(bounded A commit -q -m "own hook runs the template")
-check "an own hook that runs the template commits, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
+rc=$(bounded A commit -q -m "own hook runs Mentat's hook")
+check "an own hook that runs Mentat's hook commits, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
 reset; stage_clean loop3; h=$(head_of)
-rc=$(bounded M commit -q -m "maintainer, own hook runs the template")
-check "for the maintainer, an own hook that runs the template commits, scanned, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
+rc=$(bounded M commit -q -m "maintainer, own hook runs Mentat's hook")
+check "for the maintainer, an own hook that runs Mentat's hook commits, scanned, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
 reset; stage_hit; h=$(head_of)
-rc=$(bounded M commit -q -m "maintainer, own hook runs the template")
-check "for the maintainer, an own hook that runs the template still refuses a staged secret" '[ "$rc" != 0 ] && [ "$rc" != 143 ] && [ "$(head_of)" = "$h" ] && grep -qF "stub-rule in file two.txt" "$STUB/out"'
+rc=$(bounded M commit -q -m "maintainer, own hook runs Mentat's hook")
+check "for the maintainer, an own hook that runs Mentat's hook still refuses a staged secret" '[ "$rc" != 0 ] && [ "$rc" != 143 ] && [ "$(head_of)" = "$h" ] && grep -qF "stub-rule in file two.txt" "$STUB/out"'
 
-# Without own-hook.sh beside them, the templates refuse after their checks.
-cp -Rp "$root/git-templates" "$tmp/partial"; rm "$tmp/partial/own-hook.sh"
+# Without own-hook.sh beside them, Mentat's hooks refuse after their checks.
+cp -Rp "$root/git-hooks" "$tmp/partial"; rm "$tmp/partial/own-hook.sh"
 reset; stage_clean partial; h=$(head_of)
 (cd "$repo" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/partial/hooks" git commit -q -m partial) >"$STUB/out" 2>&1; rc=$?
 check "a missing own-hook.sh refuses the commit and says so" '[ "$rc" = 1 ] && [ "$(head_of)" = "$h" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
 reset; (cd "$repo" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/partial/hooks" git push -q origin feat/x:feat/partial) >"$STUB/out" 2>&1; rc=$?
 check "a missing own-hook.sh refuses the push and says so" '[ "$rc" != 0 ] && [ -z "$(remote_head feat/partial)" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
 
-# git init runs under the templates: plain, bare and in place.
+# git init runs under Mentat's hooks: plain, bare and in place.
 A init -q "$tmp/new-plain"; rc=$?
-check "git init of a new repository works under the templates" '[ "$rc" = 0 ] && git -C "$tmp/new-plain" rev-parse --git-dir >/dev/null 2>&1'
+check "git init of a new repository works under Mentat's hooks" '[ "$rc" = 0 ] && git -C "$tmp/new-plain" rev-parse --git-dir >/dev/null 2>&1'
 A init -q --bare "$tmp/new-bare.git"; rc=$?
-check "git init --bare works under the templates" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/new-bare.git" rev-parse --is-bare-repository)" = true ]'
+check "git init --bare works under Mentat's hooks" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/new-bare.git" rev-parse --is-bare-repository)" = true ]'
 mkdir "$tmp/new-inplace"
-(cd "$tmp/new-inplace" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tpl" git init -q) >"$STUB/out" 2>&1; rc=$?
-check "git init in place works under the templates" '[ "$rc" = 0 ] && [ -d "$tmp/new-inplace/.git" ]'
+(cd "$tmp/new-inplace" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$mentat_hooks" git init -q) >"$STUB/out" 2>&1; rc=$?
+check "git init in place works under Mentat's hooks" '[ "$rc" = 0 ] && [ -d "$tmp/new-inplace/.git" ]'
 # Where git cannot tell the repository yet, as while git init creates it, GIT_DIR names it.
 mkdir -p "$tmp/half/hooks" "$tmp/elsewhere"
 own "$tmp/half/hooks/post-commit" half
-rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$tpl/post-commit" one) </dev/null >"$STUB/out" 2>&1; rc=$?
-check "with no repository git can read, a template runs the own hook in GIT_DIR/hooks" '[ "$rc" = 0 ] && [ "$(cat "$STUB/half.args" 2>/dev/null)" = "[one]" ]'
+rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$mentat_hooks/post-commit" one) </dev/null >"$STUB/out" 2>&1; rc=$?
+check "with no repository git can read, Mentat's hook runs the own hook in GIT_DIR/hooks" '[ "$rc" = 0 ] && [ "$(cat "$STUB/half.args" 2>/dev/null)" = "[one]" ]'
 
 # The session-start check of the installed copy.
 inst="$tmp/installed"
-cp -Rp "$root/git-templates" "$inst"
-start() { MENTAT_GIT_TEMPLATES_DIR=$inst "$root/hooks/session-start" >"$STUB/start" 2>&1; }
+cp -Rp "$root/git-hooks" "$inst"
+start() { MENTAT_GIT_HOOKS_DIR=$inst "$root/hooks/session-start" >"$STUB/start" 2>&1; }
 # problem_is <counts>: the output is one problem line of counts, with no folder or file
 # name, a blank line, then rules.md.
 problem_is() {
-  [ "$rc" = 0 ] && [ "$(head -n 1 "$STUB/start")" = "Mentat PROBLEM: the git hook templates agents' git uses have problems ($1), so agents' commits and pushes may be refused or unchecked. Tell the maintainer before anything else, and run mentat check." ] &&
+  [ "$rc" = 0 ] && [ "$(head -n 1 "$STUB/start")" = "Mentat PROBLEM: the git hooks agents' git uses have problems ($1), so agents' commits and pushes may be refused or unchecked. Tell the maintainer before anything else, and run mentat check." ] &&
     tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"
 }
 rm -rf "${STUB:?}"/*; start; rc=$?
 check "session start: an installed and current copy prints rules.md alone" '[ "$rc" = 0 ] && cmp -s "$STUB/start" "$root/rules.md"'
 alone() { [ "$rc" = 0 ] && cmp -s "$STUB/start" "$root/rules.md"; }
 "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
-check "session start: with no templates in use, it prints rules.md alone" 'alone'
+check "session start: with the git hooks not in use, it prints rules.md alone" 'alone'
 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
-check "session start: GIT_CONFIG_* entries that name no core.hooksPath are not a use of the templates" 'alone'
+check "session start: GIT_CONFIG_* entries that name no core.hooksPath are not a use of the git hooks" 'alone'
 PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
-check "session start: with no templates in use, a missing gitleaks prints nothing extra" 'alone'
+check "session start: with the git hooks not in use, a missing gitleaks prints nothing extra" 'alone'
 GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/nowhere/hooks" GIT_CONFIG_KEY_1=user.name GIT_CONFIG_VALUE_1=x \
   GIT_CONFIG_KEY_2=Core.HooksPath GIT_CONFIG_VALUE_2="$inst/hooks/" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
 check "session start: the last core.hooksPath entry in GIT_CONFIG_* names a current copy, so rules.md prints alone" 'alone'
 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/nowhere/hooks" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
 check "session start: a core.hooksPath entry naming a missing folder prints a problem line, then rules.md" 'problem_is "the folder is missing"'
 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$inst/hooks" PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
-check "session start: with the templates in use, a missing gitleaks prints a problem line, then rules.md" 'problem_is "not installed: gitleaks"'
+check "session start: with the git hooks in use, a missing gitleaks prints a problem line, then rules.md" 'problem_is "not installed: gitleaks"'
 for f in scan own-hook.sh hooks/pre-commit hooks/pre-push hooks/commit-msg hooks/post-checkout; do
   mv "$inst/$f" "$tmp/away"; start; rc=$?; mv "$tmp/away" "$inst/$f"
   check "session start: a missing $f prints a problem line counting it, then rules.md" 'problem_is "1 missing or not executable"'
@@ -563,18 +563,18 @@ for f in scan own-hook.sh hooks/pre-commit hooks/pre-push hooks/commit-msg hooks
   check "session start: a changed $f prints a problem line counting it, then rules.md" 'problem_is "1 changed"'
 done
 chmod -x "$inst/hooks/pre-push"; start; rc=$?; chmod +x "$inst/hooks/pre-push"
-check "session start: a template that is not executable is a problem" 'problem_is "1 missing or not executable"'
+check "session start: a hook that is not executable is a problem" 'problem_is "1 missing or not executable"'
 mv "$inst/scan" "$tmp/away"; rm "$inst/hooks/commit-msg"; printf '# changed\n' >>"$inst/hooks/pre-push"
-MENTAT_GIT_TEMPLATES_DIR=$inst PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+MENTAT_GIT_HOOKS_DIR=$inst PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
 check "session start: several problems print one line of counts" 'problem_is "2 missing or not executable, 1 changed, not installed: gitleaks"'
 mv "$tmp/away" "$inst/scan"
 rm -rf "$inst"; start; rc=$?
 check "session start: a missing folder is a problem" 'problem_is "the folder is missing"'
-# A plugin copy without lib/templates.sh still prints the rules, after a problem line.
+# A plugin copy without lib/git-hooks.sh still prints the rules, after a problem line.
 mkdir -p "$tmp/plugin/hooks"
 cp "$root/hooks/session-start" "$tmp/plugin/hooks/"; cp "$root/rules.md" "$tmp/plugin/"
 "$tmp/plugin/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
 check "session start: a check that cannot run says so, then prints rules.md" \
-  '[ "$rc" = 0 ] && [ "$(head -n 1 "$STUB/start")" = "Mentat PROBLEM: the installed git hook templates could not be checked. Tell the maintainer before anything else, and run mentat check." ] && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
+  '[ "$rc" = 0 ] && [ "$(head -n 1 "$STUB/start")" = "Mentat PROBLEM: the installed git hooks could not be checked. Tell the maintainer before anything else, and run mentat check." ] && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
 
 [ "$failures" -eq 0 ]

@@ -3,7 +3,7 @@
 # adds to every session's context on startup, resume, clear, compact and fork.
 # Claude Code caps a hook's output at 10,000 characters; tests/run holds this
 # hook's output under a fixed limit, set so that its worst case stays under that cap.
-# When agents' git uses the git hook templates (lib/templates.sh), it first prints one
+# When agents' git uses the git hooks (lib/git-hooks.sh), it first prints one
 # problem line of counts, with no names, when the installed copy has problems or cannot
 # be checked; tests/run holds that worst case under the cap.
 # Finds its files relative to this script, never the working directory, so it
@@ -13,10 +13,10 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 problem=""
 # Bash 3.2 exits when . finds no file, so the file is looked for first.
 # shellcheck source=/dev/null
-if [ -f "$root/lib/templates.sh" ] && . "$root/lib/templates.sh" 2>/dev/null; then
-  if dir=$(templates_dir); then problem=$(templates_summary "$root" "$dir" 2>/dev/null) || true; fi
+if [ -f "$root/lib/git-hooks.sh" ] && . "$root/lib/git-hooks.sh" 2>/dev/null; then
+  if dir=$(git_hooks_dir); then problem=$(git_hooks_summary "$root" "$dir" 2>/dev/null) || true; fi
 else
-  problem="the installed git hook templates could not be checked"
+  problem="the installed git hooks could not be checked"
 fi
 if [ -n "$problem" ]; then
   printf 'Mentat PROBLEM: %s. Tell the maintainer before anything else, and run mentat check.\n\n' "$problem"
