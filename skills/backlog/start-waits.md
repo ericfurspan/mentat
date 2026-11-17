@@ -6,7 +6,7 @@ A start wait is one line in an agreed item's description, in its item shape slot
 - `Starts after: <owner/repo>#<N> merged`: that pull request is merged.
 - `Starts after: count <what> in <where> <opened|merged> after <YYYY-MM-DD> reaches <N>`: the number of `<what>` in `<where>` opened or merged after that date reaches `<N>`, read in full (every page).
 
-Writing. Agreement in `mentat:propose` and its typed planning session add the line in the same write that records that an agreed item must wait on one of these conditions. Writes to `## Current plan`, triage and the Linear adapter's refinement of hand-made items leave the line unchanged. A session that finds the wait met may remove the line when it next writes the item; nothing depends on that.
+Writing. Agreement in `mentat:propose` and its typed planning session add the line in the same write that records that an agreed item must wait on one of these conditions. Writes to the `Now:` line, triage and the Linear adapter's refinement of hand-made items leave the line unchanged. A session that finds the wait met may remove the line when it next writes the item; nothing depends on that.
 
 Reading. A session that decides whether an item can start reads its wait then, read-only. The wait is:
 

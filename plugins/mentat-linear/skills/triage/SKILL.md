@@ -53,7 +53,7 @@ Record each answer before asking the next, as `mentat:backlog`, the tracker's ad
 - Merge: read the named item in full (`mentat:backlog` "Reading an item"), then mark this item a duplicate of it and comment on it, citing the answer and naming the item merged. Merged into a Todo item, that scope is not committed: it joins the spec only once agreed through `mentat:propose`, which asks for it, after its plan check, when the item is next planned.
 - Later: a dated note citing the answer, as a comment or on its inbox line.
 
-For an item from a reader that posts outcomes at its source, follow that reader's steps for recording it, which may put the post before the item is removed. An item with a decision that "Ask" sends to its own planning session gets that next step, `/mentat:propose <id>`, in its `## Current plan` section.
+For an item from a reader that posts outcomes at its source, follow that reader's steps for recording it, which may put the post before the item is removed. An item with a decision that "Ask" sends to its own planning session gets that next step, `/mentat:propose <id>`, on its `Now:` line (`mentat:backlog` "Item shape").
 
 ## Report
 

@@ -1,6 +1,6 @@
 # Agent records
 
-Read this before writing or reading an item's agent records (its spec fingerprint and build answer, material assumptions, advice against, and plan check and second opinion settlements), and again after a compaction.
+Read this before writing or reading an item's agent records (its spec fingerprint and build answer, material assumptions, advice against, plan check and second opinion settlements, decisions and longer plan), and again after a compaction.
 
 ## The comment
 
@@ -11,12 +11,14 @@ An item keeps its agent records in one comment whose first line is `Agent record
 - `Advised against: <close|shrink|not build>; reason: <one line>` ("Advice against" below).
 - `Plan check:` the plan check's settlement ("Plan check" below).
 - `Second opinion, round <n>:` that round's settlement ("Second opinions" below).
+- `Decisions:` one line per answered decision for the maintainer: the question, the answer, its date and the rejected options in a few words ("Decision lines" below).
+- `Plan:` a current plan longer than the item's `Now:` line, which keeps the next step.
 
-A later fingerprint and build answer, assumptions list or advice replaces the earlier one in place, so the current one stands. Settlements add one entry per plan check or round. With GitHub issues, the comment holds no settlements: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog.
+A later fingerprint and build answer, assumptions list, advice or plan replaces the earlier one in place, so the current one stands. Settlements and decisions lines add one entry each. With GitHub issues, the comment holds no settlements, decisions or plan: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog, and an issue keeps its plan and decisions in its body (`github.md`).
 
 ## Writing it
 
-The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint and build answer, each assumption and its state, the advice, each settlement entry), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
+The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint and build answer, each assumption and its state, the advice, each settlement entry and decisions line, the plan), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
 
 A chat request has no item yet: keep its plan check and second opinion records, and their files, for "Agreement" in `SKILL.md`, which writes them on the item it creates. If nothing is agreed, nothing is written.
 
@@ -27,6 +29,10 @@ An item's first `Agent records` comment carries forward the latest fingerprint a
 ## Readers
 
 Every reader takes a record from the `Agent records` comment, else from the older comments as above: build readiness, builder briefs, the review's stop and final check, the record shapes in item reads, and the move to Linear (`../build/SKILL.md` steps 3 and 6, `mentat:propose` steps 4 and 7, `mentat:review` step 4 and "Final check", `../review/stop.md` "Evidence", `../review/after-ready.md`, `item-reads.md`, `assumptions.md`, `mentat-linear:linear` "Moving to Linear").
+
+## Decision lines
+
+Each skill that records the maintainer's answer on an item writes its decisions line, not a comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request, and the line points to it. The answered decision leaves any open decision section, and when it was a marked decision, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
 
 ## Advice against
 
