@@ -4,13 +4,13 @@ With either tracker, read this before reading an item to plan, propose, triage o
 
 ## The full read
 
-Such a read takes the item's description and the text of every comment, inline comments with the description text they quote and replies included, from every page, without downloading attachment files. A page that cannot be read is read again. If the read stays incomplete, the session says so and asks no decision on that item: `mentat:propose` takes it no further, and a build names and skips it.
+Such a read takes the item's description, its spec and the text of every comment the tracker's adapter lists, inline comments with the description text they quote and replies included, from every page, without downloading attachment files. A page that cannot be read is read again. If the read stays incomplete, the session says so and asks no decision on that item: `mentat:propose` takes it no further, and a build names and skips it.
 
 A listing reads only what it names. The lookup of the next-work offer (`next-work.md`) keeps only its read of Later notes for the Inbox count.
 
 ## The maintainer's comments
 
-The maintainer is who the tracker's adapter names. A comment this session wrote, or one in a record shape these skills define (the agent records comment, the older spec fingerprint, advice, material assumptions, second-opinion settlement and plan check record comments, the copy of a hand-made item's original text, answer replies) or the maintainer's own instructions name, is not theirs. Text whose authorship stays unclear is context, never a maintainer choice.
+The maintainer is who the tracker's adapter names. A comment this session wrote, or one in a record shape these skills define (the agent records comment, the older spec fingerprint, advice, material assumptions, second-opinion settlement and plan check record comments, an older comment copying a hand-made item's original text, answer replies) or the maintainer's own instructions name, is not theirs. Text whose authorship stays unclear is context, never a maintainer choice.
 
 A maintainer comment that asks a question or objects is open until a later answer reply answers it, the maintainer answers or withdraws it, or its thread is resolved where the tracker has resolved threads. A later maintainer question or objection in a resolved thread opens it again.
 
