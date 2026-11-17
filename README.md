@@ -48,7 +48,7 @@ Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, To
 - `/mentat:propose [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
 
-Moved from core: `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`; `status`, later `waiting`, was removed.
+Moved from core: `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`.
 
 [`rules.md`](rules.md) holds the core rules, `skills/` each step's detail.
 
