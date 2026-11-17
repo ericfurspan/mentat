@@ -1,11 +1,11 @@
 # shellcheck shell=bash
-# The installed git hook templates. Sourced by bin/mentat and hooks/session-start.
+# The installed git hooks. Sourced by bin/mentat and hooks/session-start.
 
-# git_hooks_dir: prints the folder agents' git takes its hook templates from:
+# git_hooks_dir: prints the folder agents' git takes its git hooks from:
 # MENTAT_GIT_HOOKS_DIR, else the parent of the hooks folder that the last
 # core.hooksPath entry among GIT_CONFIG_COUNT, GIT_CONFIG_KEY_<n> and GIT_CONFIG_VALUE_<n>
 # names (keys match ignoring case, as git's do). Returns 1, printing nothing, when
-# neither names one: the templates are not in use.
+# neither names one: the git hooks are not in use.
 git_hooks_dir() {
   local i=0 n=${GIT_CONFIG_COUNT:-0} k v hooks=""
   if [ -n "${MENTAT_GIT_HOOKS_DIR:-}" ]; then printf '%s\n' "$MENTAT_GIT_HOOKS_DIR"; return 0; fi
@@ -20,7 +20,7 @@ git_hooks_dir() {
   case "$hooks" in */*) printf '%s\n' "${hooks%/*}" ;; *) printf '.\n' ;; esac
 }
 
-# git_hooks_scan <Mentat folder> <templates folder>: compares, read-only, the installed
+# git_hooks_scan <Mentat folder> <installed folder>: compares, read-only, the installed
 # copy with <Mentat folder>/git-hooks and sets t_nofolder (1 when the folder is
 # missing), t_missing and t_differs (the files missing or not executable where the
 # source is, and those that differ, each with a leading space) and t_tools (gitleaks
@@ -40,21 +40,21 @@ git_hooks_scan() {
   [ -z "$t_nofolder$t_missing$t_differs$t_tools" ]
 }
 
-# git_hooks_problems <Mentat folder> <templates folder>: prints one line per problem,
+# git_hooks_problems <Mentat folder> <installed folder>: prints one line per problem,
 # naming the folder and each file. 0 none, 1 some.
 git_hooks_problems() {
   local dir=$2 f IFS=$' \t\n'
   git_hooks_scan "$1" "$dir" && return 0
-  [ -z "$t_nofolder" ] || printf 'the git hook templates folder %s is missing, so agents'"'"' git runs no hooks\n' "$dir"
-  [ -z "$t_missing" ] || printf 'the git hook templates in %s are missing or not executable (%s), so agents'"'"' git may skip checks or the repository'"'"'s own hooks\n' "$dir" "${t_missing# }"
-  [ -z "$t_differs" ] || printf 'the git hook templates in %s differ from this copy of Mentat (%s), so agents'"'"' git runs other checks\n' "$dir" "${t_differs# }"
+  [ -z "$t_nofolder" ] || printf 'the git hooks folder %s is missing, so agents'"'"' git runs no hooks\n' "$dir"
+  [ -z "$t_missing" ] || printf 'the git hooks in %s are missing or not executable (%s), so agents'"'"' git may skip checks or the repository'"'"'s own hooks\n' "$dir" "${t_missing# }"
+  [ -z "$t_differs" ] || printf 'the git hooks in %s differ from this copy of Mentat (%s), so agents'"'"' git runs other checks\n' "$dir" "${t_differs# }"
   for f in $t_tools; do
-    printf '%s is not installed, so the git hook templates in %s refuse every agent commit and push\n' "$f" "$dir"
+    printf '%s is not installed, so the git hooks in %s refuse every agent commit and push\n' "$f" "$dir"
   done
   return 1
 }
 
-# git_hooks_summary <Mentat folder> <templates folder>: prints one line of counts, with
+# git_hooks_summary <Mentat folder> <installed folder>: prints one line of counts, with
 # no folder or file names, so its length has a fixed bound. 0 no problem (nothing
 # printed), 1 some.
 git_hooks_summary() {
@@ -66,6 +66,6 @@ git_hooks_summary() {
   # shellcheck disable=SC2086
   n=$(set -- $t_differs; echo $#); [ "$n" = 0 ] || parts+=", $n changed"
   [ -z "$t_tools" ] || parts+=", not installed:$t_tools"
-  printf 'the git hook templates agents'"'"' git uses have problems (%s), so agents'"'"' commits and pushes may be refused or unchecked\n' "${parts#, }"
+  printf 'the git hooks agents'"'"' git uses have problems (%s), so agents'"'"' commits and pushes may be refused or unchecked\n' "${parts#, }"
   return 1
 }

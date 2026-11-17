@@ -11,13 +11,13 @@
 
 Mentat is a Claude Code plugin for building software with multiple AI agents.
 
-Claude Code plans, builds and reviews each change; you decide what gets built and merge every pull request. With `mentat-reviewers` on in committed settings, Codex reviews every round, Grok the first head. A hook blocks an agent's merge; where set up, git hook templates refuse its default-branch pushes and likely secrets.
+Claude Code plans, builds and reviews each change; you decide what gets built and merge every pull request. With `mentat-reviewers` on in committed settings, Codex reviews every round, Grok the first head. A hook blocks an agent's merge; where set up, git hooks refuse its default-branch pushes and likely secrets.
 
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
 - For `mentat-reviewers`: the Codex CLI, signed in, outside the home folder, and Grok Build (`grok`), signed in (`grok login`).
-- For the git hook templates: `gitleaks`.
+- For the git hooks: `gitleaks`.
 
 ## Install
 
@@ -68,9 +68,9 @@ Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linea
 
 `MENTAT_FIRST_REVIEW_MODEL=<model>`, such as `fable` or `opus`, runs each pull request's first local review; empty is off. Fable outside your plan bills credits or fails.
 
-## Git hook templates
+## Git hooks
 
-`git-hooks/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Both guards hold only where agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy; `mentat check` reports their state.
+The hooks in `git-hooks/` refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Both guards hold only where agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy; `mentat check` reports their state.
 
 ## Credits
 
