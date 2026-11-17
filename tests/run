@@ -22,19 +22,25 @@ else
   printf '%s\n' "$tracker_words"
 fi
 
-# A backlog item's description stays short: the item shape names one Now: line, and backlog's skill
-# requires no Current plan or Decisions section. The spec lives where the tracker's adapter says: on
-# Linear in the issue document titled Spec, on GitHub issues in the body's ## Spec section.
+# A backlog item's description stays short: the item shape names one Now: line and sends the decisions
+# lines and longer plan to the agent records, which keep the Spec document's id. The spec lives where the
+# tracker's adapter says: on Linear in the issue document titled Spec, on GitHub issues in the body's ## Spec section.
 f=skills/backlog/SKILL.md
-if awk '/^## Item shape$/ { on = 1; next } on && /^## / { exit } on' "$f" | grep -q "\`Now:\` line"; then
+item_shape=$(awk '/^## Item shape$/ { on = 1; next } on && /^## / { exit } on' "$f")
+if printf '%s\n' "$item_shape" | grep -q "\`Now:\` line"; then
   pass "$f's item shape names the Now: line"
 else
   fail "$f's item shape must name the Now: line"
 fi
-if grep -n -e '## Current plan' -e '## Decisions' "$f"; then
-  fail "$f must not require a Current plan or Decisions section in the description"
+if printf '%s\n' "$item_shape" | grep -q "decisions lines, any longer current plan and its material assumptions go in its agent records"; then
+  pass "$f's item shape sends the decisions lines and longer plan to the agent records"
 else
-  pass "$f requires no Current plan or Decisions section in the description"
+  fail "$f's item shape must send the decisions lines and longer plan to the agent records"
+fi
+if grep -q "^- \`Spec document: <id>\`" skills/backlog/agent-records.md; then
+  pass "skills/backlog/agent-records.md lists the Spec document record"
+else
+  fail "skills/backlog/agent-records.md must list the Spec document record"
 fi
 if grep -q "document titled exactly \`Spec\`" plugins/mentat-linear/skills/linear/SKILL.md; then
   pass "the Linear adapter keeps the spec in the document titled Spec"
