@@ -22,6 +22,31 @@ else
   printf '%s\n' "$tracker_words"
 fi
 
+# A backlog item's description stays short: the item shape names one Now: line, and backlog's skill
+# requires no Current plan or Decisions section. The spec lives where the tracker's adapter says: on
+# Linear in the issue document titled Spec, on GitHub issues in the body's ## Spec section.
+f=skills/backlog/SKILL.md
+if awk '/^## Item shape$/ { on = 1; next } on && /^## / { exit } on' "$f" | grep -q "\`Now:\` line"; then
+  pass "$f's item shape names the Now: line"
+else
+  fail "$f's item shape must name the Now: line"
+fi
+if grep -n -e '## Current plan' -e '## Decisions' "$f"; then
+  fail "$f must not require a Current plan or Decisions section in the description"
+else
+  pass "$f requires no Current plan or Decisions section in the description"
+fi
+if grep -q "document titled exactly \`Spec\`" plugins/mentat-linear/skills/linear/SKILL.md; then
+  pass "the Linear adapter keeps the spec in the document titled Spec"
+else
+  fail "the Linear adapter must keep the spec in the document titled Spec"
+fi
+if grep -q "the issue body's \`## Spec\` section" skills/backlog/github.md; then
+  pass "skills/backlog/github.md keeps the spec in the issue body's ## Spec section"
+else
+  fail "skills/backlog/github.md must keep the spec in the issue body's ## Spec section"
+fi
+
 # The README stays short: at most 500 words by wc -w.
 readme_words=$(wc -w <README.md | tr -d ' ')
 if [ "$readme_words" -le 500 ]; then
