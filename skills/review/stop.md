@@ -16,7 +16,7 @@ Push nothing and commission no fixes until the answer. Fixes, or the final check
 
 ## Evidence
 
-The reviewers' own finding text, the spec's goal (`mentat:backlog` "Where the spec lives"), Grok's stop review, and any disproved material assumption still open in the item's recorded assumptions (`mentat:backlog` "Material assumptions"). When Grok is not installed, outside reviewers are off or unknown, or Grok did not finish or refused, the question says so; with outside reviewers off, it does not call the review weaker. No new subagent.
+The reviewers' own finding text, the spec's goal (`mentat:backlog` "Where the spec lives"), Grok's stop review, and any disproved material assumption still open in the item's recorded assumptions (`mentat:backlog` "Material assumptions"). The evidence also gives how much the diff grew from the first round's reviewed range to this round's (`git diff --shortstat` of each range, read from the "Change reviewed" line of that round's local Claude review comment, a round as `mentat status` counts it) and whether the findings so far cluster in one file or area; the question names both in a few words. When Grok is not installed, outside reviewers are off or unknown, or Grok did not finish or refused, the question says so; with outside reviewers off, it does not call the review weaker. No new subagent.
 
 ## The question
 
