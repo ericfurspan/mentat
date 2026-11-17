@@ -14,7 +14,7 @@ Find the project with the Linear connector, by that name and team. If the connec
 
 ## Stages
 
-The Inbox is the Triage status, every issue of the project in Triage, with no label needed; Backlog, Todo and In Progress are those statuses; Done is Done, Canceled or Duplicate. Inbox issues are undecided, not items: no type label, no item shape, not in the order of agreed work. Triage outcomes set the status explicitly: Accept moves the issue to Backlog with a type label and the item shape; Close sets Canceled, with the reason; Merge sets Duplicate of the target; Later keeps it in Triage. Agents never use Linear's own Accept, Decline, Mark as duplicate or Snooze.
+The Inbox is the Triage status, every issue of the project in Triage, with no label needed; Backlog, Todo and In Progress are those statuses; Done is Done, Canceled or Duplicate. Inbox issues are undecided, not items: no type label, no item shape, not in the order of agreed work. Triage outcomes set the status explicitly: Accept moves the issue to Backlog with a type label and the item shape; Close sets Canceled, with the reason; Merge sets Duplicate of the target, which gets the one line triage leaves, not the merged text; Later keeps it in Triage. Agents never use Linear's own Accept, Decline, Mark as duplicate or Snooze.
 
 ## Start waits
 
