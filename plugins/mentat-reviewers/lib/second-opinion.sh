@@ -90,20 +90,28 @@ opinion_grok() {
 }
 
 # The idea is judged as of HEAD, never the working tree, and the result is printed,
-# not posted: nothing here talks to GitHub but fresh_check's fetch of origin's default
-# branch, and a checkout behind it gets no second opinion (exit 5).
+# not posted: nothing here talks to GitHub but the fetches of origin's default branch
+# that read the switch and check freshness. Unless outside reviewers are on here, as
+# review --codex reads it, the checkout goes nowhere (exit 6); a checkout behind origin's
+# default branch gets no second opinion (exit 5).
 opinion_repo() {
-  local idea="$1"
+  local idea="$1" reviewers reviewers_why reviewers_def
   [ -f "$idea" ] || die "idea file not found: $idea" 64
+  reviewers_here
+  case "$reviewers" in
+    on) ;;
+    off) die "no second opinion: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on $reviewers_def), so nothing was sent to Codex or Grok" 6 ;;
+    *) die "no second opinion: outside reviewers are unknown in this repository ($reviewers_why), so nothing was sent to Codex or Grok; they give one only once it reads as on" 6 ;;
+  esac
   sweep_leftovers
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
-  local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind fresh_note
+  local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind
   command -v git >/dev/null 2>&1 || die "no second opinion: git is not installed" 1
   top=$(git rev-parse --show-toplevel) || die "no second opinion: not inside a git repository" 1
   head=$(git -C "$top" rev-parse HEAD) || die "no second opinion: could not read HEAD" 1
   changes=$(git -C "$top" status --porcelain) || die "no second opinion: could not read git status" 1
   [ -z "$changes" ] || dirty=yes
-  fresh_check "$top"
+  fresh_check "$top" "$reviewers_def" || die "no second opinion: could not check whether the checkout is behind origin's default branch $reviewers_def" 1
   fresh_stop "mentat second-opinion"
   res=$(mktemp -d) || die "no second opinion: could not create a temporary directory" 1
   # shellcheck disable=SC2064 # expand now, so the path is fixed when the trap is set
@@ -116,7 +124,6 @@ opinion_repo() {
   pair_run opinion $tools
 
   printf '## Second opinion on %s\n\n- Commit read: %s\n' "$idea" "$head"
-  [ -z "$fresh_note" ] || printf -- '- %s\n' "$fresh_note"
   if [ "$dirty" = yes ]; then
     printf -- '- Uncommitted changes: yes. They were not read; %s given only that commit.\n\n' "$both"
   else

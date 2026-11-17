@@ -59,10 +59,11 @@
 #     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
 #     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
 #     is behind origin's default branch (not a tool failure: update it and run again),
-#     64 usage. It first fetches origin's default branch into a private ref, leaving
-#     origin/<default> and FETCH_HEAD as they are; when that fails or there is no origin,
-#     a local origin/<default> still counts, and the output says when freshness could not
-#     be checked. Time limits:
+#     6 outside reviewers are not on here (not a tool failure: nothing was sent), 64 usage.
+#     After the usage checks it reads whether outside reviewers are on here, as review
+#     --codex does; unless they are on, it prints why, sends nothing and exits 6. It then
+#     fetches origin's default branch into a private ref, leaving origin/<default> and
+#     FETCH_HEAD as they are. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
 #     MENTAT_GROK_REASONING_EFFORT sets Grok's effort. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied.

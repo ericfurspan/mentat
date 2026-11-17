@@ -2,9 +2,9 @@
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for `mentat second-opinion --web`, using a stub codex, a stub grok and,
-# for one case, a local repository with no remote. Any gh call or git fetch fails the
-# run: the web mode talks to no one and needs no repository. Prints PASS/FAIL per case; exits 1
-# on any FAIL.
+# for one case, a local repository whose local origin turns outside reviewers off. Any gh
+# call or git fetch fails the run: the web mode talks to no one, needs no repository and
+# never reads whether outside reviewers are on. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
@@ -115,10 +115,13 @@ EOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
 export PATH="$root/tools/bin:$PATH"
 
-# A folder that is in no git repository, and a local repository to run from in one case.
+# A folder that is in no git repository, and a local repository to run from in one case,
+# whose origin, a local bare repository, turns outside reviewers off in .claude/settings.json on trunk.
 plain="$root/plain folder"
+"$real_git" init -q --bare -b trunk "$root/my origin.git" || exit 1
 "$real_git" init -q -b trunk "$root/my repo" && cd "$root/my repo" || exit 1
-echo REPO-MARKER-README >README && mkdir sub && echo REPO-MARKER-FILE >sub/file && printf 'REPO-MARKER-AGENTS\n' >AGENTS.md && "$real_git" add -A && "$real_git" commit -q -m base
+echo REPO-MARKER-README >README && mkdir sub .claude && echo REPO-MARKER-FILE >sub/file && printf 'REPO-MARKER-AGENTS\n' >AGENTS.md && printf '{"enabledPlugins":{"mentat-reviewers@mentat":false}}\n' >.claude/settings.json && "$real_git" add -A && "$real_git" commit -q -m base || exit 1
+"$real_git" remote add origin "$root/my origin.git" && "$real_git" push -q origin trunk || exit 1
 H=$("$real_git" rev-parse HEAD)
 top=$(pwd -P)
 cd "$root" || exit 1
@@ -157,8 +160,9 @@ check "a delivered second opinion keeps no Grok log, prints nothing on stderr an
 check "outside any repository nothing is posted or fetched, and neither tool is given a file or a repository" 'no_outside && nothing_supplied "$plain"'
 check "the question is copied no further than the prompts: no question text in the arguments" '! grep -q "Ignore all previous" "$STUB/args" "$STUB/args_grok"'
 
-# From inside a repository: the web mode still supplies nothing of it.
+# From inside a repository: the web mode still supplies nothing of it, and reads no switch.
 reset; rc=$(run_in_repo "$question")
+check "with outside reviewers off in the repository, it runs as before (exit 0): both tools answer and nothing is fetched to read the switch" '[ "$rc" = 0 ] && codex_ran && grok_ran && views | grep -q "^- Codex ([0-9]* seconds): SECOND OPINION ANSWER" && views | grep -q "^- Grok ([0-9]* seconds): SECOND OPINION ANSWER" && no_outside'
 check "from inside a repository it behaves the same: no repository, no files, no gh call, no fetch" '[ "$rc" = 0 ] && no_outside && nothing_supplied "$top/sub" && [ "$(cat "$STUB/cwd")" != "$top" ] && ! grep -q "Commit read" "$STUB/stdout"'
 check "nothing of the repository is in either prompt" '! grep -q "REPO-MARKER\|$H\|my repo" "$STUB/prompt" "$STUB/prompt_grok" "$STUB/args" "$STUB/args_grok"'
 

@@ -40,46 +40,24 @@ sweep_leftovers() {
   return 0
 }
 
-# How many commits on origin's default branch HEAD lacks, so a second opinion never
-# judges a stale checkout. Sets the caller's fresh_def (the default branch), fresh_behind
-# (the count, or empty when unknown) and fresh_note (why freshness could not be checked,
-# or empty). The default branch is the one the remote names, else the local origin/HEAD.
-# It is fetched into a ref of this run's own, as review --local does, so origin/<default>
-# and git's record of the last fetch stay as they are, and the ref is deleted once counted. When the fetch
-# fails or there is no origin remote, a local origin/<default> that HEAD is behind still
-# counts. Call it before setting an EXIT trap: it sets and clears its own.
-# shellcheck disable=SC2034 # fresh_note is the caller's, read by opinion_repo
-fresh_check() { # $1 top level
-  local top=$1 ref="refs/mentat/fresh-$$" why="" n
-  fresh_def="" fresh_behind="" fresh_note=""
-  if git -C "$top" remote get-url origin >/dev/null 2>&1; then
-    fresh_def=$(GIT_TERMINAL_PROMPT=0 git -C "$top" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
-  else
-    why="the checkout has no origin remote"
+# How many commits on origin's default branch $2 HEAD lacks, so a second opinion never
+# judges a stale checkout. Its caller first read outside reviewers as on (reviewers_state),
+# which found that branch and fetched it. Sets the caller's fresh_def ($2) and fresh_behind
+# (the count), and returns 1, with fresh_behind empty, when the branch cannot be fetched
+# or counted. It is fetched into a ref of this run's own, as review --local does, so
+# origin/<default> and git's record of the last fetch stay as they are, and the ref is
+# deleted once counted. Call it before setting an EXIT trap: it sets and clears its own.
+fresh_check() { # $1 top level, $2 origin's default branch
+  local top=$1 ref="refs/mentat/fresh-$$"
+  fresh_def=$2 fresh_behind=""
+  # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
+  trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$ref") >/dev/null 2>&1" EXIT
+  if GIT_TERMINAL_PROMPT=0 git -C "$top" fetch -q --no-tags --no-write-fetch-head --refmap= origin "+refs/heads/$fresh_def:$ref" >/dev/null 2>&1; then
+    fresh_behind=$(git -C "$top" rev-list --count "HEAD..$ref" 2>/dev/null)
   fi
-  if [ -z "$fresh_def" ]; then
-    fresh_def=$(git -C "$top" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
-    fresh_def=${fresh_def#refs/remotes/origin/}
-  fi
-  if [ -z "$fresh_def" ]; then
-    [ -n "$why" ] || why="origin's default branch could not be found"
-    fresh_note="The checkout's freshness could not be checked: $why."
-    return 0
-  fi
-  if [ -z "$why" ]; then
-    # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
-    trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$ref") >/dev/null 2>&1" EXIT
-    if GIT_TERMINAL_PROMPT=0 git -C "$top" fetch -q --no-tags --no-write-fetch-head --refmap= origin "+refs/heads/$fresh_def:$ref" >/dev/null 2>&1; then
-      fresh_behind=$(git -C "$top" rev-list --count "HEAD..$ref" 2>/dev/null)
-    fi
-    git -C "$top" update-ref -d "$ref" >/dev/null 2>&1
-    trap - EXIT
-    [ -n "$fresh_behind" ] || why="origin's default branch $fresh_def could not be fetched"
-  fi
-  if [ -z "$fresh_behind" ]; then
-    n=$(git -C "$top" rev-list --count "HEAD..refs/remotes/origin/$fresh_def" 2>/dev/null) && [ "$n" -gt 0 ] && fresh_behind=$n
-  fi
-  [ -n "$fresh_behind" ] || fresh_note="The checkout's freshness could not be checked: $why."
+  git -C "$top" update-ref -d "$ref" >/dev/null 2>&1
+  trap - EXIT
+  [ -n "$fresh_behind" ]
 }
 # Exits 5 when fresh_check found HEAD behind; $1 is the command to run again.
 fresh_stop() {
@@ -95,9 +73,9 @@ fresh_stop() {
 # that key is absent, or the value is false; unknown otherwise. The working tree, local
 # and user settings and other branches never count. Sets the caller's reviewers (on, off
 # or unknown), reviewers_why (why it is unknown, else empty) and reviewers_def (the
-# default branch, or empty when none was found). The default branch is found and fetched
-# as fresh_check does, into a ref of this run's own deleted once read, so origin/<default>
-# and git's record of the last fetch stay as they are; a failed fetch is unknown, never a
+# default branch, or empty when none was found). The default branch is the one the remote
+# names, else the local origin/HEAD. It is fetched into a ref of this run's own deleted once
+# read, so origin/<default> and git's record of the last fetch stay as they are; a failed fetch is unknown, never a
 # stale local origin/<default>. Call it before setting an EXIT trap: it sets and clears its own.
 reviewers_state() { # $1 top level
   local top=$1 ref="refs/mentat/reviewers-$$"
