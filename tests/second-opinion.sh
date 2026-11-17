@@ -2,9 +2,10 @@
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for `mentat second-opinion` on an idea, using a stub codex, a stub grok and a local
-# repository with no remote, where any gh call or git fetch fails the run; the
-# freshness cases at the end add a local origin. Prints PASS/FAIL per case; exits 1
-# on any FAIL.
+# repository whose local origin turns outside reviewers on, where any gh call, or any git
+# fetch but one of origin's default branch into a private ref, fails the run; the switch
+# cases add repositories where outside reviewers are off or unknown, and the freshness
+# cases at the end add an origin that moves. Prints PASS/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
@@ -115,9 +116,13 @@ EOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
 export PATH="$root/tools/bin:$PATH"
 
-# A local repository with no remote, at a path with a space, and a subdirectory to run from.
+# A local repository at a path with a space, and a subdirectory to run from. Its origin, a
+# local bare repository, turns outside reviewers on in .claude/settings.json on trunk.
+ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
+"$real_git" init -q --bare -b trunk "$root/my origin.git" || exit 1
 "$real_git" init -q -b trunk "$root/my repo" && cd "$root/my repo" || exit 1
-echo base >README && mkdir sub && echo x >sub/file && printf 'Read me.\n' >AGENTS.md && "$real_git" add -A && "$real_git" commit -q -m base
+echo base >README && mkdir sub .claude && echo x >sub/file && printf 'Read me.\n' >AGENTS.md && printf '%s\n' "$ON" >.claude/settings.json && "$real_git" add -A && "$real_git" commit -q -m base || exit 1
+"$real_git" remote add origin "$root/my origin.git" && "$real_git" push -q origin trunk || exit 1
 H=$("$real_git" rev-parse HEAD)
 top=$(pwd -P)
 idea="$root/my idea.md"
@@ -139,7 +144,9 @@ left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 worktrees() { "$real_git" -C "$top" worktree list | wc -l | tr -d ' '; }
 # Nothing of a run is left but the private logs of failed runs, Codex's and Grok's.
 clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name 'mentat-grok-log.*' -not -name cache)" ]; }
-no_outside() { [ ! -e "$CALLS/gh" ] && [ ! -e "$CALLS/fetch" ]; }
+# Nothing is posted (no gh call), and nothing is fetched but origin's default branch, into
+# private refs that are deleted.
+no_outside() { [ ! -e "$CALLS/gh" ] && ! grep -v -F "origin +refs/heads/trunk:refs/mentat/" "$CALLS/fetch" 2>/dev/null | grep -q . && [ -z "$("$real_git" -C "$top" for-each-ref refs/mentat)" ]; }
 data() { sed -n "/^--- BEGIN IDEA DATA ---\$/,/^--- END IDEA DATA ---\$/p" "$1" | sed '1d;$d' | grep -v '^$'; }
 
 reset; rc=$(run "$idea")
@@ -147,7 +154,7 @@ check "both deliver (exit 0): a section for each in order, and a summary of both
 check "a delivered second opinion keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
 check "a delivered second opinion prints no such line on stderr" '! grep -q "no second opinion from any tool" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit read: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
-check "no remote, no fetch: nothing is posted and nothing is fetched (no gh call, no git fetch)" 'no_outside'
+check "nothing is posted and nothing is fetched but origin's default branch, into private refs that are deleted (no gh call)" 'no_outside'
 check "nothing is left behind: no worktree, no Grok run folder, no temporary folder" 'clean'
 check "Codex runs in a detached worktree at that commit, not the checkout" '[ "$(cat "$STUB/cwd_head")" = "$H" ] && [ ! -s "$STUB/cwd_branch" ] && [ "$(cat "$STUB/cwd")" != "$top" ] && [ "$(cat "$STUB/cwd")" != "$top/sub" ]'
 check "Codex runs plain codex exec with the read-only profile and cached search, not --sandbox" '[ "$(head -n 1 "$STUB/args")" = exec ] && ! grep -q -- "--sandbox" "$STUB/args" && grep -qx "default_permissions=\"mentat-review\"" "$STUB/args" && grep -qF "\":workspace_roots\"={\".\"=\"read\", " "$STUB/args" && grep -qF "\"$top/.git\"=\"read\"" "$STUB/args" && grep -qF "\"/tmp\"=\"deny\"" "$STUB/args" && ! grep -q "write" "$STUB/args" && grep -qx "web_search=\"cached\"" "$STUB/args" && grep -qx -- --ephemeral "$STUB/args" && grep -qx -- --ignore-user-config "$STUB/args" && grep -qx -- --strict-config "$STUB/args" && grep -qx "approval_policy=\"never\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args" && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args"'
@@ -294,7 +301,7 @@ grok_no_opinion "a missing grok" "grok is not installed"
 # Neither delivers: exit 1, and both sections still say why.
 reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
 check "neither delivering is exit 1, with both no-second-opinion lines on stdout" '[ "$rc" = 1 ] && grep -q "^## Codex$" "$STUB/stdout" && grep -q "^## Grok$" "$STUB/stdout" && [ "$(grep -c "no second opinion (" "$STUB/stdout")" = 4 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (codex exited with status 1" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): no second opinion (Grok exited with status 1" "$STUB/stdout"'
-check "neither delivering still posts and fetches nothing" 'no_outside'
+check "neither delivering still posts nothing and fetches nothing but origin's default branch" 'no_outside'
 check "neither delivering prints one line on stderr saying no tool gave a second opinion" '[ "$(grep -c "^mentat: no second opinion from any tool" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ]'
 
 # Cancelling: the parent killed stops both model processes and cleans up.
@@ -326,6 +333,47 @@ reset; rc=$(run "$idea")
 check "at start, deletes a Grok run folder older than a day and a kept log older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-opinion.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ]'
 rm -rf "$cache/mentat/grok-opinion.old" "$TMPDIR/mentat-codex-log.old"
 
+# The switch: the checkout goes to Codex and Grok only where outside reviewers are on in
+# .claude/settings.json on origin's default branch, read as review --codex reads it, after
+# the usage and idea-file checks and before the start sweep, the freshness fetch, the export
+# and any tool. Off and unknown each have an origin and a clone of their own; the lone
+# repository has no remote, though its own committed settings turn outside reviewers on.
+OFF_LINE="mentat: no second opinion: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on trunk), so nothing was sent to Codex or Grok"
+unknown_line() { printf 'mentat: no second opinion: outside reviewers are unknown in this repository (%s), so nothing was sent to Codex or Grok; they give one only once it reads as on' "$1"; }
+gate_repo() { # $1 name, $2 .claude/settings.json on its origin's trunk
+  "$real_git" init -q --bare -b trunk "$root/$1 origin.git" && "$real_git" clone -q "$root/my origin.git" "$root/$1 repo" &&
+    (cd "$root/$1 repo" && printf '%s' "$2" >.claude/settings.json && "$real_git" commit -qam settings &&
+      "$real_git" remote set-url origin "$root/$1 origin.git" && "$real_git" push -q origin trunk)
+}
+gate_repo off '{"enabledPlugins":{"mentat-reviewers@mentat":false}}' || exit 1
+gate_repo unknown '{"enabledPlugins":' || exit 1
+"$real_git" init -q -b trunk "$root/lone repo" && (cd "$root/lone repo" && mkdir sub .claude && echo x >sub/file && printf '%s\n' "$ON" >.claude/settings.json && "$real_git" add -A && "$real_git" commit -q -m base) || exit 1
+gate_run() { (cd "$root/$1 repo/sub" && shift && "$mentat" second-opinion "$@" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); echo $?; }
+# Exit 6 with the one line $2 on stderr and nothing on stdout. From repository $1 nothing
+# was sent or left: neither tool ran, at most one fetch (the switch's own), no private ref,
+# no worktree, no run or temporary folder, and the old leftovers the start sweep deletes are still there.
+gate_refused() { # $1 the repository, $2 the one line on stderr
+  [ "$rc" = 6 ] && [ "$(cat "$STUB/stderr")" = "$2" ] && [ ! -s "$STUB/stdout" ] && ! codex_ran && ! grok_ran &&
+    [ "$(cat "$CALLS/fetch" 2>/dev/null | wc -l | tr -d ' ')" -le 1 ] && [ -z "$("$real_git" -C "$1" for-each-ref refs/mentat)" ] &&
+    [ "$("$real_git" -C "$1" worktree list | wc -l | tr -d ' ')" = 1 ] && [ "$(ls -A "$cache/mentat")" = grok-opinion.old ] &&
+    [ -f "$TMPDIR/mentat-codex-log.old" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name 'mentat-grok-log.*' -not -name cache)" ]
+}
+reset; rc=$(run "$idea")
+check "outside reviewers on in .claude/settings.json on origin's default branch: the second opinion runs (exit 0)" '[ "$rc" = 0 ] && codex_ran && grok_ran && grep -q "^- Codex ([0-9]* seconds): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout"'
+mkdir -p "$cache/mentat/grok-opinion.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-opinion.old"
+echo x >"$TMPDIR/mentat-codex-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-codex-log.old"
+reset; rc=$(gate_run off "$idea")
+check "outside reviewers off: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/off repo" "$OFF_LINE"'
+reset; rc=$(gate_run unknown "$idea")
+check "outside reviewers unknown: no second opinion (exit 6), saying why, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/unknown repo" "$(unknown_line ".claude/settings.json on trunk could not be read as JSON")"'
+reset; rc=$(gate_run lone "$idea")
+check "no origin remote, though the checkout's own settings turn outside reviewers on: no second opinion (exit 6), saying why, and nothing fetched or run" 'gate_refused "$root/lone repo" "$(unknown_line "the checkout has no origin remote")" && [ ! -e "$CALLS/fetch" ]'
+reset; rc=$(gate_run off "$root/missing idea.md")
+check "outside reviewers off, a missing idea file is still a usage error (exit 64), found before the switch is read" '[ "$rc" = 64 ] && [ "$(cat "$STUB/stderr")" = "mentat: idea file not found: $root/missing idea.md" ] && [ ! -e "$CALLS/fetch" ]'
+reset; rc=$(gate_run off)
+check "outside reviewers off, no idea file is still a usage error (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat second-opinion" "$STUB/stderr" && [ ! -e "$CALLS/fetch" ]'
+rm -rf "$cache/mentat/grok-opinion.old" "$TMPDIR/mentat-codex-log.old"
+
 # Usage errors: exactly one existing file.
 reset; rc=$(run)
 check "no idea file is a usage error (exit 64), and nothing ran" '[ "$rc" = 64 ] && ! codex_ran && ! grok_ran'
@@ -337,15 +385,14 @@ reset; rc=$(run "$root")
 check "a folder is a usage error (exit 64)" '[ "$rc" = 64 ] && ! codex_ran && ! grok_ran'
 rc=$("$mentat" second-opinion >/dev/null 2>&1; echo $?)
 check "usage errors come before anything else, even outside a repository" '[ "$rc" = 64 ]'
-reset; rc=$(cd "$root" && "$mentat" second-opinion "$idea" >"$STUB/stdout" 2>/dev/null </dev/null; echo $?)
-check "outside a git repository no second opinion is given (exit 1)" '[ "$rc" = 1 ] && ! codex_ran && ! grok_ran'
+reset; rc=$(cd "$root" && "$mentat" second-opinion "$idea" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null; echo $?)
+check "outside a git repository outside reviewers are unknown: no second opinion (exit 6), and nothing ran" '[ "$rc" = 6 ] && [ "$(cat "$STUB/stderr")" = "$(unknown_line "not inside a git repository")" ] && ! codex_ran && ! grok_ran'
 
 # Freshness: HEAD is checked against origin's default branch, fetched into a private ref.
-reset; rc=$(run "$idea")
-check "no remote: second-opinion runs, fetches nothing and says the checkout's freshness could not be checked" '[ "$rc" = 0 ] && codex_ran && no_outside && grep -q "^- The checkout.s freshness could not be checked: the checkout has no origin remote\.$" "$STUB/stdout"'
+# The origin turns outside reviewers on.
 O="$root/fresh origin.git" U="$root/fresh upstream" F="$root/fresh repo"
 "$real_git" init -q --bare -b trunk "$O" || exit 1
-"$real_git" init -q -b trunk "$U" && (cd "$U" && echo one >README && printf 'Read me.\n' >AGENTS.md && "$real_git" add -A && "$real_git" commit -q -m one && "$real_git" remote add origin "$O" && "$real_git" push -q origin trunk) || exit 1
+"$real_git" init -q -b trunk "$U" && (cd "$U" && echo one >README && printf 'Read me.\n' >AGENTS.md && mkdir .claude && printf '%s\n' "$ON" >.claude/settings.json && "$real_git" add -A && "$real_git" commit -q -m one && "$real_git" remote add origin "$O" && "$real_git" push -q origin trunk) || exit 1
 "$real_git" clone -q "$O" "$F" || exit 1
 upstream_commit() { (cd "$U" && echo "$1" >>README && "$real_git" commit -q -am "$1" && "$real_git" push -q origin trunk) || exit 1; }
 run_in() { (cd "$F" && "$mentat" second-opinion "$idea" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); echo $?; }
@@ -373,12 +420,12 @@ check "HEAD ahead of the default branch runs as before" 'runs_fresh'
 upstream_commit four
 reset; rc=$(run_in)
 check "a feature branch missing a default-branch commit is refused (exit 5)" 'refused "1 commit"'
+# A failed fetch leaves outside reviewers unknown: a local origin/<default>, here ahead of
+# HEAD and turning them on, never counts.
 "$real_git" -C "$F" remote set-url origin "$root/gone.git" || exit 1
 stale=$("$real_git" -C "$F" commit-tree -p HEAD -m stale "HEAD^{tree}") && "$real_git" -C "$F" update-ref refs/remotes/origin/trunk "$stale" || exit 1
+FETCH_FAILED_LINE=$(unknown_line "origin's default branch trunk could not be fetched")
 reset; rc=$(run_in)
-check "a failed fetch with a local origin/<default> that HEAD is behind is refused (exit 5)" 'refused "1 commit"'
-"$real_git" -C "$F" update-ref refs/remotes/origin/trunk HEAD || exit 1
-reset; rc=$(run_in)
-check "a failed fetch with a local origin/<default> HEAD has runs, saying the freshness could not be checked" '[ "$rc" = 0 ] && codex_ran && grep -q "^- The checkout.s freshness could not be checked: origin.s default branch trunk could not be fetched\.$" "$STUB/stdout"'
+check "a failed fetch is no second opinion (exit 6), saying why, though a local origin/<default> turns outside reviewers on, and nothing ran" '[ "$rc" = 6 ] && [ "$(cat "$STUB/stderr")" = "$FETCH_FAILED_LINE" ] && [ ! -s "$STUB/stdout" ] && ! codex_ran && ! grok_ran && [ -z "$("$real_git" -C "$F" for-each-ref refs/mentat)" ]'
 
 [ "$failures" -eq 0 ]

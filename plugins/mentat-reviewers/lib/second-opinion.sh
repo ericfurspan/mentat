@@ -90,11 +90,19 @@ opinion_grok() {
 }
 
 # The idea is judged as of HEAD, never the working tree, and the result is printed,
-# not posted: nothing here talks to GitHub but fresh_check's fetch of origin's default
-# branch, and a checkout behind it gets no second opinion (exit 5).
+# not posted: nothing here talks to GitHub but the fetches of origin's default branch
+# that read the switch and check freshness. Unless outside reviewers are on here, as
+# review --codex reads it, the checkout goes nowhere (exit 6); a checkout behind origin's
+# default branch gets no second opinion (exit 5).
 opinion_repo() {
-  local idea="$1"
+  local idea="$1" reviewers reviewers_why reviewers_def
   [ -f "$idea" ] || die "idea file not found: $idea" 64
+  reviewers_here
+  case "$reviewers" in
+    on) ;;
+    off) die "no second opinion: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on $reviewers_def), so nothing was sent to Codex or Grok" 6 ;;
+    *) die "no second opinion: outside reviewers are unknown in this repository ($reviewers_why), so nothing was sent to Codex or Grok; they give one only once it reads as on" 6 ;;
+  esac
   sweep_leftovers
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
   local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind fresh_note
