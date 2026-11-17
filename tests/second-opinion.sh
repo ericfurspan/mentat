@@ -37,7 +37,8 @@ echo fake-mcp-secret >"$GH_USER/mcp_credentials.json"
 GH_REAL=$(cd -P "$GH_USER" && pwd -P)
 export GROK_HOME="$GH_USER" XAI_API_KEY=fake-xai-key MENTAT_CANARY=fake-canary GROK_FOLDER_TRUST=0
 
-# gh must never be called; git is the real one, except that a fetch is recorded.
+# gh must never be called; git is the real one, except that a fetch is recorded, and the
+# freshness fetch fails while $STUB/fresh_fetch_fails exists.
 cat >"$root/tools/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "gh $*" >>"$CALLS/gh"
@@ -45,6 +46,7 @@ exit 99
 EOF
 { printf '#!/usr/bin/env bash\nREAL=%q\n' "$real_git"; cat; } >"$root/tools/bin/git" <<'EOF'
 for a in "$@"; do [ "$a" = fetch ] && echo "git $*" >>"$CALLS/fetch"; done
+case "$*" in *" fetch "*refs/mentat/fresh-*) [ -f "$STUB/fresh_fetch_fails" ] && exit 128 ;; esac
 exec "$REAL" "$@"
 EOF
 # codex: records how it was started and what it can see, then replies with
@@ -405,6 +407,9 @@ refused() { # $1 the count and its noun
 }
 reset; rc=$(run_in)
 check "HEAD up to date with the default branch runs as before, after a fetch, with no freshness line" 'runs_fresh'
+# The freshness fetch failing after the switch read on: no checkout is judged unchecked.
+reset; touch "$STUB/fresh_fetch_fails"; rc=$(run_in)
+check "a freshness fetch that fails after the switch read on is no second opinion (exit 1), saying so, and nothing ran" '[ "$rc" = 1 ] && [ "$(cat "$STUB/stderr")" = "mentat: no second opinion: could not check whether the checkout is behind origin'"'"'s default branch trunk" ] && [ ! -s "$STUB/stdout" ] && ! codex_ran && ! grok_ran && grep -q "refs/mentat/fresh-" "$CALLS/fetch" && [ -z "$("$real_git" -C "$F" for-each-ref refs/mentat)" ]'
 upstream_commit two; upstream_commit three
 before_tracking=$(tracking) before_fetch_head=$(fetch_head)
 reset; rc=$(run_in)

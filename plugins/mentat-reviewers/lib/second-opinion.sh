@@ -105,13 +105,13 @@ opinion_repo() {
   esac
   sweep_leftovers
   # shellcheck disable=SC2034 # run_pids is set by pair_run and read by pair_cancel
-  local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind fresh_note
+  local top head changes dirty=no res="" run_pids="" tools="codex grok" t both="both tools were" fresh_def fresh_behind
   command -v git >/dev/null 2>&1 || die "no second opinion: git is not installed" 1
   top=$(git rev-parse --show-toplevel) || die "no second opinion: not inside a git repository" 1
   head=$(git -C "$top" rev-parse HEAD) || die "no second opinion: could not read HEAD" 1
   changes=$(git -C "$top" status --porcelain) || die "no second opinion: could not read git status" 1
   [ -z "$changes" ] || dirty=yes
-  fresh_check "$top"
+  fresh_check "$top" "$reviewers_def" || die "no second opinion: could not check whether the checkout is behind origin's default branch $reviewers_def" 1
   fresh_stop "mentat second-opinion"
   res=$(mktemp -d) || die "no second opinion: could not create a temporary directory" 1
   # shellcheck disable=SC2064 # expand now, so the path is fixed when the trap is set
@@ -124,7 +124,6 @@ opinion_repo() {
   pair_run opinion $tools
 
   printf '## Second opinion on %s\n\n- Commit read: %s\n' "$idea" "$head"
-  [ -z "$fresh_note" ] || printf -- '- %s\n' "$fresh_note"
   if [ "$dirty" = yes ]; then
     printf -- '- Uncommitted changes: yes. They were not read; %s given only that commit.\n\n' "$both"
   else
