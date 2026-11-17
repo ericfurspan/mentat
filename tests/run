@@ -22,6 +22,37 @@ else
   printf '%s\n' "$tracker_words"
 fi
 
+# A backlog item's description stays short: the item shape names one Now: line and sends the decisions
+# lines and longer plan to the agent records, which keep the Spec document's id. The spec lives where the
+# tracker's adapter says: on Linear in the issue document titled Spec, on GitHub issues in the body's ## Spec section.
+f=skills/backlog/SKILL.md
+item_shape=$(awk '/^## Item shape$/ { on = 1; next } on && /^## / { exit } on' "$f")
+if printf '%s\n' "$item_shape" | grep -q "\`Now:\` line"; then
+  pass "$f's item shape names the Now: line"
+else
+  fail "$f's item shape must name the Now: line"
+fi
+if printf '%s\n' "$item_shape" | grep -q "decisions lines, any longer current plan and its material assumptions go in its agent records"; then
+  pass "$f's item shape sends the decisions lines and longer plan to the agent records"
+else
+  fail "$f's item shape must send the decisions lines and longer plan to the agent records"
+fi
+if grep -q "^- \`Spec document: <id>\`" skills/backlog/agent-records.md; then
+  pass "skills/backlog/agent-records.md lists the Spec document record"
+else
+  fail "skills/backlog/agent-records.md must list the Spec document record"
+fi
+if grep -q "document titled exactly \`Spec\`" plugins/mentat-linear/skills/linear/SKILL.md; then
+  pass "the Linear adapter keeps the spec in the document titled Spec"
+else
+  fail "the Linear adapter must keep the spec in the document titled Spec"
+fi
+if grep -q "the issue body's \`## Spec\` section" skills/backlog/github.md; then
+  pass "skills/backlog/github.md keeps the spec in the issue body's ## Spec section"
+else
+  fail "skills/backlog/github.md must keep the spec in the issue body's ## Spec section"
+fi
+
 # The README stays short: at most 500 words by wc -w.
 readme_words=$(wc -w <README.md | tr -d ' ')
 if [ "$readme_words" -le 500 ]; then
@@ -174,14 +205,7 @@ else
   fail "$f's description must end by listing its argument (Arguments: a backlog item id.)"
 fi
 
-# The waiting list is started only by a command, a build run by a command or by the session; both list their arguments.
-for s in 'name: waiting' 'disable-model-invocation: true'; do
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" skills/waiting/SKILL.md; then
-    pass "skills/waiting/SKILL.md's frontmatter sets $s"
-  else
-    fail "skills/waiting/SKILL.md's frontmatter must set $s"
-  fi
-done
+# A build is run by a command or by the session, and lists its arguments.
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want='name: build' skills/build/SKILL.md; then
   pass "skills/build/SKILL.md's frontmatter sets name: build"
 else
@@ -191,11 +215,6 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
   fail "skills/build/SKILL.md's frontmatter must not set disable-model-invocation, so the session can call it"
 else
   pass "skills/build/SKILL.md's frontmatter does not set disable-model-invocation"
-fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, and full\./ { found = 1; exit 0 } END { exit !found }' skills/waiting/SKILL.md; then
-  pass "skills/waiting/SKILL.md's description lists its arguments"
-else
-  fail "skills/waiting/SKILL.md's description must list its arguments (Arguments: project names or all, and full.)"
 fi
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: backlog item ids\./ { found = 1; exit 0 } END { exit !found }' skills/build/SKILL.md; then
   pass "skills/build/SKILL.md's description lists its arguments"
