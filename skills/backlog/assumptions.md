@@ -2,7 +2,7 @@
 
 With either tracker, read this before writing or reading an item's material assumptions, and again after a compaction.
 
-A material assumption is an unchecked fact a plan relies on that would change the design or the checks if false (`mentat:propose` step 5). Assumptions never go in the `## Spec` section; the spec's shape, its limits and the review criteria are unchanged by them.
+A material assumption is an unchecked fact a plan relies on that would change the design or the checks if false (`mentat:propose` step 5). Assumptions never go in the spec; the spec's shape, its limits and the review criteria are unchanged by them.
 
 ## The record
 
