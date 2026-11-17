@@ -33,7 +33,7 @@ Every reader takes a record from the `Agent records` comment, else from the olde
 
 ## Decision lines
 
-Each skill that records the maintainer's answer on an item writes its decisions line where "Item shape" in `SKILL.md` says (with GitHub issues, the body's `## Decisions`), not a comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request, and the line points to it. The answered decision leaves any open decision section, and when it was a marked decision, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
+Each skill that records the maintainer's answer on an item writes its decisions line in this comment's `Decisions:` record (with GitHub issues, the body's `## Decisions`), never a separate comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request (with GitHub issues, one comment, as `github.md` says), and the line points to it. The answered decision leaves any open decision section, and when it was a marked decision, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
 
 ## Advice against
 
