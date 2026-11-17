@@ -79,7 +79,7 @@ review_prep_claude() {
   git -C "$top" log --no-color --format=medium "$mb..$head" >"$tmp/data/log" || not_reviewed "could not read the commits $mb..$head"
   printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s, and you have no shell. ' "$pr" "$head"
   printf 'Review the change from %s to %s: the diff is in %s and its commits are in %s; read them and the files around the change with your file tools. Do not modify files. ' "$mb" "$head" "$tmp/data/diff" "$tmp/data/log"
-  printf 'Your file tools can read only this checkout and the folder holding the diff and the commit log, and a read anywhere else is refused and fails the whole review, so attempt none; state what you cannot check from those two places as a limitation of a complete review, not as a reason for INCOMPLETE and not as a guessed finding.\n\n'
+  printf 'Your file tools can read only this checkout and the folder holding the diff and the commit log, and a read anywhere else is refused and fails the whole review, so attempt none; state what you cannot check from those two places as a limitation of a complete review, not as a reason for INCOMPLETE, which stays for a material file in this checkout, or the diff, that cannot be read, and not as a guessed finding.\n\n'
 }
 # Sets the caller's claude_model, the model to review on, and claude_key, the setting
 # that chose it: FIRST_REVIEW_MODEL when it is set and the pull request has no local
