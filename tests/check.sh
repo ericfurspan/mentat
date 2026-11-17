@@ -129,10 +129,15 @@ reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR GIT_CONFIG_COUNT=3 GIT
 check "the last core.hooksPath entry in GIT_CONFIG_*, matched ignoring case, names the git hooks folder" '[ "$rc" = 0 ] && grep -qxF "OK: the git hooks in $INSTALLED are installed and current" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$root/none/hooks" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a core.hooksPath entry naming a missing folder is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hooks folder $root/none is missing, so agents'"'"' git runs no hooks" "$STUB/out"'
+# An installed folder still named git-templates is found the same way, and a line says it keeps its older name.
+mkdir "$root/older" && cp -Rp "$INSTALLED" "$root/older/git-templates"
+reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$root/older/git-templates/hooks" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "an installed folder named git-templates is current, with a line saying it keeps its older name" '[ "$rc" = 0 ] && grep -qxF "OK: the installed git hooks folder keeps its older name, git-templates" "$STUB/out" && grep -qxF "OK: the git hooks in $root/older/git-templates are installed and current" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
 
 # The installed git hooks: current is OK; a missing, changed or not executable file is a problem.
 reset; rc=$(run)
 check "installed and current git hooks are OK" '[ "$rc" = 0 ] && grep -qxF "OK: the git hooks in $INSTALLED are installed and current" "$STUB/out"'
+check "an installed folder with another name gets no line about an older name" '! grep -q "older name" "$STUB/out"'
 mv "$INSTALLED/scan" "$root/scan.away"; reset; rc=$(run); mv "$root/scan.away" "$INSTALLED/scan"
 check "a missing installed scanner is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hooks in $INSTALLED are missing or not executable (scan), so agents'"'"' git may skip checks or the repository'"'"'s own hooks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 mv "$INSTALLED/hooks/post-checkout" "$root/stub.away"; reset; rc=$(run); mv "$root/stub.away" "$INSTALLED/hooks/post-checkout"

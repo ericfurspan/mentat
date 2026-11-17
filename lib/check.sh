@@ -93,13 +93,16 @@ c_modules() {
   fi
 }
 # The git hooks (lib/git-hooks.sh): a warning when agents' git does not use
-# them; when it does, one problem per problem with the installed copy.
+# them; when it does, one problem per problem with the installed copy. An installed
+# folder named git-templates, the name it was copied under before Mentat's folder was
+# renamed, gets a line saying so before the lines that print its path.
 c_git_hooks() {
   local dir problems p IFS=$'\n'
   if ! dir=$(git_hooks_dir); then
     c_warn "the git hooks are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
     return 0
   fi
+  case ${dir%/} in git-templates | */git-templates) c_ok "the installed git hooks folder keeps its older name, git-templates" ;; esac
   # shellcheck disable=SC2154 # root, Mentat's folder, is set by bin/mentat.
   if problems=$(git_hooks_problems "$root" "$dir"); then
     c_ok "the git hooks in $dir are installed and current"
