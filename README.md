@@ -66,7 +66,7 @@ Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linea
 
 `mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone.
 
-`MENTAT_FIRST_REVIEW_MODEL=<model>` runs each pull request's first local review, then the default review model if it does not run; `MENTAT_PLAN_CHECK_MODEL=<model>` runs plan checks. Empty is off. A model outside your plan bills credits or fails.
+`MENTAT_FIRST_REVIEW_MODEL=<model>` runs each pull request's first local review, then `MENTAT_REVIEW_MODEL`, else the default, if it does not run; `MENTAT_PLAN_CHECK_MODEL=<model>` runs plan checks. Empty is off. A model outside your plan bills credits or fails.
 
 ## Git hooks
 
