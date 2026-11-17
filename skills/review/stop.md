@@ -8,7 +8,7 @@ A stop is pending after any completed round from round three on that posted find
 
 At the end of the round, and on resume while the answer is pending:
 
-1. Rewrite the Status line with the state `Blocked: reassessing after round <n>` (Skill tool, `mentat:pr`), and mark the item as waiting on the answer (`mentat:backlog` "Marking a wait").
+1. Rewrite the Status line with the state `Blocked: reassessing after round <n>` (Skill tool, `mentat:pr`), and, with an external backlog, mark the item as waiting on the answer (`mentat:backlog` "Marking a wait").
 2. Where `mentat reviewers` prints `reviewers: on`, `grok` is installed and `mentat status <N>` shows `grok stop: none`, run `mentat review --grok --stop <N>`, with `--request <file>` and `--require-ci` as `mentat:review` "Spec" and step 1 say; exit 3 runs it again. With any other `grok stop:` value, run nothing: re-read its comment, naming its head and spec fingerprint from that field (`running on` is did not finish unless this session's own run is still going).
 3. Ask the question below. It is the loop's tell-the-maintainer.
 
@@ -32,7 +32,7 @@ At any round, new evidence that the change cannot meet its goal sets `Blocked: <
 
 ## Durable pause
 
-One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision, its decisions line (`mentat:backlog` "Item shape"), and ends the stop's wait (`mentat:backlog` "Marking a wait").
+One Review details line (`mentat:pr`) records the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads it before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision, its decisions line (`mentat:backlog` "Item shape"), and, with an external backlog, ends the stop's wait (`mentat:backlog` "Marking a wait").
 
 ## Started sessions
 
