@@ -49,6 +49,34 @@ status_rounds() {
   done <<<"$1"
 }
 
+# The review of the owner of repository $1 on its pull request $2, whose head is $3,
+# the first that holds: "no single owner" (an organization owns the repository),
+# "author" (the owner opened it), "approved on head" (the owner's latest submitted
+# review is APPROVED on $3, as skills/review/ready-gate.md reads it), "requested" (the
+# owner is among the requested reviewers), else "not requested". Each read is made only
+# when the answer needs it; one that fails gives "unknown (<why>)" and stops nothing.
+status_owner_review() {
+  local owner=${1%%/*} kind state requested
+  kind=$(gh api "repos/$1" --jq .owner.type) || kind=""
+  case "$kind" in
+    Organization) echo "no single owner"; return ;;
+    User) ;;
+    *) echo "unknown (could not read the repository owner)"; return ;;
+  esac
+  if ! state=$(gh pr view "$2" --json author,reviews | jq -r --arg o "$owner" --arg h "$3" '
+    ([.reviews[] | select(.author.login == $o and .state != "PENDING")] | sort_by(.submittedAt) | last) as $r
+    | if .author.login == $o then "author"
+      elif $r != null and $r.state == "APPROVED" and $r.commit.oid == $h then "approved on head"
+      else "" end'); then
+    echo "unknown (could not read the reviews)"; return
+  fi
+  if [ -n "$state" ]; then echo "$state"; return; fi
+  if ! requested=$(gh pr view "$2" --json reviewRequests | jq -r --arg o "$owner" 'any(.reviewRequests[]; .login == $o)'); then
+    echo "unknown (could not read the requested reviewers)"; return
+  fi
+  if [ "$requested" = true ]; then echo requested; else echo "not requested"; fi
+}
+
 status() {
   local pr="" request_file="" request fp repo me head lines ci kind sha res lfp
   local rounds last last_fp grok=none grok_stop_state=none codex_state=none reviewed out
@@ -117,5 +145,6 @@ status() {
     elif [ "$last_fp" = "$fp" ]; then out="$out, spec: matches"
     else out="$out, spec: differs (last review ${last_fp:-none}, file $fp)"; fi
   fi
+  out="$out, owner review: $(status_owner_review "$repo" "$pr" "$head")"
   printf '%s\n' "$out"
 }
