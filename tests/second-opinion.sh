@@ -361,7 +361,7 @@ gate_refused() { # $1 the repository, $2 the one line on stderr
     [ -f "$TMPDIR/mentat-codex-log.old" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name 'mentat-grok-log.*' -not -name cache)" ]
 }
 reset; rc=$(run "$idea")
-check "outside reviewers on in .claude/settings.json on origin's default branch: the second opinion runs (exit 0)" '[ "$rc" = 0 ] && codex_ran && grok_ran && grep -q "^- Codex ([0-9]* seconds): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout"'
+check "outside reviewers on in .claude/settings.json on origin's default branch: the switch is read from it before the freshness fetch, and the second opinion runs (exit 0)" '[ "$rc" = 0 ] && codex_ran && grok_ran && grep -q "^- Codex ([0-9]* seconds): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout" && sw=$(grep -n -m 1 -F "origin +refs/heads/trunk:refs/mentat/reviewers-" "$CALLS/fetch" | cut -d: -f1) && fr=$(grep -n -m 1 -F "refs/mentat/fresh-" "$CALLS/fetch" | cut -d: -f1) && [ -n "$sw" ] && [ -n "$fr" ] && [ "$sw" -lt "$fr" ]'
 mkdir -p "$cache/mentat/grok-opinion.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-opinion.old"
 echo x >"$TMPDIR/mentat-codex-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-codex-log.old"
 reset; rc=$(gate_run off "$idea")
