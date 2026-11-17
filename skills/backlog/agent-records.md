@@ -12,7 +12,7 @@ An item keeps its agent records in one comment whose first line is `Agent record
 - `Plan check:` the plan check's settlement ("Plan check" below).
 - `Second opinion, round <n>:` that round's settlement ("Second opinions" below).
 - `Decisions:` one line per answered decision for the maintainer: the question, the answer, its date and the rejected options in a few words ("Decision lines" below).
-- `Plan:` a current plan longer than the item's `Now:` line, which keeps the next step.
+- `Plan:` a current plan longer than the item's next step ("Item shape" in `SKILL.md`).
 
 A later fingerprint and build answer, assumptions list, advice or plan replaces the earlier one in place, so the current one stands. Settlements and decisions lines add one entry each. With GitHub issues, the comment holds no settlements, decisions or plan: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog, and an issue keeps its plan and decisions in its body (`github.md`).
 
@@ -32,7 +32,7 @@ Every reader takes a record from the `Agent records` comment, else from the olde
 
 ## Decision lines
 
-Each skill that records the maintainer's answer on an item writes its decisions line, not a comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request, and the line points to it. The answered decision leaves any open decision section, and when it was a marked decision, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
+Each skill that records the maintainer's answer on an item writes its decisions line where "Item shape" in `SKILL.md` says (with GitHub issues, the body's `## Decisions`), not a comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request, and the line points to it. The answered decision leaves any open decision section, and when it was a marked decision, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
 
 ## Advice against
 
