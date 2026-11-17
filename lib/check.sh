@@ -15,7 +15,7 @@
 # When claude is installed, it reads its version and the local plugin list, and prints
 # only the Claude Code version, the scope and version of each copy of the Mentat plugin,
 # and the names of the Mentat modules installed.
-# It warns when agents' git does not use the git hook templates (lib/templates.sh), and
+# It warns when agents' git does not use the git hook templates (lib/git-hooks.sh), and
 # when it does, a missing or changed installed copy, or a missing gitleaks or jq, is a
 # problem.
 KEPT_BRANCHES_FILE="$HOME/.config/mentat/warn-kept-branches"
@@ -92,16 +92,16 @@ c_modules() {
     c_ok "no Mentat modules installed (optional: mentat-reviewers, mentat-linear, mentat-extras, mentat-public-text)"
   fi
 }
-# The git hook templates (lib/templates.sh): a warning when agents' git does not use
+# The git hook templates (lib/git-hooks.sh): a warning when agents' git does not use
 # them; when it does, one problem per problem with the installed copy.
-c_templates() {
+c_git_hooks() {
   local dir problems p IFS=$'\n'
-  if ! dir=$(templates_dir); then
+  if ! dir=$(git_hooks_dir); then
     c_warn "the git hook templates are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
     return 0
   fi
   # shellcheck disable=SC2154 # root, Mentat's folder, is set by bin/mentat.
-  if problems=$(templates_problems "$root" "$dir"); then
+  if problems=$(git_hooks_problems "$root" "$dir"); then
     c_ok "the git hook templates in $dir are installed and current"
     return 0
   fi
@@ -161,12 +161,12 @@ check() {
   done
   [ "$check_problems" = 0 ] || c_finish
   c_review_tools
-  # Only the git hook templates need gitleaks: with them in use, c_templates reports a missing one as a problem.
+  # Only the git hook templates need gitleaks: with them in use, c_git_hooks reports a missing one as a problem.
   if command -v gitleaks >/dev/null 2>&1; then
     v=$(gitleaks version 2>/dev/null | head -n 1)
     c_ok "gitleaks is installed (${v:-version unknown})"
   fi
-  c_templates
+  c_git_hooks
   c_claude_version
   c_plugin_copies
   c_modules

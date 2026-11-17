@@ -80,7 +80,7 @@
 #   mentat check  Checks what Mentat itself needs, changing nothing but a temporary ref
 #     (deleted after) that mentat reviewers' fetch uses: tools, the git hook
 #     templates installed and the same as this copy when agents' git uses them
-#     (lib/templates.sh), gh signed in, the repository readable, claude installed at a version
+#     (lib/git-hooks.sh), gh signed in, the repository readable, claude installed at a version
 #     the merge hook and the review need; prints the Mentat modules installed, whether
 #     outside reviewers are on here as mentat reviewers reads it, and whether codex and grok
 #     are installed, and warns when outside reviewers are unknown or are on with codex or
@@ -100,7 +100,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review templates check status; do
+for lib in shared publish review git-hooks check status; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1

@@ -76,8 +76,8 @@ export PATH="$root/bin:$PATH"
 export HOME="$root/home"
 # An installed and current copy of the git hook templates, in use for every case but those that change it.
 unset GIT_CONFIG_COUNT
-export MENTAT_GIT_TEMPLATES_DIR="$root/templates"
-cp -Rp "$(dirname "$mentat")/../git-hooks" "$MENTAT_GIT_TEMPLATES_DIR"
+export MENTAT_GIT_HOOKS_DIR="$root/installed"
+cp -Rp "$(dirname "$mentat")/../git-hooks" "$MENTAT_GIT_HOOKS_DIR"
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$(dirname "$LIST")"
 echo stubword >"$LIST"
@@ -113,36 +113,36 @@ check "prints the installed gitleaks version" 'grep -qx "OK: gitleaks is install
 # Without gitleaks and with the templates not in use, nothing Mentat runs needs it: check names only the templates and still passes.
 NOT_IN_USE="WARN: the git hook templates are not in use for agents: no core.hooksPath entry in GIT_CONFIG_* names them"
 mkdir "$root/nogitleaks"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogitleaks/$t"; done; ln -s "$root/bin/gh" "$root/bin/claude" "$root/nogitleaks/"
-reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "with the templates not in use, a missing gitleaks is not reported, exit 0" '[ "$rc" = 0 ] && ! grep -q gitleaks "$STUB/out" && grep -qxF "$NOT_IN_USE" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
 reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "with the templates in use, a missing gitleaks is a problem (exit 1), not a warning" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: gitleaks is not installed, so the git hook templates in $MENTAT_GIT_TEMPLATES_DIR refuse every agent commit and push" "$STUB/out" && ! grep -q "^WARN: gitleaks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+check "with the templates in use, a missing gitleaks is a problem (exit 1), not a warning" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: gitleaks is not installed, so the git hook templates in $MENTAT_GIT_HOOKS_DIR refuse every agent commit and push" "$STUB/out" && ! grep -q "^WARN: gitleaks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
 
 # Whether agents' git uses the templates: the override, else the last core.hooksPath entry in GIT_CONFIG_*.
-TPL=$MENTAT_GIT_TEMPLATES_DIR
-reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR "$mentat" check >"$STUB/out" 2>&1; echo $?)
+INSTALLED=$MENTAT_GIT_HOOKS_DIR
+reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "with neither the override nor a core.hooksPath entry, one warning says the templates are not in use" '[ "$rc" = 0 ] && grep -qxF "$NOT_IN_USE" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ] && ! grep -q "git hook templates in" "$STUB/out"'
-reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x "$mentat" check >"$STUB/out" 2>&1; echo $?)
+reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "GIT_CONFIG_* entries with no core.hooksPath leave the templates not in use" '[ "$rc" = 0 ] && grep -qxF "$NOT_IN_USE" "$STUB/out"'
-reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$root/none/hooks" \
-  GIT_CONFIG_KEY_1=user.name GIT_CONFIG_VALUE_1=x GIT_CONFIG_KEY_2=Core.HooksPath GIT_CONFIG_VALUE_2="$TPL/hooks" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-check "the last core.hooksPath entry in GIT_CONFIG_*, matched ignoring case, names the templates folder" '[ "$rc" = 0 ] && grep -qxF "OK: the git hook templates in $TPL are installed and current" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_TEMPLATES_DIR GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$root/none/hooks" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$root/none/hooks" \
+  GIT_CONFIG_KEY_1=user.name GIT_CONFIG_VALUE_1=x GIT_CONFIG_KEY_2=Core.HooksPath GIT_CONFIG_VALUE_2="$INSTALLED/hooks" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+check "the last core.hooksPath entry in GIT_CONFIG_*, matched ignoring case, names the templates folder" '[ "$rc" = 0 ] && grep -qxF "OK: the git hook templates in $INSTALLED are installed and current" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; rc=$(cd "$root/cwd" && env -u MENTAT_GIT_HOOKS_DIR GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$root/none/hooks" "$mentat" check >"$STUB/out" 2>&1; echo $?)
 check "a core.hooksPath entry naming a missing folder is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates folder $root/none is missing, so agents'"'"' git runs no hooks" "$STUB/out"'
 
 # The installed git hook templates: current is OK; a missing, changed or not executable file is a problem.
 reset; rc=$(run)
-check "installed and current git hook templates are OK" '[ "$rc" = 0 ] && grep -qxF "OK: the git hook templates in $TPL are installed and current" "$STUB/out"'
-mv "$TPL/scan" "$root/scan.away"; reset; rc=$(run); mv "$root/scan.away" "$TPL/scan"
-check "a missing installed scanner is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates in $TPL are missing or not executable (scan), so agents'"'"' git may skip checks or the repository'"'"'s own hooks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
-mv "$TPL/hooks/post-checkout" "$root/stub.away"; reset; rc=$(run); mv "$root/stub.away" "$TPL/hooks/post-checkout"
+check "installed and current git hook templates are OK" '[ "$rc" = 0 ] && grep -qxF "OK: the git hook templates in $INSTALLED are installed and current" "$STUB/out"'
+mv "$INSTALLED/scan" "$root/scan.away"; reset; rc=$(run); mv "$root/scan.away" "$INSTALLED/scan"
+check "a missing installed scanner is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates in $INSTALLED are missing or not executable (scan), so agents'"'"' git may skip checks or the repository'"'"'s own hooks" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+mv "$INSTALLED/hooks/post-checkout" "$root/stub.away"; reset; rc=$(run); mv "$root/stub.away" "$INSTALLED/hooks/post-checkout"
 check "a missing installed chain-only template is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qF "are missing or not executable (hooks/post-checkout)" "$STUB/out"'
-cp -p "$TPL/hooks/pre-push" "$root/pre-push.keep"; printf '# changed\n' >>"$TPL/hooks/pre-push"; reset; rc=$(run); mv "$root/pre-push.keep" "$TPL/hooks/pre-push"
-check "a changed installed template is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates in $TPL differ from this copy of Mentat (hooks/pre-push), so agents'"'"' git runs other checks" "$STUB/out"'
-chmod -x "$TPL/hooks/pre-commit"; reset; rc=$(run); chmod +x "$TPL/hooks/pre-commit"
+cp -p "$INSTALLED/hooks/pre-push" "$root/pre-push.keep"; printf '# changed\n' >>"$INSTALLED/hooks/pre-push"; reset; rc=$(run); mv "$root/pre-push.keep" "$INSTALLED/hooks/pre-push"
+check "a changed installed template is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: the git hook templates in $INSTALLED differ from this copy of Mentat (hooks/pre-push), so agents'"'"' git runs other checks" "$STUB/out"'
+chmod -x "$INSTALLED/hooks/pre-commit"; reset; rc=$(run); chmod +x "$INSTALLED/hooks/pre-commit"
 check "an installed template that is not executable is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qF "are missing or not executable (hooks/pre-commit)" "$STUB/out"'
-mv "$TPL/scan" "$root/scan.away"; printf '# changed\n' >>"$TPL/hooks/commit-msg"; reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-mv "$root/scan.away" "$TPL/scan"; cp -p "$(dirname "$mentat")/../git-hooks/hooks/commit-msg" "$TPL/hooks/commit-msg"
+mv "$INSTALLED/scan" "$root/scan.away"; printf '# changed\n' >>"$INSTALLED/hooks/commit-msg"; reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
+mv "$root/scan.away" "$INSTALLED/scan"; cp -p "$(dirname "$mentat")/../git-hooks/hooks/commit-msg" "$INSTALLED/hooks/commit-msg"
 check "each problem with the templates is its own problem line" '[ "$rc" = 1 ] && [ "$(last)" = "Check failed: 3 problem(s)" ] && grep -qF "differ from this copy of Mentat (hooks/commit-msg)" "$STUB/out"'
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'

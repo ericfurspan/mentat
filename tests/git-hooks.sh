@@ -12,14 +12,14 @@ set -uo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 failures=0
-check() { if eval "$2"; then printf 'PASS: git-templates %s\n' "$1"; else printf 'FAIL: git-templates %s\n' "$1"; failures=$((failures + 1)); fi; }
+check() { if eval "$2"; then printf 'PASS: git-hooks %s\n' "$1"; else printf 'FAIL: git-hooks %s\n' "$1"; failures=$((failures + 1)); fi; }
 
 base=$(mktemp -d)
 trap 'rm -rf "$base"' EXIT
 tmp="$base/with space"
 export STUB="$tmp/stub"
 export HOME="$tmp/home"
-unset XDG_CONFIG_HOME GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS MENTAT_OWN_HOOK MENTAT_GIT_TEMPLATES_DIR
+unset XDG_CONFIG_HOME GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS MENTAT_OWN_HOOK MENTAT_GIT_HOOKS_DIR
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$tmp/gitconfig"
 mkdir -p "$STUB" "$tmp/bin" "$HOME" "$tmp/tmpdir"
 export TMPDIR="$tmp/tmpdir"
@@ -55,7 +55,7 @@ exit "$code"
 STUBEOF
 chmod +x "$tmp/bin/gitleaks"
 export PATH="$tmp/bin:$PATH"
-tpl="$root/git-hooks/hooks"
+mentat_hooks="$root/git-hooks/hooks"
 
 # A bare origin whose HEAD is main, and a clone on a feature branch.
 git init -q --bare "$tmp/origin.git"
@@ -74,7 +74,7 @@ git -C "$repo" checkout -q -b feat/x
 # A <args>: git in an agent's shell, from $repo (or $in), with the templates' folder as
 # core.hooksPath. M <args>: the maintainer's git, with no such entry.
 in=$repo
-A() { (cd "$in" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tpl" git "$@") >"$STUB/out" 2>&1; }
+A() { (cd "$in" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$mentat_hooks" git "$@") >"$STUB/out" 2>&1; }
 M() { (cd "$in" && git "$@") >"$STUB/out" 2>&1; }
 remote_head() { git --git-dir="$tmp/origin.git" rev-parse -q --verify "refs/heads/$1" 2>/dev/null; }
 head_of() { git -C "$in" rev-parse HEAD; }
@@ -313,7 +313,7 @@ check "a secret pushed to a repository at a local path is refused" \
   '[ "$rc" != 0 ] && ! git --git-dir="$tmp/local.git" rev-parse -q --verify refs/heads/feat/leak >/dev/null && grep -qF "stub-rule in leak.txt" "$STUB/out"'
 # When the refs of the repository pushed to cannot be read, commits it may have are
 # scanned too: here kept.txt's secret, which origin has.
-reset; (cd "$repo" && printf 'refs/heads/feat/x %s refs/heads/feat/unread %040d\n' "$(head_of)" 0 | "$tpl/pre-push" origin "$tmp/unreadable.git") >"$STUB/out" 2>&1; rc=$?
+reset; (cd "$repo" && printf 'refs/heads/feat/x %s refs/heads/feat/unread %040d\n' "$(head_of)" 0 | "$mentat_hooks/pre-push" origin "$tmp/unreadable.git") >"$STUB/out" 2>&1; rc=$?
 check "when the refs of the repository pushed to cannot be read, every commit reachable from the push is scanned" '[ "$rc" != 0 ] && grep -qF "stub-rule in kept.txt" "$STUB/out"'
 reset; M push -q origin feat/x:main; rc=$?
 check "the maintainer's git runs no template: a push to the default branch goes through" '[ "$rc" = 0 ] && [ "$(remote_head main)" = "$(head_of)" ]'
@@ -377,12 +377,12 @@ in=$repo
 chain="applypatch-msg pre-applypatch post-applypatch pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge post-rewrite pre-auto-gc sendemail-validate push-to-checkout"
 # shellcheck disable=SC2086 # $chain is a list of words.
 want_hooks=$(printf '%s\n' pre-commit pre-push $chain | sort | tr '\n' ' ')
-check "the templates' hooks folder holds pre-commit, pre-push and the chain-only templates, nothing else" '[ "$(ls "$tpl" | sort | tr "\n" " ")" = "$want_hooks" ]'
+check "the templates' hooks folder holds pre-commit, pre-push and the chain-only templates, nothing else" '[ "$(ls "$mentat_hooks" | sort | tr "\n" " ")" = "$want_hooks" ]'
 printf 'line one\nline two\n' >"$tmp/chain-stdin"
 for name in $chain; do
   own "$repo/.git/hooks/$name" "chain-$name"
   rm -rf "${STUB:?}"/*; echo 5 >"$STUB/chain-$name.exit"
-  (cd "$repo" && "$tpl/$name" "first arg" second <"$tmp/chain-stdin") >"$STUB/out" 2>&1; rc=$?
+  (cd "$repo" && "$mentat_hooks/$name" "first arg" second <"$tmp/chain-stdin") >"$STUB/out" 2>&1; rc=$?
   check "the $name template runs the repository's own hook with its arguments, stdin and exit status" \
     '[ "$rc" = 5 ] && [ "$(cat "$STUB/chain-$name.args")" = "[first arg][second]" ] && cmp -s "$STUB/chain-$name.stdin" "$tmp/chain-stdin"'
   rm "$repo/.git/hooks/$name"
@@ -488,7 +488,7 @@ bounded() { # bounded <command...>: runs it in its own process group, killing th
   kill "$sleeper" 2>/dev/null
   echo "$rc"
 }
-git -C "$repo" config core.hooksPath "$tpl"
+git -C "$repo" config core.hooksPath "$mentat_hooks"
 reset; stage_clean loop1; h=$(head_of)
 rc=$(bounded A commit -q -m "templates as own hook path")
 check "a local core.hooksPath naming the templates commits once, scanned, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
@@ -497,7 +497,7 @@ check "a local core.hooksPath naming the templates pushes, with no loop" '[ "$rc
 reset; rc=$(bounded A push -q origin feat/x:main)
 check "a local core.hooksPath naming the templates still refuses the default branch" '[ "$rc" != 0 ] && [ "$rc" != 143 ] && [ "$(remote_head main)" = "$main" ] && grep -q "default branch (main)" "$STUB/out"'
 git -C "$repo" config --unset core.hooksPath
-printf '#!/bin/sh\nexec "%s/pre-commit" "$@"\n' "$tpl" >"$repo/.git/hooks/pre-commit"
+printf '#!/bin/sh\nexec "%s/pre-commit" "$@"\n' "$mentat_hooks" >"$repo/.git/hooks/pre-commit"
 reset; stage_clean loop2; h=$(head_of)
 rc=$(bounded A commit -q -m "own hook runs the template")
 check "an own hook that runs the template commits, with no loop" '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ -s "$STUB/calls" ]'
@@ -522,18 +522,18 @@ check "git init of a new repository works under the templates" '[ "$rc" = 0 ] &&
 A init -q --bare "$tmp/new-bare.git"; rc=$?
 check "git init --bare works under the templates" '[ "$rc" = 0 ] && [ "$(git --git-dir="$tmp/new-bare.git" rev-parse --is-bare-repository)" = true ]'
 mkdir "$tmp/new-inplace"
-(cd "$tmp/new-inplace" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tpl" git init -q) >"$STUB/out" 2>&1; rc=$?
+(cd "$tmp/new-inplace" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$mentat_hooks" git init -q) >"$STUB/out" 2>&1; rc=$?
 check "git init in place works under the templates" '[ "$rc" = 0 ] && [ -d "$tmp/new-inplace/.git" ]'
 # Where git cannot tell the repository yet, as while git init creates it, GIT_DIR names it.
 mkdir -p "$tmp/half/hooks" "$tmp/elsewhere"
 own "$tmp/half/hooks/post-commit" half
-rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$tpl/post-commit" one) </dev/null >"$STUB/out" 2>&1; rc=$?
+rm -rf "${STUB:?}"/*; (cd "$tmp/elsewhere" && GIT_DIR="$tmp/half" "$mentat_hooks/post-commit" one) </dev/null >"$STUB/out" 2>&1; rc=$?
 check "with no repository git can read, a template runs the own hook in GIT_DIR/hooks" '[ "$rc" = 0 ] && [ "$(cat "$STUB/half.args" 2>/dev/null)" = "[one]" ]'
 
 # The session-start check of the installed copy.
 inst="$tmp/installed"
 cp -Rp "$root/git-hooks" "$inst"
-start() { MENTAT_GIT_TEMPLATES_DIR=$inst "$root/hooks/session-start" >"$STUB/start" 2>&1; }
+start() { MENTAT_GIT_HOOKS_DIR=$inst "$root/hooks/session-start" >"$STUB/start" 2>&1; }
 # problem_is <counts>: the output is one problem line of counts, with no folder or file
 # name, a blank line, then rules.md.
 problem_is() {
@@ -565,12 +565,12 @@ done
 chmod -x "$inst/hooks/pre-push"; start; rc=$?; chmod +x "$inst/hooks/pre-push"
 check "session start: a template that is not executable is a problem" 'problem_is "1 missing or not executable"'
 mv "$inst/scan" "$tmp/away"; rm "$inst/hooks/commit-msg"; printf '# changed\n' >>"$inst/hooks/pre-push"
-MENTAT_GIT_TEMPLATES_DIR=$inst PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
+MENTAT_GIT_HOOKS_DIR=$inst PATH="$tmp/nogitleaks:/usr/bin:/bin" "$root/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
 check "session start: several problems print one line of counts" 'problem_is "2 missing or not executable, 1 changed, not installed: gitleaks"'
 mv "$tmp/away" "$inst/scan"
 rm -rf "$inst"; start; rc=$?
 check "session start: a missing folder is a problem" 'problem_is "the folder is missing"'
-# A plugin copy without lib/templates.sh still prints the rules, after a problem line.
+# A plugin copy without lib/git-hooks.sh still prints the rules, after a problem line.
 mkdir -p "$tmp/plugin/hooks"
 cp "$root/hooks/session-start" "$tmp/plugin/hooks/"; cp "$root/rules.md" "$tmp/plugin/"
 "$tmp/plugin/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
