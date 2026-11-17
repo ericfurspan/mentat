@@ -77,7 +77,7 @@ export HOME="$root/home"
 # An installed and current copy of the git hook templates, in use for every case but those that change it.
 unset GIT_CONFIG_COUNT
 export MENTAT_GIT_TEMPLATES_DIR="$root/templates"
-cp -Rp "$(dirname "$mentat")/../git-templates" "$MENTAT_GIT_TEMPLATES_DIR"
+cp -Rp "$(dirname "$mentat")/../git-hooks" "$MENTAT_GIT_TEMPLATES_DIR"
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$(dirname "$LIST")"
 echo stubword >"$LIST"
@@ -142,7 +142,7 @@ check "a changed installed template is a problem (exit 1)" '[ "$rc" = 1 ] && gre
 chmod -x "$TPL/hooks/pre-commit"; reset; rc=$(run); chmod +x "$TPL/hooks/pre-commit"
 check "an installed template that is not executable is a problem (exit 1)" '[ "$rc" = 1 ] && grep -qF "are missing or not executable (hooks/pre-commit)" "$STUB/out"'
 mv "$TPL/scan" "$root/scan.away"; printf '# changed\n' >>"$TPL/hooks/commit-msg"; reset; rc=$(cd "$root/cwd" && PATH="$root/nogitleaks:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1; echo $?)
-mv "$root/scan.away" "$TPL/scan"; cp -p "$(dirname "$mentat")/../git-templates/hooks/commit-msg" "$TPL/hooks/commit-msg"
+mv "$root/scan.away" "$TPL/scan"; cp -p "$(dirname "$mentat")/../git-hooks/hooks/commit-msg" "$TPL/hooks/commit-msg"
 check "each problem with the templates is its own problem line" '[ "$rc" = 1 ] && [ "$(last)" = "Check failed: 3 problem(s)" ] && grep -qF "differ from this copy of Mentat (hooks/commit-msg)" "$STUB/out"'
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for git-templates/ (the pre-commit and pre-push templates, the
+# Behavior tests for git-hooks/ (the pre-commit and pre-push templates, the
 # chain-only templates, the scanner and own-hook.sh) and the session-start check of the
 # installed copy. An agent's git names the templates' folder in core.hooksPath through
 # GIT_CONFIG_* entries; the maintainer's git has no such entries. A stub gitleaks and
@@ -55,7 +55,7 @@ exit "$code"
 STUBEOF
 chmod +x "$tmp/bin/gitleaks"
 export PATH="$tmp/bin:$PATH"
-tpl="$root/git-templates/hooks"
+tpl="$root/git-hooks/hooks"
 
 # A bare origin whose HEAD is main, and a clone on a feature branch.
 git init -q --bare "$tmp/origin.git"
@@ -509,7 +509,7 @@ rc=$(bounded M commit -q -m "maintainer, own hook runs the template")
 check "for the maintainer, an own hook that runs the template still refuses a staged secret" '[ "$rc" != 0 ] && [ "$rc" != 143 ] && [ "$(head_of)" = "$h" ] && grep -qF "stub-rule in file two.txt" "$STUB/out"'
 
 # Without own-hook.sh beside them, the templates refuse after their checks.
-cp -Rp "$root/git-templates" "$tmp/partial"; rm "$tmp/partial/own-hook.sh"
+cp -Rp "$root/git-hooks" "$tmp/partial"; rm "$tmp/partial/own-hook.sh"
 reset; stage_clean partial; h=$(head_of)
 (cd "$repo" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$tmp/partial/hooks" git commit -q -m partial) >"$STUB/out" 2>&1; rc=$?
 check "a missing own-hook.sh refuses the commit and says so" '[ "$rc" = 1 ] && [ "$(head_of)" = "$h" ] && grep -q "own-hook.sh could not be loaded" "$STUB/out"'
@@ -532,7 +532,7 @@ check "with no repository git can read, a template runs the own hook in GIT_DIR/
 
 # The session-start check of the installed copy.
 inst="$tmp/installed"
-cp -Rp "$root/git-templates" "$inst"
+cp -Rp "$root/git-hooks" "$inst"
 start() { MENTAT_GIT_TEMPLATES_DIR=$inst "$root/hooks/session-start" >"$STUB/start" 2>&1; }
 # problem_is <counts>: the output is one problem line of counts, with no folder or file
 # name, a blank line, then rules.md.

@@ -21,12 +21,12 @@ templates_dir() {
 }
 
 # templates_scan <Mentat folder> <templates folder>: compares, read-only, the installed
-# copy with <Mentat folder>/git-templates and sets t_nofolder (1 when the folder is
+# copy with <Mentat folder>/git-hooks and sets t_nofolder (1 when the folder is
 # missing), t_missing and t_differs (the files missing or not executable where the
 # source is, and those that differ, each with a leading space) and t_tools (gitleaks
 # and jq, which the scan needs, when not installed). 0 no problem, 1 some.
 templates_scan() {
-  local src=$1/git-templates dir=$2 f p
+  local src=$1/git-hooks dir=$2 f p
   t_nofolder="" t_missing="" t_differs="" t_tools=""
   if [ ! -d "$dir" ]; then t_nofolder=1
   else

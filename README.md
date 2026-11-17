@@ -70,7 +70,7 @@ Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linea
 
 ## Git hook templates
 
-`git-templates/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Both guards hold only where agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy; `mentat check` reports their state.
+`git-hooks/` hooks refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Both guards hold only where agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy; `mentat check` reports their state.
 
 ## Credits
 
