@@ -45,11 +45,10 @@ Optional modules install as `<module>@mentat`:
 
 Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
 
-- `/mentat:waiting [project ... | all] [full]`: what needs you, your unanswered asks; `full` adds the rest.
 - `/mentat:propose [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
 
-Moved from core: `status` became `/mentat:waiting` and `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`.
+Moved from core: `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`; `status`, later `waiting`, was removed.
 
 [`rules.md`](rules.md) holds the core rules, `skills/` each step's detail.
 
