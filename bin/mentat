@@ -11,10 +11,10 @@
 #     Claude runs in a fresh context, with read tools only, on MENTAT_REVIEW_MODEL (unset,
 #     the review default in lib/review.sh), or, with MENTAT_FIRST_REVIEW_MODEL set, on that
 #     model while the pull request has no local round (as mentat status counts them), and,
-#     when Claude reports that no model ran, once more on the review model
-#     (MENTAT_REVIEW_MODEL, else the review default) if that is another model; the record
-#     names the model that ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time
-#     limit is MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200).
+#     when Claude reports that no model ran, once more on the review default if that is
+#     another model, whatever MENTAT_REVIEW_MODEL names; the record names the model that
+#     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
+#     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200).
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
 #     --codex and --grok first read whether outside reviewers are on here, as mentat
 #     reviewers does; unless they are on, they print why, post nothing and exit 6.

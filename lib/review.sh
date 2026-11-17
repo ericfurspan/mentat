@@ -106,29 +106,29 @@ review_model_claude() {
   claude_model=$FIRST_REVIEW_MODEL claude_key=MENTAT_FIRST_REVIEW_MODEL
 }
 # A first round in which no model ran at all, by Claude's own report, runs once more on the
-# review model, REVIEW_MODEL, which later rounds use, unless that is the model it asked for.
-# claude_model and claude_key keep the model asked for, so the record names it beside the
-# model that ran (review_meta_claude). A first round that is not run again says why.
+# review default, MENTAT_REVIEW_MODEL_DEFAULT, whatever MENTAT_REVIEW_MODEL names, unless the
+# default is the model it asked for. claude_model and claude_key keep the model asked for, so
+# the record names it beside the model that ran (review_meta_claude). A first round that is
+# not run again says why.
 review_run_claude() {
-  local hint review first_note
+  local hint fallback first_note
   review_model_claude
   hint="the review model is set with $claude_key (now $claude_model)"
   if [ "$claude_key" != MENTAT_FIRST_REVIEW_MODEL ]; then
     run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$claude_model" "$hint"
     return
   fi
-  review="the review model (MENTAT_REVIEW_MODEL, now $REVIEW_MODEL)"
-  [ -n "${MENTAT_REVIEW_MODEL:-}" ] || review="the review model (the review default, $REVIEW_MODEL)"
-  if [ "$claude_model" = "$REVIEW_MODEL" ]; then
-    first_note="not run again on $review, which is the same model"
+  fallback="the review default ($MENTAT_REVIEW_MODEL_DEFAULT)"
+  if [ "$claude_model" = "$MENTAT_REVIEW_MODEL_DEFAULT" ]; then
+    first_note="not run again on $fallback, which is the same model"
     run_claude "$tmp/tree" "$tmp/prompt" "$out" first_round_not_reviewed "$tmp/data" "$claude_model" "$hint"
     return
   fi
-  first_note="a first round runs again, on $review, only when Claude reports that no model ran"
+  first_note="a first round runs again, on $fallback, only when Claude reports that no model ran"
   run_claude "$tmp/tree" "$tmp/prompt" "$out" first_round_not_reviewed "$tmp/data" "$claude_model" "$hint" \
-    "reviewing once on $review" && return 0
-  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$REVIEW_MODEL" \
-    "this run was on $review, as no model ran on $claude_key (now $claude_model)"
+    "reviewing once on $fallback" && return 0
+  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$MENTAT_REVIEW_MODEL_DEFAULT" \
+    "this run was on $fallback, as no model ran on $claude_key (now $claude_model)"
 }
 # A first round's failure, with review_run_claude's note on why it is not run again.
 first_round_not_reviewed() { not_reviewed "$1; $first_note"; }

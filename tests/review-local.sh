@@ -283,19 +283,23 @@ reset; touch "$STUB/comments_fail"; rc=$(run_first)
 check "MENTAT_FIRST_REVIEW_MODEL with the comments unreadable is not reviewed, names the setting, and Claude does not run" 'closed "could not read this account'"'"'s comments on #7, which MENTAT_FIRST_REVIEW_MODEL needs to tell the first round" && ! grep -qx claude "$STUB/calls"'
 reset; echo error_max_turns >"$STUB/subtype"; rc=$(run_first)
 check "a first-round run that fails is not reviewed, naming MENTAT_FIRST_REVIEW_MODEL and its value" 'closed "Claude'"'"'s run ended with error_max_turns, not success; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable)"'
-# A first round in which Claude reports that no model ran runs once more on the review model
-# (MENTAT_REVIEW_MODEL, else the review default), unless that is the same model; one that a
+# A first round in which Claude reports that no model ran runs once more on the review default,
+# whatever MENTAT_REVIEW_MODEL names, unless the default is the model it asked for; one that a
 # model ran in, or that hit the time limit, does not.
 models() { tr '\n' ' ' <"$STUB/models"; }
-NOT_AGAIN="a first round runs again, on the review model (the review default, opus), only when Claude reports that no model ran"
+NOT_AGAIN="a first round runs again, on the review default (opus), only when Claude reports that no model ran"
+RETRIED="mentat: Claude reports that no model ran: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); reviewing once on the review default (opus)"
+FELL_BACK="- Model: claude-opus-4-9 (first round, asked for MENTAT_FIRST_REVIEW_MODEL=fable)"
 reset; echo fable >"$STUB/nostart"; rc=$(run_first)
-check "a first-round model that does not run: one more run on the review default, posted, whose record names the model asked for and the one that ran" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "mentat: Claude reports that no model ran: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); reviewing once on the review model (the review default, opus)" "$STUB/out" && folded | grep -qx -- "- Model: claude-opus-4-9 (first round, asked for MENTAT_FIRST_REVIEW_MODEL=fable)"'
-reset; echo fable >"$STUB/nostart"; echo claude-quill-1 >"$STUB/model_ran"; rc=$(MENTAT_REVIEW_MODEL=quill run_first)
-check "with MENTAT_REVIEW_MODEL set, a first-round model that does not run is run once more on MENTAT_REVIEW_MODEL, not the review default" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable quill " ] && grep -qxF "mentat: Claude reports that no model ran: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); reviewing once on the review model (MENTAT_REVIEW_MODEL, now quill)" "$STUB/out" && folded | grep -qx -- "- Model: claude-quill-1 (first round, asked for MENTAT_FIRST_REVIEW_MODEL=fable)"'
+check "a first-round model that does not run: one more run on the review default, posted, whose record names the model asked for and the one that ran" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "$RETRIED" "$STUB/out" && folded | grep -qx -- "$FELL_BACK"'
+reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_REVIEW_MODEL=quill run_first)
+check "with MENTAT_REVIEW_MODEL set to another model, a first-round model that does not run is run once more on the review default, not MENTAT_REVIEW_MODEL" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "$RETRIED" "$STUB/out" && folded | grep -qx -- "$FELL_BACK"'
 reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_REVIEW_MODEL=fable run_first)
-check "with MENTAT_REVIEW_MODEL the same model as MENTAT_FIRST_REVIEW_MODEL, a first-round model that does not run is not run again, and says so" 'closed "claude exited with status 1: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); not run again on the review model (MENTAT_REVIEW_MODEL, now fable), which is the same model" && [ "$(models)" = "fable " ]'
+check "with MENTAT_REVIEW_MODEL the same model as MENTAT_FIRST_REVIEW_MODEL, a first-round model that does not run is run once more on the review default, and posts" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "$RETRIED" "$STUB/out" && folded | grep -qx -- "$FELL_BACK"'
+reset; echo opus >"$STUB/nostart"; rc=$(MENTAT_FIRST_REVIEW_MODEL=opus run)
+check "with MENTAT_FIRST_REVIEW_MODEL the review default, a first-round model that does not run is not run again, and says so" 'closed "claude exited with status 1: There is an issue with the selected model (opus).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now opus); not run again on the review default (opus), which is the same model" && [ "$(models)" = "opus " ]'
 reset; printf 'fable\nopus\n' >"$STUB/nostart"; rc=$(run_first)
-check "neither the first-round model nor the review default runs: not reviewed after the one more run, naming both" 'closed "claude exited with status 1: There is an issue with the selected model (opus).; this run was on the review model (the review default, opus), as no model ran on MENTAT_FIRST_REVIEW_MODEL (now fable)" && [ "$(models)" = "fable opus " ]'
+check "neither the first-round model nor the review default runs: not reviewed after the one more run, naming both" 'closed "claude exited with status 1: There is an issue with the selected model (opus).; this run was on the review default (opus), as no model ran on MENTAT_FIRST_REVIEW_MODEL (now fable)" && [ "$(models)" = "fable opus " ]'
 reset; echo 1 >"$STUB/exit"; printf '{"type":"result","subtype":"error_max_turns","is_error":true,"permission_denials":[],"modelUsage":{"claude-fable-5":{}}}\n' >"$STUB/raw"; rc=$(run_first)
 if closed "claude exited with status 1: the run ended with error_max_turns; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); $NOT_AGAIN"; then ran_failed=yes; else ran_failed=no; fi
 m1=$(models); rm -f "$STUB/raw" "$STUB/exit" "$STUB/models"; rc=$(run_first)
