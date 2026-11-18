@@ -26,7 +26,7 @@ Before each brief, note the main checkout's branch, `HEAD` and status with `git 
 
 ## Testing
 
-Before pushing, Claude Code tests the pushed commit, with a clean working tree (`git -C <path> status --porcelain` prints nothing), not relying on the builder's report, unless the repository's AGENTS.md says CI runs the test command on every pull request. Then CI is that run, except that after CI fails on the branch, the next commit is tested this way before it is pushed; and when that run was skipped, a head with no CI check runs is not a pass: Claude Code tests that commit before any review of it counts, in a worktree for that test run, not for a builder, at a temporary path outside every checkout (`git worktree add --detach <temporary path> <commit>`, the test command there, then `git worktree remove <temporary path>`), never in the main checkout or the session's own.
+Before pushing, Claude Code tests the pushed commit, with a clean working tree (`git -C <path> status --porcelain` prints nothing), not relying on the builder's report, unless the repository's AGENTS.md says CI runs the test command on every pull request. Then CI is that run, except that after CI fails on the branch, the next commit is tested this way before it is pushed; and when that run was skipped, a head with no CI check runs is not a pass: Claude Code tests that commit before any review of it counts, in a test worktree at a temporary path outside every checkout (`git worktree add --detach <temporary path> <commit>`, the test command there with its output saved outside it, then `git worktree remove <temporary path>`; a refusal keeps it, listed for the maintainer), never in the main checkout or the session's own.
 
 ## Recovery
 
