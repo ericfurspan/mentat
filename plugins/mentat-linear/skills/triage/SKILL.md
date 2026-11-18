@@ -25,7 +25,7 @@ The maintainer's own instructions name channel readers for triage, in an order; 
 
 ## The Inbox
 
-For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), plus any further inbox the maintainer's instructions name for it (lines or issues, as they say). Read every page of a list. Read each item the sitting asks about in full, as `mentat:backlog` "Reading an item" says. Leave out an item with a dated Later note, on its inbox line or in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.
+For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage). Read every page of a list. Read each item the sitting asks about in full, as `mentat:backlog` "Reading an item" says. Leave out an item with a dated Later note in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again.
 
 ## Search
 
@@ -46,12 +46,12 @@ Ask each item's questions together, never interleaved with another item's. A dec
 
 ## Record each answer
 
-Record each answer before asking the next, as `mentat:backlog`, the tracker's adapter and the maintainer's instructions say, so "The Inbox" does not find the item again. An item from a further inbox is recorded as those instructions say; accepted, it becomes a backlog item holding its text (or reuses one), read back, then leaves that inbox. Recording an answer also posts the answer reply for the open maintainer comments it answered (`mentat:backlog` "Reading an item"). For an Inbox item:
+Record each answer before asking the next, as `mentat:backlog`, the tracker's adapter and the maintainer's instructions say, so "The Inbox" does not find the item again. Recording an answer also posts the answer reply for the open maintainer comments it answered (`mentat:backlog` "Reading an item"). For an Inbox item:
 
 - Accept: Claude Code writes the item shape through `mentat:backlog`, moves it to Backlog and reads it back, never through the tracker's own triage actions.
 - Close: one update adds the first description line `Closed <date>: <the maintainer's reason in their terms>.` and ends the item as canceled. A retry adds no line the description already opens with.
 - Merge: read the named item in full (`mentat:backlog` "Reading an item"), then mark this item a duplicate of it and leave one comment line on it naming the item merged and citing the answer, without restating the merged text. Merged into a Todo item, that scope is not committed: it joins the spec only once agreed through `mentat:propose`, which asks for it, after its plan check, when the item is next planned.
-- Later: a dated note citing the answer, as a comment or on its inbox line.
+- Later: a dated note citing the answer, as a comment.
 
 For an item from a reader that posts outcomes at its source, follow that reader's steps for recording it, which may put the post before the item is removed. An item with a decision that "Ask" sends to its own planning session gets `/mentat:propose <id>` as its next step (`mentat:backlog` "Item shape").
 
