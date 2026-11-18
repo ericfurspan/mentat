@@ -22,7 +22,7 @@ Each round of a pull request (the first build, CI fixes, review fixes, work afte
 
 ## Main-checkout check
 
-Before each brief, note the main checkout's branch, `HEAD` and the output of `git status --porcelain -- ':(exclude).claude/worktrees'`. After the helper reports, that status prints nothing, and the branch and `HEAD` are what they were before the brief. If the main checkout was not clean before the brief, compare the output with the one taken then, and the run's final message says the check was weaker. On any difference, start no further helper, change nothing in the main checkout, and tell the maintainer the paths and what changed. The check does not see writes to ignored paths.
+Before each brief, note the main checkout's branch, `HEAD` and status with `git -C <main> branch --show-current`, `git -C <main> rev-parse HEAD` and `git -C <main> status --porcelain -- ':(exclude).claude/worktrees'`, `<main>` being the main checkout as "One helper per branch" defines it. Where the session's own checkout is another directory, note its branch, `HEAD` and status the same way with `git -C` on it, since a builder must change neither. After the helper reports, each status prints nothing, and each branch and `HEAD` are what they were before the brief. If a checkout was not clean before the brief, compare its output with the one taken then, and the run's final message says the check was weaker. On any difference, start no further helper, change nothing in either checkout, and tell the maintainer the paths and what changed. The check does not see writes to ignored paths.
 
 ## Testing
 
