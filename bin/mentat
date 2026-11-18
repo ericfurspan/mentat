@@ -6,8 +6,8 @@
 #     result in time), 3 the head moved, 4 CI did not pass on the head (failing or
 #     unfinished checks printed, then the review, which is not posted and not a round).
 #     When no CI check ran on the head, a line says so.
-#     `mentat review --local <PR>` is the same. A comment that holds a local path or a
-#     private name, in a public repository, is kept in a local file and not posted (exit 1).
+#     A comment that holds a local path or a private name, in a public repository, is
+#     kept in a local file and not posted (exit 1).
 #     Claude runs in a fresh context, with read tools only, on MENTAT_REVIEW_MODEL (unset,
 #     the review default in lib/review.sh), or, with MENTAT_FIRST_REVIEW_MODEL set, on that
 #     model while the pull request has no local round (as mentat status counts them), and,
@@ -136,7 +136,6 @@ case "${1:-}" in
     case "${1:-}" in
       --codex) shift; handover review-codex "$@" ;;
       --grok) shift; handover review-grok "$@" ;;
-      --local) shift ;;
     esac
     review_args "" "$@"
     # shellcheck disable=SC2154 # pr is set by review_args
@@ -146,5 +145,5 @@ case "${1:-}" in
   reviewers) shift; reviewers_command "$@" ;;
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion [--web] <file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion [--web] <file> | mentat check" 64 ;;
 esac

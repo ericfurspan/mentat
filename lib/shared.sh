@@ -44,7 +44,7 @@ sweep_leftovers() {
 # judges a stale checkout. Its caller first read outside reviewers as on (reviewers_state),
 # which found that branch and fetched it. Sets the caller's fresh_def ($2) and fresh_behind
 # (the count), and returns 1, with fresh_behind empty, when the branch cannot be fetched
-# or counted. It is fetched into a ref of this run's own, as review --local does, so
+# or counted. It is fetched into a ref of this run's own, as the local review does, so
 # origin/<default> and git's record of the last fetch stay as they are, and the ref is
 # deleted once counted. Call it before setting an EXIT trap: it sets and clears its own.
 fresh_check() { # $1 top level, $2 origin's default branch
@@ -305,10 +305,10 @@ read_issues() { # $1 pr, $2 pull request JSON
 # The arguments of mentat review after its mode, for every reviewer: --request <file>
 # and --require-ci, each at most once, in any order, with any flag the function named
 # by $1 takes (it returns 1 for one it does not take), then exactly one pull request
-# number ("review 7 --local" would otherwise run the Claude review). Sets the caller's
+# number ("review 7 --codex" would otherwise run the Claude review). Sets the caller's
 # request_file, request_given, require_ci and pr; anything else is a usage error.
 review_args() { # $1 function for more flags, or "", $2... the arguments
-  local more=$1 usage="usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>"
+  local more=$1 usage="usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>"
   shift
   request_file="" request_given=no require_ci=no
   while :; do
