@@ -18,7 +18,7 @@ The main session never changes its own directory into a worktree: it runs `git -
 
 ## One helper per branch
 
-Each round of a pull request (the first build, CI fixes, review fixes, work after a hold) is one `mentat:builder`, started with the Agent tool's `isolation: "worktree"` option in the background, so the session stays free. The brief names the branch, the session's own checkout and the main checkout (the parent of `git rev-parse --path-format=absolute --git-common-dir`). While the builder runs, the host's lock on its worktree is the lock; the session adds none. When its completion notice arrives, done, stopped or failed, run the main-checkout check. The next round starts a fresh builder on the branch.
+A pull request has one builder at a time, which is what `rules.md` means by one builder per pull request: each round of it (the first build, CI fixes, review fixes, work after a hold) is a fresh `mentat:builder`, started with the Agent tool's `isolation: "worktree"` option in the background, so the session stays free. The brief names the branch, the session's own checkout and the main checkout (the parent of `git rev-parse --path-format=absolute --git-common-dir`). While the builder runs, the host's lock on its worktree is the lock; the session adds none. When its completion notice arrives, done, stopped or failed, run the main-checkout check. The next round starts a fresh builder on the branch.
 
 ## Main-checkout check
 
