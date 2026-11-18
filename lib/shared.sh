@@ -365,7 +365,7 @@ review_criteria() {
   printf 'Flag it as a finding if you cannot state the intent in one sentence, or if your sentence and the description'"'"'s disagree: its intent is the opening sentence of its Summary (or of the equivalent section of the repository'"'"'s own template), and the second sentence of that Summary says why the change is needed, not what it does. '
   printf 'A description sentence that leaves out detail yours has does not disagree with it; only a different claim about what the change does is a disagreement. '
   printf 'When an agreed request or a linked issue is given, then list, before the findings, only the items in it (what to build, what to leave alone, how it is checked) that the change does not meet or that cannot be checked from the diff and the files, one short line each with the reason; do not list met items, and report each unmet item as a finding too. '
-  printf 'A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description'"'"'s Review details report who checked it and what they saw. '
+  printf 'A requirement the request marks as checked by hand is not unmet or uncheckable when the pull request description'"'"'s Review details report who checked it and what they saw, or, before the merge, when the request marks it as checked after the merge. '
   printf 'If every item is met and checkable, say so in one line. When neither is given, do not invent criteria and skip this list.\n\n'
 }
 # Rewrites the reply in $1 so that it holds no machine-local path:
