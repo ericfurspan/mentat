@@ -5,6 +5,8 @@
 
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 # The reviewer runs in a fresh context that never saw the build, on a configurable model.
+# The review default, the one place its value is named: usage text, skills and the README
+# name the setting.
 MENTAT_REVIEW_MODEL_DEFAULT=opus
 REVIEW_MODEL="${MENTAT_REVIEW_MODEL:-$MENTAT_REVIEW_MODEL_DEFAULT}"
 # Set and not empty, a pull request's first local Claude round runs on this model instead.
@@ -15,7 +17,10 @@ CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 # Runs Claude in directory $1 on prompt file $2 and writes its reply to $3. On any
 # failure it calls $4 with the reason, which exits. $5 is the folder holding the
 # diff and the log, outside $1, which Claude may also read. $6 is the model and $7
-# the setting that chose it, which a failure names. Sets the caller's
+# what a failure says about it, such as the setting that chose it. With $8, a run in
+# which no model ran at all, by Claude's own report (an empty modelUsage, as for a
+# model the account cannot use), is said, with $8, and returns 1 instead; output
+# with no such report, and the time limit, still fail. Sets the caller's
 # claude_models to the models that ran, from Claude's own report.
 # --safe-mode loads no CLAUDE.md, hooks, skills or installed plugins, but still lists
 # a plugin folder named in CLAUDE_CODE_PLUGIN_DIRS (Claude Code 2.1.322), so claude
@@ -25,8 +30,7 @@ CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 # denied too (Claude Code 2.1.322). A denied tool call, an error or output that is
 # not Claude's JSON result is not a review.
 run_claude() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" model="$6" key="$7" json log rc secs=0 pid n why
-  local hint="the review model is set with $key (now $model)"
+  local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" model="$6" hint="$7" retry="${8:-}" json log rc secs=0 pid n why
   local args=(-p --safe-mode --restricted --add-dir "$data" --model "$model" --permission-mode dontAsk
     --tools "$CLAUDE_REVIEW_TOOLS" --allowedTools "$CLAUDE_REVIEW_TOOLS" --output-format json)
   json="${out%/*}/claude.json" log="${out%/*}/claude.log"
@@ -52,6 +56,10 @@ run_claude() {
   why=$(jq -r 'if type != "object" then empty
     elif (.result | type) == "string" then .result | split("\n")[0] | .[0:200]
     elif (.subtype | type) == "string" then "the run ended with " + .subtype else empty end' "$json" 2>/dev/null)
+  if [ -n "$retry" ] && jq -e 'type == "object" and (.modelUsage | type) == "object" and (.modelUsage | length) == 0' "$json" >/dev/null 2>&1; then
+    printf 'mentat: Claude reports that no model ran%s; %s; %s\n' "${why:+: $why}" "$hint" "$retry" >&2
+    return 1
+  fi
   [ "$rc" -eq 0 ] || "$fail" "claude exited with status $rc${why:+: $why}; $hint"
   [ -s "$json" ] || "$fail" "Claude returned no output"
   n=$(jq -er 'if type == "object" then .subtype | strings else empty end' "$json" 2>/dev/null) ||
@@ -97,10 +105,33 @@ review_model_claude() {
   [ "$rounds" -eq 0 ] || return 0
   claude_model=$FIRST_REVIEW_MODEL claude_key=MENTAT_FIRST_REVIEW_MODEL
 }
+# A first round in which no model ran at all, by Claude's own report, runs once more on the
+# review default, MENTAT_REVIEW_MODEL_DEFAULT, whatever MENTAT_REVIEW_MODEL names, unless the
+# default is the model it asked for. claude_model and claude_key keep the model asked for, so
+# the record names it beside the model that ran (review_meta_claude). A first round that is
+# not run again says why.
 review_run_claude() {
+  local hint fallback first_note
   review_model_claude
-  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$claude_model" "$claude_key"
+  hint="the review model is set with $claude_key (now $claude_model)"
+  if [ "$claude_key" != MENTAT_FIRST_REVIEW_MODEL ]; then
+    run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$claude_model" "$hint"
+    return
+  fi
+  fallback="the review default ($MENTAT_REVIEW_MODEL_DEFAULT)"
+  if [ "$claude_model" = "$MENTAT_REVIEW_MODEL_DEFAULT" ]; then
+    first_note="not run again on $fallback, which is the same model"
+    run_claude "$tmp/tree" "$tmp/prompt" "$out" first_round_not_reviewed "$tmp/data" "$claude_model" "$hint"
+    return
+  fi
+  first_note="a first round runs again, on $fallback, only when Claude reports that no model ran"
+  run_claude "$tmp/tree" "$tmp/prompt" "$out" first_round_not_reviewed "$tmp/data" "$claude_model" "$hint" \
+    "reviewing once on $fallback" && return 0
+  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$MENTAT_REVIEW_MODEL_DEFAULT" \
+    "this run was on $fallback, as no model ran on $claude_key (now $claude_model)"
 }
+# A first round's failure, with review_run_claude's note on why it is not run again.
+first_round_not_reviewed() { not_reviewed "$1; $first_note"; }
 review_meta_claude() {
   # The models that ran, from Claude's report; the one asked for when none of them is it (a
   # fallback); and the first-round setting when it chose the model.

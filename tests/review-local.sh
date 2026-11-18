@@ -90,7 +90,8 @@ STUBEOF
 # read on stdin and in the folder after --add-dir, and its run in the calls gh records. Then prints Claude's JSON result
 # with $STUB/reply as the reply, $STUB/model_ran as the models that ran (comma-separated,
 # default claude-opus-4-9), $STUB/subtype and $STUB/denials; or $STUB/raw as it is.
-# Exits with $STUB/exit (default 0).
+# Exits with $STUB/exit (default 0). Each run adds the model asked for to $STUB/models; a
+# model listed in $STUB/nostart does not run: the result reports no model usage, exit 1.
 cat >"$root/tools/bin/claude" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "$*" = --version ] && { echo "2.1.322 (Claude Code)"; exit 0; }
@@ -108,6 +109,12 @@ for a in "$@"; do
   if [ "$prev" = --add-dir ]; then printf '%s\n' "$a" >"$STUB/data"; cp "$a/diff" "$STUB/seen_diff"; cp "$a/log" "$STUB/seen_log"; fi
   prev=$a
 done
+model=$(sed -n '/^--model$/{n;p;q;}' "$STUB/args")
+printf '%s\n' "$model" >>"$STUB/models"
+if grep -qxF -- "$model" "$STUB/nostart" 2>/dev/null; then
+  printf '{"type":"result","subtype":"success","is_error":true,"result":"There is an issue with the selected model (%s).","permission_denials":[],"modelUsage":{}}\n' "$model"
+  exit 1
+fi
 [ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
 rc=$(cat "$STUB/exit" 2>/dev/null || echo 0)
 [ -f "$STUB/raw" ] && { cat "$STUB/raw"; exit "$rc"; }
@@ -274,10 +281,31 @@ check "a first round that reports another model posts, naming the setting asked 
 check "a first round that reports another model counts as a round" 'status | grep -q "local rounds 1,"'
 reset; touch "$STUB/comments_fail"; rc=$(run_first)
 check "MENTAT_FIRST_REVIEW_MODEL with the comments unreadable is not reviewed, names the setting, and Claude does not run" 'closed "could not read this account'"'"'s comments on #7, which MENTAT_FIRST_REVIEW_MODEL needs to tell the first round" && ! grep -qx claude "$STUB/calls"'
-reset; echo 1 >"$STUB/exit"; printf '{"type":"result","subtype":"success","is_error":true,"result":"There is an issue with the selected model (fable).","permission_denials":[],"modelUsage":{}}\n' >"$STUB/raw"; rc=$(run_first)
-check "a first-round model that cannot start is not reviewed, naming MENTAT_FIRST_REVIEW_MODEL and its value" 'closed "claude exited with status 1: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable)"'
 reset; echo error_max_turns >"$STUB/subtype"; rc=$(run_first)
 check "a first-round run that fails is not reviewed, naming MENTAT_FIRST_REVIEW_MODEL and its value" 'closed "Claude'"'"'s run ended with error_max_turns, not success; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable)"'
+# A first round in which Claude reports that no model ran runs once more on the review default,
+# whatever MENTAT_REVIEW_MODEL names, unless the default is the model it asked for; one that a
+# model ran in, or that hit the time limit, does not.
+models() { tr '\n' ' ' <"$STUB/models"; }
+NOT_AGAIN="a first round runs again, on the review default (opus), only when Claude reports that no model ran"
+RETRIED="mentat: Claude reports that no model ran: There is an issue with the selected model (fable).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); reviewing once on the review default (opus)"
+FELL_BACK="- Model: claude-opus-4-9 (first round, asked for MENTAT_FIRST_REVIEW_MODEL=fable)"
+reset; echo fable >"$STUB/nostart"; rc=$(run_first)
+check "a first-round model that does not run: one more run on the review default, posted, whose record names the model asked for and the one that ran" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "$RETRIED" "$STUB/out" && folded | grep -qx -- "$FELL_BACK"'
+reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_REVIEW_MODEL=quill run_first)
+check "with MENTAT_REVIEW_MODEL set to another model, a first-round model that does not run is run once more on the review default, not MENTAT_REVIEW_MODEL" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "$RETRIED" "$STUB/out" && folded | grep -qx -- "$FELL_BACK"'
+reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_REVIEW_MODEL=fable run_first)
+check "with MENTAT_REVIEW_MODEL the same model as MENTAT_FIRST_REVIEW_MODEL, a first-round model that does not run is run once more on the review default, and posts" '[ "$rc" = 0 ] && posted && [ "$(models)" = "fable opus " ] && grep -qxF "$RETRIED" "$STUB/out" && folded | grep -qx -- "$FELL_BACK"'
+reset; echo opus >"$STUB/nostart"; rc=$(MENTAT_FIRST_REVIEW_MODEL=opus run)
+check "with MENTAT_FIRST_REVIEW_MODEL the review default, a first-round model that does not run is not run again, and says so" 'closed "claude exited with status 1: There is an issue with the selected model (opus).; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now opus); not run again on the review default (opus), which is the same model" && [ "$(models)" = "opus " ]'
+reset; printf 'fable\nopus\n' >"$STUB/nostart"; rc=$(run_first)
+check "neither the first-round model nor the review default runs: not reviewed after the one more run, naming both" 'closed "claude exited with status 1: There is an issue with the selected model (opus).; this run was on the review default (opus), as no model ran on MENTAT_FIRST_REVIEW_MODEL (now fable)" && [ "$(models)" = "fable opus " ]'
+reset; echo 1 >"$STUB/exit"; printf '{"type":"result","subtype":"error_max_turns","is_error":true,"permission_denials":[],"modelUsage":{"claude-fable-5":{}}}\n' >"$STUB/raw"; rc=$(run_first)
+if closed "claude exited with status 1: the run ended with error_max_turns; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable); $NOT_AGAIN"; then ran_failed=yes; else ran_failed=no; fi
+m1=$(models); rm -f "$STUB/raw" "$STUB/exit" "$STUB/models"; rc=$(run_first)
+check "a first round that a model ran in and that failed is not run again: not reviewed, saying why, and the next run is still the first round" '[ "$ran_failed" = yes ] && [ "$m1" = "fable " ] && [ "$rc" = 0 ] && [ "$(models)" = "fable " ]'
+reset; touch "$STUB/hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run_first)
+check "a first round past the time limit is not run again, and says so" 'closed "Claude did not finish within 1 seconds; $NOT_AGAIN" && [ "$(models)" = "fable " ] && ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null'
 
 # Without codex installed, the review runs and posts as usual. path_without prints the
 # PATH with each folder that holds $1 replaced by a folder of links to all else in it.
