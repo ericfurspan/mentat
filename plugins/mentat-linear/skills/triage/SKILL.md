@@ -9,7 +9,7 @@ The maintainer started one sitting: gather new ideas from every channel into the
 
 ## Arguments
 
-- Check the arguments before any reader writes. `all` means every current project and is neither a project name nor a reader option. Match project names as the maintainer's own instructions say, else against the backlog's project names. An option no reader takes, or a combination a reader refuses, stops the sitting with nothing changed and lists the options each reader accepts.
+- Check the arguments before any reader writes. `all` means every current project and is neither a project name nor a reader option. Match project names against the backlog's project names. An option no reader takes, or a combination a reader refuses, stops the sitting with nothing changed and lists the options each reader accepts.
 - With neither project names nor `all`, reader options alone included, an opening question asks once, before any reader runs, which projects' ideas the sitting settles: the session's project first, then `all`, another through Other. It is a session control, not a decision: it has no "N of M" and is not asked again after a compaction. The answer names the projects whose ideas the sitting settles, not a limit on what readers file ("Readers"). Where the maintainer's own instructions name no project list, ask nothing: the sitting covers the session's repository. Brainstorm mode keeps its own project question.
 
 ## During the sitting
