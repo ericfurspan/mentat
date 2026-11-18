@@ -54,7 +54,7 @@ When the maintainer agrees to build something, with either answer to `mentat:pro
 - On an item created here, write the plan check and second opinion records kept for it, with their files, as `agent-records.md` in this skill's folder says.
 - Record the spec's fingerprint. Read the spec back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as `mentat:review` "Spec" computes it (the same command), never from the text written, and record it with the answer to `mentat:propose`'s agreement question (build now or later), citing the agreement, in the item's agent records (`agent-records.md`). Do it again, with that agreement's answer, whenever an agreed change of scope rewrites the spec.
 - A change of scope updates the spec, in the same words. Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the spec only once agreed through `mentat:propose`. Before the item ends with that scope still not agreed, the scope goes to the Inbox as one entry naming the item.
-- Move the item to Todo once the maintainer agrees, to In Progress when the branch exists, and to Done when the pull request merges, or, with a hand check after the merge, once the maintainer reports its result ("Marking a wait"). Link the pull request from the item once it exists. The pull request writes no `Closes #`.
+- Move the item to Todo once the maintainer agrees, to In Progress when the branch exists, and to Done when the pull request merges, or, with a hand check after the merge, once the maintainer reports its result ("Marking a wait", or `github.md` with GitHub issues). Link the pull request from the item once it exists. The pull request writes no `Closes #`.
 
 ## Second opinion records
 
