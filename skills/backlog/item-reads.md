@@ -4,7 +4,7 @@ With either tracker, read this before reading an item to plan, propose, triage o
 
 ## The full read
 
-Such a read takes the item's description, its spec (`mentat:backlog` "Where the spec lives") and the text of every comment the tracker's adapter lists, inline comments with the description text they quote and replies included, from every page, without downloading attachment files. A page that cannot be read is read again. If the read stays incomplete, the session says so and asks no decision on that item: `mentat:propose` takes it no further, and a build names and skips it.
+Such a read takes the item's description, its spec (`mentat:backlog` "Where the spec lives") and the text of every comment the tracker's adapter lists, inline comments with the description text they quote and replies included, from every page, without downloading attachment files. A page that cannot be read is read again. If the read stays incomplete, the session says so and asks no decision on that item: `mentat:propose` takes it no further, and a build names and skips it. A session that plans or builds the item asks each decision in its "Decision for the maintainer" section (`SKILL.md` "Item shape") in chat, as `../propose/decisions.md` says, before it relies on it.
 
 A listing reads only what it names. The lookup of the next-work offer (`next-work.md`) keeps only its read of Later notes for the Inbox count.
 
