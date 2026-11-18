@@ -26,11 +26,11 @@ An item's type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
 
 ## Marking a wait
 
-On a wait, and on each decision for the maintainer that the maintainer's own instructions mark on an item, in any stage, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When a wait ends or a marked decision is answered, and the item keeps no other wait (a wait block, a merge wait or a review stop) and no marked decision, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "Ready to merge: #N" and a review stop get the same label and assignment, and the same removal.
+On a wait, and on each decision for the maintainer that blocks an item's work, in any stage, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When a wait ends or a blocking decision is answered, and the item keeps no other wait (a wait block, a merge wait or a review stop) and no blocking decision, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "Ready to merge: #N" and a review stop get the same label and assignment, and the same removal.
 
 ## The order of agreed work
 
-The next agreed work, the tracker's order, is the open Todo items without the `Waiting on you` label, or with it only for a marked decision that does not block the item's work, and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
+The next agreed work, the tracker's order, is the open Todo items without the `Waiting on you` label and not parked, ranked by Priority level name: Urgent, High, Medium, Low, then No priority, oldest created first within a level. Linear's own drag order is not used. Read every page of results before ranking, and report the waiting and In Progress items too. Claude Code sets Priority only to a level the maintainer gave: agreement alone never sets or raises it, and parking keeps it.
 
 The Backlog order, for the lookup of the next-work offer (`next-work.md` in `mentat:backlog`'s folder), is the open Backlog items, not parked, ranked by the same keys: Priority level, then oldest created first within a level. Read every page of results before ranking; Linear's own drag order is not used.
 
@@ -60,7 +60,7 @@ When a session lists this project to choose or plan work (not for `mentat:propos
 
 ## Labels
 
-The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`, which marks every wait and every marked decision for the maintainer ("Marking a wait").
+The team's labels are `Bug`, `Feature`, `Improvement` and `Waiting on you`, which marks every wait and every decision for the maintainer that blocks an item's work ("Marking a wait").
 
 ## New project shape
 
