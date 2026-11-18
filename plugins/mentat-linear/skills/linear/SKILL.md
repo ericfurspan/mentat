@@ -36,7 +36,7 @@ The Backlog order, for the lookup of the next-work offer (`next-work.md` in `men
 
 ## Reading an item
 
-For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project's lead, the lead field of the project. List every page of an item's comments and of its `Spec` document's comments ("Where the spec lives"). An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads and the `Spec` document's included. Attachment links in comments are not downloaded. A refined hand-made item's original text is read from its `Original text` document ("Hand-made items").
+For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project's lead, the lead field of the project. List every page of an item's comments and of its `Spec` document's comments ("Where the spec lives"). An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads and the `Spec` document's included. Attachment links in comments are not downloaded. An item's original text is read from its `Original text` document, where it has one.
 
 ## Where the spec lives
 
@@ -53,10 +53,6 @@ Name the item's branch with its identifier as its own segment, lowercase, as in 
 ## GitHub integration
 
 Warning for the maintainer: Linear's GitHub integration can post an item's description, a wait block included, to GitHub. The maintainer sets its "Comments in GitHub" to post without issue descriptions and turns it off for public repositories; agents do not change it. Its move of an item to Done at merge is undone for an item still waiting on a hand check ("Waits left open").
-
-## Hand-made items
-
-Off unless the maintainer's own instructions turn it on. Then, when a session lists this project to choose or plan work (not while copying a spec for a review, not for `mentat:propose`'s read, typed or not, not for the lookup of the next-work offer (`next-work.md` in `mentat:backlog`'s folder), and not from a skill that forbids writes), it refines each open item there that the project's lead created, that has none of the type labels, that has no spec ("Where the spec lives") and that is not in Triage: every item in Triage is the Inbox ("Stages"), settled in triage, so the cleanup skips it by status. First it creates a document on the item titled `Original text`, reusing one already titled so, holding the item's title and description as they are; if that write is refused, the item stays unchanged. Then it sets a title, one type label (`Improvement` when the choice is unclear) and a description holding the item shape's opening sentence, any start wait line unchanged, its `Now:` line (where the item stands and the next step) and the original's links as its links line. A question stays a question: refining neither answers nor researches it. An item in Todo or In Progress keeps its status and is named in the reply. The assignee and other labels stay as they are. An item that cannot get a fair title or type without inventing what it asks stays unchanged and is named in the reply.
 
 ## Waits left open
 

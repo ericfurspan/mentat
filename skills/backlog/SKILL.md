@@ -16,7 +16,7 @@ Keep an item's description short, so items look alike. It holds only these, in t
 - The start wait, optional: one line opening `Starts after:` ("Start waits").
 - The wait block ("Marking a wait"), only while steps wait on the maintainer, in the shape "Waits on the maintainer" gives, its steps in full; remove it when the wait ends. Then an open section for a decision for the maintainer, where the maintainer's own instructions mark one. These are the first headings of the description, the wait block first.
 - One `Now:` line, the item's next step: where the item stands and what comes next, replaced in place.
-- One links line, such as the original's links a refined hand-made item keeps (`mentat-linear:linear`).
+- One links line.
 
 The item's decisions lines, any longer current plan and its material assumptions go in its agent records (`agent-records.md`). The tracker's adapter may keep the next step and the decisions lines elsewhere (`github.md`); every reader and writer uses its place. Evidence goes to an attachment or the pull request; a replaced plan is deleted, not posted as a comment. Agents post no progress comments on an item; once a pull request exists, progress is on the pull request.
 
