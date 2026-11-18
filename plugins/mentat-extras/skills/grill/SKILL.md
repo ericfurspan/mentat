@@ -4,7 +4,7 @@ description: "Interviewing the maintainer about a plan, decision or idea, one cl
 user-invocable: false
 ---
 
-The maintainer wants to be questioned about a plan, decision or idea until the two of you agree on it. If they typed text after the command, grill them on that; otherwise on the request in hand. This runs once: do it, then normal work resumes.
+The maintainer wants to be questioned about a plan, decision or idea until the two of you agree on it. Grill them on the request in hand. This runs once: do it, then normal work resumes.
 
 1. Finish the step in flight first. Never interrupt a running builder, review or test run. Then change nothing while the grill runs: no edits, no commits, no GitHub writes. Reading is fine.
 2. Read before asking: the code, the files, the backlog item and what the maintainer has said this session. Lay the subject out as a tree of decisions, where settling one decision opens the ones that depend on it.
