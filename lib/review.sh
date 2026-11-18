@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# The local review (`mentat review` and `--local`, and the reviewers module's
-# `--codex`) and its default reviewer, a headless Claude: run_claude. Sourced by
+# The local review (`mentat review`, and the reviewers module's `--codex`) and
+# its default reviewer, a headless Claude: run_claude. Sourced by
 # bin/mentat and by the reviewers module's entries.
 
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
@@ -153,7 +153,7 @@ review_meta_claude() {
 review_local() {
   local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models="" claude_model="" claude_key=""
   "review_name_$reviewer"
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   sweep_leftovers
   review_traps
   read_request "$pr"

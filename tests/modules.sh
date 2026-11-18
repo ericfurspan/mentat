@@ -100,7 +100,7 @@ check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" =
 for args in "--codex --stop 7" "--grok --stop --stop 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   out=$(PATH="$sys" bin/mentat review $args 2>&1); rc=$?
-  check "with none on PATH, this checkout's entry reads review $args" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat review [--local | --codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" ]'
+  check "with none on PATH, this checkout's entry reads review $args" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" ]'
 done
 
 # With neither: the copy of core without the module folder, and nothing on PATH.

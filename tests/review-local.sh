@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for `mentat review` and `mentat review --local`, the Claude review,
+# Behavior tests for `mentat review`, the Claude review,
 # using a real git origin, a stub gh and a stub claude. Prints PASS/FAIL per case;
 # exits 1 on any FAIL. tests/review-codex.sh covers `mentat review --codex`.
 set -uo pipefail
@@ -17,7 +17,7 @@ export TMPDIR="$root/tmp" XDG_CACHE_HOME="$root/cache"
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")" "$TMPDIR"
 failures=0
-check() { if eval "$2"; then printf 'PASS: review --local %s\n' "$1"; else printf 'FAIL: review --local %s\n' "$1"; failures=$((failures + 1)); fi; }
+check() { if eval "$2"; then printf 'PASS: review-local %s\n' "$1"; else printf 'FAIL: review-local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset MENTAT_REVIEW_MODEL MENTAT_FIRST_REVIEW_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS
@@ -134,7 +134,7 @@ reset() {
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
-run() { (cd "$root/work" && "$mentat" review --local "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
+run() { (cd "$root/work" && "$mentat" review "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
 # The posted review: a heading line, then the bullets and the reply folded, then the result line.
 heading() { [ "$(head -n 1 "$STUB/comment")" = "## Local Claude review of $H: $1, spec fingerprint ${2:-none}" ]; }
@@ -496,10 +496,13 @@ git -C "$root/work" update-ref refs/remotes/origin/main "$BASE"
 reset; touch "$STUB/comment_fails"; rc=$(run)
 check "a failed post is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post the review" "$STUB/out"'
 
-rc=$("$mentat" review --local abc >/dev/null 2>&1; echo $?)
+rc=$("$mentat" review 7x >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
+# The retired second name of the plain review is refused like any unknown option, and runs nothing.
+reset; rc=$(cd "$root/work" && "$mentat" review --local 7 >"$STUB/out" 2>&1; echo $?)
+check "--local is a usage error (exit 64) that prints the usage line, and Claude does not run, nothing is read or posted" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" ] && [ ! -f "$STUB/prompt" ] && [ ! -f "$STUB/calls" ] && ! posted'
 
-# With no mode flag, mentat review is the Claude review, the same as --local.
+# With no mode flag, mentat review is the Claude review.
 reset; rc=$(cd "$root/work" && "$mentat" review 7 >"$STUB/out" 2>&1; echo $?)
 check "no mode flag runs the Claude review and posts it (exit 0)" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && heading "no findings" none && fold_shape "REVIEW RESULT: NO FINDINGS" && [ "$(arg --model)" = opus ]'
 
@@ -509,7 +512,7 @@ REQ_TEXT=$'Make the README say change.\nLeave every other file alone.\nChecked b
 REQ_FP=71fca9a263e9  # shasum -a 256 of REQ_TEXT, first 12 hex characters, computed independently
 mkdir -p "$root/req dir"
 printf '%s\n' "$REQ_TEXT" >"$root/req dir/agreed request.md"
-runq() { (cd "$root/work" && "$mentat" review --local --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
+runq() { (cd "$root/work" && "$mentat" review --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
 reset; rc=$(runq "$root/req dir/agreed request.md")
 check "--request: the request reaches Claude in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
 check "--request: the posted comment records the request fingerprint (first 12 hex of its SHA-256), in the heading and in the fold" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && [ "${#REQ_FP}" = 12 ] && heading "no findings" "$REQ_FP" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
@@ -529,14 +532,14 @@ reset; unread "with an unreadable file" "$root/locked.md" "could not read the ag
 reset; unread "with a directory" "$root" "could not read the agreed request file"
 reset; unread "with an empty file name (an empty variable)" "" "request file name for #7 is empty"
 chmod 600 "$root/locked.md"
-# With no mode flag, --request runs the same Claude review as --local --request.
+# With no mode flag, --request runs the Claude review.
 reset; rc=$(cd "$root/work" && "$mentat" review --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
 check "--request with no mode flag reviews with Claude and records the fingerprint" '[ "$rc" = 0 ] && grep -q "found nothing on $H" "$STUB/out" && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && heading "no findings" "$REQ_FP"'
-rc=$("$mentat" review --local --request >"$STUB/out" 2>&1; echo $?)
+rc=$("$mentat" review --request >"$STUB/out" 2>&1; echo $?)
 check "--request without a file and a pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 # --require-ci: a head where no CI check ran is not a pass.
-runrc() { (cd "$root/work" && "$mentat" review --local "$@" >"$STUB/out" 2>&1); echo $?; }
+runrc() { (cd "$root/work" && "$mentat" review "$@" >"$STUB/out" 2>&1); echo $?; }
 reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
 check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
 check "--require-ci: a review not posted for a head with no CI counts no round" 'status | grep -q "local rounds 0,"'
@@ -569,8 +572,8 @@ reset; echo UNKNOWN >"$STUB/mergeable"; echo 33333333333333333333333333333333333
 check "--require-ci with the merge state unknown until the timeout and a head that moved exits 3, not 4, and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(merge_reads)" -ge 1 ] && grep -q "the head moved from $H; run mentat review again" "$STUB/out" && ! grep -q "could not be read\|not posted" "$STUB/out"'
 for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   # shellcheck disable=SC2086 # the words are the arguments
-  rc=$("$mentat" review --local $args >/dev/null 2>&1; echo $?)
-  check "usage error (exit 64) for: review --local $args" '[ "$rc" = 64 ]'
+  rc=$("$mentat" review $args >/dev/null 2>&1; echo $?)
+  check "usage error (exit 64) for: review $args" '[ "$rc" = 64 ]'
 done
 
 # Interrupts. mentat runs in its own process group with default INT handling (a job this
@@ -584,7 +587,7 @@ interrupt() { # $1 model or ci, $2 signal, $3 group or pid
     cd "$root/work" || exit 1
     # A long pause between CI reads, which the signal must not wait out.
     [ "$1" = model ] || export MENTAT_REVIEW_INTERVAL_SECONDS=30 MENTAT_CI_TIMEOUT_SECONDS=120
-    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --local 7 >"$STUB/out" 2>&1
+    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review 7 >"$STUB/out" 2>&1
   ) &
   ip=$! ready=no
   for i in $(seq 100); do

@@ -45,7 +45,7 @@ opinion_body() { # $1 idea file
   printf "End your reply with exactly one final line, one of:\nSECOND OPINION VERDICT: DO IT\nSECOND OPINION VERDICT: DO IT DIFFERENTLY - <how, briefly>\nSECOND OPINION VERDICT: DON'T - <why, briefly>\n"
 }
 
-# Codex reads a detached worktree at the recorded commit, as review --local does.
+# Codex reads a detached worktree at the recorded commit, as the local review does.
 opinion_codex() {
   local tmp
   command -v codex >/dev/null 2>&1 || pair_fail "codex is not installed"

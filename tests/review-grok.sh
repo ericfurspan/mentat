@@ -537,14 +537,14 @@ reset; touch "$STUB/result_fails"; rc=$(srun)
 check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, codex: none, ci:"'
 reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --stop --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
 check "--stop between the other flags after --grok posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ]'
-for args in "--stop 7" "--local --stop 7" "--stop --grok 7" "--grok --stop --stop 7" "--grok 7 --stop"; do
+for args in "--stop 7" "--codex --stop 7" "--stop --grok 7" "--grok --stop --stop 7" "--grok 7 --stop"; do
   reset
   # shellcheck disable=SC2086 # the words are the arguments
   rc=$(cd "$root" && "$mentat" review $args >"$STUB/out" 2>&1; echo $?)
   check "usage error (exit 64), nothing read, for: review $args" '[ "$rc" = 64 ] && grep -qF "usage: mentat review" "$STUB/out" && [ ! -f "$STUB/calls" ]'
 done
 
-for args in "--grok" "--grok abc" "--grok 7 8" "--grok --local 7" "--grok --local" "--local --grok 7" "--grok 7 --local" "--grok --require-ci --require-ci 7" "--require-ci --grok 7"; do
+for args in "--grok" "--grok abc" "--grok 7 8" "--grok --codex 7" "--grok --codex" "--codex --grok 7" "--grok 7 --codex" "--grok --require-ci --require-ci 7" "--require-ci --grok 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   rc=$("$mentat" review $args >/dev/null 2>&1; echo $?)
   check "usage error (exit 64) for: review $args" '[ "$rc" = 64 ]'
