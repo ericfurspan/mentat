@@ -3,9 +3,10 @@
 
 # Status prints one line of a pull request's review state, read from the comments
 # the review commands post (lib/review.sh, and plugins/mentat-reviewers/lib/codex.sh and
-# grok.sh). It posts, edits and pushes nothing. Only comments by the account gh is
-# signed in as count: anyone who can comment could post the same text.
-# tests/run fails when a heading these match changes where it is written.
+# grok.sh), the owner's review and whether the description has the section for calls
+# made without the maintainer. It posts, edits and pushes nothing. Only comments by the
+# account gh is signed in as count: anyone who can comment could post the same text.
+# tests/run fails when a comment heading these match changes where it is written.
 
 # One line per review comment by $3 on pull request $2 of repository $1, oldest
 # first: "local <sha> <no-findings|findings|incomplete> <fingerprint>" for a Local
@@ -75,6 +76,20 @@ status_owner_review() {
     echo "unknown (could not read the requested reviewers)"; return
   fi
   if [ "$requested" = true ]; then echo requested; else echo "not requested"; fi
+}
+
+# Whether the description of pull request $1 has the "Calls made without the maintainer"
+# section (skills/pr/SKILL.md): "present" when some line of it, CR stripped, is a Markdown
+# ATX heading with that text at any level, wherever a template puts it, else "missing". A
+# read that fails gives "unknown (<why>)" and stops nothing. No test pins that heading's
+# text in the skill: a change to it there also changes it here.
+status_calls_section() {
+  local body cr=$'\r'
+  if ! body=$(gh pr view "$1" --json body --jq .body); then
+    echo "unknown (could not read the description)"; return
+  fi
+  body=${body//$cr/}
+  if grep -Eq '^#{1,6} +Calls made without the maintainer( +#+)? *$' <<<"$body"; then echo present; else echo missing; fi
 }
 
 status() {
@@ -147,5 +162,6 @@ status() {
     else out="$out, spec: differs (last review ${last_fp:-none}, file $fp)"; fi
   fi
   out="$out, owner review: $(status_owner_review "$repo" "$pr" "$head")"
+  out="$out, calls section: $(status_calls_section "$pr")"
   printf '%s\n' "$out"
 }

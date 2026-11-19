@@ -59,10 +59,12 @@
 #     with its result and spec fingerprint), the Codex review's on the last commit Claude
 #     reviewed (none, did not finish on it, or done on it with its result and spec
 #     fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
-#     Claude review's spec fingerprint matches the file, and a done Codex review's. Last, the
+#     Claude review's spec fingerprint matches the file, and a done Codex review's. Then the
 #     repository owner's review, the first that holds: no single owner (an organization owns
 #     the repository), author, approved on head (their latest submitted review), requested or
-#     not requested; unknown (<why>) when a read it needs fails, which stops nothing else.
+#     not requested. Last, the calls section: present when the description has a heading
+#     "Calls made without the maintainer" at any level, else missing. Either is unknown
+#     (<why>) when a read it needs fails, which stops nothing else.
 #     Posts nothing. 0 printed, 1 could not read.
 #   mentat reviewers  Prints whether outside reviewers (Codex and Grok) are on in this
 #     repository, on one line: "reviewers: on", "reviewers: off" or "reviewers: unknown -
