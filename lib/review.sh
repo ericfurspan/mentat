@@ -74,14 +74,16 @@ run_claude() {
     printf 'mentat: Claude reports that no model ran%s; %s; %s\n' "${why:+: $why}" "$hint" "$retry" >&2
     return 1
   fi
-  [ "$rc" -eq 0 ] || "$fail" "claude exited with status $rc${why:+: $why}; $hint"
+  # A second argument to "$fail" is the same reason without Claude's own text, for the line
+  # that tells the maintainer now (not_reviewed, lib/shared.sh).
+  [ "$rc" -eq 0 ] || "$fail" "claude exited with status $rc${why:+: $why}; $hint" "claude exited with status $rc; $hint"
   [ -s "$json" ] || "$fail" "Claude returned no output"
   n=$(jq -er 'if type == "object" then .subtype | strings else empty end' "$json" 2>/dev/null) ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
   [ "$n" = success ] || "$fail" "Claude's run ended with $n, not success; $hint"
   jq -e '(.result | type) == "string" and (.permission_denials | type) == "array" and (.modelUsage | type) == "object"' "$json" >/dev/null 2>&1 ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
-  [ "$(jq -r '.is_error // false' "$json")" = false ] || "$fail" "Claude reported an error${why:+: $why}; $hint"
+  [ "$(jq -r '.is_error // false' "$json")" = false ] || "$fail" "Claude reported an error${why:+: $why}; $hint" "Claude reported an error; $hint"
   n=$(jq -r '.permission_denials | length' "$json")
   [ "$n" -eq 0 ] || "$fail" "Claude was denied $n tool call(s) ($(jq -r '[.permission_denials[].tool_name | strings] | unique | join(", ")' "$json")), so the review may not have read what it needed"
   claude_models=$(jq -r '.modelUsage | keys | join(", ")' "$json")
@@ -153,12 +155,14 @@ review_run_claude() {
 # A first round's failure, with review_run_claude's note on why it is not run again. A
 # first run that is run again (no model ran) returns before this, so only the run that
 # ends the round is recorded.
-first_round_not_reviewed() { review_tool_failed "$1; $first_note"; }
+first_round_not_reviewed() { review_tool_failed "$1; $first_note" "${2:-$1}; $first_note"; }
 # A failure of the reviewer tool itself in review_local (reviewer, from its caller): recorded
-# as one of the reviewer's failures in a row (lib/shared.sh), then not reviewed.
+# as one of the reviewer's failures in a row (lib/shared.sh), then not reviewed. $2, when
+# given, is the reason without the reviewer's own text, for the line that tells the
+# maintainer now.
 review_tool_failed() {
   reviewer_failed "$reviewer"
-  not_reviewed "$1"
+  not_reviewed "$1" "${2:-$1}"
 }
 review_meta_claude() {
   # The models that ran, from Claude's report; the one asked for when none of them is it (a

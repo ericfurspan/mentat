@@ -688,7 +688,7 @@ NOT_REVIEWED_3="mentat: not reviewed: claude exited with status 3: Nothing to fl
 reset; fail_run 7
 check "a first tool failure is recorded and not raised: exit 1 and the not-reviewed line alone, as before" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && recorded "fail owner/repo#7 "'
 fail_run 8 "$H2"
-check "a second tool failure in a row, on another pull request, adds one line telling the maintainer now: Claude, the count, both pull requests and the reason (exit 1)" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7, owner/repo#8): claude exited with status 3: Nothing to flag.; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -q "^mentat: not reviewed: claude exited with status 3" "$STUB/out" && recorded "fail owner/repo#7 fail owner/repo#8 "'
+check "a second tool failure in a row, on another pull request, adds one line telling the maintainer now: Claude, the count, both pull requests and the reason without Claude's own text (exit 1)" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7, owner/repo#8): claude exited with status 3; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "$NOT_REVIEWED_3" "$STUB/out" && recorded "fail owner/repo#7 fail owner/repo#8 "'
 fail_run 7
 check "a third in a row names each pull request once" '[ "$rc" = 1 ] && raised | grep -qF "Claude has failed 3 times in a row (owner/repo#7, owner/repo#8): "'
 stub_reset; rc=$(run 7)
@@ -712,6 +712,21 @@ reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
 check "a first round run again on the review default records only the second run's outcome" '[ "$rc" = 0 ] && recorded "ok owner/repo#7 "'
 reset; echo fable >"$STUB/nostart"; echo 3 >"$STUB/exit"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
 check "a first round run again whose second run fails records one failure" '[ "$rc" = 1 ] && recorded "fail owner/repo#7 "'
+# The raise line holds no text from Claude's reply; the not-reviewed line keeps it.
+CANARY=CANARY-REVIEWER-TEXT-4821
+canary_run() { # $1: exit; $2: raw JSON or empty; the rest: env for the run
+  local e=$1 raw=$2; shift 2
+  stub_reset; echo "$e" >"$STUB/exit"; printf '%s\n\nREVIEW RESULT: NO FINDINGS\n' "$CANARY" >"$STUB/reply"
+  [ -z "$raw" ] || printf '%s\n' "$raw" >"$STUB/raw"
+  rc=$(for a in "$@"; do export "${a?}"; done; run 7)
+}
+reset; canary_run 3 ""; canary_run 3 ""
+check "Claude exiting non-zero twice in a row: the raise line leaves out Claude's text, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): claude exited with status 3; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "mentat: not reviewed: claude exited with status 3: $CANARY; the review model is set with MENTAT_REVIEW_MODEL (now opus)" "$STUB/out"'
+ERR_JSON='{"type":"result","subtype":"success","is_error":true,"result":"'$CANARY'\nmore","permission_denials":[],"modelUsage":{"claude-opus-4-9":{}}}'
+reset; canary_run 0 "$ERR_JSON"; canary_run 0 "$ERR_JSON"
+check "Claude reporting an error twice in a row: the raise line leaves out Claude's text, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude reported an error; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "mentat: not reviewed: Claude reported an error: $CANARY; the review model is set with MENTAT_REVIEW_MODEL (now opus)" "$STUB/out"'
+reset; canary_run 3 "" MENTAT_FIRST_REVIEW_MODEL=opus; canary_run 3 "" MENTAT_FIRST_REVIEW_MODEL=opus
+check "a first round failing twice in a row: the raise line leaves out Claude's text and keeps the first-round note" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): claude exited with status 3; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now opus); not run again on the review default (opus), which is the same model" ] && grep -qxF "mentat: not reviewed: claude exited with status 3: $CANARY; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now opus); not run again on the review default (opus), which is the same model" "$STUB/out"'
 # A record that cannot be written changes neither the exit status nor the message.
 mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
 reset; fail_run 7; rc=$(XDG_CACHE_HOME="$root/badcache" run 7)

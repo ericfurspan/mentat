@@ -8,11 +8,13 @@ CI_GRACE_SECONDS="${MENTAT_CI_GRACE_SECONDS:-60}"
 
 die() { printf 'mentat: %s\n' "$1" >&2; exit "${2:-1}"; }
 # With review_raise set (reviewer_failed), the not-reviewed line is followed by one line
-# that tells the maintainer now, with the same reason.
+# that tells the maintainer now, with the reason $2, the reason without the reviewer's own
+# text, when given, else $1.
 review_raise=""
 not_reviewed() {
+  local raise_why=${2:-$1}
   printf 'mentat: not reviewed: %s\n' "$1" >&2
-  [ -z "$review_raise" ] || printf 'mentat: tell the maintainer now: %s: %s\n' "$review_raise" "${1//$'\n'/ }" >&2
+  [ -z "$review_raise" ] || printf 'mentat: tell the maintainer now: %s: %s\n' "$review_raise" "${raise_why//$'\n'/ }" >&2
   exit 1
 }
 
