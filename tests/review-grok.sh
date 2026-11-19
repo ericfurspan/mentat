@@ -176,6 +176,7 @@ STUBEOF
 chmod +x "$root/bin/gh" "$root/bin/grok" "$root/bin/codex"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
 export PATH="$root/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
+unset MENTAT_REVIEW_ROUNDS
 
 reply() { # $1 text, $2 stop reason
   jq -n --arg t "$1" --arg s "${2:-end_turn}" '{text: $t, stopReason: $s, sessionId: "s", modelUsage: {"grok-stub": {}}}' >"$STUB/out_json"
@@ -537,6 +538,17 @@ reset; touch "$STUB/result_fails"; rc=$(srun)
 check "--stop: a failed post of the review, after its start comment, posts its own did-not-finish line" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && grep -q "^Grok stop review did not finish on $H: .*could not post the review" "$STUB/comment.2" && status | grep -qF "grok: none, grok stop: did not finish on ${H:0:7}, codex: none, ci:"'
 reset; rc=$(cd "$root/work tree" && "$mentat" review --grok --require-ci --stop --request "$root/req dir/agreed request.md" 7 >"$STUB/out" 2>&1; echo $?)
 check "--stop between the other flags after --grok posts as usual (exit 0)" '[ "$rc" = 0 ] && [ "$(cat "$STUB/comment.1")" = "Grok stop review started on $H" ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint $REQ_FP" ]'
+# The round limit is the Claude review's alone: --grok and --grok --stop run with the limit's
+# local rounds used, neither reads nor checks MENTAT_REVIEW_ROUNDS, and no record names a limit.
+at_limit() { jq -n --arg b "## Local Claude review of $H: findings, spec fingerprint none" '[range(5) | {user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; }
+reset; at_limit; rc=$(run)
+check "the round limit's 5 local rounds used: --grok is not refused, and posts with no round limit line" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && heading "no findings" && ! grep -q "Round limit" "$STUB/comment.2"'
+reset; at_limit; rc=$(srun)
+check "the round limit's 5 local rounds used: --grok --stop is not refused, and posts with no round limit line" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ] && [ "$(first 2)" = "## Local Grok stop review of $H: no findings, spec fingerprint none" ] && ! grep -q "Round limit" "$STUB/comment.2"'
+reset; at_limit; rc=$(MENTAT_REVIEW_ROUNDS=2 run)
+check "MENTAT_REVIEW_ROUNDS=2 with 5 local rounds used: --grok is not refused" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ]'
+reset; rc=$(MENTAT_REVIEW_ROUNDS=abc srun)
+check "MENTAT_REVIEW_ROUNDS=abc: --grok --stop does not check it, and posts" '[ "$rc" = 0 ] && grok_ran && [ "$(comments)" = 2 ]'
 for args in "--stop 7" "--codex --stop 7" "--stop --grok 7" "--grok --stop --stop 7" "--grok 7 --stop"; do
   reset
   # shellcheck disable=SC2086 # the words are the arguments

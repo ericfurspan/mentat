@@ -20,7 +20,7 @@ failures=0
 check() { if eval "$2"; then printf 'PASS: review-local %s\n' "$1"; else printf 'FAIL: review-local %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-unset MENTAT_REVIEW_MODEL MENTAT_FIRST_REVIEW_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS
+unset MENTAT_REVIEW_MODEL MENTAT_FIRST_REVIEW_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS MENTAT_REVIEW_ROUNDS
 
 # An origin with main and pull request 7, whose head changes README.
 git init -q --bare -b main "$root/origin.git"
@@ -171,11 +171,11 @@ unposted() { sed "1,/^Review of $H, not posted and not a round:\$/d" "$STUB/out"
 status() { (cd "$root/work" && "$mentat" status 7 2>&1); }
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "a review that finishes before CI is posted only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "found nothing on $H" "$STUB/out" && ! grep -q "not posted" "$STUB/out"'
-check "a posted review counts as a round" 'status | grep -q "local rounds 1,"'
+check "a posted review counts as a round" 'status | grep -q "local rounds 1 of 5,"'
 reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "CI failing after the review exits 4, posts nothing and names the failing check" '[ "$rc" = 4 ] && ! posted && ! grep -q "pr comment" "$STUB/calls" && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out"'
 check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(cat "$STUB/reply")" ]'
-check "a review not posted for failed CI counts no round" 'status | grep -q "local rounds 0,"'
+check "a review not posted for failed CI counts no round" 'status | grep -q "local rounds 0 of 5,"'
 reset; printf -- '- (non-blocking) README:1 still running\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout exits 4, posts nothing and prints the review" '[ "$rc" = 4 ] && ! posted && grep -q "CI did not finish on $H within 2 seconds" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ]'
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
@@ -254,11 +254,10 @@ check "a run past the time limit is stopped and not reviewed" 'closed "Claude di
 # MENTAT_FIRST_REVIEW_MODEL: with it set, a pull request's first local round (none yet, as
 # mentat status counts them) runs on it, and later rounds on MENTAT_REVIEW_MODEL or the default.
 run_first() { MENTAT_FIRST_REVIEW_MODEL=fable run; }
-read_comments() { grep -q '/comments$' "$STUB/calls"; }
 for unset_or_empty in unset empty; do
   reset
   if [ "$unset_or_empty" = unset ]; then rc=$(run); else rc=$(MENTAT_FIRST_REVIEW_MODEL='' run); fi
-  check "MENTAT_FIRST_REVIEW_MODEL $unset_or_empty: the default model, no comment read and no first-round note" '[ "$rc" = 0 ] && [ "$(arg --model)" = opus ] && folded | grep -qx -- "- Model: claude-opus-4-9" && ! read_comments'
+  check "MENTAT_FIRST_REVIEW_MODEL $unset_or_empty: the default model and no first-round note" '[ "$rc" = 0 ] && [ "$(arg --model)" = opus ] && folded | grep -qx -- "- Model: claude-opus-4-9"'
 done
 reset; echo claude-fable-5 >"$STUB/model_ran"; rc=$(run_first)
 check "MENTAT_FIRST_REVIEW_MODEL with no earlier round: runs on it, and the record names the model and the setting" '[ "$rc" = 0 ] && [ "$(arg --model)" = fable ] && folded | grep -qx -- "- Model: claude-fable-5 (first round, MENTAT_FIRST_REVIEW_MODEL=fable)"'
@@ -278,9 +277,7 @@ rm -f "$STUB/comment"; printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n'
 check "a posted INCOMPLETE first round is no round: the next run is on MENTAT_FIRST_REVIEW_MODEL" '[ "$rc1" = 1 ] && [ "$m1" = fable ] && [ "$rc" = 0 ] && [ "$(arg --model)" = fable ]'
 reset; rc=$(run_first)
 check "a first round that reports another model posts, naming the setting asked for and the model that ran" '[ "$rc" = 0 ] && posted && folded | grep -qx -- "- Model: claude-opus-4-9 (first round, asked for MENTAT_FIRST_REVIEW_MODEL=fable)"'
-check "a first round that reports another model counts as a round" 'status | grep -q "local rounds 1,"'
-reset; touch "$STUB/comments_fail"; rc=$(run_first)
-check "MENTAT_FIRST_REVIEW_MODEL with the comments unreadable is not reviewed, names the setting, and Claude does not run" 'closed "could not read this account'"'"'s comments on #7, which MENTAT_FIRST_REVIEW_MODEL needs to tell the first round" && ! grep -qx claude "$STUB/calls"'
+check "a first round that reports another model counts as a round" 'status | grep -q "local rounds 1 of 5,"'
 reset; echo error_max_turns >"$STUB/subtype"; rc=$(run_first)
 check "a first-round run that fails is not reviewed, naming MENTAT_FIRST_REVIEW_MODEL and its value" 'closed "Claude'"'"'s run ended with error_max_turns, not success; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now fable)"'
 # A first round in which Claude reports that no model ran runs once more on the review default,
@@ -306,6 +303,49 @@ m1=$(models); rm -f "$STUB/raw" "$STUB/exit" "$STUB/models"; rc=$(run_first)
 check "a first round that a model ran in and that failed is not run again: not reviewed, saying why, and the next run is still the first round" '[ "$ran_failed" = yes ] && [ "$m1" = "fable " ] && [ "$rc" = 0 ] && [ "$(models)" = "fable " ]'
 reset; touch "$STUB/hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run_first)
 check "a first round past the time limit is not run again, and says so" 'closed "Claude did not finish within 1 seconds; $NOT_AGAIN" && [ "$(models)" = "fable " ] && ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null'
+
+# The round limit, MENTAT_REVIEW_ROUNDS (5 when unset): a pull request that already has
+# that many completed local rounds, counted as mentat status counts them, gets no round. The run is
+# refused (exit 7) once the repository is known: no model runs, no CI is read, nothing is posted.
+# mine <body>: adds a comment on #7 as this account; prior <n>: n completed Local Claude reviews.
+mine() { jq --arg b "$1" '. + [{user: {login: "agent-bot"}, body: $b}]' <<<"$(cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]')" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json"; }
+prior() { local i=0; while [ "$i" -lt "$1" ]; do mine "## Local Claude review of $H: findings, spec fingerprint none"; i=$((i + 1)); done; }
+refused() { # $1 the rounds used, $2 the limit
+  [ "$rc" = 7 ] && ! posted && ! grep -q '^pr comment' "$STUB/calls" && ! grep -qx claude "$STUB/calls" && ! grep -q check-runs "$STUB/calls" &&
+    [ "$(cat "$STUB/out")" = "mentat: #7 has used its $1 of $2 local review rounds; MENTAT_REVIEW_ROUNDS sets the limit" ]
+}
+# The bullet right after the agreed request fingerprint.
+limit_line() { folded | sed -n '/^- Agreed request fingerprint: /{n;p;q;}'; }
+reset; prior 4; rc=$(run)
+check "the default limit: with 4 completed rounds a fifth runs and posts, its record names the limit after the fingerprint, and the heading is unchanged" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 5" ] && heading "no findings" none'
+check "status then prints 5 of 5" 'status | grep -q "local rounds 5 of 5,"'
+rm -f "$STUB/comment" "$STUB/calls"; rc=$(run)
+check "the default limit: with 5 completed rounds the run is refused (exit 7): no model, no CI read, nothing posted" 'refused 5 5'
+reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS=08 run)
+check "MENTAT_REVIEW_ROUNDS=08 is 8: a sixth round runs and posts, and its record names 8" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 8" ]'
+reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS=7 run)
+check "MENTAT_REVIEW_ROUNDS=7: a sixth round runs and posts, and its record names 7" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 7" ] && heading "no findings" none'
+reset; prior 9; rc=$(MENTAT_REVIEW_ROUNDS=10 run)
+check "MENTAT_REVIEW_ROUNDS=10: a tenth round runs" '[ "$rc" = 0 ] && posted && [ "$(limit_line)" = "- Round limit: 10" ]'
+reset; prior 2; rc=$(MENTAT_REVIEW_ROUNDS=2 run)
+check "MENTAT_REVIEW_ROUNDS=2: refused at 2 completed rounds" 'refused 2 2'
+reset; prior 6; rc=$(run)
+check "more completed rounds than the limit: refused, naming both" 'refused 6 5'
+# An incomplete Local Claude review, a Codex review and another account's review are no round.
+reset; prior 4; mine "## Local Claude review of $H: incomplete, spec fingerprint none"; mine "## Local Codex review of $H: findings, spec fingerprint none"
+jq --arg b "## Local Claude review of $H: findings, spec fingerprint none" '. + [{user: {login: "someone-else"}, body: $b}]' "$STUB/issue_comments.json" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json"
+rc=$(run)
+check "an incomplete Local Claude review, a Codex review and another account's review count toward no limit: the fifth round runs" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls"'
+for bad in '' 0 00 abc -1 1.5; do
+  reset; rc=$(MENTAT_REVIEW_ROUNDS=$bad run)
+  check "MENTAT_REVIEW_ROUNDS=\"$bad\" is a usage error (exit 64) before anything runs" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$bad\"" ] && [ ! -f "$STUB/calls" ]'
+done
+reset; touch "$STUB/comments_fail"; rc=$(run)
+check "the comments unreadable: not reviewed, naming the round limit; Claude does not run and nothing is posted" 'closed "could not read this account'"'"'s comments on #7, which the round limit (MENTAT_REVIEW_ROUNDS) needs" && ! grep -qx claude "$STUB/calls" && ! grep -q "^pr comment" "$STUB/calls"'
+reset; touch "$STUB/comments_fail"; rc=$(run_first)
+check "with MENTAT_FIRST_REVIEW_MODEL too, the comments unreadable: not reviewed, naming the round limit, and Claude does not run" 'closed "could not read this account'"'"'s comments on #7, which the round limit (MENTAT_REVIEW_ROUNDS) needs" && ! grep -qx claude "$STUB/calls"'
+reset; prior 1; rc=$(run_first)
+check "the comments are read once a run, and that count also tells MENTAT_FIRST_REVIEW_MODEL it is no first round" '[ "$rc" = 0 ] && [ "$(arg --model)" = opus ] && [ "$(grep -c "/comments\$" "$STUB/calls")" = 1 ]'
 
 # Without codex installed, the review runs and posts as usual. path_without prints the
 # PATH with each folder that holds $1 replaced by a folder of links to all else in it.
@@ -542,7 +582,7 @@ check "--request without a file and a pull request number is a usage error (exit
 runrc() { (cd "$root/work" && "$mentat" review "$@" >"$STUB/out" 2>&1); echo $?; }
 reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
 check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
-check "--require-ci: a review not posted for a head with no CI counts no round" 'status | grep -q "local rounds 0,"'
+check "--require-ci: a review not posted for a head with no CI counts no round" 'status | grep -q "local rounds 0 of 5,"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci --request "$root/req dir/agreed request.md" 7)
 check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && grep -q "BEGIN AGREED REQUEST DATA" "$STUB/prompt"'
 reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
@@ -553,7 +593,7 @@ conflict="Pull request #7 conflicts with its base branch, so its tests did not r
 merge_reads() { cat "$STUB/merge_reads" 2>/dev/null || echo 0; }
 reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
 check "--require-ci with every check passed on a conflicting pull request exits 4, says it conflicts, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qxF "$conflict" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
-check "--require-ci: a review not posted for a conflict counts no round" 'status | grep -q "local rounds 0,"'
+check "--require-ci: a review not posted for a conflict counts no round" 'status | grep -q "local rounds 0 of 5,"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
 check "--require-ci with no CI check on a conflicting pull request exits 4 with the conflict as the reason" '[ "$rc" = 4 ] && ! posted && grep -qxF "$conflict" "$STUB/out" && ! grep -q "No CI checks ran" "$STUB/out"'
 reset; echo UNKNOWN >"$STUB/mergeable"; echo MERGEABLE >"$STUB/mergeable_later"; rc=$(runrc --require-ci 7)

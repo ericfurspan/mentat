@@ -79,7 +79,7 @@ status_owner_review() {
 
 status() {
   local pr="" request_file="" request fp repo me head lines ci kind sha res lfp
-  local rounds last last_fp grok=none grok_stop_state=none codex_state=none reviewed out
+  local limit rounds last last_fp grok=none grok_stop_state=none codex_state=none reviewed out
   [ $# -ge 1 ] && pr=$1
   case "$#:${2:-}" in
     1:) ;;
@@ -87,6 +87,7 @@ status() {
     *) pr="" ;;
   esac
   case "$pr" in '' | *[!0-9]*) die "usage: mentat status <pull request number> [--request <file>]" 64 ;; esac
+  round_limit
   if [ $# -eq 3 ]; then
     # Read and fingerprinted as mentat review --request does (read_request).
     if [ ! -f "$request_file" ] || [ ! -r "$request_file" ] || ! request=$(cat "$request_file"); then
@@ -139,7 +140,7 @@ status() {
   elif grep -q '^fail ' <<<"$lines"; then ci=failed
   elif grep -q '^pending ' <<<"$lines"; then ci=running
   else ci=passed; fi
-  out="head ${head:0:7}, local rounds $rounds, head reviewed: $reviewed, grok: $grok, grok stop: $grok_stop_state, codex: $codex_state, ci: $ci"
+  out="head ${head:0:7}, local rounds $rounds of $limit, head reviewed: $reviewed, grok: $grok, grok stop: $grok_stop_state, codex: $codex_state, ci: $ci"
   if [ -n "$request_file" ]; then
     if [ -z "$last" ]; then out="$out, spec: no review yet"
     elif [ "$last_fp" = "$fp" ]; then out="$out, spec: matches"

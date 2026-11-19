@@ -182,6 +182,7 @@ STUBEOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex" "$root/tools/bin/claude"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
+unset MENTAT_REVIEW_ROUNDS
 
 reset() {
   rm -f "$STUB"/*
@@ -226,11 +227,20 @@ status() { (cd "$root/work" && "$mentat" status 7 2>&1); }
 claude_reviewed() { jq -n --arg b "## Local Claude review of $H: findings, spec fingerprint none" '[{user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; }
 reset; claude_reviewed; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "a review that finishes before CI is posted only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "found nothing on $H" "$STUB/out" && ! grep -q "not posted" "$STUB/out"'
-check "a posted review is Codex done on the head Claude reviewed, and adds no round" 'status | grep -qF "local rounds 1, head reviewed: yes, grok: none, grok stop: none, codex: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
+check "a posted review is Codex done on the head Claude reviewed, and adds no round" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
 reset; claude_reviewed; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "CI failing after the review exits 4, posts nothing and names the failing check" '[ "$rc" = 4 ] && ! posted && ! grep -q "pr comment" "$STUB/calls" && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out"'
 check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(cat "$STUB/reply")" ]'
-check "a review not posted for failed CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
+check "a review not posted for failed CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
+# The round limit is the Claude review's alone: --codex runs with the limit's rounds used, and
+# neither reads nor checks MENTAT_REVIEW_ROUNDS, and its record names no limit.
+at_limit() { jq -n --arg b "## Local Claude review of $H: findings, spec fingerprint none" '[range(5) | {user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; }
+reset; at_limit; rc=$(run)
+check "the round limit's 5 local rounds used: --codex is not refused, and posts with no round limit line" '[ "$rc" = 0 ] && posted && heading "no findings" && ! grep -q "Round limit" "$STUB/comment"'
+reset; at_limit; rc=$(MENTAT_REVIEW_ROUNDS=2 run)
+check "MENTAT_REVIEW_ROUNDS=2 with 5 local rounds used: --codex is not refused" '[ "$rc" = 0 ] && posted && heading "no findings"'
+reset; rc=$(MENTAT_REVIEW_ROUNDS=abc run)
+check "MENTAT_REVIEW_ROUNDS=abc: --codex does not check it, and posts" '[ "$rc" = 0 ] && posted && heading "no findings"'
 reset; printf -- '- (non-blocking) README:1 still running\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout exits 4, posts nothing and prints the review" '[ "$rc" = 4 ] && ! posted && grep -q "CI did not finish on $H within 2 seconds" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ]'
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
@@ -507,7 +517,7 @@ check "--request without a file and a pull request number is a usage error (exit
 runrc() { (cd "$root/work" && "$mentat" review --codex "$@" >"$STUB/out" 2>&1); echo $?; }
 reset; claude_reviewed; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
 check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
-check "--require-ci: a review not posted for a head with no CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
+check "--require-ci: a review not posted for a head with no CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci --request "$root/req dir/agreed request.md" 7)
 check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && grep -q "BEGIN AGREED REQUEST DATA" "$STUB/prompt"'
 reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
