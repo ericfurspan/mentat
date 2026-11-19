@@ -4,7 +4,9 @@
 #     waits for CI on that head and posts the result only once CI passed. 0 no findings,
 #     2 findings posted (link printed), 1 not reviewed (error, incomplete review or no
 #     result in time), 3 the head moved, 4 CI did not pass on the head (failing or
-#     unfinished checks printed, then the review, which is not posted and not a round).
+#     unfinished checks printed, then the review, which is not posted and not a round),
+#     7 the pull request already has the round limit's completed local rounds (as mentat
+#     status counts them): nothing ran or was posted; --codex and --grok are never refused.
 #     When no CI check ran on the head, a line says so.
 #     A comment that holds a local path or a private name, in a public repository, is
 #     kept in a local file and not posted (exit 1).
@@ -14,7 +16,8 @@
 #     when Claude reports that no model ran, once more on the review default if that is
 #     another model, whatever MENTAT_REVIEW_MODEL names; the record names the model that
 #     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
-#     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200).
+#     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200). The round limit is MENTAT_REVIEW_ROUNDS
+#     (unset or empty, 5; a whole number of 1 or more, else exit 64), which the record names.
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
 #     --codex and --grok first read whether outside reviewers are on here, as mentat
 #     reviewers does; unless they are on, they print why, post nothing and exit 6.
@@ -42,7 +45,8 @@
 #   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
 #     review state from the comments the review commands posted as this gh account: the head
 #     commit, the local rounds (completed Local Claude reviews; a Codex review is not a
-#     round), whether the head is the last commit Claude
+#     round) against the limit in force (MENTAT_REVIEW_ROUNDS, as for review), whether the
+#     head is the last commit Claude
 #     reviewed, the Grok state (none, running, done or did not finish), the
 #     Grok stop review's (none, or running, done or did not finish on a commit, a done one
 #     with its result and spec fingerprint), the Codex review's on the last commit Claude
@@ -138,6 +142,7 @@ case "${1:-}" in
       --grok) shift; handover review-grok "$@" ;;
     esac
     review_args "" "$@"
+    round_limit
     # shellcheck disable=SC2154 # pr is set by review_args
     review_local claude "$pr" ;;
   ci) shift; [ $# -eq 1 ] || die "usage: mentat ci <pull request number>" 64; ci "$@" ;;

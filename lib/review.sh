@@ -14,6 +14,15 @@ FIRST_REVIEW_MODEL="${MENTAT_FIRST_REVIEW_MODEL:-}"
 # Read tools only, and no shell: the runner hands the diff and the commit log over as files.
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 
+# Sets the caller's limit to the local review rounds a pull request may use:
+# MENTAT_REVIEW_ROUNDS, 5 when unset or empty; anything but a whole number of 1 or more
+# is a usage error. Read only by the Claude review (bin/mentat) and mentat status, not
+# when this file is sourced, so the module's entries never read it.
+round_limit() {
+  limit=${MENTAT_REVIEW_ROUNDS:-5}
+  case "$limit" in 0* | *[!0-9]*) die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not $limit" 64 ;; esac
+}
+
 # Runs Claude in directory $1 on prompt file $2 and writes its reply to $3. On any
 # failure it calls $4 with the reason, which exits. $5 is the folder holding the
 # diff and the log, outside $1, which Claude may also read. $6 is the model and $7
@@ -80,7 +89,7 @@ run_claude() {
 # review_name_r sets the caller's name, which the heading shows; review_prep_r writes
 # the prompt's opening (where to look) to stdout and any files the reviewer reads;
 # review_run_r runs it; review_meta_r prints the record's lines on the tool and the
-# model. Claude's are here; another reviewer's come with the module that runs it.
+# model; review_check_r, where defined, runs once the repository is known. Claude's are here; another reviewer's come with the module that runs it.
 review_name_claude() { name=Claude; }
 review_prep_claude() {
   git -C "$top" diff --no-ext-diff --no-textconv --no-color "$mb" "$head" >"$tmp/data/diff" || not_reviewed "could not diff $mb..$head"
@@ -89,20 +98,26 @@ review_prep_claude() {
   printf 'Review the change from %s to %s: the diff is in %s and its commits are in %s; read them and the files around the change with your file tools. Do not modify files. ' "$mb" "$head" "$tmp/data/diff" "$tmp/data/log"
   printf 'Your file tools can read only this checkout and the folder holding the diff and the commit log, and a read anywhere else is refused and fails the whole review, so attempt none; state what you cannot check from those two places as a limitation of a complete review, not as a reason for INCOMPLETE, which stays for a material file in this checkout, or the diff, that cannot be read, and not as a guessed finding.\n\n'
 }
-# Sets the caller's claude_model, the model to review on, and claude_key, the setting
-# that chose it: FIRST_REVIEW_MODEL when it is set and the pull request has no local
-# round yet, counted as mentat status counts them (lib/status.sh), else REVIEW_MODEL.
-# A run that posted no round leaves the next one the first.
-review_model_claude() {
+# The round limit, which review_local runs once the repository is known, before
+# anything is fetched or run: sets the caller's rounds to the pull request's local
+# rounds, counted as mentat status counts them (lib/status.sh), and refuses (exit 7,
+# nothing posted) when they reach limit, which bin/mentat set with round_limit.
+review_check_claude() {
   # shellcheck disable=SC2034 # status_rounds sets last and last_fp too; local keeps them here
-  local me lines rounds last last_fp
-  claude_model=$REVIEW_MODEL claude_key=MENTAT_REVIEW_MODEL
-  [ -n "$FIRST_REVIEW_MODEL" ] || return 0
+  local me lines last last_fp
   if ! me=$(gh api user --jq .login) || [ -z "$me" ] || ! lines=$(status_comments "$repo" "$pr" "$me"); then
-    not_reviewed "could not read this account's comments on #$pr, which MENTAT_FIRST_REVIEW_MODEL needs to tell the first round"
+    not_reviewed "could not read this account's comments on #$pr, which the round limit (MENTAT_REVIEW_ROUNDS) needs"
   fi
   status_rounds "$lines"
-  [ "$rounds" -eq 0 ] || return 0
+  [ "$rounds" -lt "$limit" ] || die "#$pr has used its $rounds of $limit local review rounds; MENTAT_REVIEW_ROUNDS sets the limit" 7
+}
+# Sets the caller's claude_model, the model to review on, and claude_key, the setting
+# that chose it: FIRST_REVIEW_MODEL when it is set and the pull request has no local
+# round yet (rounds, from review_check_claude), else REVIEW_MODEL. A run that posted
+# no round leaves the next one the first.
+review_model_claude() {
+  claude_model=$REVIEW_MODEL claude_key=MENTAT_REVIEW_MODEL
+  [ -n "$FIRST_REVIEW_MODEL" ] && [ "$rounds" -eq 0 ] || return 0
   claude_model=$FIRST_REVIEW_MODEL claude_key=MENTAT_FIRST_REVIEW_MODEL
 }
 # A first round in which no model ran at all, by Claude's own report, runs once more on the
@@ -137,6 +152,7 @@ review_meta_claude() {
   # fallback); and the first-round setting when it chose the model.
   local asked=$claude_model first=""
   if [ "$claude_key" = MENTAT_FIRST_REVIEW_MODEL ]; then asked="$claude_key=$claude_model" first="first round, "; fi
+  printf -- '- Round limit: %s\n' "$limit"
   printf -- '- Claude Code: %s\n- Model: %s' "$(claude --version 2>/dev/null | head -n 1 | sed -n 's/^\([0-9][0-9.]*\).*/\1/p')" "$claude_models"
   case "$claude_models" in
     *"$claude_model"*) [ -z "$first" ] || printf ' (%s%s)' "$first" "$asked" ;;
@@ -151,7 +167,7 @@ review_meta_claude() {
 # passed there and the head has not moved since. $1 is the reviewer: claude, the
 # default, or one whose functions (above) a module defines.
 review_local() {
-  local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models="" claude_model="" claude_key=""
+  local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models="" claude_model="" claude_key="" rounds=""
   "review_name_$reviewer"
   case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
   sweep_leftovers
@@ -169,6 +185,7 @@ review_local() {
   if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
     not_reviewed "could not read the repository with gh"
   fi
+  if declare -F "review_check_$reviewer" >/dev/null; then "review_check_$reviewer"; fi
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
   read_issues "$pr" "$info"
