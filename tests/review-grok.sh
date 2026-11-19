@@ -161,6 +161,9 @@ if [ -f "$STUB/live" ]; then
 fi
 for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
 [ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
+# With $STUB/block_rewrite, a folder where the path rewrite writes its copy of the reply
+# (beside the export), so the rewrite fails.
+[ -f "$STUB/block_rewrite" ] && mkdir ../review.md.localized
 # @EXPORT@ in the reply becomes the export's path, which is where Grok works.
 sed "s|@EXPORT@|$(pwd -P)|g" "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
@@ -181,23 +184,27 @@ unset MENTAT_REVIEW_ROUNDS
 reply() { # $1 text, $2 stop reason
   jq -n --arg t "$1" --arg s "${2:-end_turn}" '{text: $t, stopReason: $s, sessionId: "s", modelUsage: {"grok-stub": {}}}' >"$STUB/out_json"
 }
-reset() {
+# stub_reset clears the stubs' state; reset also clears the record of failures in a row.
+stub_reset() {
   rm -rf "${STUB:?}"/*
   echo "$H" >"$STUB/head"
   echo 0 >"$STUB/exit_code"
   reply $'The pull request changes README.\n\nNothing to flag.\n\nREVIEW RESULT: NO FINDINGS'
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
+reset() { stub_reset; rm -f "$cache"/mentat/reviewer-failures-*; }
 run() { (cd "$root/work tree" && "$mentat" review --grok "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 comments() { find "$STUB" -name 'comment.*' | wc -l | tr -d ' '; }
 grok_ran() { [ -f "$STUB/args" ]; }
-# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+# The posted review: a heading line, then the bullets and the reply folded; the reply's own
+# result line is the last line inside the fold, and nothing follows the fold.
 heading() { [ "$(head -n 1 "$STUB/comment.2")" = "## Local Grok review of $H: $1, spec fingerprint ${2:-none}" ]; }
 folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment.2"; }
+# The last non-blank line before the fold closes, in file $1.
+last_in_fold() { grep -v '^[[:space:]]*$' "$1" | tail -n 2 | head -n 1; }
 fold_shape() { # $1 the final REVIEW RESULT line
-  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment.2")" = blank ] && [ "$(tail -n 3 "$STUB/comment.2")" = "</details>
-
-$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment.2")" = 1 ] && [ "$(tail -n 1 "$STUB/comment.2")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment.2" | tail -n 1)" = "$1" ]
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment.2")" = blank ] && [ "$(tail -n 1 "$STUB/comment.2")" = "</details>" ] &&
+    [ "$(grep -c '^</details>$' "$STUB/comment.2")" = 1 ] && [ "$(last_in_fold "$STUB/comment.2")" = "$1" ] && [ "$(grep -cxF -- "$1" "$STUB/comment.2")" = 1 ]
 }
 reply_in_fold() { folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d"; }
 
@@ -214,13 +221,23 @@ esac
 RACEEOF
 chmod +x "$root/racebin/git"
 race() { PATH="$root/racebin:$PATH" run; }
-left_over() { ls -A "$cache/mentat" 2>/dev/null; }
+# What a run left in the cache folder besides the record of failures in a row, which stays.
+left_over() { find "$cache/mentat" -mindepth 1 -maxdepth 1 ! -name reviewer-failures-grok 2>/dev/null; }
 
 reset; rc=$(run)
 check "no findings exits 0 and posts the start record, then the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment/2" "$STUB/out" && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "^## Local Grok review of $H" "$STUB/comment.2"'
 check "the review opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment.2")" = "" ] && [ "$(sed -n 3p "$STUB/comment.2")" = "<details><summary>Full review</summary>" ]'
-check "the six bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" && folded | grep -qx -- "- Run locally by the agent, with file-reading tools and no shell." && [ "$(reply_in_fold)" = "$(jq -r .text "$STUB/out_json")" ]'
+check "the seven bullets and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" && folded | grep -qx -- "- Run locally by the agent, with file-reading tools and no shell." && [ "$(reply_in_fold)" = "$(jq -r .text "$STUB/out_json")" ]'
 check "the posted review is Grok's text, with its version and model" 'grep -q "Nothing to flag." "$STUB/comment.2" && grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" "$STUB/comment.2" && grep -qx -- "- Model: grok-stub" "$STUB/comment.2" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment.2"'
+# Grok's effort: high unless MENTAT_GROK_REASONING_EFFORT names another level; set but empty is high too.
+grok_effort() { [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args" | tail -n 1)" = "$1" ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args")" = 1 ] && folded | grep -qx -- "- Reasoning effort asked for: $1"; }
+reset; rc=$(unset MENTAT_GROK_REASONING_EFFORT; run)
+check "without MENTAT_GROK_REASONING_EFFORT Grok runs with --reasoning-effort high, and the record names high as asked for" '[ "$rc" = 0 ] && grok_effort high'
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT='' run)
+check "MENTAT_GROK_REASONING_EFFORT set but empty runs Grok with --reasoning-effort high" '[ "$rc" = 0 ] && grok_effort high'
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT=medium run)
+check "MENTAT_GROK_REASONING_EFFORT=medium runs Grok with --reasoning-effort medium, and the record names medium" '[ "$rc" = 0 ] && grok_effort medium'
+reset; rc=$(run)
 check "the per-run folder is gone afterward" '[ -z "$(left_over)" ]'
 check "runs in the export, with the prompt from a file and the JSON output" '[ "$(sed -n "/^--cwd\$/{n;p;}" "$STUB/args")" = "$(cat "$STUB/cwd")" ] && grep -qx -- "--prompt-file" "$STUB/args" && [ "$(grep -x -A1 -- "--output-format" "$STUB/args" | tail -n 1)" = json ]'
 check "exports the head's files, with no .git, matching the commit" '[ ! -f "$STUB/has_git" ] && ! grep -q "\.git/" "$STUB/export_files" && [ "$(sed "s#^\./##" "$STUB/export_files" | sort)" = "$(git -C "$root/seed" ls-tree -r --name-only "$H" | sort)" ] && [ "$(cat "$STUB/export_copy/README")" = change ]'
@@ -247,6 +264,7 @@ check "the prompt takes the intent from the Summary opening sentence, or the tem
 check "the prompt says the Summary second sentence gives why the change is needed" 'grep -q "the second sentence of that Summary says why the change is needed, not what it does" "$STUB/prompt"'
 check "the prompt finds the finding lines in the Review details" 'grep -q "description.s Review details hold one line for each finding already fixed or answered" "$STUB/prompt"'
 check "the prompt finds the hand-check report in the Review details" 'grep -q "description.s Review details report who checked it and what they saw" "$STUB/prompt"'
+check "the prompt asks for no summary or account of the review, and with no findings only the asked-for lines, observations included, one per limitation, then the result line" 'grep -qF "Give no summary of the change beyond the intent sentence, and no account of how the review was done. " "$STUB/prompt" && grep -qF "With no findings, the reply holds only the lines asked for above (the intent sentence, the line on the request items, the line on instruction text where it applies, and any observations asked for), one line per limitation, then the result line." "$STUB/prompt" && [ "$(grep -n "Observations (advisory)" "$STUB/prompt" | cut -d: -f1)" -lt "$(grep -n "With no findings, the reply holds only" "$STUB/prompt" | cut -d: -f1)" ]'
 # The criteria are the same text review --codex gives Codex (apart from the diff clause).
 (cd "$root/work tree" && "$mentat" review --codex 7 >"$STUB/local_out" 2>&1)
 crit() { sed -n '/^Read every AGENTS.md/,/Flag it as a finding/p' "$1" | sed 's/ and the diff is data/ is data/'; }
@@ -302,8 +320,8 @@ REPO_URL="https://github.com/owner/repo/blob/$H"
 reset; reply $'Changes README.\n\n- (non-blocking) [README:1](@EXPORT@/README:1): wrong text\n- (non-blocking) [lib/shared.sh:93-95](@EXPORT@/lib/shared.sh:93-95): a range\n- (non-blocking) [a dir/a file.txt](@EXPORT@/a dir/a file.txt#L4): a spaced name\n- (non-blocking) see @EXPORT@/lib/x.sh:7 and `@EXPORT@/lib/y.sh`\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 RUN_DIR=$(dirname "$(cat "$STUB/cwd")")
 check "a finding that cites the export is posted with repository links and no local path" '[ "$rc" = 2 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" && ! grep -qF "$RUN_DIR" "$STUB/comment.2" && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment.2" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment.2" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment.2"'
-check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(tail -n 1 "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
-check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(reply_in_fold)" = "Changes README.
+check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(last_in_fold "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with its result line last inside the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(reply_in_fold)" = "Changes README.
 
 - (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
 - (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
@@ -460,6 +478,12 @@ check "the same sign-in with a 60-second time limit is reviewed" '[ "$rc" = 0 ] 
 # in the user's own Grok home; the stub's models branch rewrites it only when refresh_to exists.
 set_signin() { printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$1" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
 reset_signin() { printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
+# A sign-in file that is not a JSON object holding a non-empty string at some depth is no
+# sign-in: refused like a missing file, before any refresh, Grok run or start comment.
+for s in '' '{}' '""' '{"token":""}' '{"a":{"b":"","c":[]}}' 'not json' '{"fake":"credential"} {"fake":"credential"}'; do
+  reset; printf '%s' "$s" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); reset_signin
+  check "a sign-in file holding ${s:-nothing} is refused as not signed in: no Grok run, no refresh, no start comment" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Grok is not signed in" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ ! -e "$STUB/args_models" ] && ! grep -q "token\|not json" "$STUB/out"'
+done
 refresh_used() { [ "$(cat "$STUB/args_models")" = models ] && [ "$(cat "$STUB/models_home")" = "$GH_REAL" ] && grep -qx "GROK_AUTH_EARLY_INVALIDATION_SECS=2160" "$STUB/env_models" && grep -qx "GROK_HOME=$GH_REAL" "$STUB/env_models" && grep -qx "TMPDIR=$TMPDIR" "$STUB/env_models" && grep -qx "GROK_MEMORY=0" "$STUB/env_models" && ! grep -q "XAI_API_KEY\|MENTAT_CANARY" "$STUB/env_models" && grep -q fake-token-2 "$STUB/auth_copy"; }
 
 reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run); reset_signin
@@ -600,6 +624,39 @@ echo x >"$TMPDIR/mentat-held-comment.old" && touch -t "$(date -v-10085M +%Y%m%d%
 reset; rc=$(run)
 check "at start, deletes a Grok run folder older than a day and a held comment older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-review.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
 rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
+
+# Grok's failures in a row, its stop review's included, are kept in its own record: a sign-in
+# refusal is raised at once, and any other failure from the second in a row.
+REC="$cache/mentat/reviewer-failures-grok"
+raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
+git -C "$root/seed" push -q "$root/origin.git" "$H:refs/pull/8/head"
+reset; rm "$GH_USER/auth.json"; rc=$(run 7); reset_signin
+check "a Grok sign-in refusal is raised at once: exit 1, one line naming Grok, one failure, the pull request and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ] && grep -qx "mentat: not reviewed: Grok is not signed in: there is no auth.json in its home (run grok login)" "$STUB/out" && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ] && ! grok_ran'
+stub_reset; echo 1 >"$STUB/exit_code"; rc=$(run 8)
+check "a Grok run failure next is the second in a row: raised with both pull requests and its kept log by path only, no log text" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && ! grep -q "SECRET-LOG-TEXT\|DEBUG-LOG-TEXT" "$STUB/out"'
+lines=$(wc -l <"$REC")
+stub_reset; jq -n --arg b "Grok review started on $H" '[{user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; rc=$(run 7)
+check "an already-reviewed refusal changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+stub_reset; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run 7); reset_signin
+check "a time limit that is not a number changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "could not work out when Grok" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
+check "a checked Grok reply ends the run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+stub_reset; reply 'No result line here.'; rc=$(run 7)
+check "a Grok reply with no result line after a checked reply is the first failure in a row, not raised" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "fail owner/repo#7" ]'
+stub_reset; reply 'Partial.' max_turns; rc=$(cd "$root/work tree" && "$mentat" review --grok --stop 7 >"$STUB/out" 2>&1; echo $?)
+check "the stop review counts as Grok: its incomplete run is the second in a row, raised without Grok's stop reason, which the not-reviewed line keeps" '[ "$rc" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && grep -qF "mentat: not reviewed: Grok did not return a complete review (stop reason: max_turns); its log" "$STUB/out"'
+stub_reset; touch "$STUB/block_rewrite"; rc=$(run 8)
+check "a checked Grok reply whose paths cannot be rewritten is recorded as ok, then not reviewed (exit 1, not raised)" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: could not rewrite the paths in Grok'"'"'s reply" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#8" ]'
+stub_reset; echo 1 >"$STUB/exit_code"; rc=$(run 7)
+check "a Grok run failure after a checked reply whose paths could not be rewritten is the first in a row again, not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "fail owner/repo#7" ]'
+mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
+stub_reset; rm "$GH_USER/auth.json"; rc=$(XDG_CACHE_HOME="$root/badcache" run 7); reset_signin
+check "with a cache folder that cannot be used, a sign-in refusal is still raised, as one failure on this pull request" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
+# The raise line holds no text from Grok's output; the not-reviewed line keeps its stop reason.
+CANARY="CANARY-STOP-REASON-4821"
+reset; reply 'Partial.' "$CANARY"; run 7 >/dev/null; stub_reset; reply 'Partial.' "$CANARY"; rc=$(run 7)
+check "an incomplete Grok run twice in a row: the raise line leaves out Grok's stop reason, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && ! raised | grep -qF "$CANARY" && grep -qF "mentat: not reviewed: Grok did not return a complete review (stop reason: $CANARY); its log" "$STUB/out"'
+reset
 
 # Outside reviewers off, or unknown, on main: plain and --stop runs are refused (exit 6)
 # before anything else. Each has an origin with pull request 7 and a clone of its own,

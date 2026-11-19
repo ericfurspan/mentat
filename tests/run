@@ -252,11 +252,13 @@ for f in agents/builder.md agents/plan-checker.md; do
     fail "$f must be a tracked file"
   fi
 done
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want='tools: Read, Grep, Glob' agents/plan-checker.md; then
-  pass "agents/plan-checker.md's frontmatter sets tools: Read, Grep, Glob"
-else
-  fail "agents/plan-checker.md's frontmatter must set tools: Read, Grep, Glob"
-fi
+for want in 'tools: Read, Grep, Glob' 'effort: high'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$want" agents/plan-checker.md; then
+    pass "agents/plan-checker.md's frontmatter sets $want"
+  else
+    fail "agents/plan-checker.md's frontmatter must set $want"
+  fi
+done
 # The builder runs in its own worktree, in the background.
 for want in 'isolation: worktree' 'background: true'; do
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$want" agents/builder.md; then

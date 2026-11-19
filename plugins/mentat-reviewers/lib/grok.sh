@@ -25,7 +25,9 @@
 # `mentat second-opinion --web` runs it on any question with web search alone: no file tools and
 # an empty export. The functions below that they share (grok_signin, grok_run_folder,
 # grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
-# function named in `fail`: not_reviewed before Grok runs, grok_fail from then on.
+# function named in `fail`: not_reviewed before Grok runs, grok_fail from then on; the
+# review passes its own (grok_signin_failed, grok_tool_failed), which also record Grok's
+# failures in a row.
 # The pull-request steps (reading it, the diff prompt, the start comment, the
 # did-not-finish comment and posting) stay in review_grok's own functions.
 # Convention: these functions set the caller's variables by name and never return
@@ -36,8 +38,9 @@ GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
 GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
-# Empty leaves Grok's own default; otherwise passed as --reasoning-effort (the value is not checked).
-GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-}"
+# Always passed as --reasoning-effort: high when the setting is unset or empty, else its
+# value (not checked; a review's record names it, in safe characters, as the level asked for).
+GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-high}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
 # Grok reviews a pull request once, and once more as the stop review (the caller's
@@ -123,6 +126,11 @@ grok_signin() {
   local expiry now ends
   real_grok=$(realdir "${GROK_HOME:-$HOME/.grok}") && [ -f "$real_grok/auth.json" ] ||
     "$fail" "Grok is not signed in: there is no auth.json in its home (run grok login)"
+  # A sign-in is one JSON object holding a non-empty string at some depth; an empty file,
+  # {}, "" or {"token":""} is none. Nothing from the file is printed.
+  jq -se 'length == 1 and (.[0] | type == "object") and ([.[0] | .. | strings | select(length > 0)] | length > 0)' \
+    "$real_grok/auth.json" >/dev/null 2>&1 ||
+    "$fail" "Grok is not signed in: its auth.json holds no sign-in (run grok login)"
   grok_expiry
   if [ -n "$expiry" ] && [ -n "$ends" ] && { [[ "${expiry:0:19}" < "$now" ]] || [[ "${expiry:0:19}" < "$ends" ]]; }; then
     grok_refresh
@@ -306,9 +314,7 @@ grok_args() {
     d=$(dirname "$d")
     args+=(--deny "Read($d)" --deny "Grep($d)")
   done
-  if [ -n "$GROK_REASONING_EFFORT" ]; then
-    args+=(--reasoning-effort "$GROK_REASONING_EFFORT")
-  fi
+  args+=(--reasoning-effort "$GROK_REASONING_EFFORT")
 }
 
 # Keeps a copy of Grok's raw log for the maintainer and sets the caller's kept to
@@ -326,10 +332,11 @@ grok_keep_log() {
 # is Grok's raw output and may hold a credential, so it is not printed or posted.
 # After the start comment, the failure also says so on the pull request. A publish
 # check hit on that comment skips the post.
-# $2, optional, is for the local message only. Reads the caller's pr, repo, head,
-# started, err, out and ghome.
+# $2, optional, is for the local message only. $3, optional, is $1 without Grok's own
+# output, for the line that tells the maintainer now (not_reviewed, lib/shared.sh). Reads
+# the caller's pr, repo, head, started, err, out and ghome.
 grok_fail() {
-  local kept held=""
+  local kept held="" rest
   grok_keep_log
   if [ "$started" = yes ] && [ "${grok_stop:-no}" = yes ]; then
     held=$(held_comment "Grok stop review did not finish on $head: $1" "$repo") ||
@@ -338,7 +345,8 @@ grok_fail() {
     held=$(held_comment "Grok review did not finish on $head: $1" "$repo") ||
       gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
   fi
-  not_reviewed "$1${2:+; $2}${held:+; $held}${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
+  rest="${2:+; $2}${held:+; $held}${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
+  not_reviewed "$1$rest" "${3:-$1}$rest"
 }
 
 # Runs Grok in the rebuilt environment under its time limit, and calls "$fail"
@@ -392,21 +400,37 @@ grok_reply() {
   local stop
   stop=$(jq -s -r 'if length == 1 and (.[0] | type) == "object" then (.[0].stopReason // "none" | tostring) else "none" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9_-' | head -c 40)
   if ! jq -s -e 'length == 1 and (.[0] | type) == "object" and .[0].stopReason == "end_turn" and (.[0].text | type) == "string" and (.[0].text | test("\\S"))' "$out" >/dev/null 2>&1; then
-    "$fail" "Grok did not return a complete review (stop reason: ${stop:-none})"
+    "$fail" "Grok did not return a complete review (stop reason: ${stop:-none})" "Grok did not return a complete review"
   fi
   jq -r '.text' "$out" >"$result_file" || "$fail" "could not read Grok's reply"
 }
 
-# Checks Grok's reply, in $result_file with its paths rewritten, and sets the
-# caller's result to its final REVIEW RESULT line.
+# Checks Grok's reply, as Grok returned it, into $result_file: a complete reply that
+# ends with a final REVIEW RESULT line.
 grok_check() {
   grok_reply
+  result_line "$(last_line "$result_file")" || grok_tool_failed "Grok's reply has no final REVIEW RESULT line"
+}
+# Rewrites the paths in the checked reply in $result_file and sets the caller's result to
+# its final REVIEW RESULT line.
+grok_localize() {
   localize_review_paths "$result_file" "$repo" "$head" "$run/export" "$cache/mentat/${run##*/}/export" || grok_fail "could not rewrite the paths in Grok's reply"
   result=$(last_line "$result_file")
-  case "$result" in
-    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
-    *) grok_fail "Grok's reply has no final REVIEW RESULT line" ;;
-  esac
+  result_line "$result" || grok_fail "Grok's reply has no final REVIEW RESULT line"
+}
+
+# The review's own failure functions, which second opinions never use: a sign-in refusal
+# (grok_signin's, told apart by how it starts) is one of Grok's failures in a row and is
+# always raised; Grok's run failing from then on is one too (lib/shared.sh). Any other
+# stop records nothing.
+grok_signin_failed() {
+  case "$1" in "Grok is not signed in"* | "Grok's sign-in"*) reviewer_failed grok always ;; esac
+  not_reviewed "$1"
+}
+# $2, when given, is $1 without Grok's own output, for the line that tells the maintainer now.
+grok_tool_failed() {
+  reviewer_failed grok
+  grok_fail "$1" "" "${2:-}"
 }
 
 # Posts the checked reply on the pull request, after the start comment, and exits
@@ -426,10 +450,11 @@ grok_post() {
     printf '<details><summary>Full review</summary>\n\n'
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
-    printf -- '- Grok CLI: %s\n- Model: %s\n- Time: %s\n' "$("$grok_bin" --version 2>/dev/null | head -n 1)" "$model" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf -- '- Grok CLI: %s\n- Model: %s\n- Reasoning effort asked for: %s\n- Time: %s\n' "$("$grok_bin" --version 2>/dev/null | head -n 1)" "$model" \
+      "$(printf '%s' "$GROK_REASONING_EFFORT" | tr -cd 'A-Za-z0-9._-' | head -c 32)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '- Run locally by the agent, with file-reading tools and no shell.\n\n---\n\n'
     cat "$result_file"
-    printf '\n</details>\n\n%s\n' "$result"
+    printf '\n</details>\n'
   } >"$run/comment" || grok_fail "could not write the comment"
   # The start comment stops a rerun, so the pull request says the review did not finish.
   if held=$(held_comment "$(cat "$run/comment")" "$repo"); then grok_fail "the review was held back and not posted" "$held"; fi
@@ -454,15 +479,22 @@ review_grok() {
   sweep_leftovers
   review_traps
   read_request "$pr"
+  fail=grok_signin_failed
   grok_prepare
+  fail=not_reviewed
   grok_run_folder
   grok_export_head
   grok_pr_prompt
   grok_home
   grok_args
-  fail=grok_fail
+  fail=grok_tool_failed
   grok_exec
   grok_check
+  fail=grok_fail
+  # A checked reply, as Grok returned it, ends Grok's failures in a row, whether or not it
+  # is posted; a failure from here on is not Grok's.
+  reviewer_record grok ok
+  grok_localize
   wait_for_ci "$repo" "$head" "$result_file" "$pr" "$again"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run $again again" 3

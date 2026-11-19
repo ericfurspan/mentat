@@ -154,11 +154,13 @@ case "$1 $2" in
 esac
 STUBEOF
 # codex: records where it ran and what it read, and its run in the calls gh records, then replies with $STUB/reply.
+# Its output (the log mentat keeps) starts with $STUB/header, the run header Codex writes, when present.
 cat >"$root/tools/bin/codex" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
 echo codex >>"$STUB/calls"
 printf '%s\n' "$@" >"$STUB/args"
+[ ! -f "$STUB/header" ] || cat "$STUB/header"
 cat >"$STUB/prompt"
 [ ! -f "$STUB/live" ] || "$LIVE_SELF" --probe
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
@@ -184,21 +186,25 @@ chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex" "$root/tools/bin/claude"
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 unset MENTAT_REVIEW_ROUNDS
 
-reset() {
+# stub_reset clears the stubs' state; reset also clears the record of failures in a row.
+stub_reset() {
   rm -f "$STUB"/*
   echo "$H" >"$STUB/head"
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
+reset() { stub_reset; rm -f "$XDG_CACHE_HOME"/mentat/reviewer-failures-*; }
 run() { (cd "$root/work" && "$mentat" review --codex "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
-# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+# The posted review: a heading line, then the bullets and the reply folded; the reply's own
+# result line is the last line inside the fold, and nothing follows the fold.
 heading() { [ "$(head -n 1 "$STUB/comment")" = "## Local Codex review of $H: $1, spec fingerprint ${2:-none}" ]; }
 folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment"; }
+# The last non-blank line before the fold closes, in file $1.
+last_in_fold() { grep -v '^[[:space:]]*$' "$1" | tail -n 2 | head -n 1; }
 fold_shape() { # $1 the final REVIEW RESULT line
-  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 3 "$STUB/comment")" = "</details>
-
-$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(tail -n 1 "$STUB/comment")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment" | tail -n 1)" = "$1" ]
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 1 "$STUB/comment")" = "</details>" ] &&
+    [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(last_in_fold "$STUB/comment")" = "$1" ] && [ "$(grep -cxF -- "$1" "$STUB/comment")" = 1 ]
 }
 
 # A git that, right after any fetch of pull/7/head, also fetches main in the same checkout:
@@ -256,10 +262,32 @@ check "a reply without a result line is not reviewed before any wait for CI" '[ 
 reset; rc=$(run)
 check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
 check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
-check "the bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
+check "the bullets and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
+# The model the record names comes only from the model: line of the header Codex writes at
+# the start of its run, between its two separator lines; nothing else from the log is posted.
+# $1 is the header's model line, or "" for none; the rest of the arguments follow the header.
+codex_header() {
+  local model="$1"
+  shift
+  { printf '%s\n' "" "OpenAI Codex v0.160.0 (research preview)" "--------" "workdir: /stub/workdir/codex-log-text"
+    [ -z "$model" ] || printf '%s\n' "$model"
+    printf '%s\n' "provider: openai" "approval: never" "sandbox: read-only" "reasoning effort: high" "--------" "$@"; } >"$STUB/header"
+}
+codex_model() { folded | grep -qxF -- "- Model: $1, reasoning effort high" && ! grep -q "codex-log-text\|provider: openai\|OpenAI Codex v" "$STUB/comment"; }
+reset; codex_header "model: gpt-stub-9.1"; rc=$(run)
+check "the record names the model from the header Codex wrote, with its effort, and no other log text" '[ "$rc" = 0 ] && codex_model gpt-stub-9.1'
+reset; rc=$(run)
+check "with no header in the log the record names the model unknown" '[ "$rc" = 0 ] && codex_model unknown'
+reset; codex_header "" user "model: opus"; rc=$(run)
+check "a model: line after the header, such as an echoed repository file, gives unknown" '[ "$rc" = 0 ] && codex_model unknown'
+reset; codex_header 'model: gpt-$(x) <b>&"stub"'"'"'/9:1_a.b'; rc=$(run)
+check "the header's model keeps only model-name characters" '[ "$rc" = 0 ] && codex_model "gpt-xbstub/9:1_a.b"'
+reset; codex_header "model: $(printf 'm%.0s' $(seq 100))"; rc=$(run)
+check "the header's model is capped at 64 characters" '[ "$rc" = 0 ] && codex_model "$(printf "m%.0s" $(seq 64))"'
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
+check "the prompt asks for no summary or account of the review, and with no findings only the asked-for lines, one per limitation, then the result line" 'grep -qF "Give no summary of the change beyond the intent sentence, and no account of how the review was done. " "$STUB/prompt" && grep -qF "With no findings, the reply holds only the lines asked for above (the intent sentence, the line on the request items, the line on instruction text where it applies, and any observations asked for), one line per limitation, then the result line." "$STUB/prompt"'
 check "the prompt takes the intent from the Summary opening sentence, or the template equivalent" 'grep -q "its intent is the opening sentence of its Summary (or of the equivalent section of the repository.s own template)" "$STUB/prompt"'
 check "the prompt says the Summary second sentence gives why the change is needed" 'grep -q "the second sentence of that Summary says why the change is needed, not what it does" "$STUB/prompt"'
 check "the prompt finds the finding lines in the Review details" 'grep -q "description.s Review details hold one line for each finding already fixed or answered" "$STUB/prompt"'
@@ -361,8 +389,8 @@ REPLYEOF
 rc=$(run)
 check "a finding that cites the temporary checkout is posted with repository links and no temporary path" '[ "$rc" = 2 ] && ! leaked && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment"'
 check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
-check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(tail -n 1 "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
-check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
+check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(last_in_fold "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with its result line last inside the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
 
 - (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
 - (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
@@ -415,7 +443,7 @@ check "a checkout path with spaces and special characters is rewritten, and only
 held_file() { sed -n 's/.*the maintainer can read it at //p' "$STUB/out"; }
 held() { # $1 category, $2 the match: not posted, not reviewed, kept whole, and no message repeats it
   [ "$rc" = 1 ] && ! posted && grep -q "not reviewed: the comment holds $1, so it was not posted" "$STUB/out" &&
-    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(tail -n 1 "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
+    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(last_in_fold "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
 }
 printf '# a comment\n\nStubCodename\n' >"$LIST"
 reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
@@ -565,6 +593,25 @@ kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
 check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
+
+# Codex's failures in a row are kept in its own record; from the second, a line tells the
+# maintainer now. A refusal of where Codex is installed is not Codex's failure.
+REC="$XDG_CACHE_HOME/mentat/reviewer-failures-codex"
+raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
+reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run 7)
+check "a first Codex failure (its time limit) is recorded and not raised" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex did not finish within 0 seconds" "$STUB/out" && [ -z "$(raised)" ] && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ]'
+stub_reset; echo "$H2" >"$STUB/head"; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 8)
+check "a second Codex failure in a row (no result line), on another pull request, is raised naming Codex, both pull requests and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Codex has failed 2 times in a row (owner/repo#7, owner/repo#8): Codex'"'"'s reply has no final REVIEW RESULT line" ] && [ ! -e "$XDG_CACHE_HOME/mentat/reviewer-failures-claude" ]'
+lines=$(wc -l <"$REC")
+mkdir -p "$HOME/bin" && cp "$root/tools/bin/codex" "$HOME/bin/codex"
+stub_reset; rc=$(PATH="$HOME/bin:$PATH" run 7)
+rm -rf "${HOME:?}/bin"
+check "a refusal of where Codex is installed changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "installed in or above the home folder" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+stub_reset; rc=$(run 7)
+check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
+check "a Codex failure after a checked reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+reset
 
 # At start, Grok run folders older than a day, and kept logs and held comments older than
 # seven days, are deleted. Newer ones, other names, symlinks and their targets stay.

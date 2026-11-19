@@ -13,6 +13,8 @@ REVIEW_MODEL="${MENTAT_REVIEW_MODEL:-$MENTAT_REVIEW_MODEL_DEFAULT}"
 FIRST_REVIEW_MODEL="${MENTAT_FIRST_REVIEW_MODEL:-}"
 # Read tools only, and no shell: the runner hands the diff and the commit log over as files.
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
+# Effort is pinned, as Codex's is; the record names it as the level asked for.
+CLAUDE_REVIEW_EFFORT=high
 
 # Sets the caller's limit to the local review rounds a pull request may use:
 # MENTAT_REVIEW_ROUNDS, 5 when unset; a whole number of 1 or more, leading zeros allowed
@@ -43,7 +45,7 @@ round_limit() {
 # not Claude's JSON result is not a review.
 run_claude() {
   local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" model="$6" hint="$7" retry="${8:-}" json log rc secs=0 pid n why
-  local args=(-p --safe-mode --restricted --add-dir "$data" --model "$model" --permission-mode dontAsk
+  local args=(-p --safe-mode --restricted --add-dir "$data" --model "$model" --effort "$CLAUDE_REVIEW_EFFORT" --permission-mode dontAsk
     --tools "$CLAUDE_REVIEW_TOOLS" --allowedTools "$CLAUDE_REVIEW_TOOLS" --output-format json)
   json="${out%/*}/claude.json" log="${out%/*}/claude.log"
   (cd "$dir" && unset CLAUDE_CODE_PLUGIN_DIRS && exec claude "${args[@]}" <"$prompt") >"$json" 2>"$log" &
@@ -72,16 +74,19 @@ run_claude() {
     printf 'mentat: Claude reports that no model ran%s; %s; %s\n' "${why:+: $why}" "$hint" "$retry" >&2
     return 1
   fi
-  [ "$rc" -eq 0 ] || "$fail" "claude exited with status $rc${why:+: $why}; $hint"
+  # A second argument to "$fail" is the same reason without Claude's own text, for the line
+  # that tells the maintainer now (not_reviewed, lib/shared.sh).
+  [ "$rc" -eq 0 ] || "$fail" "claude exited with status $rc${why:+: $why}; $hint" "claude exited with status $rc; $hint"
   [ -s "$json" ] || "$fail" "Claude returned no output"
   n=$(jq -er 'if type == "object" then .subtype | strings else empty end' "$json" 2>/dev/null) ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
-  [ "$n" = success ] || "$fail" "Claude's run ended with $n, not success; $hint"
+  [ "$n" = success ] || "$fail" "Claude's run ended with $n, not success; $hint" "Claude's run did not end in success; $hint"
   jq -e '(.result | type) == "string" and (.permission_denials | type) == "array" and (.modelUsage | type) == "object"' "$json" >/dev/null 2>&1 ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
-  [ "$(jq -r '.is_error // false' "$json")" = false ] || "$fail" "Claude reported an error${why:+: $why}; $hint"
+  [ "$(jq -r '.is_error // false' "$json")" = false ] || "$fail" "Claude reported an error${why:+: $why}; $hint" "Claude reported an error; $hint"
   n=$(jq -r '.permission_denials | length' "$json")
-  [ "$n" -eq 0 ] || "$fail" "Claude was denied $n tool call(s) ($(jq -r '[.permission_denials[].tool_name | strings] | unique | join(", ")' "$json")), so the review may not have read what it needed"
+  [ "$n" -eq 0 ] || "$fail" "Claude was denied $n tool call(s) ($(jq -r '[.permission_denials[].tool_name | strings] | unique | join(", ")' "$json")), so the review may not have read what it needed" \
+    "Claude was denied $n tool call(s), so the review may not have read what it needed"
   claude_models=$(jq -r '.modelUsage | keys | join(", ")' "$json")
   [ -n "$claude_models" ] || "$fail" "Claude's output does not say which model ran"
   jq -r .result "$json" >"$out" || "$fail" "could not read Claude's reply"
@@ -133,7 +138,7 @@ review_run_claude() {
   review_model_claude
   hint="the review model is set with $claude_key (now $claude_model)"
   if [ "$claude_key" != MENTAT_FIRST_REVIEW_MODEL ]; then
-    run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$claude_model" "$hint"
+    run_claude "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed "$tmp/data" "$claude_model" "$hint"
     return
   fi
   fallback="the review default ($MENTAT_REVIEW_MODEL_DEFAULT)"
@@ -145,11 +150,21 @@ review_run_claude() {
   first_note="a first round runs again, on $fallback, only when Claude reports that no model ran"
   run_claude "$tmp/tree" "$tmp/prompt" "$out" first_round_not_reviewed "$tmp/data" "$claude_model" "$hint" \
     "reviewing once on $fallback" && return 0
-  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$MENTAT_REVIEW_MODEL_DEFAULT" \
+  run_claude "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed "$tmp/data" "$MENTAT_REVIEW_MODEL_DEFAULT" \
     "this run was on $fallback, as no model ran on $claude_key (now $claude_model)"
 }
-# A first round's failure, with review_run_claude's note on why it is not run again.
-first_round_not_reviewed() { not_reviewed "$1; $first_note"; }
+# A first round's failure, with review_run_claude's note on why it is not run again. A
+# first run that is run again (no model ran) returns before this, so only the run that
+# ends the round is recorded.
+first_round_not_reviewed() { review_tool_failed "$1; $first_note" "${2:-$1}; $first_note"; }
+# A failure of the reviewer tool itself in review_local (reviewer, from its caller): recorded
+# as one of the reviewer's failures in a row (lib/shared.sh), then not reviewed. $2, when
+# given, is the reason without the reviewer's own text, for the line that tells the
+# maintainer now.
+review_tool_failed() {
+  reviewer_failed "$reviewer"
+  not_reviewed "$1" "${2:-$1}"
+}
 review_meta_claude() {
   # The models that ran, from Claude's report; the one asked for when none of them is it (a
   # fallback); and the first-round setting when it chose the model.
@@ -161,7 +176,7 @@ review_meta_claude() {
     *"$claude_model"*) [ -z "$first" ] || printf ' (%s%s)' "$first" "$asked" ;;
     *) printf ' (%sasked for %s)' "$first" "$asked" ;;
   esac
-  printf '\n'
+  printf '\n- Effort asked for: %s\n' "$CLAUDE_REVIEW_EFFORT"
 }
 
 # A local review reads the pull request's head as GitHub has it, never this
@@ -223,12 +238,13 @@ review_local() {
 
   local out="$tmp/review.md" result url held
   "review_run_$reviewer"
+  result_line "$(last_line "$out")" || review_tool_failed "$name's reply has no final REVIEW RESULT line"
+  # A checked reply, as the reviewer returned it, ends the reviewer's failures in a row,
+  # whether or not it is posted; a failure from here on is not the reviewer's.
+  reviewer_record "$reviewer" ok
   localize_review_paths "$out" "$repo" "$head" "$tmp/tree" "$tmp/data" || not_reviewed "could not rewrite the paths in $name's reply"
   result=$(last_line "$out")
-  case "$result" in
-    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
-    *) not_reviewed "$name's reply has no final REVIEW RESULT line" ;;
-  esac
+  result_line "$result" || not_reviewed "$name's reply has no final REVIEW RESULT line"
   # The review ran without waiting for CI; it is posted only once CI passes on the same head.
   wait_for_ci "$repo" "$head" "$out" "$pr" "mentat review"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
@@ -242,7 +258,7 @@ review_local() {
     printf -- '- Time: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '\n---\n\n'
     cat "$out"
-    printf '\n</details>\n\n%s\n' "$result"
+    printf '\n</details>\n'
   } >"$tmp/comment" || not_reviewed "could not write the comment"
   if held=$(held_comment "$(cat "$tmp/comment")" "$repo"); then not_reviewed "$held"; fi
   url=$(gh pr comment "$pr" --body-file "$tmp/comment") || not_reviewed "could not post the review on #$pr"

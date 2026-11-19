@@ -102,6 +102,9 @@ git rev-parse HEAD >"$STUB/model_head"; cat README >"$STUB/model_readme"
 # @TREE@, @TREEP@ and @DATA@ in the reply become the checkout's path as created and
 # resolved (macOS: /var and /private/var) and the data folder's.
 pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
+# With $STUB/block_rewrite, a folder where the path rewrite writes its copy of the reply
+# (beside the checkout), so the rewrite fails.
+[ -f "$STUB/block_rewrite" ] && mkdir ../review.md.localized
 echo "CLAUDE_CODE_PLUGIN_DIRS ${CLAUDE_CODE_PLUGIN_DIRS+set}" >"$STUB/env"
 echo "ANTHROPIC_API_KEY ${ANTHROPIC_API_KEY+set}" >>"$STUB/env"
 prev=""
@@ -128,21 +131,25 @@ chmod +x "$root/tools/bin/gh" "$root/tools/bin/claude"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
-reset() {
+# stub_reset clears the stubs' state; reset also clears the record of failures in a row.
+stub_reset() {
   rm -f "$STUB"/*
   echo "$H" >"$STUB/head"
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
+reset() { stub_reset; rm -f "$XDG_CACHE_HOME"/mentat/reviewer-failures-*; }
 run() { (cd "$root/work" && "$mentat" review "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
-# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+# The posted review: a heading line, then the bullets and the reply folded; the reply's own
+# result line is the last line inside the fold, and nothing follows the fold.
 heading() { [ "$(head -n 1 "$STUB/comment")" = "## Local Claude review of $H: $1, spec fingerprint ${2:-none}" ]; }
 folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment"; }
+# The last non-blank line before the fold closes, in file $1.
+last_in_fold() { grep -v '^[[:space:]]*$' "$1" | tail -n 2 | head -n 1; }
 fold_shape() { # $1 the final REVIEW RESULT line
-  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 3 "$STUB/comment")" = "</details>
-
-$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(tail -n 1 "$STUB/comment")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment" | tail -n 1)" = "$1" ]
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 1 "$STUB/comment")" = "</details>" ] &&
+    [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(last_in_fold "$STUB/comment")" = "$1" ] && [ "$(grep -cxF -- "$1" "$STUB/comment")" = 1 ]
 }
 # The argument after $1 in the stub's arguments, and whether $1 is one of them.
 arg() { sed -n "/^$1\$/{n;p;q;}" "$STUB/args"; }
@@ -191,13 +198,15 @@ check "a reply without a result line is not reviewed before any wait for CI" '[ 
 reset; rc=$(run)
 check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Claude review of $H" "$STUB/comment"'
 check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
-check "the bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Claude Code: 2.1.322" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
+check "the bullets and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Claude Code: 2.1.322" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "the record names the model that ran, from Claude's own report" 'folded | grep -qx -- "- Model: claude-opus-4-9"'
+check "Claude runs with --effort high, and the record names high as the effort asked for" '[ "$(arg --effort)" = high ] && [ "$(grep -cx -- "--effort" "$STUB/args")" = 1 ] && folded | grep -qx -- "- Effort asked for: high"'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/model_head")" = "$H" ] && [ "$(cat "$STUB/model_readme")" = change ]'
 check "reviews the change from the merge base" 'grep -q "Review the change from $BASE to $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Claude the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
 check "the prompt takes the intent from the Summary opening sentence, or the template equivalent" 'grep -q "its intent is the opening sentence of its Summary (or of the equivalent section of the repository.s own template)" "$STUB/prompt"'
 check "the prompt says the Summary second sentence gives why the change is needed" 'grep -q "the second sentence of that Summary says why the change is needed, not what it does" "$STUB/prompt"'
+check "the prompt asks for no summary or account of the review, and with no findings only the asked-for lines, one per limitation, then the result line" 'grep -qF "Give no summary of the change beyond the intent sentence, and no account of how the review was done. " "$STUB/prompt" && grep -qF "With no findings, the reply holds only the lines asked for above (the intent sentence, the line on the request items, the line on instruction text where it applies, and any observations asked for), one line per limitation, then the result line." "$STUB/prompt"'
 check "the prompt finds the finding lines in the Review details" 'grep -q "description.s Review details hold one line for each finding already fixed or answered" "$STUB/prompt"'
 check "the prompt finds the hand-check report in the Review details" 'grep -q "description.s Review details report who checked it and what they saw" "$STUB/prompt"'
 
@@ -414,8 +423,8 @@ REPLYEOF
 rc=$(run)
 check "a finding that cites the temporary checkout is posted with repository links and no temporary path" '[ "$rc" = 2 ] && ! leaked && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment"'
 check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
-check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(tail -n 1 "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
-check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
+check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(last_in_fold "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with its result line last inside the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
 
 - (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
 - (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
@@ -470,7 +479,7 @@ check "a checkout path with spaces and special characters is rewritten, and only
 held_file() { sed -n 's/.*the maintainer can read it at //p' "$STUB/out"; }
 held() { # $1 category, $2 the match: not posted, not reviewed, kept whole, and no message repeats it
   [ "$rc" = 1 ] && ! posted && grep -q "not reviewed: the comment holds $1, so it was not posted" "$STUB/out" &&
-    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Claude review of $H" "$(held_file)" && [ "$(tail -n 1 "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
+    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Claude review of $H" "$(held_file)" && [ "$(last_in_fold "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
 }
 printf '# a comment\n\nStubCodename\n' >"$LIST"
 reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
@@ -670,5 +679,102 @@ reset; rc=$(run)
 check "at start, deletes Grok run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/grok-review.old" ] && [ ! -e "$c/grok-opinion.old" ] && [ ! -e "$c/grok-opinion-web.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ] && [ ! -e "$TMPDIR/mentat-grok-log.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
 check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/grok-review.new/f" ] && [ -f "$c/grok-reviewx/f" ] && [ -L "$c/grok-review.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-codex-log.new" ] && [ -f "$TMPDIR/mentat-codex-logs" ] && [ -L "$TMPDIR/mentat-grok-log.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
 rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
+
+# Each reviewer keeps its failures in a row on this machine, one line per run that counts,
+# in Mentat's cache folder; from the second failure in a row a line tells the maintainer now.
+REC="$XDG_CACHE_HOME/mentat/reviewer-failures-claude"
+raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
+# The record's lines without their timestamps and run tokens, on one line; every line has a timestamp.
+recorded() { ! grep -qv '^[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z ' "$REC" && [ "$(cut -d" " -f2,3 "$REC" | tr '\n' ' ')" = "$1" ]; }
+fail_run() { stub_reset; echo "${2:-$H}" >"$STUB/head"; echo 3 >"$STUB/exit"; rc=$(run "${1:-7}"); }
+NOT_REVIEWED_3="mentat: not reviewed: claude exited with status 3: Nothing to flag.; the review model is set with MENTAT_REVIEW_MODEL (now opus)"
+reset; fail_run 7
+check "a first tool failure is recorded and not raised: exit 1 and the not-reviewed line alone, as before" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && recorded "fail owner/repo#7 "'
+fail_run 8 "$H2"
+check "a second tool failure in a row, on another pull request, adds one line telling the maintainer now: Claude, the count, both pull requests and the reason without Claude's own text (exit 1)" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7, owner/repo#8): claude exited with status 3; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "$NOT_REVIEWED_3" "$STUB/out" && recorded "fail owner/repo#7 fail owner/repo#8 "'
+fail_run 7
+check "a third in a row names each pull request once" '[ "$rc" = 1 ] && raised | grep -qF "Claude has failed 3 times in a row (owner/repo#7, owner/repo#8): "'
+stub_reset; rc=$(run 7)
+check "a checked reply ends the run of failures" '[ "$rc" = 0 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+fail_run 7
+check "a tool failure after a checked reply is the first in a row again, and is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+stub_reset; printf 'I could not read the diff.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; rc=$(run 7)
+check "an INCOMPLETE reply ends the run of failures too (exit 1, not raised)" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+fail_run 7
+check "a tool failure after an INCOMPLETE reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+reset; fail_run 7
+stub_reset; echo "$H2" >"$STUB/head"; touch "$STUB/block_rewrite"; rc=$(run 8)
+check "a checked reply whose paths cannot be rewritten is recorded as ok, then not reviewed (exit 1, not raised)" '[ "$rc" = 1 ] && grep -qx "mentat: not reviewed: could not rewrite the paths in Claude'"'"'s reply" "$STUB/out" && [ -z "$(raised)" ] && recorded "fail owner/repo#7 ok owner/repo#8 "'
+fail_run 7
+check "a tool failure after a checked reply whose paths could not be rewritten is the first in a row again, and is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && recorded "fail owner/repo#7 ok owner/repo#8 fail owner/repo#7 "'
+lines=$(wc -l <"$REC")
+stub_reset; rc=$(cd "$root/work" && "$mentat" review --request "$root/no such request" 7 >"$STUB/out" 2>&1; echo $?)
+check "a failure that is not the reviewer's (a request file that cannot be read) changes nothing in the record" '[ "$rc" = 1 ] && [ "$(wc -l <"$REC")" = "$lines" ] && [ -z "$(raised)" ]'
+stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
+check "a checked reply ends the run even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+fail_run 7
+stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
+check "a reply with no result line is a tool failure, raised as the second in a row" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude'"'"'s reply has no final REVIEW RESULT line" ]'
+# A first round whose model did not run is run once more; only that run's outcome counts.
+reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
+check "a first round run again on the review default records only the second run's outcome" '[ "$rc" = 0 ] && recorded "ok owner/repo#7 "'
+reset; echo fable >"$STUB/nostart"; echo 3 >"$STUB/exit"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
+check "a first round run again whose second run fails records one failure" '[ "$rc" = 1 ] && recorded "fail owner/repo#7 "'
+# The raise line holds no text from Claude's reply; the not-reviewed line keeps it.
+CANARY="CANARY-REVIEWER-TEXT-4821"
+canary_run() { # $1: exit; $2: raw JSON or empty; the rest: env for the run
+  local e=$1 raw=$2; shift 2
+  stub_reset; echo "$e" >"$STUB/exit"; printf '%s\n\nREVIEW RESULT: NO FINDINGS\n' "$CANARY" >"$STUB/reply"
+  [ -z "$raw" ] || printf '%s\n' "$raw" >"$STUB/raw"
+  rc=$(for a in "$@"; do export "${a?}"; done; run 7)
+}
+reset; canary_run 3 ""; canary_run 3 ""
+check "Claude exiting non-zero twice in a row: the raise line leaves out Claude's text, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): claude exited with status 3; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "mentat: not reviewed: claude exited with status 3: $CANARY; the review model is set with MENTAT_REVIEW_MODEL (now opus)" "$STUB/out"'
+ERR_JSON='{"type":"result","subtype":"success","is_error":true,"result":"'$CANARY'\nmore","permission_denials":[],"modelUsage":{"claude-opus-4-9":{}}}'
+reset; canary_run 0 "$ERR_JSON"; canary_run 0 "$ERR_JSON"
+check "Claude reporting an error twice in a row: the raise line leaves out Claude's text, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude reported an error; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "mentat: not reviewed: Claude reported an error: $CANARY; the review model is set with MENTAT_REVIEW_MODEL (now opus)" "$STUB/out"'
+reset; canary_run 3 "" MENTAT_FIRST_REVIEW_MODEL=opus; canary_run 3 "" MENTAT_FIRST_REVIEW_MODEL=opus
+check "a first round failing twice in a row: the raise line leaves out Claude's text and keeps the first-round note" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): claude exited with status 3; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now opus); not run again on the review default (opus), which is the same model" ] && grep -qxF "mentat: not reviewed: claude exited with status 3: $CANARY; the review model is set with MENTAT_FIRST_REVIEW_MODEL (now opus); not run again on the review default (opus), which is the same model" "$STUB/out"'
+SUBTYPE_JSON='{"type":"result","subtype":"'$CANARY'","is_error":false,"result":"REVIEW RESULT: NO FINDINGS","permission_denials":[],"modelUsage":{"claude-opus-4-9":{}}}'
+reset; canary_run 0 "$SUBTYPE_JSON"; canary_run 0 "$SUBTYPE_JSON"
+check "a run not ending in success twice in a row: the raise line leaves out how Claude says it ended, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude'"'"'s run did not end in success; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -qxF "mentat: not reviewed: Claude'"'"'s run ended with $CANARY, not success; the review model is set with MENTAT_REVIEW_MODEL (now opus)" "$STUB/out"'
+DENIED_JSON='{"type":"result","subtype":"success","is_error":false,"result":"REVIEW RESULT: NO FINDINGS","permission_denials":[{"tool_name":"'$CANARY'","tool_use_id":"t1","tool_input":{}}],"modelUsage":{"claude-opus-4-9":{}}}'
+reset; canary_run 0 "$DENIED_JSON"; canary_run 0 "$DENIED_JSON"
+check "a denied tool call twice in a row: the raise line gives the count without the tool names, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude was denied 1 tool call(s), so the review may not have read what it needed" ] && grep -qxF "mentat: not reviewed: Claude was denied 1 tool call(s) ($CANARY), so the review may not have read what it needed" "$STUB/out"'
+# A record that cannot be written changes neither the exit status nor the message.
+mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
+reset; fail_run 7; rc=$(XDG_CACHE_HOME="$root/badcache" run 7)
+check "with a cache folder that cannot be written, a failure exits 1 with the not-reviewed line alone" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && [ -f "$root/badcache/mentat" ] && recorded "fail owner/repo#7 "'
+reset; echo 3 >"$STUB/exit"; rc=$(XDG_CACHE_HOME=relative-cache run 7)
+check "a cache folder that is not an absolute path is not written, and the failure is reported as before" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && [ ! -e "$root/work/relative-cache" ] && [ ! -e "$REC" ]'
+# Runs at the same time each add their own line: one small append each.
+reset; (
+  # shellcheck source=/dev/null
+  . "$(dirname "$mentat")/../lib/shared.sh" || exit 1
+  repo=owner/repo
+  for i in $(seq 30); do pr=$i reviewer_record claude fail & done
+  wait
+)
+check "30 records written at the same time are all kept, one line each" '[ "$(wc -l <"$REC" | tr -d " ")" = 30 ] && [ "$(cut -d" " -f3 "$REC" | sort -u | wc -l | tr -d " ")" = 30 ]'
+# A failure is counted at its own line: another run's line written between this run's
+# append and its read does not change this run's count. $1 is that other run's line.
+raced() {
+  (
+    # shellcheck source=/dev/null
+    . "$(dirname "$mentat")/../lib/shared.sh" || exit 1
+    eval "own_$(declare -f reviewer_record)"
+    # shellcheck disable=SC2329 # reviewer_failed calls it
+    reviewer_record() { own_reviewer_record "$@" && printf '%s\n' "$other" >>"$REC"; }
+    other=$1 repo=owner/repo pr=7
+    reviewer_failed claude
+    # shellcheck disable=SC2154 # set by reviewer_failed in lib/shared.sh
+    printf '%s\n' "$review_raise"
+  )
+}
+reset; mkdir -p "${REC%/*}" && echo "2026-01-01T00:00:00Z fail owner/repo#5 earlier-run" >"$REC"
+check "another run's ok line after this run's failure still leaves this run the second in a row" '[ "$(raced "2026-01-01T00:00:02Z ok owner/repo#9 other-run")" = "Claude has failed 2 times in a row (owner/repo#5, owner/repo#7)" ]'
+reset; mkdir -p "${REC%/*}" && echo "2026-01-01T00:00:00Z fail owner/repo#5 earlier-run" >"$REC"
+check "another run's failure after this run's failure is not counted in this run's raise" '[ "$(raced "2026-01-01T00:00:02Z fail owner/repo#9 other-run")" = "Claude has failed 2 times in a row (owner/repo#5, owner/repo#7)" ]'
+reset
 
 [ "$failures" -eq 0 ]
