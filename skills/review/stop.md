@@ -2,7 +2,7 @@
 
 Read this at the end of every review round, on resume and after a compaction, from `mentat:review`.
 
-A stop is pending after any completed round from round three on that posted findings, Codex's included, fixed or answered alike. A round with no findings from either review goes to the final check. The round limit's hard stop still holds; at the last round the stop comes first. Once "Ready to merge: #N" was given, `after-ready.md` applies instead.
+A stop is pending after any completed round from round three on that posted findings, Codex's included, fixed or answered alike. A round with no findings from either review goes to the final check. The round limit's hard stop still holds; at the last round a pending stop comes first. Once "Ready to merge: #N" was given, `after-ready.md` applies instead.
 
 ## Order
 
