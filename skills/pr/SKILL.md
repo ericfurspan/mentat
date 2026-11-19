@@ -6,15 +6,17 @@ user-invocable: false
 
 1. Read the diff and the linked issue, not from memory: before the pull request exists, `git diff <remote>/<base>...HEAD` after fetching; after, `gh pr diff <pr>`; the issue with `gh issue view <issue>`. With an external backlog there is no issue: read the spec from the backlog as `mentat:backlog` "Where the spec lives" says, write no `Closes #`, and never name the backlog's workspace or item in the body.
    An issue agreed under this workflow carries a spec where and in the shape `mentat:backlog` gives (one sentence of intent; numbered requirements, each checkable, and one the maintainer checks by hand says so; "Out of scope:"), written by Claude Code when the maintainer agrees and scaled to the change. Read it from the issue.
-2. Use the repository's pull request template if it has one: fill its summary section with the Summary and its test section with the Test plan and any See it line, put the Status line on the first line of the body, moved from any place the template gives it, with any wait right below it, add Decisions, Risks and Review details only where it has no place for them, and add `Closes #` (or `Refs #`) as below where it has no place for it. Otherwise use the template below. Where the repository has a `GLOSSARY.md`, use its terms. Titles follow Conventional Commits, and the title and body follow `records.md` in `mentat:backlog`'s folder. Claude Code opens a normal pull request by default.
+2. Use the repository's pull request template if it has one: fill its summary section with the Summary and its test section with the Test plan and any See it line, put the Status line on the first line of the body, moved from any place the template gives it, with any wait and then the `Built with:` line right below it, add Decisions, Risks and Review details only where it has no place for them, and add `Closes #` (or `Refs #`) as below where it has no place for it. Otherwise use the template below. Where the repository has a `GLOSSARY.md`, use its terms. Titles follow Conventional Commits, and the title and body follow `records.md` in `mentat:backlog`'s folder. Claude Code opens a normal pull request by default.
 3. The Summary's opening sentence (in a repository's template, the opening sentence of its summary section) says what changes for the maintainer, in plain words, in about 25 words at most, with no file path, command or flag. It is the intent sentence the reviewers compare their own against. The second sentence says why the change is needed, in plain words: the problem it fixes for the maintainer, with no file path, command or flag, and nothing else. If you cannot state the change in one sentence, ask the maintainer before opening the pull request.
 4. Every claim matches the diff on the head commit; in a Decisions line, the chosen behavior matches the diff and an "agreed" mark matches the spec. After every push, rewrite the Status line, the Test plan and the `Head:` line in Review details for the new head commit; when the push changes what the diff does, update the rest of the body too.
-5. Rewrite the Status line, Risks and the Test plan's results in place whenever the body is updated and whenever the review loop stops (`mentat:review`), so they say where things stand now. A wait on the maintainer goes right below the Status line, as `mentat:backlog` "Waits on the maintainer" says: when the wait is on a backlog item (external or a GitHub issue), only its one line saying the steps are on the backlog item; with no backlog item, the wait itself.
+5. Rewrite the Status line, the `Built with:` line, Risks and the Test plan's results in place whenever the body is updated and whenever the review loop stops (`mentat:review`), so they say where things stand now. A wait on the maintainer goes right below the Status line, as `mentat:backlog` "Waits on the maintainer" says: when the wait is on a backlog item (external or a GitHub issue), only its one line saying the steps are on the backlog item; with no backlog item, the wait itself.
 
 ```markdown
 **Status:** <Ready | In review | Blocked: <why> | Not reviewed: <why>>
 
 <A wait on the maintainer, when one exists (step 5).>
+
+Built with: session <model>; builder <model>, effort <effort> (configured); <reviewer> <model>, effort <effort> asked for, for each reviewer that posted a review.
 
 ## Summary
 
@@ -49,8 +51,6 @@ Head: <commit>
 |---|---|---|
 | <number> | <the check that covers it> | <what was observed; a check that failed before the fix and passed after is the builder's report and gives both; a hand check says who checked and what they saw> |
 
-Built with: session <model>, effort <effort> (read at each builder run); builder <model>, effort <effort> (configured).
-
 </details>
 ```
 
@@ -64,4 +64,4 @@ The Test plan gives each check run on the head commit and its result, the test c
 
 The requirement table has one row per numbered requirement of the spec, by number (an older issue or item, agreed before the spec had that name and with no numbered list, is read as each requirement it states); one check may cover several.
 
-The `Built with:` line says which models built the pull request. The session values are the model and effort setting the build session read for itself at or right after each builder run, one entry per run when they changed; earlier entries stay as written. The builder values are what its definition sets, labeled as configured; a definition that sets no effort says `effort not set`. A value not read is `unknown`; nothing is inferred, from a model-family alias or from memory.
+The `Built with:` line, right below the Status line and any wait, says which models built and reviewed the pull request. The session value is the model the build session read for itself at or right after each builder run, with no effort, one entry per run when it changed; earlier entries stay as written. The builder value is the exact model its report names, with the effort its definition sets, labeled as configured; a definition that sets no effort says `effort not set`. Then each reviewer that posted a review on the pull request, by name, with the exact model and the effort asked for that its latest review comment names. A value not read is `unknown`; nothing is inferred, from a model-family alias or from memory.
