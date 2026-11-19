@@ -227,11 +227,11 @@ claude_reviewed() { jq -n --arg b "## Local Claude review of $H: findings, spec 
 reset; claude_reviewed; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "a review that finishes before CI is posted only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "found nothing on $H" "$STUB/out" && ! grep -q "not posted" "$STUB/out"'
 check "a posted review is Codex done on the head Claude reviewed, and adds no round" 'status | grep -qF "local rounds 1, head reviewed: yes, grok: none, grok stop: none, codex: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
-reset; claude_reviewed; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
+reset; claude_reviewed; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "CI failing after the review exits 4, posts nothing and names the failing check" '[ "$rc" = 4 ] && ! posted && ! grep -q "pr comment" "$STUB/calls" && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out"'
 check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(cat "$STUB/reply")" ]'
 check "a review not posted for failed CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
-reset; printf -- '- P2 README:1 still running\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs queued null >"$STUB/check_runs.json"; rc=$(run)
+reset; printf -- '- (non-blocking) README:1 still running\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout exits 4, posts nothing and prints the review" '[ "$rc" = 4 ] && ! posted && grep -q "CI did not finish on $H within 2 seconds" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ]'
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
 check "a head that moves during the wait for CI exits 3 and posts nothing" '[ "$rc" = 3 ] && ! posted && [ "$(order)" = "model ci " ] && grep -q "the head moved from $H" "$STUB/out"'
@@ -329,10 +329,10 @@ H2=$(git -C "$root/seed" rev-parse HEAD)
 reset; echo "$H2" >"$STUB/head"; rc=$(run 8)
 check "a later round's head is still reviewed from the merge base, not from the head reviewed before" '[ "$rc" = 0 ] && grep -q "git diff $BASE $H2" "$STUB/prompt" && ! grep -q "git diff $H " "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H2" "$STUB/comment"'
 
-reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
-check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment"'
-check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- P1 README:1 wrong text"'
-reset; printf 'REVIEW RESULT: NO FINDINGS\n\n- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "(blocking) README:1" "$STUB/comment"'
+check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- (blocking) README:1 wrong text"'
+reset; printf 'REVIEW RESULT: NO FINDINGS\n\n- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "the heading's result comes from the reply's final line only" '[ "$rc" = 2 ] && heading findings none && fold_shape "REVIEW RESULT: FINDINGS"'
 
 # Codex runs in a temporary checkout and may cite files by its absolute path, as created or
@@ -342,64 +342,64 @@ leaked() { grep -qF "$(cat "$STUB/tree")" "$STUB/comment" || grep -qF "$(cat "$S
 reset; cat >"$STUB/reply" <<'REPLYEOF'
 Changes README.
 
-- P2 [README:1](@TREE@/README:1): wrong text
-- P2 [lib/shared.sh:93-95](@TREEP@/lib/shared.sh:93-95): a range
-- P3 [a dir/a file.txt](@TREE@/a dir/a file.txt#L4): a spaced name
-- P3 see @TREEP@/lib/x.sh:7 and `@TREE@/lib/y.sh`
+- (non-blocking) [README:1](@TREE@/README:1): wrong text
+- (non-blocking) [lib/shared.sh:93-95](@TREEP@/lib/shared.sh:93-95): a range
+- (non-blocking) [a dir/a file.txt](@TREE@/a dir/a file.txt#L4): a spaced name
+- (non-blocking) see @TREEP@/lib/x.sh:7 and `@TREE@/lib/y.sh`
 REVIEW RESULT: FINDINGS
 REPLYEOF
 rc=$(run)
 check "a finding that cites the temporary checkout is posted with repository links and no temporary path" '[ "$rc" = 2 ] && ! leaked && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment"'
-check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- P3 see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
+check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
 check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(tail -n 1 "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
 check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
 
-- P2 [README:1]($REPO_URL/README#L1): wrong text
-- P2 [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
-- P3 [a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name
-- P3 see lib/x.sh:7 and \`lib/y.sh\`
+- (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
+- (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
+- (non-blocking) [a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name
+- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`
 REVIEW RESULT: FINDINGS" ]'
-reset; printf -- '- P3 see @TREE@-other/z and /Users/other/tree/w\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
-check "a path that only starts with the checkout's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 see $(cat "$STUB/tree")-other/z and /Users/other/tree/w" "$STUB/comment"'
+reset; printf -- '- (non-blocking) see @TREE@-other/z and /Users/other/tree/w\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+check "a path that only starts with the checkout's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- (non-blocking) see $(cat "$STUB/tree")-other/z and /Users/other/tree/w" "$STUB/comment"'
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @TREE@/lib/z.sh\n' >"$STUB/reply"; rc=$(run)
 check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
 # Link forms: an angle-bracket target, parentheses in a file name, and a line given only in the link text.
 reset; cat >"$STUB/reply" <<'REPLYEOF'
-- P2 [a dir/a file.txt:7](<@TREE@/a dir/a file.txt:7>): angle target
-- P2 [app/(auth)/page.tsx:7](@TREE@/app/(auth)/page.tsx:7) (see also [x](@TREE@/y.sh:2)): parentheses
-- P2 [lib/shared.sh:93](@TREE@/lib/shared.sh): line in the text
-- P2 [lib/x.sh:3-5](@TREEP@/lib/x.sh): range in the text
+- (non-blocking) [a dir/a file.txt:7](<@TREE@/a dir/a file.txt:7>): angle target
+- (non-blocking) [app/(auth)/page.tsx:7](@TREE@/app/(auth)/page.tsx:7) (see also [x](@TREE@/y.sh:2)): parentheses
+- (non-blocking) [lib/shared.sh:93](@TREE@/lib/shared.sh): line in the text
+- (non-blocking) [lib/x.sh:3-5](@TREEP@/lib/x.sh): range in the text
 REVIEW RESULT: FINDINGS
 REPLYEOF
 rc=$(run)
-check "an angle-bracket link target becomes a repository link" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- P2 [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): angle target" "$STUB/comment"'
-check "a file name with parentheses is linked whole, and the text after the link is kept" 'grep -qF -- "- P2 [app/(auth)/page.tsx:7]($REPO_URL/app/%28auth%29/page.tsx#L7) (see also [x]($REPO_URL/y.sh#L2)): parentheses" "$STUB/comment"'
-check "a line given only in the link text goes into the link, a range too" 'grep -qF -- "- P2 [lib/shared.sh:93]($REPO_URL/lib/shared.sh#L93): line in the text" "$STUB/comment" && grep -qF -- "- P2 [lib/x.sh:3-5]($REPO_URL/lib/x.sh#L3-L5): range in the text" "$STUB/comment"'
+check "an angle-bracket link target becomes a repository link" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- (non-blocking) [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): angle target" "$STUB/comment"'
+check "a file name with parentheses is linked whole, and the text after the link is kept" 'grep -qF -- "- (non-blocking) [app/(auth)/page.tsx:7]($REPO_URL/app/%28auth%29/page.tsx#L7) (see also [x]($REPO_URL/y.sh#L2)): parentheses" "$STUB/comment"'
+check "a line given only in the link text goes into the link, a range too" 'grep -qF -- "- (non-blocking) [lib/shared.sh:93]($REPO_URL/lib/shared.sh#L93): line in the text" "$STUB/comment" && grep -qF -- "- (non-blocking) [lib/x.sh:3-5]($REPO_URL/lib/x.sh#L3-L5): range in the text" "$STUB/comment"'
 
 # Percent-encoded targets and code-formatted link text.
 reset; cat >"$STUB/reply" <<'REPLYEOF'
-- P2 [a dir/a file.txt:7](@TREE@/a%20dir/a%20file.txt:7): encoded file name
-- P2 [caf](@TREE@/caf%C3%A9.txt:2): non-ASCII, and [x](https://example.test/a%20b) is not touched
-- P2 [`lib/x.sh:7`](@TREE@/lib/x.sh): code-formatted text
+- (non-blocking) [a dir/a file.txt:7](@TREE@/a%20dir/a%20file.txt:7): encoded file name
+- (non-blocking) [caf](@TREE@/caf%C3%A9.txt:2): non-ASCII, and [x](https://example.test/a%20b) is not touched
+- (non-blocking) [`lib/x.sh:7`](@TREE@/lib/x.sh): code-formatted text
 REVIEW RESULT: FINDINGS
 REPLYEOF
 rc=$(run)
-check "a link target with a percent-encoded file name is decoded and encoded once" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- P2 [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): encoded file name" "$STUB/comment" && grep -qF -- "- P2 [caf]($REPO_URL/café.txt#L2)" "$STUB/comment"'
+check "a link target with a percent-encoded file name is decoded and encoded once" '[ "$rc" = 2 ] && ! leaked && grep -qF -- "- (non-blocking) [a dir/a file.txt:7]($REPO_URL/a%20dir/a%20file.txt#L7): encoded file name" "$STUB/comment" && grep -qF -- "- (non-blocking) [caf]($REPO_URL/café.txt#L2)" "$STUB/comment"'
 check "a link that does not point into the checkout is not decoded" 'grep -qF -- "[x](https://example.test/a%20b) is not touched" "$STUB/comment"'
-check "a line in code-formatted link text goes into the link" 'grep -qF -- "- P2 [\`lib/x.sh:7\`]($REPO_URL/lib/x.sh#L7): code-formatted text" "$STUB/comment"'
+check "a line in code-formatted link text goes into the link" 'grep -qF -- "- (non-blocking) [\`lib/x.sh:7\`]($REPO_URL/lib/x.sh#L7): code-formatted text" "$STUB/comment"'
 spaced="$root/sp ace/tree"
 mkdir -p "$spaced"
-printf -- '- P1 [lib/a.sh:7](%s/lib/a.sh:7) and [b](<%s/b.sh>) and %s/c.sh\n' "${spaced// /%20}" "${spaced// /%20}" "$spaced" >"$STUB/enc.md"
-check "a root with spaces, written as %20 in a link target, is matched" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/enc.md" owner/repo "$H" "$spaced") && [ "$(cat "$STUB/enc.md")" = "- P1 [lib/a.sh:7]($REPO_URL/lib/a.sh#L7) and [b]($REPO_URL/b.sh) and c.sh" ]'
+printf -- '- (blocking) [lib/a.sh:7](%s/lib/a.sh:7) and [b](<%s/b.sh>) and %s/c.sh\n' "${spaced// /%20}" "${spaced// /%20}" "$spaced" >"$STUB/enc.md"
+check "a root with spaces, written as %20 in a link target, is matched" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/enc.md" owner/repo "$H" "$spaced") && [ "$(cat "$STUB/enc.md")" = "- (blocking) [lib/a.sh:7]($REPO_URL/lib/a.sh#L7) and [b]($REPO_URL/b.sh) and c.sh" ]'
 
 # The roots are matched literally: a checkout whose path has spaces and characters sed and
 # regular expressions treat specially (the test's temporary directory, where mktemp ignores
 # TMPDIR on macOS, cannot be made to have them), called directly.
 odd="$root/odd & [dir] (x)+.*|\\ \$HOME/tree"
 mkdir -p "$odd"
-printf -- '- P1 [README:1](%s/README:1): wrong\n- P2 %s/lib/a b.sh:3 and %s2/keep\n' "$odd" "$odd" "$odd" >"$STUB/odd.md"
-check "a checkout path with spaces and special characters is rewritten, and only that path" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/odd.md" owner/repo "$H" "$odd") && [ "$(cat "$STUB/odd.md")" = "- P1 [README:1]($REPO_URL/README#L1): wrong
-- P2 lib/a b.sh:3 and $odd""2/keep" ]'
+printf -- '- (blocking) [README:1](%s/README:1): wrong\n- (non-blocking) %s/lib/a b.sh:3 and %s2/keep\n' "$odd" "$odd" "$odd" >"$STUB/odd.md"
+check "a checkout path with spaces and special characters is rewritten, and only that path" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/odd.md" owner/repo "$H" "$odd") && [ "$(cat "$STUB/odd.md")" = "- (blocking) [README:1]($REPO_URL/README#L1): wrong
+- (non-blocking) lib/a b.sh:3 and $odd""2/keep" ]'
 
 # The publish check, on the final comment, right before the post.
 held_file() { sed -n 's/.*the maintainer can read it at //p' "$STUB/out"; }
@@ -408,27 +408,27 @@ held() { # $1 category, $2 the match: not posted, not reviewed, kept whole, and 
     grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(tail -n 1 "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
 }
 printf '# a comment\n\nStubCodename\n' >"$LIST"
-reset; printf -- '- P3 %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
+reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
 check "a comment with the home path is not posted, exits as not reviewed, is kept, and no message repeats it" 'held "a local path" "$HOME"'
 check "a hit looks up the reviewed repository" 'grep -qF "repo view owner/repo --json isPrivate" "$STUB/calls"'
 rm -f "$(held_file)"
-reset; printf -- '- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+reset; printf -- '- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a comment with a word from the list, in another case, is the same" 'held "a configured private name" stubcodename'
 rm -f "$(held_file)"
 reset; printf 'Stopped at stubcodename.\n\nREVIEW RESULT: INCOMPLETE - could not read stubcodename\n' >"$STUB/reply"; rc=$(run)
 check "an INCOMPLETE reason is checked before it is posted or printed" 'held "a configured private name" stubcodename'
 rm -f "$(held_file)"
-reset; touch "$STUB/lookup_fails"; printf -- '- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+reset; touch "$STUB/lookup_fails"; printf -- '- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a failed visibility lookup counts as public" 'held "a configured private name" stubcodename'
 rm -f "$(held_file)"
-reset; touch "$STUB/private"; printf -- '- P3 about stubcodename at %s/x\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
+reset; touch "$STUB/private"; printf -- '- (non-blocking) about stubcodename at %s/x\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
 check "a private repository's comment is posted unchanged" '[ "$rc" = 2 ] && grep -qF "about stubcodename at $HOME/x" "$STUB/comment"'
 reset; rc=$(run)
 check "no hit: posts, with no visibility lookup" '[ "$rc" = 0 ] && posted && ! grep -q isPrivate "$STUB/calls"'
 rm "$LIST"
-reset; printf -- '- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
+reset; printf -- '- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a missing word list never blocks" '[ "$rc" = 2 ] && grep -q "about stubcodename" "$STUB/comment"'
-reset; printf -- '- P3 %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
+reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
 check "with a missing word list the home path is still found" 'held "a local path" "$HOME"'
 rm -f "$(held_file)"
 
@@ -505,7 +505,7 @@ check "--request without a file and a pull request number is a usage error (exit
 
 # --require-ci: a head where no CI check ran is not a pass.
 runrc() { (cd "$root/work" && "$mentat" review --codex "$@" >"$STUB/out" 2>&1); echo $?; }
-reset; claude_reviewed; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
+reset; claude_reviewed; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
 check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
 check "--require-ci: a review not posted for a head with no CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci --request "$root/req dir/agreed request.md" 7)
@@ -513,7 +513,7 @@ check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted 
 reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
 check "--require-ci after --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment"'
 # --require-ci: a pull request that conflicts with its base branch is not a pass (tests/review-local.sh covers the rest).
-reset; printf -- '- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
+reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
 check "--require-ci with every check passed on a conflicting pull request exits 4, says it conflicts, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qxF "Pull request #7 conflicts with its base branch, so its tests did not run on $H. Resolve the conflict and push." "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
 for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   # shellcheck disable=SC2086 # the words are the arguments

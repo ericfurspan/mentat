@@ -291,27 +291,27 @@ chmod 600 "$root/locked.md"
 rc=$("$mentat" review --request "$root/req dir/agreed request.md" --grok 7 >"$STUB/out" 2>&1; echo $?)
 check "--request before the mode is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
-reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
-check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/comment/2" "$STUB/out" && grep -q "P1 README:1" "$STUB/comment.2"'
-check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- P1 README:1 wrong text"'
+reset; reply $'- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H: https://example.test/comment/2" "$STUB/out" && grep -q "(blocking) README:1" "$STUB/comment.2"'
+check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- (blocking) README:1 wrong text"'
 
 # Grok works in an export under the per-run folder and may cite files by its absolute path.
 # The posted review holds no such path, and links the file at the reviewed commit.
 REPO_URL="https://github.com/owner/repo/blob/$H"
-reset; reply $'Changes README.\n\n- P2 [README:1](@EXPORT@/README:1): wrong text\n- P2 [lib/shared.sh:93-95](@EXPORT@/lib/shared.sh:93-95): a range\n- P3 [a dir/a file.txt](@EXPORT@/a dir/a file.txt#L4): a spaced name\n- P3 see @EXPORT@/lib/x.sh:7 and `@EXPORT@/lib/y.sh`\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+reset; reply $'Changes README.\n\n- (non-blocking) [README:1](@EXPORT@/README:1): wrong text\n- (non-blocking) [lib/shared.sh:93-95](@EXPORT@/lib/shared.sh:93-95): a range\n- (non-blocking) [a dir/a file.txt](@EXPORT@/a dir/a file.txt#L4): a spaced name\n- (non-blocking) see @EXPORT@/lib/x.sh:7 and `@EXPORT@/lib/y.sh`\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 RUN_DIR=$(dirname "$(cat "$STUB/cwd")")
 check "a finding that cites the export is posted with repository links and no local path" '[ "$rc" = 2 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" && ! grep -qF "$RUN_DIR" "$STUB/comment.2" && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment.2" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment.2" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment.2"'
-check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- P3 see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(tail -n 1 "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
+check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(tail -n 1 "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
 check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(reply_in_fold)" = "Changes README.
 
-- P2 [README:1]($REPO_URL/README#L1): wrong text
-- P2 [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
-- P3 [a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name
-- P3 see lib/x.sh:7 and \`lib/y.sh\`
+- (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
+- (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
+- (non-blocking) [a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name
+- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`
 
 REVIEW RESULT: FINDINGS" ]'
-reset; reply $'- P3 not @EXPORT@-other/z or /Users/other/export/w\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
-check "a path that only starts with the export's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- P3 not $(cat "$STUB/cwd")-other/z or /Users/other/export/w" "$STUB/comment.2"'
+reset; reply $'- (non-blocking) not @EXPORT@-other/z or /Users/other/export/w\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+check "a path that only starts with the export's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- (non-blocking) not $(cat "$STUB/cwd")-other/z or /Users/other/export/w" "$STUB/comment.2"'
 reset; reply $'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @EXPORT@/lib/z.sh'; rc=$(run)
 check "an INCOMPLETE reason that names the export is posted and printed as a repository path" '[ "$rc" = 1 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" "$STUB/out" && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment.2" && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out"'
 
@@ -330,7 +330,7 @@ status() { (cd "$root/work tree" && "$mentat" status 7 2>&1); }
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "a review that finishes before CI posts its start comment and review only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && ! grep -q "not posted" "$STUB/out"'
 check "a posted review is Grok's one run" 'status | grep -q "grok: done,"'
-reset; reply $'- P1 README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
+reset; reply $'- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS'; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "CI failing after the review exits 4, posts nothing, not even the start comment, and names the failing check" '[ "$rc" = 4 ] && grok_ran && [ "$(comments)" = 0 ] && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out" && [ -z "$(left_over)" ]'
 check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(jq -r .text "$STUB/out_json")" ]'
 check "a review not posted for failed CI leaves Grok not run" 'status | grep -q "grok: none,"'
@@ -420,24 +420,24 @@ printf '# a comment\n\nStubCodename\nreview started on\ndid not finish on\n' >"$
 reset; rc=$(run)
 check "a start comment with a hit is not posted, is kept, and nothing is posted" '[ "$rc" = 1 ] && [ "$(comments)" = 0 ] && grok_ran && says_held "a configured private name" "review started on" && [ "$(cat "$(held_file)")" = "Grok review started on $H" ]'
 printf '# a comment\n\nStubCodename\ndid not finish on\n' >"$LIST"
-reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+reset; reply $'- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a failure comment with a hit is skipped, with no second try, and the review exits as not reviewed" '[ "$rc" = 1 ] && [ "$(comments)" = 1 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "not reviewed: the review was held back and not posted" "$STUB/out" && [ -z "$(left_over)" ]'
 printf '# a comment\n\nStubCodename\n' >"$LIST"
-reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+reset; reply $'- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a review with a word from the list is not posted, is kept whole, and the pull request says it did not finish" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && says_held "a configured private name" stubcodename && grep -q "^## Local Grok review of $H" "$(held_file)" && [ "$(cat "$STUB/comment.2")" = "Grok review did not finish on $H: the review was held back and not posted" ]'
-reset; reply "$(printf -- '- P3 at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOME")"; rc=$(run)
+reset; reply "$(printf -- '- (non-blocking) at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOME")"; rc=$(run)
 check "a review with the home path is the same" '[ "$rc" = 1 ] && [ "$(comments)" = 2 ] && says_held "a local path" "$HOME" && ! grep -qF "$HOME" "$STUB/comment.2"'
-reset; touch "$STUB/lookup_fails"; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+reset; touch "$STUB/lookup_fails"; reply $'- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a failed visibility lookup counts as public" '[ "$rc" = 1 ] && says_held "a configured private name" stubcodename && ! grep -rq stubcodename "$STUB"/comment.*'
-reset; touch "$STUB/private"; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+reset; touch "$STUB/private"; reply $'- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a private repository's review is posted" '[ "$rc" = 2 ] && grep -q "about stubcodename" "$STUB/comment.2"'
 check "a hit looks up the reviewed repository" 'grep -qF "repo view owner/repo --json isPrivate" "$STUB/calls"'
 reset; rc=$(run)
 check "no hit: posts, with no visibility lookup" '[ "$rc" = 0 ] && [ "$(comments)" = 2 ] && ! grep -q isPrivate "$STUB/calls"'
 rm "$LIST"
-reset; reply $'- P3 about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
+reset; reply $'- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 check "a missing word list never blocks" '[ "$rc" = 2 ] && grep -q "about stubcodename" "$STUB/comment.2"'
-reset; reply "$(printf -- '- P3 at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOME")"; rc=$(run)
+reset; reply "$(printf -- '- (non-blocking) at %s/notes.md\n\nREVIEW RESULT: FINDINGS' "$HOME")"; rc=$(run)
 check "with a missing word list the home path is still found" '[ "$rc" = 1 ] && says_held "a local path" "$HOME"'
 
 reset; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
