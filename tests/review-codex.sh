@@ -154,11 +154,13 @@ case "$1 $2" in
 esac
 STUBEOF
 # codex: records where it ran and what it read, and its run in the calls gh records, then replies with $STUB/reply.
+# Its output (the log mentat keeps) starts with $STUB/header, the run header Codex writes, when present.
 cat >"$root/tools/bin/codex" <<'STUBEOF'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] && { echo codex-stub; exit 0; }
 echo codex >>"$STUB/calls"
 printf '%s\n' "$@" >"$STUB/args"
+[ ! -f "$STUB/header" ] || cat "$STUB/header"
 cat >"$STUB/prompt"
 [ ! -f "$STUB/live" ] || "$LIVE_SELF" --probe
 git rev-parse HEAD >"$STUB/codex_head"; cat README >"$STUB/codex_readme"
@@ -258,6 +260,27 @@ check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "foun
 check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
 check "the bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
+# The model the record names comes only from the model: line of the header Codex writes at
+# the start of its run, between its two separator lines; nothing else from the log is posted.
+# $1 is the header's model line, or "" for none; the rest of the arguments follow the header.
+codex_header() {
+  local model="$1"
+  shift
+  { printf '%s\n' "" "OpenAI Codex v0.160.0 (research preview)" "--------" "workdir: /stub/workdir/codex-log-text"
+    [ -z "$model" ] || printf '%s\n' "$model"
+    printf '%s\n' "provider: openai" "approval: never" "sandbox: read-only" "reasoning effort: high" "--------" "$@"; } >"$STUB/header"
+}
+codex_model() { folded | grep -qxF -- "- Model: $1, reasoning effort high" && ! grep -q "codex-log-text\|provider: openai\|OpenAI Codex v" "$STUB/comment"; }
+reset; codex_header "model: gpt-stub-9.1"; rc=$(run)
+check "the record names the model from the header Codex wrote, with its effort, and no other log text" '[ "$rc" = 0 ] && codex_model gpt-stub-9.1'
+reset; rc=$(run)
+check "with no header in the log the record names the model unknown" '[ "$rc" = 0 ] && codex_model unknown'
+reset; codex_header "" user "model: opus"; rc=$(run)
+check "a model: line after the header, such as an echoed repository file, gives unknown" '[ "$rc" = 0 ] && codex_model unknown'
+reset; codex_header 'model: gpt-$(x) <b>&"stub"'"'"'/9:1_a.b'; rc=$(run)
+check "the header's model keeps only model-name characters" '[ "$rc" = 0 ] && codex_model "gpt-xbstub/9:1_a.b"'
+reset; codex_header "model: $(printf 'm%.0s' $(seq 100))"; rc=$(run)
+check "the header's model is capped at 64 characters" '[ "$rc" = 0 ] && codex_model "$(printf "m%.0s" $(seq 64))"'
 check "reviews the change from the merge base" 'grep -q "git diff $BASE $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Codex the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
 check "the prompt takes the intent from the Summary opening sentence, or the template equivalent" 'grep -q "its intent is the opening sentence of its Summary (or of the equivalent section of the repository.s own template)" "$STUB/prompt"'

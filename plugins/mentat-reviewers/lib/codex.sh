@@ -21,7 +21,18 @@ review_prep_codex() {
 # shellcheck disable=SC2154 # tmp and out are review_local's
 review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled; }
 review_meta_codex() {
-  printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "Codex default model" "$CODEX_EFFORT"
+  printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "$(codex_model "$tmp/codex.log")" "$CODEX_EFFORT"
+}
+# Prints the model Codex ran, from its log $1: the first "model: " line of the header Codex
+# writes at the start of its run, between its first two separator lines and within the
+# log's first 20 lines, so a model: line in what follows (the prompt it echoes, a file it
+# reads) is never taken. Only model-name characters are kept, at most 64; else unknown.
+# Nothing else from the log, which may hold a credential, is printed.
+codex_model() {
+  local m
+  m=$(awk 'NR > 20 { exit } /^--------/ { if (++s == 2) exit; next } s == 1 && /^model: / { sub(/^model: /, ""); print; exit }' "$1" 2>/dev/null |
+    tr -cd 'A-Za-z0-9._:/-' | head -c 64)
+  printf '%s' "${m:-unknown}"
 }
 
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
