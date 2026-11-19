@@ -10,7 +10,7 @@ One builder per pull request, in its worktree; the main session edits no files. 
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
-After "Ready to merge: #N", push nothing to #N until the maintainer answers your "Hold #N: <reason>".
+After "Ready to merge: #N", push nothing to #N until the maintainer answers your "Hold #N: <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word relay of it; about any other pull request, say what it waits on.
 
 After compaction or resume, reload the current skill and `helpers.md`.
 
