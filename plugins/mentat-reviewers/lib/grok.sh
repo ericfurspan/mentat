@@ -332,10 +332,11 @@ grok_keep_log() {
 # is Grok's raw output and may hold a credential, so it is not printed or posted.
 # After the start comment, the failure also says so on the pull request. A publish
 # check hit on that comment skips the post.
-# $2, optional, is for the local message only. Reads the caller's pr, repo, head,
-# started, err, out and ghome.
+# $2, optional, is for the local message only. $3, optional, is $1 without Grok's own
+# output, for the line that tells the maintainer now (not_reviewed, lib/shared.sh). Reads
+# the caller's pr, repo, head, started, err, out and ghome.
 grok_fail() {
-  local kept held=""
+  local kept held="" rest
   grok_keep_log
   if [ "$started" = yes ] && [ "${grok_stop:-no}" = yes ]; then
     held=$(held_comment "Grok stop review did not finish on $head: $1" "$repo") ||
@@ -344,7 +345,8 @@ grok_fail() {
     held=$(held_comment "Grok review did not finish on $head: $1" "$repo") ||
       gh pr comment "$pr" --body "Grok review did not finish on $head: $1" >/dev/null || printf 'mentat: could not post that Grok did not finish\n' >&2
   fi
-  not_reviewed "$1${2:+; $2}${held:+; $held}${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
+  rest="${2:+; $2}${held:+; $held}${kept:+; its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
+  not_reviewed "$1$rest" "${3:-$1}$rest"
 }
 
 # Runs Grok in the rebuilt environment under its time limit, and calls "$fail"
@@ -398,7 +400,7 @@ grok_reply() {
   local stop
   stop=$(jq -s -r 'if length == 1 and (.[0] | type) == "object" then (.[0].stopReason // "none" | tostring) else "none" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9_-' | head -c 40)
   if ! jq -s -e 'length == 1 and (.[0] | type) == "object" and .[0].stopReason == "end_turn" and (.[0].text | type) == "string" and (.[0].text | test("\\S"))' "$out" >/dev/null 2>&1; then
-    "$fail" "Grok did not return a complete review (stop reason: ${stop:-none})"
+    "$fail" "Grok did not return a complete review (stop reason: ${stop:-none})" "Grok did not return a complete review"
   fi
   jq -r '.text' "$out" >"$result_file" || "$fail" "could not read Grok's reply"
 }
@@ -425,9 +427,10 @@ grok_signin_failed() {
   case "$1" in "Grok is not signed in"* | "Grok's sign-in"*) reviewer_failed grok always ;; esac
   not_reviewed "$1"
 }
+# $2, when given, is $1 without Grok's own output, for the line that tells the maintainer now.
 grok_tool_failed() {
   reviewer_failed grok
-  grok_fail "$@"
+  grok_fail "$1" "" "${2:-}"
 }
 
 # Posts the checked reply on the pull request, after the start comment, and exits

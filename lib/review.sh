@@ -80,12 +80,13 @@ run_claude() {
   [ -s "$json" ] || "$fail" "Claude returned no output"
   n=$(jq -er 'if type == "object" then .subtype | strings else empty end' "$json" 2>/dev/null) ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
-  [ "$n" = success ] || "$fail" "Claude's run ended with $n, not success; $hint"
+  [ "$n" = success ] || "$fail" "Claude's run ended with $n, not success; $hint" "Claude's run did not end in success; $hint"
   jq -e '(.result | type) == "string" and (.permission_denials | type) == "array" and (.modelUsage | type) == "object"' "$json" >/dev/null 2>&1 ||
     "$fail" "Claude's output is not the JSON result it gives with --output-format json"
   [ "$(jq -r '.is_error // false' "$json")" = false ] || "$fail" "Claude reported an error${why:+: $why}; $hint" "Claude reported an error; $hint"
   n=$(jq -r '.permission_denials | length' "$json")
-  [ "$n" -eq 0 ] || "$fail" "Claude was denied $n tool call(s) ($(jq -r '[.permission_denials[].tool_name | strings] | unique | join(", ")' "$json")), so the review may not have read what it needed"
+  [ "$n" -eq 0 ] || "$fail" "Claude was denied $n tool call(s) ($(jq -r '[.permission_denials[].tool_name | strings] | unique | join(", ")' "$json")), so the review may not have read what it needed" \
+    "Claude was denied $n tool call(s), so the review may not have read what it needed"
   claude_models=$(jq -r '.modelUsage | keys | join(", ")' "$json")
   [ -n "$claude_models" ] || "$fail" "Claude's output does not say which model ran"
   jq -r .result "$json" >"$out" || "$fail" "could not read Claude's reply"
