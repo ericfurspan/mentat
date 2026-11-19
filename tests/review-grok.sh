@@ -161,6 +161,9 @@ if [ -f "$STUB/live" ]; then
 fi
 for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
 [ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
+# With $STUB/block_rewrite, a folder where the path rewrite writes its copy of the reply
+# (beside the export), so the rewrite fails.
+[ -f "$STUB/block_rewrite" ] && mkdir ../review.md.localized
 # @EXPORT@ in the reply becomes the export's path, which is where Grok works.
 sed "s|@EXPORT@|$(pwd -P)|g" "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
@@ -642,6 +645,10 @@ stub_reset; reply 'No result line here.'; rc=$(run 7)
 check "a Grok reply with no result line after a checked reply is the first failure in a row, not raised" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "fail owner/repo#7" ]'
 stub_reset; reply 'Partial.' max_turns; rc=$(cd "$root/work tree" && "$mentat" review --grok --stop 7 >"$STUB/out" 2>&1; echo $?)
 check "the stop review counts as Grok: its incomplete run is the second in a row, raised" '[ "$rc" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review (stop reason: max_turns)"'
+stub_reset; touch "$STUB/block_rewrite"; rc=$(run 8)
+check "a checked Grok reply whose paths cannot be rewritten is recorded as ok, then not reviewed (exit 1, not raised)" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: could not rewrite the paths in Grok'"'"'s reply" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#8" ]'
+stub_reset; echo 1 >"$STUB/exit_code"; rc=$(run 7)
+check "a Grok run failure after a checked reply whose paths could not be rewritten is the first in a row again, not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "fail owner/repo#7" ]'
 mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
 stub_reset; rm "$GH_USER/auth.json"; rc=$(XDG_CACHE_HOME="$root/badcache" run 7); reset_signin
 check "with a cache folder that cannot be used, a sign-in refusal is still raised, as one failure on this pull request" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'

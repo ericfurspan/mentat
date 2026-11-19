@@ -57,6 +57,13 @@ reviewer_failed() {
   review_raise="$who has failed $n $run in a row ($prs)"
 }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
+# Whether $1 is a final REVIEW RESULT line a review may end with.
+result_line() {
+  case "$1" in
+    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) return 0 ;;
+  esac
+  return 1
+}
 
 # The one background child a review command waits on (the model, Grok's sign-in refresh
 # or the pause between CI reads), set when it starts and cleared once it is reaped.

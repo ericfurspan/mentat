@@ -102,6 +102,9 @@ git rev-parse HEAD >"$STUB/model_head"; cat README >"$STUB/model_readme"
 # @TREE@, @TREEP@ and @DATA@ in the reply become the checkout's path as created and
 # resolved (macOS: /var and /private/var) and the data folder's.
 pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
+# With $STUB/block_rewrite, a folder where the path rewrite writes its copy of the reply
+# (beside the checkout), so the rewrite fails.
+[ -f "$STUB/block_rewrite" ] && mkdir ../review.md.localized
 echo "CLAUDE_CODE_PLUGIN_DIRS ${CLAUDE_CODE_PLUGIN_DIRS+set}" >"$STUB/env"
 echo "ANTHROPIC_API_KEY ${ANTHROPIC_API_KEY+set}" >>"$STUB/env"
 prev=""
@@ -699,6 +702,11 @@ stub_reset; printf 'I could not read the diff.\n\nREVIEW RESULT: INCOMPLETE - th
 check "an INCOMPLETE reply ends the run of failures too (exit 1, not raised)" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 fail_run 7
 check "a tool failure after an INCOMPLETE reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+reset; fail_run 7
+stub_reset; echo "$H2" >"$STUB/head"; touch "$STUB/block_rewrite"; rc=$(run 8)
+check "a checked reply whose paths cannot be rewritten is recorded as ok, then not reviewed (exit 1, not raised)" '[ "$rc" = 1 ] && grep -qx "mentat: not reviewed: could not rewrite the paths in Claude'"'"'s reply" "$STUB/out" && [ -z "$(raised)" ] && recorded "fail owner/repo#7 ok owner/repo#8 "'
+fail_run 7
+check "a tool failure after a checked reply whose paths could not be rewritten is the first in a row again, and is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && recorded "fail owner/repo#7 ok owner/repo#8 fail owner/repo#7 "'
 lines=$(wc -l <"$REC")
 stub_reset; rc=$(cd "$root/work" && "$mentat" review --request "$root/no such request" 7 >"$STUB/out" 2>&1; echo $?)
 check "a failure that is not the reviewer's (a request file that cannot be read) changes nothing in the record" '[ "$rc" = 1 ] && [ "$(wc -l <"$REC")" = "$lines" ] && [ -z "$(raised)" ]'

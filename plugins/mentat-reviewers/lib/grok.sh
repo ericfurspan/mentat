@@ -403,16 +403,18 @@ grok_reply() {
   jq -r '.text' "$out" >"$result_file" || "$fail" "could not read Grok's reply"
 }
 
-# Checks Grok's reply, in $result_file with its paths rewritten, and sets the
-# caller's result to its final REVIEW RESULT line.
+# Checks Grok's reply, as Grok returned it, into $result_file: a complete reply that
+# ends with a final REVIEW RESULT line.
 grok_check() {
   grok_reply
+  result_line "$(last_line "$result_file")" || grok_tool_failed "Grok's reply has no final REVIEW RESULT line"
+}
+# Rewrites the paths in the checked reply in $result_file and sets the caller's result to
+# its final REVIEW RESULT line.
+grok_localize() {
   localize_review_paths "$result_file" "$repo" "$head" "$run/export" "$cache/mentat/${run##*/}/export" || grok_fail "could not rewrite the paths in Grok's reply"
   result=$(last_line "$result_file")
-  case "$result" in
-    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
-    *) grok_tool_failed "Grok's reply has no final REVIEW RESULT line" ;;
-  esac
+  result_line "$result" || grok_fail "Grok's reply has no final REVIEW RESULT line"
 }
 
 # The review's own failure functions, which second opinions never use: a sign-in refusal
@@ -486,8 +488,10 @@ review_grok() {
   grok_exec
   grok_check
   fail=grok_fail
-  # A checked reply ends Grok's failures in a row, whether or not it is posted.
+  # A checked reply, as Grok returned it, ends Grok's failures in a row, whether or not it
+  # is posted; a failure from here on is not Grok's.
   reviewer_record grok ok
+  grok_localize
   wait_for_ci "$repo" "$head" "$result_file" "$pr" "$again"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run $again again" 3

@@ -237,14 +237,13 @@ review_local() {
 
   local out="$tmp/review.md" result url held
   "review_run_$reviewer"
+  result_line "$(last_line "$out")" || review_tool_failed "$name's reply has no final REVIEW RESULT line"
+  # A checked reply, as the reviewer returned it, ends the reviewer's failures in a row,
+  # whether or not it is posted; a failure from here on is not the reviewer's.
+  reviewer_record "$reviewer" ok
   localize_review_paths "$out" "$repo" "$head" "$tmp/tree" "$tmp/data" || not_reviewed "could not rewrite the paths in $name's reply"
   result=$(last_line "$out")
-  case "$result" in
-    "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
-    *) review_tool_failed "$name's reply has no final REVIEW RESULT line" ;;
-  esac
-  # A checked reply ends the reviewer's failures in a row, whether or not it is posted.
-  reviewer_record "$reviewer" ok
+  result_line "$result" || not_reviewed "$name's reply has no final REVIEW RESULT line"
   # The review ran without waiting for CI; it is posted only once CI passes on the same head.
   wait_for_ci "$repo" "$head" "$out" "$pr" "mentat review"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
