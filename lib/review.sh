@@ -135,7 +135,7 @@ review_run_claude() {
   review_model_claude
   hint="the review model is set with $claude_key (now $claude_model)"
   if [ "$claude_key" != MENTAT_FIRST_REVIEW_MODEL ]; then
-    run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$claude_model" "$hint"
+    run_claude "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed "$tmp/data" "$claude_model" "$hint"
     return
   fi
   fallback="the review default ($MENTAT_REVIEW_MODEL_DEFAULT)"
@@ -147,11 +147,19 @@ review_run_claude() {
   first_note="a first round runs again, on $fallback, only when Claude reports that no model ran"
   run_claude "$tmp/tree" "$tmp/prompt" "$out" first_round_not_reviewed "$tmp/data" "$claude_model" "$hint" \
     "reviewing once on $fallback" && return 0
-  run_claude "$tmp/tree" "$tmp/prompt" "$out" not_reviewed "$tmp/data" "$MENTAT_REVIEW_MODEL_DEFAULT" \
+  run_claude "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed "$tmp/data" "$MENTAT_REVIEW_MODEL_DEFAULT" \
     "this run was on $fallback, as no model ran on $claude_key (now $claude_model)"
 }
-# A first round's failure, with review_run_claude's note on why it is not run again.
-first_round_not_reviewed() { not_reviewed "$1; $first_note"; }
+# A first round's failure, with review_run_claude's note on why it is not run again. A
+# first run that is run again (no model ran) returns before this, so only the run that
+# ends the round is recorded.
+first_round_not_reviewed() { review_tool_failed "$1; $first_note"; }
+# A failure of the reviewer tool itself in review_local (reviewer, from its caller): recorded
+# as one of the reviewer's failures in a row (lib/shared.sh), then not reviewed.
+review_tool_failed() {
+  reviewer_failed "$reviewer"
+  not_reviewed "$1"
+}
 review_meta_claude() {
   # The models that ran, from Claude's report; the one asked for when none of them is it (a
   # fallback); and the first-round setting when it chose the model.
@@ -229,8 +237,10 @@ review_local() {
   result=$(last_line "$out")
   case "$result" in
     "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
-    *) not_reviewed "$name's reply has no final REVIEW RESULT line" ;;
+    *) review_tool_failed "$name's reply has no final REVIEW RESULT line" ;;
   esac
+  # A checked reply ends the reviewer's failures in a row, whether or not it is posted.
+  reviewer_record "$reviewer" ok
   # The review ran without waiting for CI; it is posted only once CI passes on the same head.
   wait_for_ci "$repo" "$head" "$out" "$pr" "mentat review"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"

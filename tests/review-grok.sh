@@ -181,13 +181,15 @@ unset MENTAT_REVIEW_ROUNDS
 reply() { # $1 text, $2 stop reason
   jq -n --arg t "$1" --arg s "${2:-end_turn}" '{text: $t, stopReason: $s, sessionId: "s", modelUsage: {"grok-stub": {}}}' >"$STUB/out_json"
 }
-reset() {
+# stub_reset clears the stubs' state; reset also clears the record of failures in a row.
+stub_reset() {
   rm -rf "${STUB:?}"/*
   echo "$H" >"$STUB/head"
   echo 0 >"$STUB/exit_code"
   reply $'The pull request changes README.\n\nNothing to flag.\n\nREVIEW RESULT: NO FINDINGS'
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
+reset() { stub_reset; rm -f "$cache"/mentat/reviewer-failures-*; }
 run() { (cd "$root/work tree" && "$mentat" review --grok "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 comments() { find "$STUB" -name 'comment.*' | wc -l | tr -d ' '; }
 grok_ran() { [ -f "$STUB/args" ]; }
@@ -216,7 +218,8 @@ esac
 RACEEOF
 chmod +x "$root/racebin/git"
 race() { PATH="$root/racebin:$PATH" run; }
-left_over() { ls -A "$cache/mentat" 2>/dev/null; }
+# What a run left in the cache folder besides the record of failures in a row, which stays.
+left_over() { find "$cache/mentat" -mindepth 1 -maxdepth 1 ! -name reviewer-failures-grok 2>/dev/null; }
 
 reset; rc=$(run)
 check "no findings exits 0 and posts the start record, then the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment/2" "$STUB/out" && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "^## Local Grok review of $H" "$STUB/comment.2"'
@@ -227,7 +230,7 @@ check "the posted review is Grok's text, with its version and model" 'grep -q "N
 grok_effort() { [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args" | tail -n 1)" = "$1" ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args")" = 1 ] && folded | grep -qx -- "- Reasoning effort asked for: $1"; }
 reset; rc=$(unset MENTAT_GROK_REASONING_EFFORT; run)
 check "without MENTAT_GROK_REASONING_EFFORT Grok runs with --reasoning-effort high, and the record names high as asked for" '[ "$rc" = 0 ] && grok_effort high'
-reset; rc=$(MENTAT_GROK_REASONING_EFFORT= run)
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT='' run)
 check "MENTAT_GROK_REASONING_EFFORT set but empty runs Grok with --reasoning-effort high" '[ "$rc" = 0 ] && grok_effort high'
 reset; rc=$(MENTAT_GROK_REASONING_EFFORT=medium run)
 check "MENTAT_GROK_REASONING_EFFORT=medium runs Grok with --reasoning-effort medium, and the record names medium" '[ "$rc" = 0 ] && grok_effort medium'
@@ -618,6 +621,31 @@ echo x >"$TMPDIR/mentat-held-comment.old" && touch -t "$(date -v-10085M +%Y%m%d%
 reset; rc=$(run)
 check "at start, deletes a Grok run folder older than a day and a held comment older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-review.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
 rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
+
+# Grok's failures in a row, its stop review's included, are kept in its own record: a sign-in
+# refusal is raised at once, and any other failure from the second in a row.
+REC="$cache/mentat/reviewer-failures-grok"
+raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
+git -C "$root/seed" push -q "$root/origin.git" "$H:refs/pull/8/head"
+reset; rm "$GH_USER/auth.json"; rc=$(run 7); reset_signin
+check "a Grok sign-in refusal is raised at once: exit 1, one line naming Grok, one failure, the pull request and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ] && grep -qx "mentat: not reviewed: Grok is not signed in: there is no auth.json in its home (run grok login)" "$STUB/out" && [ "$(cut -d" " -f2- "$REC")" = "fail owner/repo#7" ] && ! grok_ran'
+stub_reset; echo 1 >"$STUB/exit_code"; rc=$(run 8)
+check "a Grok run failure next is the second in a row: raised with both pull requests and its kept log by path only, no log text" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && ! grep -q "SECRET-LOG-TEXT\|DEBUG-LOG-TEXT" "$STUB/out"'
+lines=$(wc -l <"$REC")
+stub_reset; jq -n --arg b "Grok review started on $H" '[{user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; rc=$(run 7)
+check "an already-reviewed refusal changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "Grok already reviewed #7" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+stub_reset; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run 7); reset_signin
+check "a time limit that is not a number changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "could not work out when Grok" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
+check "a checked Grok reply ends the run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+stub_reset; reply 'No result line here.'; rc=$(run 7)
+check "a Grok reply with no result line after a checked reply is the first failure in a row, not raised" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "fail owner/repo#7" ]'
+stub_reset; reply 'Partial.' max_turns; rc=$(cd "$root/work tree" && "$mentat" review --grok --stop 7 >"$STUB/out" 2>&1; echo $?)
+check "the stop review counts as Grok: its incomplete run is the second in a row, raised" '[ "$rc" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review (stop reason: max_turns)"'
+mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
+stub_reset; rm "$GH_USER/auth.json"; rc=$(XDG_CACHE_HOME="$root/badcache" run 7); reset_signin
+check "with a cache folder that cannot be used, a sign-in refusal is still raised, as one failure on this pull request" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
+reset
 
 # Outside reviewers off, or unknown, on main: plain and --stop runs are refused (exit 6)
 # before anything else. Each has an origin with pull request 7 and a clone of its own,

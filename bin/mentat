@@ -10,6 +10,12 @@
 #     When no CI check ran on the head, a line says so.
 #     A comment that holds a local path or a private name, in a public repository, is
 #     kept in a local file and not posted (exit 1).
+#     Each reviewer's failures in a row on this machine (its tool failing, timing out or
+#     giving no usable reply or result line, and a Grok sign-in refusal) are kept in
+#     reviewer-failures-<claude|codex|grok> in Mentat's cache folder (XDG_CACHE_HOME, else
+#     ~/.cache); a checked reply ends the run. A Grok sign-in refusal, and a second or later
+#     failure in a row, also print one line starting "mentat: tell the maintainer now:" with
+#     the reviewer, the count, the pull requests and the reason (still exit 1).
 #     Claude runs in a fresh context, with read tools only, at --effort high, on MENTAT_REVIEW_MODEL (unset,
 #     the review default in lib/review.sh), or, with MENTAT_FIRST_REVIEW_MODEL set, on that
 #     model while the pull request has no local round (as mentat status counts them), and,

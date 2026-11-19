@@ -25,7 +25,9 @@
 # `mentat second-opinion --web` runs it on any question with web search alone: no file tools and
 # an empty export. The functions below that they share (grok_signin, grok_run_folder,
 # grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
-# function named in `fail`: not_reviewed before Grok runs, grok_fail from then on.
+# function named in `fail`: not_reviewed before Grok runs, grok_fail from then on; the
+# review passes its own (grok_signin_failed, grok_tool_failed), which also record Grok's
+# failures in a row.
 # The pull-request steps (reading it, the diff prompt, the start comment, the
 # did-not-finish comment and posting) stay in review_grok's own functions.
 # Convention: these functions set the caller's variables by name and never return
@@ -409,8 +411,21 @@ grok_check() {
   result=$(last_line "$result_file")
   case "$result" in
     "REVIEW RESULT: NO FINDINGS" | "REVIEW RESULT: FINDINGS" | "REVIEW RESULT: INCOMPLETE - "*[![:space:]]*) ;;
-    *) grok_fail "Grok's reply has no final REVIEW RESULT line" ;;
+    *) grok_tool_failed "Grok's reply has no final REVIEW RESULT line" ;;
   esac
+}
+
+# The review's own failure functions, which second opinions never use: a sign-in refusal
+# (grok_signin's, told apart by how it starts) is one of Grok's failures in a row and is
+# always raised; Grok's run failing from then on is one too (lib/shared.sh). Any other
+# stop records nothing.
+grok_signin_failed() {
+  case "$1" in "Grok is not signed in"* | "Grok's sign-in"*) reviewer_failed grok always ;; esac
+  not_reviewed "$1"
+}
+grok_tool_failed() {
+  reviewer_failed grok
+  grok_fail "$@"
 }
 
 # Posts the checked reply on the pull request, after the start comment, and exits
@@ -459,15 +474,20 @@ review_grok() {
   sweep_leftovers
   review_traps
   read_request "$pr"
+  fail=grok_signin_failed
   grok_prepare
+  fail=not_reviewed
   grok_run_folder
   grok_export_head
   grok_pr_prompt
   grok_home
   grok_args
-  fail=grok_fail
+  fail=grok_tool_failed
   grok_exec
   grok_check
+  fail=grok_fail
+  # A checked reply ends Grok's failures in a row, whether or not it is posted.
+  reviewer_record grok ok
   wait_for_ci "$repo" "$head" "$result_file" "$pr" "$again"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
   [ "$now" = "$head" ] || die "the head moved from $head; run $again again" 3

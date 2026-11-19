@@ -128,12 +128,14 @@ chmod +x "$root/tools/bin/gh" "$root/tools/bin/claude"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 
-reset() {
+# stub_reset clears the stubs' state; reset also clears the record of failures in a row.
+stub_reset() {
   rm -f "$STUB"/*
   echo "$H" >"$STUB/head"
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
+reset() { stub_reset; rm -f "$XDG_CACHE_HOME"/mentat/reviewer-failures-*; }
 run() { (cd "$root/work" && "$mentat" review "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
 # The posted review: a heading line, then the bullets and the reply folded; the reply's own
@@ -674,5 +676,57 @@ reset; rc=$(run)
 check "at start, deletes Grok run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/grok-review.old" ] && [ ! -e "$c/grok-opinion.old" ] && [ ! -e "$c/grok-opinion-web.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ] && [ ! -e "$TMPDIR/mentat-grok-log.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
 check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/grok-review.new/f" ] && [ -f "$c/grok-reviewx/f" ] && [ -L "$c/grok-review.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-codex-log.new" ] && [ -f "$TMPDIR/mentat-codex-logs" ] && [ -L "$TMPDIR/mentat-grok-log.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
 rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
+
+# Each reviewer keeps its failures in a row on this machine, one line per run that counts,
+# in Mentat's cache folder; from the second failure in a row a line tells the maintainer now.
+REC="$XDG_CACHE_HOME/mentat/reviewer-failures-claude"
+raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
+# The record's lines without their timestamps, on one line; every line has one.
+recorded() { ! grep -qv '^[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z ' "$REC" && [ "$(cut -d" " -f2- "$REC" | tr '\n' ' ')" = "$1" ]; }
+fail_run() { stub_reset; echo "${2:-$H}" >"$STUB/head"; echo 3 >"$STUB/exit"; rc=$(run "${1:-7}"); }
+NOT_REVIEWED_3="mentat: not reviewed: claude exited with status 3: Nothing to flag.; the review model is set with MENTAT_REVIEW_MODEL (now opus)"
+reset; fail_run 7
+check "a first tool failure is recorded and not raised: exit 1 and the not-reviewed line alone, as before" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && recorded "fail owner/repo#7 "'
+fail_run 8 "$H2"
+check "a second tool failure in a row, on another pull request, adds one line telling the maintainer now: Claude, the count, both pull requests and the reason (exit 1)" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7, owner/repo#8): claude exited with status 3: Nothing to flag.; the review model is set with MENTAT_REVIEW_MODEL (now opus)" ] && grep -q "^mentat: not reviewed: claude exited with status 3" "$STUB/out" && recorded "fail owner/repo#7 fail owner/repo#8 "'
+fail_run 7
+check "a third in a row names each pull request once" '[ "$rc" = 1 ] && raised | grep -qF "Claude has failed 3 times in a row (owner/repo#7, owner/repo#8): "'
+stub_reset; rc=$(run 7)
+check "a checked reply ends the run of failures" '[ "$rc" = 0 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+fail_run 7
+check "a tool failure after a checked reply is the first in a row again, and is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+stub_reset; printf 'I could not read the diff.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; rc=$(run 7)
+check "an INCOMPLETE reply ends the run of failures too (exit 1, not raised)" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+fail_run 7
+check "a tool failure after an INCOMPLETE reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+lines=$(wc -l <"$REC")
+stub_reset; rc=$(cd "$root/work" && "$mentat" review --request "$root/no such request" 7 >"$STUB/out" 2>&1; echo $?)
+check "a failure that is not the reviewer's (a request file that cannot be read) changes nothing in the record" '[ "$rc" = 1 ] && [ "$(wc -l <"$REC")" = "$lines" ] && [ -z "$(raised)" ]'
+stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
+check "a checked reply ends the run even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+fail_run 7
+stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
+check "a reply with no result line is a tool failure, raised as the second in a row" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude'"'"'s reply has no final REVIEW RESULT line" ]'
+# A first round whose model did not run is run once more; only that run's outcome counts.
+reset; echo fable >"$STUB/nostart"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
+check "a first round run again on the review default records only the second run's outcome" '[ "$rc" = 0 ] && recorded "ok owner/repo#7 "'
+reset; echo fable >"$STUB/nostart"; echo 3 >"$STUB/exit"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
+check "a first round run again whose second run fails records one failure" '[ "$rc" = 1 ] && recorded "fail owner/repo#7 "'
+# A record that cannot be written changes neither the exit status nor the message.
+mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
+reset; fail_run 7; rc=$(XDG_CACHE_HOME="$root/badcache" run 7)
+check "with a cache folder that cannot be written, a failure exits 1 with the not-reviewed line alone" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && [ -f "$root/badcache/mentat" ] && recorded "fail owner/repo#7 "'
+reset; echo 3 >"$STUB/exit"; rc=$(XDG_CACHE_HOME=relative-cache run 7)
+check "a cache folder that is not an absolute path is not written, and the failure is reported as before" '[ "$rc" = 1 ] && [ "$(cat "$STUB/out")" = "$NOT_REVIEWED_3" ] && [ ! -e "$root/work/relative-cache" ] && [ ! -e "$REC" ]'
+# Runs at the same time each add their own line: one small append each.
+reset; (
+  # shellcheck source=/dev/null
+  . "$(dirname "$mentat")/../lib/shared.sh" || exit 1
+  repo=owner/repo
+  for i in $(seq 30); do pr=$i reviewer_record claude fail & done
+  wait
+)
+check "30 records written at the same time are all kept, one line each" '[ "$(wc -l <"$REC" | tr -d " ")" = 30 ] && [ "$(cut -d" " -f3 "$REC" | sort -u | wc -l | tr -d " ")" = 30 ]'
+reset
 
 [ "$failures" -eq 0 ]

@@ -186,12 +186,14 @@ chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex" "$root/tools/bin/claude"
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
 unset MENTAT_REVIEW_ROUNDS
 
-reset() {
+# stub_reset clears the stubs' state; reset also clears the record of failures in a row.
+stub_reset() {
   rm -f "$STUB"/*
   echo "$H" >"$STUB/head"
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n' >"$STUB/reply"
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
+reset() { stub_reset; rm -f "$XDG_CACHE_HOME"/mentat/reviewer-failures-*; }
 run() { (cd "$root/work" && "$mentat" review --codex "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
 # The posted review: a heading line, then the bullets and the reply folded; the reply's own
@@ -591,6 +593,25 @@ kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
 check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
+
+# Codex's failures in a row are kept in its own record; from the second, a line tells the
+# maintainer now. A refusal of where Codex is installed is not Codex's failure.
+REC="$XDG_CACHE_HOME/mentat/reviewer-failures-codex"
+raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
+reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run 7)
+check "a first Codex failure (its time limit) is recorded and not raised" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex did not finish within 0 seconds" "$STUB/out" && [ -z "$(raised)" ] && [ "$(cut -d" " -f2- "$REC")" = "fail owner/repo#7" ]'
+stub_reset; echo "$H2" >"$STUB/head"; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 8)
+check "a second Codex failure in a row (no result line), on another pull request, is raised naming Codex, both pull requests and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Codex has failed 2 times in a row (owner/repo#7, owner/repo#8): Codex'"'"'s reply has no final REVIEW RESULT line" ] && [ ! -e "$XDG_CACHE_HOME/mentat/reviewer-failures-claude" ]'
+lines=$(wc -l <"$REC")
+mkdir -p "$HOME/bin" && cp "$root/tools/bin/codex" "$HOME/bin/codex"
+stub_reset; rc=$(PATH="$HOME/bin:$PATH" run 7)
+rm -rf "${HOME:?}/bin"
+check "a refusal of where Codex is installed changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "installed in or above the home folder" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+stub_reset; rc=$(run 7)
+check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
+check "a Codex failure after a checked reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+reset
 
 # At start, Grok run folders older than a day, and kept logs and held comments older than
 # seven days, are deleted. Newer ones, other names, symlinks and their targets stay.

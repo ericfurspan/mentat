@@ -258,7 +258,7 @@ reset; rc=$(MENTAT_GROK_REASONING_EFFORT=medium run "$idea")
 check "MENTAT_GROK_REASONING_EFFORT=medium passes --reasoning-effort medium to Grok" '[ "$rc" = 0 ] && grok_effort medium'
 reset; rc=$(unset MENTAT_GROK_REASONING_EFFORT; run "$idea")
 check "without MENTAT_GROK_REASONING_EFFORT Grok gets --reasoning-effort high" '[ "$rc" = 0 ] && grok_ran && grok_effort high'
-reset; rc=$(MENTAT_GROK_REASONING_EFFORT= run "$idea")
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT='' run "$idea")
 check "MENTAT_GROK_REASONING_EFFORT set but empty gives Grok --reasoning-effort high" '[ "$rc" = 0 ] && grok_ran && grok_effort high'
 check "a Codex timeout of 0 does not limit Grok" 'reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run "$idea"); [ "$rc" = 0 ] && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout"'
 reset; rc=$(GROK_HOME="$root/no grok home" run "$idea")
@@ -435,5 +435,8 @@ stale=$("$real_git" -C "$F" commit-tree -p HEAD -m stale "HEAD^{tree}") && "$rea
 FETCH_FAILED_LINE=$(unknown_line "origin's default branch trunk could not be fetched")
 reset; rc=$(run_in)
 check "a failed fetch is no second opinion (exit 6), saying why, though a local origin/<default> turns outside reviewers on, and nothing ran" '[ "$rc" = 6 ] && [ "$(cat "$STUB/stderr")" = "$FETCH_FAILED_LINE" ] && [ ! -s "$STUB/stdout" ] && ! codex_ran && ! grok_ran && [ -z "$("$real_git" -C "$F" for-each-ref refs/mentat)" ]'
+# Only mentat review keeps a record of reviewer failures: every run above, its Codex and Grok
+# failures and sign-in refusals included, left none, and no line told the maintainer now.
+check "second opinions write no record of reviewer failures and raise nothing" '[ -z "$(find "$cache" -name "reviewer-failures-*")" ] && ! grep -rq "tell the maintainer now" "$STUB"'
 
 [ "$failures" -eq 0 ]

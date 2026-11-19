@@ -18,8 +18,10 @@ review_prep_codex() {
   printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
   printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
 }
+# A failure of Codex's own run is one of its failures in a row (review_tool_failed, in
+# core's lib/review.sh); a refusal of where Codex is installed is not.
 # shellcheck disable=SC2154 # tmp and out are review_local's
-review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" not_reviewed disabled; }
+review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed disabled "" not_reviewed; }
 review_meta_codex() {
   printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "$(codex_model "$tmp/codex.log")" "$CODEX_EFFORT"
 }
@@ -119,12 +121,13 @@ codex_prefixes() {
 # practice; "live" for a second opinion with --web, which asks any question. Search
 # runs on OpenAI's side, outside the permissions profile below. $6 is optional:
 # "outside" adds --skip-git-repo-check, for the --web mode, which runs in an empty folder that is not a repository (Codex refuses
-# to start there otherwise). Every other caller passes nothing.
+# to start there otherwise). Every other caller passes nothing. $7, optional, is the
+# function codex_prefixes calls in place of $4 when it refuses where Codex is installed.
 run_codex() {
   local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes outside=()
   if [ "${6:-}" = outside ]; then outside=(--skip-git-repo-check); fi
   log="${out%/*}/codex.log"
-  codex_prefixes "$fail"
+  codex_prefixes "${7:-$fail}"
   filesystem=$(codex_filesystem "$dir" "$prefixes")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
   # final reply, so it cannot end with the status line the callers check.
