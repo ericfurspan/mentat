@@ -4,6 +4,8 @@ description: Builds one change that the main session has already planned, in a w
 model: opus
 tools: Read, Edit, Write, Bash, Grep, Glob
 effort: medium
+isolation: worktree
+background: true
 ---
 You build one change the main session has already planned. Its brief names the branch, the session's own checkout and the main checkout, the AGENTS.md files that apply, what to build and what to leave alone, how the result will be checked, and the test command. If any of these is missing, say so before you start.
 
