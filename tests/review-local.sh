@@ -713,7 +713,7 @@ check "a first round run again on the review default records only the second run
 reset; echo fable >"$STUB/nostart"; echo 3 >"$STUB/exit"; rc=$(MENTAT_FIRST_REVIEW_MODEL=fable run)
 check "a first round run again whose second run fails records one failure" '[ "$rc" = 1 ] && recorded "fail owner/repo#7 "'
 # The raise line holds no text from Claude's reply; the not-reviewed line keeps it.
-CANARY=CANARY-REVIEWER-TEXT-4821
+CANARY="CANARY-REVIEWER-TEXT-4821"
 canary_run() { # $1: exit; $2: raw JSON or empty; the rest: env for the run
   local e=$1 raw=$2; shift 2
   stub_reset; echo "$e" >"$STUB/exit"; printf '%s\n\nREVIEW RESULT: NO FINDINGS\n' "$CANARY" >"$STUB/reply"
@@ -749,9 +749,11 @@ raced() {
     # shellcheck source=/dev/null
     . "$(dirname "$mentat")/../lib/shared.sh" || exit 1
     eval "own_$(declare -f reviewer_record)"
+    # shellcheck disable=SC2329 # reviewer_failed calls it
     reviewer_record() { own_reviewer_record "$@" && printf '%s\n' "$other" >>"$REC"; }
     other=$1 repo=owner/repo pr=7
     reviewer_failed claude
+    # shellcheck disable=SC2154 # set by reviewer_failed in lib/shared.sh
     printf '%s\n' "$review_raise"
   )
 }
