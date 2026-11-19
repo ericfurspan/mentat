@@ -221,6 +221,15 @@ check "no findings exits 0 and posts the start record, then the review" '[ "$rc"
 check "the review opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment.2")" = "" ] && [ "$(sed -n 3p "$STUB/comment.2")" = "<details><summary>Full review</summary>" ]'
 check "the six bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" && folded | grep -qx -- "- Run locally by the agent, with file-reading tools and no shell." && [ "$(reply_in_fold)" = "$(jq -r .text "$STUB/out_json")" ]'
 check "the posted review is Grok's text, with its version and model" 'grep -q "Nothing to flag." "$STUB/comment.2" && grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" "$STUB/comment.2" && grep -qx -- "- Model: grok-stub" "$STUB/comment.2" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment.2"'
+# Grok's effort: high unless MENTAT_GROK_REASONING_EFFORT names another level; set but empty is high too.
+grok_effort() { [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args" | tail -n 1)" = "$1" ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args")" = 1 ] && folded | grep -qx -- "- Reasoning effort asked for: $1"; }
+reset; rc=$(unset MENTAT_GROK_REASONING_EFFORT; run)
+check "without MENTAT_GROK_REASONING_EFFORT Grok runs with --reasoning-effort high, and the record names high as asked for" '[ "$rc" = 0 ] && grok_effort high'
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT= run)
+check "MENTAT_GROK_REASONING_EFFORT set but empty runs Grok with --reasoning-effort high" '[ "$rc" = 0 ] && grok_effort high'
+reset; rc=$(MENTAT_GROK_REASONING_EFFORT=medium run)
+check "MENTAT_GROK_REASONING_EFFORT=medium runs Grok with --reasoning-effort medium, and the record names medium" '[ "$rc" = 0 ] && grok_effort medium'
+reset; rc=$(run)
 check "the per-run folder is gone afterward" '[ -z "$(left_over)" ]'
 check "runs in the export, with the prompt from a file and the JSON output" '[ "$(sed -n "/^--cwd\$/{n;p;}" "$STUB/args")" = "$(cat "$STUB/cwd")" ] && grep -qx -- "--prompt-file" "$STUB/args" && [ "$(grep -x -A1 -- "--output-format" "$STUB/args" | tail -n 1)" = json ]'
 check "exports the head's files, with no .git, matching the commit" '[ ! -f "$STUB/has_git" ] && ! grep -q "\.git/" "$STUB/export_files" && [ "$(sed "s#^\./##" "$STUB/export_files" | sort)" = "$(git -C "$root/seed" ls-tree -r --name-only "$H" | sort)" ] && [ "$(cat "$STUB/export_copy/README")" = change ]'

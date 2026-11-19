@@ -36,8 +36,9 @@ GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
 GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
-# Empty leaves Grok's own default; otherwise passed as --reasoning-effort (the value is not checked).
-GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-}"
+# Always passed as --reasoning-effort: high when the setting is unset or empty, else its
+# value (not checked; a review's record names it, in safe characters, as the level asked for).
+GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-high}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
 # Grok reviews a pull request once, and once more as the stop review (the caller's
@@ -306,9 +307,7 @@ grok_args() {
     d=$(dirname "$d")
     args+=(--deny "Read($d)" --deny "Grep($d)")
   done
-  if [ -n "$GROK_REASONING_EFFORT" ]; then
-    args+=(--reasoning-effort "$GROK_REASONING_EFFORT")
-  fi
+  args+=(--reasoning-effort "$GROK_REASONING_EFFORT")
 }
 
 # Keeps a copy of Grok's raw log for the maintainer and sets the caller's kept to
@@ -426,7 +425,8 @@ grok_post() {
     printf '<details><summary>Full review</summary>\n\n'
     printf -- '- Change reviewed: %s..%s\n' "$mb" "$head"
     printf -- '- Agreed request fingerprint: %s\n' "$request_fp"
-    printf -- '- Grok CLI: %s\n- Model: %s\n- Time: %s\n' "$("$grok_bin" --version 2>/dev/null | head -n 1)" "$model" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf -- '- Grok CLI: %s\n- Model: %s\n- Reasoning effort asked for: %s\n- Time: %s\n' "$("$grok_bin" --version 2>/dev/null | head -n 1)" "$model" \
+      "$(printf '%s' "$GROK_REASONING_EFFORT" | tr -cd 'A-Za-z0-9._-' | head -c 32)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '- Run locally by the agent, with file-reading tools and no shell.\n\n---\n\n'
     cat "$result_file"
     printf '\n</details>\n\n%s\n' "$result"

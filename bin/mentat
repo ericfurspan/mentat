@@ -27,9 +27,10 @@
 #     `mentat review --grok --stop <PR>` is the one other run, also once per pull request:
 #     the same review, whose comments say "Grok stop review" in place of "Grok review".
 #     A plain --grok is refused once this account's stop review started.
-#     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Set
-#     MENTAT_GROK_REASONING_EFFORT to pass --reasoning-effort to Grok (second-opinion too);
-#     unset leaves Grok's default.
+#     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Grok runs with
+#     --reasoning-effort high, in reviews and second opinions alike, unless
+#     MENTAT_GROK_REASONING_EFFORT names another level (set but empty is high too); the
+#     review's record names the level asked for.
 #     All take `--request <file>` and `--require-ci` after the mode, if any, in any order
 #     with --stop:
 #     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran,
@@ -75,7 +76,7 @@
 #     fetches origin's default branch into a private ref, leaving origin/<default> and
 #     FETCH_HEAD as they are. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
-#     MENTAT_GROK_REASONING_EFFORT sets Grok's effort. Grok may use its backend web search here
+#     Grok's effort is high unless MENTAT_GROK_REASONING_EFFORT names another level. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied.
 #   mentat second-opinion --web <question file>  Has Codex and Grok
 #     each answer any question, in parallel, each in an empty folder with no files and no
