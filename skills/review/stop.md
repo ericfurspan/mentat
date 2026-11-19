@@ -2,7 +2,7 @@
 
 Read this at the end of every review round, on resume and after a compaction, from `mentat:review`.
 
-A stop is pending after any completed round from round three on that posted findings, Codex's included, fixed or answered alike, until it is settled or answered. A round with no findings from either review goes to the final check. The last round within the limit has no stop: "Round limit" applies. Once "Ready to merge: #N" was given, `after-ready.md` applies instead.
+A stop is pending after any completed round from round three on that posted findings, Codex's included, fixed or answered alike, until it is settled or answered. A round with no findings from either review goes to the final check. After the last round within the limit, "Round limit" applies instead of settling or asking. Once "Ready to merge: #N" was given, `after-ready.md` applies instead.
 
 ## Order
 
@@ -36,7 +36,7 @@ At any round, new evidence that the change cannot meet its goal sets `Blocked: <
 
 ## Durable pause
 
-A settled stop is recorded once, before its fixes are commissioned, as one line in the description's Calls made without the maintainer (`mentat:pr`) naming its round and that it went on. A stop that asks gets one Review details line (`mentat:pr`) instead, recording the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads both before fixing or announcing Ready. The session that has the pull request records the answer there; the session the maintainer answered in records it on the backlog item as their decision, its decisions line (`mentat:backlog` "Item shape"), and, with an external backlog, ends the stop's wait (`mentat:backlog` "Marking a wait").
+A settled stop is recorded once, before its fixes are commissioned, as one line in the description's Calls made without the maintainer (`mentat:pr`) naming its round and that it went on. A stop that asks gets one Review details line (`mentat:pr`) instead, recording the round, the head, the pending findings, Grok's stop result and the answer, `pending` until given. A resumed session reads both before fixing or announcing Ready. The session that has the pull request records the answer in that Review details line; the session the maintainer answered in records it on the backlog item as their decision, its decisions line (`mentat:backlog` "Item shape"), and, with an external backlog, ends the stop's wait (`mentat:backlog` "Marking a wait").
 
 ## Started sessions
 
