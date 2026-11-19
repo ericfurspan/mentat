@@ -194,13 +194,15 @@ reset() {
 }
 run() { (cd "$root/work" && "$mentat" review --codex "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 posted() { [ -f "$STUB/comment" ]; }
-# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+# The posted review: a heading line, then the bullets and the reply folded; the reply's own
+# result line is the last line inside the fold, and nothing follows the fold.
 heading() { [ "$(head -n 1 "$STUB/comment")" = "## Local Codex review of $H: $1, spec fingerprint ${2:-none}" ]; }
 folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment"; }
+# The last non-blank line before the fold closes, in file $1.
+last_in_fold() { grep -v '^[[:space:]]*$' "$1" | tail -n 2 | head -n 1; }
 fold_shape() { # $1 the final REVIEW RESULT line
-  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 3 "$STUB/comment")" = "</details>
-
-$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(tail -n 1 "$STUB/comment")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment" | tail -n 1)" = "$1" ]
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 1 "$STUB/comment")" = "</details>" ] &&
+    [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(last_in_fold "$STUB/comment")" = "$1" ] && [ "$(grep -cxF -- "$1" "$STUB/comment")" = 1 ]
 }
 
 # A git that, right after any fetch of pull/7/head, also fetches main in the same checkout:
@@ -258,7 +260,7 @@ check "a reply without a result line is not reviewed before any wait for CI" '[ 
 reset; rc=$(run)
 check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
 check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
-check "the bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
+check "the bullets and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
 # The model the record names comes only from the model: line of the header Codex writes at
 # the start of its run, between its two separator lines; nothing else from the log is posted.
@@ -385,8 +387,8 @@ REPLYEOF
 rc=$(run)
 check "a finding that cites the temporary checkout is posted with repository links and no temporary path" '[ "$rc" = 2 ] && ! leaked && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment"'
 check "a plain mention of the temporary checkout, bare or in code, becomes the repository path" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment"'
-check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(tail -n 1 "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
-check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
+check "the rewrite leaves the rest of the review and its final result line alone" 'grep -qx "Changes README." "$STUB/comment" && [ "$(last_in_fold "$STUB/comment")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with its result line last inside the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "Changes README.
 
 - (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
 - (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range
@@ -439,7 +441,7 @@ check "a checkout path with spaces and special characters is rewritten, and only
 held_file() { sed -n 's/.*the maintainer can read it at //p' "$STUB/out"; }
 held() { # $1 category, $2 the match: not posted, not reviewed, kept whole, and no message repeats it
   [ "$rc" = 1 ] && ! posted && grep -q "not reviewed: the comment holds $1, so it was not posted" "$STUB/out" &&
-    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(tail -n 1 "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
+    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(last_in_fold "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
 }
 printf '# a comment\n\nStubCodename\n' >"$LIST"
 reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)

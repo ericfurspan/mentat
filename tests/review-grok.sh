@@ -191,13 +191,15 @@ reset() {
 run() { (cd "$root/work tree" && "$mentat" review --grok "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
 comments() { find "$STUB" -name 'comment.*' | wc -l | tr -d ' '; }
 grok_ran() { [ -f "$STUB/args" ]; }
-# The posted review: a heading line, then the bullets and the reply folded, then the result line.
+# The posted review: a heading line, then the bullets and the reply folded; the reply's own
+# result line is the last line inside the fold, and nothing follows the fold.
 heading() { [ "$(head -n 1 "$STUB/comment.2")" = "## Local Grok review of $H: $1, spec fingerprint ${2:-none}" ]; }
 folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment.2"; }
+# The last non-blank line before the fold closes, in file $1.
+last_in_fold() { grep -v '^[[:space:]]*$' "$1" | tail -n 2 | head -n 1; }
 fold_shape() { # $1 the final REVIEW RESULT line
-  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment.2")" = blank ] && [ "$(tail -n 3 "$STUB/comment.2")" = "</details>
-
-$1" ] && [ "$(grep -c '^</details>$' "$STUB/comment.2")" = 1 ] && [ "$(tail -n 1 "$STUB/comment.2")" = "$1" ] && [ "$(grep -v '^[[:space:]]*$' "$STUB/comment.2" | tail -n 1)" = "$1" ]
+  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment.2")" = blank ] && [ "$(tail -n 1 "$STUB/comment.2")" = "</details>" ] &&
+    [ "$(grep -c '^</details>$' "$STUB/comment.2")" = 1 ] && [ "$(last_in_fold "$STUB/comment.2")" = "$1" ] && [ "$(grep -cxF -- "$1" "$STUB/comment.2")" = 1 ]
 }
 reply_in_fold() { folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d"; }
 
@@ -219,7 +221,7 @@ left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 reset; rc=$(run)
 check "no findings exits 0 and posts the start record, then the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment/2" "$STUB/out" && [ "$(comments)" = 2 ] && [ "$(cat "$STUB/comment.1")" = "Grok review started on $H" ] && grep -q "^## Local Grok review of $H" "$STUB/comment.2"'
 check "the review opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment.2")" = "" ] && [ "$(sed -n 3p "$STUB/comment.2")" = "<details><summary>Full review</summary>" ]'
-check "the six bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" && folded | grep -qx -- "- Run locally by the agent, with file-reading tools and no shell." && [ "$(reply_in_fold)" = "$(jq -r .text "$STUB/out_json")" ]'
+check "the seven bullets and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" && folded | grep -qx -- "- Run locally by the agent, with file-reading tools and no shell." && [ "$(reply_in_fold)" = "$(jq -r .text "$STUB/out_json")" ]'
 check "the posted review is Grok's text, with its version and model" 'grep -q "Nothing to flag." "$STUB/comment.2" && grep -qx -- "- Grok CLI: grok 9.9.9 (stub)" "$STUB/comment.2" && grep -qx -- "- Model: grok-stub" "$STUB/comment.2" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment.2"'
 # Grok's effort: high unless MENTAT_GROK_REASONING_EFFORT names another level; set but empty is high too.
 grok_effort() { [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args" | tail -n 1)" = "$1" ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args")" = 1 ] && folded | grep -qx -- "- Reasoning effort asked for: $1"; }
@@ -312,8 +314,8 @@ REPO_URL="https://github.com/owner/repo/blob/$H"
 reset; reply $'Changes README.\n\n- (non-blocking) [README:1](@EXPORT@/README:1): wrong text\n- (non-blocking) [lib/shared.sh:93-95](@EXPORT@/lib/shared.sh:93-95): a range\n- (non-blocking) [a dir/a file.txt](@EXPORT@/a dir/a file.txt#L4): a spaced name\n- (non-blocking) see @EXPORT@/lib/x.sh:7 and `@EXPORT@/lib/y.sh`\n\nREVIEW RESULT: FINDINGS'; rc=$(run)
 RUN_DIR=$(dirname "$(cat "$STUB/cwd")")
 check "a finding that cites the export is posted with repository links and no local path" '[ "$rc" = 2 ] && ! grep -qF "$(cat "$STUB/cwd")" "$STUB/comment.2" && ! grep -qF "$RUN_DIR" "$STUB/comment.2" && grep -qF "[README:1]($REPO_URL/README#L1): wrong text" "$STUB/comment.2" && grep -qF "[lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range" "$STUB/comment.2" && grep -qF "[a dir/a file.txt]($REPO_URL/a%20dir/a%20file.txt#L4): a spaced name" "$STUB/comment.2"'
-check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(tail -n 1 "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
-check "the rewritten reply is inside the fold, intact, with the result line after the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(reply_in_fold)" = "Changes README.
+check "a plain mention of the export, bare or in code, becomes the repository path, and the rest of the review is kept" 'grep -qF -- "- (non-blocking) see lib/x.sh:7 and \`lib/y.sh\`" "$STUB/comment.2" && grep -qx "Changes README." "$STUB/comment.2" && [ "$(last_in_fold "$STUB/comment.2")" = "REVIEW RESULT: FINDINGS" ]'
+check "the rewritten reply is inside the fold, intact, with its result line last inside the fold" 'fold_shape "REVIEW RESULT: FINDINGS" && [ "$(reply_in_fold)" = "Changes README.
 
 - (non-blocking) [README:1]($REPO_URL/README#L1): wrong text
 - (non-blocking) [lib/shared.sh:93-95]($REPO_URL/lib/shared.sh#L93-L95): a range

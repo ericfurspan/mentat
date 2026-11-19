@@ -244,7 +244,7 @@ review_local() {
     printf -- '- Time: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '\n---\n\n'
     cat "$out"
-    printf '\n</details>\n\n%s\n' "$result"
+    printf '\n</details>\n'
   } >"$tmp/comment" || not_reviewed "could not write the comment"
   if held=$(held_comment "$(cat "$tmp/comment")" "$repo"); then not_reviewed "$held"; fi
   url=$(gh pr comment "$pr" --body-file "$tmp/comment") || not_reviewed "could not post the review on #$pr"

@@ -429,7 +429,7 @@ grok_post() {
       "$(printf '%s' "$GROK_REASONING_EFFORT" | tr -cd 'A-Za-z0-9._-' | head -c 32)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf -- '- Run locally by the agent, with file-reading tools and no shell.\n\n---\n\n'
     cat "$result_file"
-    printf '\n</details>\n\n%s\n' "$result"
+    printf '\n</details>\n'
   } >"$run/comment" || grok_fail "could not write the comment"
   # The start comment stops a rerun, so the pull request says the review did not finish.
   if held=$(held_comment "$(cat "$run/comment")" "$repo"); then grok_fail "the review was held back and not posted" "$held"; fi
