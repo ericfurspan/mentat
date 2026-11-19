@@ -245,6 +245,14 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   fail "agents/plan-checker.md's frontmatter must set tools: Read, Grep, Glob"
 fi
+# The builder runs in its own worktree, in the background.
+for want in 'isolation: worktree' 'background: true'; do
+  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$want" agents/builder.md; then
+    pass "agents/builder.md's frontmatter sets $want"
+  else
+    fail "agents/builder.md's frontmatter must set $want"
+  fi
+done
 
 # Instruction text loads into sessions, so it describes the build command's form and never writes a slash command bare.
 # That holds for rules.md and every markdown file of a skill, module skills and supporting files included.
