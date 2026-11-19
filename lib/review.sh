@@ -13,6 +13,8 @@ REVIEW_MODEL="${MENTAT_REVIEW_MODEL:-$MENTAT_REVIEW_MODEL_DEFAULT}"
 FIRST_REVIEW_MODEL="${MENTAT_FIRST_REVIEW_MODEL:-}"
 # Read tools only, and no shell: the runner hands the diff and the commit log over as files.
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
+# Effort is pinned, as Codex's is; the record names it as the level asked for.
+CLAUDE_REVIEW_EFFORT=high
 
 # Sets the caller's limit to the local review rounds a pull request may use:
 # MENTAT_REVIEW_ROUNDS, 5 when unset; a whole number of 1 or more, leading zeros allowed
@@ -43,7 +45,7 @@ round_limit() {
 # not Claude's JSON result is not a review.
 run_claude() {
   local dir="$1" prompt="$2" out="$3" fail="$4" data="$5" model="$6" hint="$7" retry="${8:-}" json log rc secs=0 pid n why
-  local args=(-p --safe-mode --restricted --add-dir "$data" --model "$model" --permission-mode dontAsk
+  local args=(-p --safe-mode --restricted --add-dir "$data" --model "$model" --effort "$CLAUDE_REVIEW_EFFORT" --permission-mode dontAsk
     --tools "$CLAUDE_REVIEW_TOOLS" --allowedTools "$CLAUDE_REVIEW_TOOLS" --output-format json)
   json="${out%/*}/claude.json" log="${out%/*}/claude.log"
   (cd "$dir" && unset CLAUDE_CODE_PLUGIN_DIRS && exec claude "${args[@]}" <"$prompt") >"$json" 2>"$log" &
@@ -161,7 +163,7 @@ review_meta_claude() {
     *"$claude_model"*) [ -z "$first" ] || printf ' (%s%s)' "$first" "$asked" ;;
     *) printf ' (%sasked for %s)' "$first" "$asked" ;;
   esac
-  printf '\n'
+  printf '\n- Effort asked for: %s\n' "$CLAUDE_REVIEW_EFFORT"
 }
 
 # A local review reads the pull request's head as GitHub has it, never this

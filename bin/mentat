@@ -10,7 +10,7 @@
 #     When no CI check ran on the head, a line says so.
 #     A comment that holds a local path or a private name, in a public repository, is
 #     kept in a local file and not posted (exit 1).
-#     Claude runs in a fresh context, with read tools only, on MENTAT_REVIEW_MODEL (unset,
+#     Claude runs in a fresh context, with read tools only, at --effort high, on MENTAT_REVIEW_MODEL (unset,
 #     the review default in lib/review.sh), or, with MENTAT_FIRST_REVIEW_MODEL set, on that
 #     model while the pull request has no local round (as mentat status counts them), and,
 #     when Claude reports that no model ran, once more on the review default if that is

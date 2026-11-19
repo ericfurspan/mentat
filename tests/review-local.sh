@@ -193,6 +193,7 @@ check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "foun
 check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
 check "the bullets and the whole reply are folded, a blank line follows the summary, and the result line is last, after the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Claude Code: 2.1.322" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "the record names the model that ran, from Claude's own report" 'folded | grep -qx -- "- Model: claude-opus-4-9"'
+check "Claude runs with --effort high, and the record names high as the effort asked for" '[ "$(arg --effort)" = high ] && [ "$(grep -cx -- "--effort" "$STUB/args")" = 1 ] && folded | grep -qx -- "- Effort asked for: high"'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/model_head")" = "$H" ] && [ "$(cat "$STUB/model_readme")" = change ]'
 check "reviews the change from the merge base" 'grep -q "Review the change from $BASE to $H" "$STUB/prompt" && grep -q "Change reviewed: $BASE..$H" "$STUB/comment"'
 check "gives Claude the pull request description as data" 'grep -q "Requirement: README says change." "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
