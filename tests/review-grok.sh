@@ -472,6 +472,12 @@ check "the same sign-in with a 60-second time limit is reviewed" '[ "$rc" = 0 ] 
 # in the user's own Grok home; the stub's models branch rewrites it only when refresh_to exists.
 set_signin() { printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$1" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
 reset_signin() { printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
+# A sign-in file that is not a JSON object holding a non-empty string at some depth is no
+# sign-in: refused like a missing file, before any refresh, Grok run or start comment.
+for s in '' '{}' '""' '{"token":""}' '{"a":{"b":"","c":[]}}' 'not json' '{"fake":"credential"} {"fake":"credential"}'; do
+  reset; printf '%s' "$s" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run); reset_signin
+  check "a sign-in file holding ${s:-nothing} is refused as not signed in: no Grok run, no refresh, no start comment" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Grok is not signed in" "$STUB/out" && ! grok_ran && [ "$(comments)" = 0 ] && [ ! -e "$STUB/args_models" ] && ! grep -q "token\|not json" "$STUB/out"'
+done
 refresh_used() { [ "$(cat "$STUB/args_models")" = models ] && [ "$(cat "$STUB/models_home")" = "$GH_REAL" ] && grep -qx "GROK_AUTH_EARLY_INVALIDATION_SECS=2160" "$STUB/env_models" && grep -qx "GROK_HOME=$GH_REAL" "$STUB/env_models" && grep -qx "TMPDIR=$TMPDIR" "$STUB/env_models" && grep -qx "GROK_MEMORY=0" "$STUB/env_models" && ! grep -q "XAI_API_KEY\|MENTAT_CANARY" "$STUB/env_models" && grep -q fake-token-2 "$STUB/auth_copy"; }
 
 reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run); reset_signin

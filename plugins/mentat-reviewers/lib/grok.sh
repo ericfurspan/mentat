@@ -124,6 +124,11 @@ grok_signin() {
   local expiry now ends
   real_grok=$(realdir "${GROK_HOME:-$HOME/.grok}") && [ -f "$real_grok/auth.json" ] ||
     "$fail" "Grok is not signed in: there is no auth.json in its home (run grok login)"
+  # A sign-in is one JSON object holding a non-empty string at some depth; an empty file,
+  # {}, "" or {"token":""} is none. Nothing from the file is printed.
+  jq -se 'length == 1 and (.[0] | type == "object") and ([.[0] | .. | strings | select(length > 0)] | length > 0)' \
+    "$real_grok/auth.json" >/dev/null 2>&1 ||
+    "$fail" "Grok is not signed in: its auth.json holds no sign-in (run grok login)"
   grok_expiry
   if [ -n "$expiry" ] && [ -n "$ends" ] && { [[ "${expiry:0:19}" < "$now" ]] || [[ "${expiry:0:19}" < "$ends" ]]; }; then
     grok_refresh
