@@ -61,7 +61,7 @@ Report once, after the asking, with only these parts in this order: one line say
 
 - An accepted item has no decision that "Ask" sent to its own planning session, whether or not questions are left: one question asks which such item to plan first with `mentat:propose`: the recommended one first, with why, then the other such items, and "Not now" last. An item with such a decision is not offered; its next step stays `/mentat:propose <id>`.
 - None was accepted, or each has such a decision, and questions are left: one question offers another sitting, "Not now" last.
-- None was accepted, or each has such a decision, and none are left: no question, except the next-work offer where the maintainer's own instructions choose that ending (`next-work.md` in `mentat:backlog`'s folder).
+- None was accepted, or each has such a decision, and none are left: no question.
 
 An answer naming an item ends the sitting; `mentat:propose` starts only after it.
 
