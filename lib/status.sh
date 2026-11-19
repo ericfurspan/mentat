@@ -89,6 +89,20 @@ status_calls_section() {
     echo "unknown (could not read the description)"; return
   fi
   body=${body//$cr/}
+  # Drop fenced code blocks: a fence opens on a line of three or more backticks or tildes,
+  # indented up to three spaces, and closes on a later line starting with at least as many
+  # of the same character; an unclosed fence runs to the end.
+  body=$(awk '
+    function run(s, c,   n) { n = 0; while (substr(s, n + 1, 1) == c) n++; return n }
+    {
+      s = $0; i = 0
+      while (i < 3 && substr(s, 1, 1) == " ") { s = substr(s, 2); i++ }
+      c = substr(s, 1, 1)
+      if (fc == "") {
+        if ((c == "`" || c == "~") && run(s, c) >= 3) { fc = c; fn = run(s, c); next }
+        print
+      } else if (c == fc && run(s, c) >= fn) fc = ""
+    }' <<<"$body")
   if grep -Eq '^#{1,6} +Calls made without the maintainer( +#+)? *$' <<<"$body"; then echo present; else echo missing; fi
 }
 

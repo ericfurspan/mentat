@@ -199,6 +199,12 @@ reset; printf '**Status:** In review\r\n\r\n## Summary\r\n\r\nA change.\r\n\r\n#
 check "calls section: present, under another heading level with closing hashes, after every other section, in a body with CRLF line ends" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
 reset; printf '**Status:** In review\n\nCalls made without the maintainer: none.\n\n## Calls made without the maintainer today\n\n####### Calls made without the maintainer\n\n##Calls made without the maintainer\n\n    ## Calls made without the maintainer\n' >"$STUB/body"; rc=$(run 7)
 check "calls section: missing, when the words are only in prose, a longer heading, seven hashes, no space after the hashes or an indented code line" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
+reset; printf '**Status:** In review\n\n## Summary\n\nThe template now reads:\n\n```markdown\n## Calls made without the maintainer\n\nnone\n```\n\n## Risks\n\n- A risk.\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: missing, when the heading is only inside a fenced code block" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
+reset; printf '**Status:** In review\n\n## Summary\n\n  ````markdown\n## Calls made without the maintainer\n```\n````\n\n## Calls made without the maintainer\n\nnone\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: present, when a real heading follows a closed fence, closed only by a line with as many backticks" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
+reset; printf '**Status:** In review\n\n## Summary\n\n~~~\n## Calls made without the maintainer\n~~~\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: missing, when the heading is only inside a tilde fence" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
 reset; : >"$STUB/body"; rc=$(run 7)
 check "calls section: an empty description is missing" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
 reset; touch "$STUB/no_body"; rc=$(run 7)
