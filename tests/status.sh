@@ -201,16 +201,16 @@ for args in "" "x" "7 8" "7 --request" "--request $root/x 7" "7 --other f"; do
   check "usage error (exit 64) for: mentat status $args" '[ "$rc" = 64 ] && grep -q "usage: mentat status <pull request number> \[--request <file>\]" "$STUB/err" && [ ! -f "$STUB/calls" ]'
 done
 
-# The round limit in force, MENTAT_REVIEW_ROUNDS (5 when unset or empty), follows the local rounds.
+# The round limit in force, MENTAT_REVIEW_ROUNDS (5 when unset), follows the local rounds.
 reset; claude_local "$OLD" findings; claude_local "$H" findings; rc=$(MENTAT_REVIEW_ROUNDS=7 run 7)
 check "MENTAT_REVIEW_ROUNDS=7: the local rounds are printed against 7" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 7, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested"'
 rc=$(MENTAT_REVIEW_ROUNDS=10 run 7)
 check "MENTAT_REVIEW_ROUNDS=10: the local rounds are printed against 10" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 10, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested"'
-rc=$(MENTAT_REVIEW_ROUNDS='' run 7)
-check "MENTAT_REVIEW_ROUNDS empty: the local rounds are printed against 5" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested"'
-for bad in 0 abc 08 -1 1.5; do
+rc=$(MENTAT_REVIEW_ROUNDS=08 run 7)
+check "MENTAT_REVIEW_ROUNDS=08: the local rounds are printed against 8" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 8, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested"'
+for bad in '' 0 00 abc -1 1.5; do
   reset; rc=$(MENTAT_REVIEW_ROUNDS=$bad run 7)
-  check "MENTAT_REVIEW_ROUNDS=$bad is a usage error (exit 64) that reads nothing from GitHub" '[ "$rc" = 64 ] && grep -qxF "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not $bad" "$STUB/err" && [ ! -s "$STUB/out" ] && [ ! -f "$STUB/calls" ]'
+  check "MENTAT_REVIEW_ROUNDS=\"$bad\" is a usage error (exit 64) that reads nothing from GitHub" '[ "$rc" = 64 ] && grep -qxF "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$bad\"" "$STUB/err" && [ ! -s "$STUB/out" ] && [ ! -f "$STUB/calls" ]'
 done
 
 if [ "$failures" -gt 0 ]; then

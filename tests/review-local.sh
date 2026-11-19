@@ -304,7 +304,7 @@ check "a first round that a model ran in and that failed is not run again: not r
 reset; touch "$STUB/hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run_first)
 check "a first round past the time limit is not run again, and says so" 'closed "Claude did not finish within 1 seconds; $NOT_AGAIN" && [ "$(models)" = "fable " ] && ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null'
 
-# The round limit, MENTAT_REVIEW_ROUNDS (5 when unset or empty): a pull request that already has
+# The round limit, MENTAT_REVIEW_ROUNDS (5 when unset): a pull request that already has
 # that many completed local rounds, counted as mentat status counts them, gets no round. The run is
 # refused (exit 7) once the repository is known: no model runs, no CI is read, nothing is posted.
 # mine <body>: adds a comment on #7 as this account; prior <n>: n completed Local Claude reviews.
@@ -321,8 +321,8 @@ check "the default limit: with 4 completed rounds a fifth runs and posts, its re
 check "status then prints 5 of 5" 'status | grep -q "local rounds 5 of 5,"'
 rm -f "$STUB/comment" "$STUB/calls"; rc=$(run)
 check "the default limit: with 5 completed rounds the run is refused (exit 7): no model, no CI read, nothing posted" 'refused 5 5'
-reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS='' run)
-check "MENTAT_REVIEW_ROUNDS empty is the default limit: refused at 5" 'refused 5 5'
+reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS=08 run)
+check "MENTAT_REVIEW_ROUNDS=08 is 8: a sixth round runs and posts, and its record names 8" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 8" ]'
 reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS=7 run)
 check "MENTAT_REVIEW_ROUNDS=7: a sixth round runs and posts, and its record names 7" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 7" ] && heading "no findings" none'
 reset; prior 9; rc=$(MENTAT_REVIEW_ROUNDS=10 run)
@@ -336,9 +336,9 @@ reset; prior 4; mine "## Local Claude review of $H: incomplete, spec fingerprint
 jq --arg b "## Local Claude review of $H: findings, spec fingerprint none" '. + [{user: {login: "someone-else"}, body: $b}]' "$STUB/issue_comments.json" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json"
 rc=$(run)
 check "an incomplete Local Claude review, a Codex review and another account's review count toward no limit: the fifth round runs" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls"'
-for bad in 0 abc 08 -1 1.5; do
+for bad in '' 0 00 abc -1 1.5; do
   reset; rc=$(MENTAT_REVIEW_ROUNDS=$bad run)
-  check "MENTAT_REVIEW_ROUNDS=$bad is a usage error (exit 64) before anything runs" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not $bad" ] && [ ! -f "$STUB/calls" ]'
+  check "MENTAT_REVIEW_ROUNDS=\"$bad\" is a usage error (exit 64) before anything runs" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$bad\"" ] && [ ! -f "$STUB/calls" ]'
 done
 reset; touch "$STUB/comments_fail"; rc=$(run)
 check "the comments unreadable: not reviewed, naming the round limit; Claude does not run and nothing is posted" 'closed "could not read this account'"'"'s comments on #7, which the round limit (MENTAT_REVIEW_ROUNDS) needs" && ! grep -qx claude "$STUB/calls" && ! grep -q "^pr comment" "$STUB/calls"'

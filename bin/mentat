@@ -17,7 +17,7 @@
 #     another model, whatever MENTAT_REVIEW_MODEL names; the record names the model that
 #     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200). The round limit is MENTAT_REVIEW_ROUNDS
-#     (unset or empty, 5; a whole number of 1 or more, else exit 64), which the record names.
+#     (unset, 5; anything but a whole number of 1 or more exits 64), which the record names.
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
 #     --codex and --grok first read whether outside reviewers are on here, as mentat
 #     reviewers does; unless they are on, they print why, post nothing and exit 6.
