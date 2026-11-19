@@ -681,8 +681,8 @@ rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
 # in Mentat's cache folder; from the second failure in a row a line tells the maintainer now.
 REC="$XDG_CACHE_HOME/mentat/reviewer-failures-claude"
 raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
-# The record's lines without their timestamps, on one line; every line has one.
-recorded() { ! grep -qv '^[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z ' "$REC" && [ "$(cut -d" " -f2- "$REC" | tr '\n' ' ')" = "$1" ]; }
+# The record's lines without their timestamps and run tokens, on one line; every line has a timestamp.
+recorded() { ! grep -qv '^[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z ' "$REC" && [ "$(cut -d" " -f2,3 "$REC" | tr '\n' ' ')" = "$1" ]; }
 fail_run() { stub_reset; echo "${2:-$H}" >"$STUB/head"; echo 3 >"$STUB/exit"; rc=$(run "${1:-7}"); }
 NOT_REVIEWED_3="mentat: not reviewed: claude exited with status 3: Nothing to flag.; the review model is set with MENTAT_REVIEW_MODEL (now opus)"
 reset; fail_run 7
@@ -692,18 +692,18 @@ check "a second tool failure in a row, on another pull request, adds one line te
 fail_run 7
 check "a third in a row names each pull request once" '[ "$rc" = 1 ] && raised | grep -qF "Claude has failed 3 times in a row (owner/repo#7, owner/repo#8): "'
 stub_reset; rc=$(run 7)
-check "a checked reply ends the run of failures" '[ "$rc" = 0 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+check "a checked reply ends the run of failures" '[ "$rc" = 0 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 fail_run 7
 check "a tool failure after a checked reply is the first in a row again, and is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
 stub_reset; printf 'I could not read the diff.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; rc=$(run 7)
-check "an INCOMPLETE reply ends the run of failures too (exit 1, not raised)" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+check "an INCOMPLETE reply ends the run of failures too (exit 1, not raised)" '[ "$rc" = 1 ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 fail_run 7
 check "a tool failure after an INCOMPLETE reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
 lines=$(wc -l <"$REC")
 stub_reset; rc=$(cd "$root/work" && "$mentat" review --request "$root/no such request" 7 >"$STUB/out" 2>&1; echo $?)
 check "a failure that is not the reviewer's (a request file that cannot be read) changes nothing in the record" '[ "$rc" = 1 ] && [ "$(wc -l <"$REC")" = "$lines" ] && [ -z "$(raised)" ]'
 stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
-check "a checked reply ends the run even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+check "a checked reply ends the run even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 fail_run 7
 stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
 check "a reply with no result line is a tool failure, raised as the second in a row" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Claude has failed 2 times in a row (owner/repo#7): Claude'"'"'s reply has no final REVIEW RESULT line" ]'
@@ -727,6 +727,23 @@ reset; (
   wait
 )
 check "30 records written at the same time are all kept, one line each" '[ "$(wc -l <"$REC" | tr -d " ")" = 30 ] && [ "$(cut -d" " -f3 "$REC" | sort -u | wc -l | tr -d " ")" = 30 ]'
+# A failure is counted at its own line: another run's line written between this run's
+# append and its read does not change this run's count. $1 is that other run's line.
+raced() {
+  (
+    # shellcheck source=/dev/null
+    . "$(dirname "$mentat")/../lib/shared.sh" || exit 1
+    eval "own_$(declare -f reviewer_record)"
+    reviewer_record() { own_reviewer_record "$@" && printf '%s\n' "$other" >>"$REC"; }
+    other=$1 repo=owner/repo pr=7
+    reviewer_failed claude
+    printf '%s\n' "$review_raise"
+  )
+}
+reset; mkdir -p "${REC%/*}" && echo "2026-01-01T00:00:00Z fail owner/repo#5 earlier-run" >"$REC"
+check "another run's ok line after this run's failure still leaves this run the second in a row" '[ "$(raced "2026-01-01T00:00:02Z ok owner/repo#9 other-run")" = "Claude has failed 2 times in a row (owner/repo#5, owner/repo#7)" ]'
+reset; mkdir -p "${REC%/*}" && echo "2026-01-01T00:00:00Z fail owner/repo#5 earlier-run" >"$REC"
+check "another run's failure after this run's failure is not counted in this run's raise" '[ "$(raced "2026-01-01T00:00:02Z fail owner/repo#9 other-run")" = "Claude has failed 2 times in a row (owner/repo#5, owner/repo#7)" ]'
 reset
 
 [ "$failures" -eq 0 ]

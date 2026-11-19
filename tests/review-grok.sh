@@ -628,7 +628,7 @@ REC="$cache/mentat/reviewer-failures-grok"
 raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
 git -C "$root/seed" push -q "$root/origin.git" "$H:refs/pull/8/head"
 reset; rm "$GH_USER/auth.json"; rc=$(run 7); reset_signin
-check "a Grok sign-in refusal is raised at once: exit 1, one line naming Grok, one failure, the pull request and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ] && grep -qx "mentat: not reviewed: Grok is not signed in: there is no auth.json in its home (run grok login)" "$STUB/out" && [ "$(cut -d" " -f2- "$REC")" = "fail owner/repo#7" ] && ! grok_ran'
+check "a Grok sign-in refusal is raised at once: exit 1, one line naming Grok, one failure, the pull request and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ] && grep -qx "mentat: not reviewed: Grok is not signed in: there is no auth.json in its home (run grok login)" "$STUB/out" && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ] && ! grok_ran'
 stub_reset; echo 1 >"$STUB/exit_code"; rc=$(run 8)
 check "a Grok run failure next is the second in a row: raised with both pull requests and its kept log by path only, no log text" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && ! grep -q "SECRET-LOG-TEXT\|DEBUG-LOG-TEXT" "$STUB/out"'
 lines=$(wc -l <"$REC")
@@ -637,9 +637,9 @@ check "an already-reviewed refusal changes nothing in the record and is not rais
 stub_reset; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run 7); reset_signin
 check "a time limit that is not a number changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "could not work out when Grok" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
 stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
-check "a checked Grok reply ends the run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+check "a checked Grok reply ends the run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 stub_reset; reply 'No result line here.'; rc=$(run 7)
-check "a Grok reply with no result line after a checked reply is the first failure in a row, not raised" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "fail owner/repo#7" ]'
+check "a Grok reply with no result line after a checked reply is the first failure in a row, not raised" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "fail owner/repo#7" ]'
 stub_reset; reply 'Partial.' max_turns; rc=$(cd "$root/work tree" && "$mentat" review --grok --stop 7 >"$STUB/out" 2>&1; echo $?)
 check "the stop review counts as Grok: its incomplete run is the second in a row, raised" '[ "$rc" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review (stop reason: max_turns)"'
 mkdir -p "$root/badcache" && : >"$root/badcache/mentat"

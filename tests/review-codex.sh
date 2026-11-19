@@ -599,7 +599,7 @@ kill -9 -- "-$ip" 2>/dev/null
 REC="$XDG_CACHE_HOME/mentat/reviewer-failures-codex"
 raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
 reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run 7)
-check "a first Codex failure (its time limit) is recorded and not raised" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex did not finish within 0 seconds" "$STUB/out" && [ -z "$(raised)" ] && [ "$(cut -d" " -f2- "$REC")" = "fail owner/repo#7" ]'
+check "a first Codex failure (its time limit) is recorded and not raised" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex did not finish within 0 seconds" "$STUB/out" && [ -z "$(raised)" ] && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ]'
 stub_reset; echo "$H2" >"$STUB/head"; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 8)
 check "a second Codex failure in a row (no result line), on another pull request, is raised naming Codex, both pull requests and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Codex has failed 2 times in a row (owner/repo#7, owner/repo#8): Codex'"'"'s reply has no final REVIEW RESULT line" ] && [ ! -e "$XDG_CACHE_HOME/mentat/reviewer-failures-claude" ]'
 lines=$(wc -l <"$REC")
@@ -608,7 +608,7 @@ stub_reset; rc=$(PATH="$HOME/bin:$PATH" run 7)
 rm -rf "${HOME:?}/bin"
 check "a refusal of where Codex is installed changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "installed in or above the home folder" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
 stub_reset; rc=$(run 7)
-check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2-)" = "ok owner/repo#7" ]'
+check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
 check "a Codex failure after a checked reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
 reset
