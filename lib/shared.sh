@@ -548,5 +548,7 @@ review_result_line() {
   printf 'Use INCOMPLETE only when a material file or the diff could not be read (a path the tools are denied is the example). '
   printf 'A vague or thin description is a finding, not INCOMPLETE, and not having run the code is a limitation to state in a complete review. '
   printf 'In the reason, name what was missing by repository-relative path or in general words, never a machine-local path or raw tool output.\n\n'
+  printf 'Give no summary of the change beyond the intent sentence, and no account of how the review was done. State each limitation in one line. '
+  printf 'With no findings, the reply holds only the lines asked for above (the intent sentence, the line on the request items, the line on instruction text where it applies, and any observations asked for), one line per limitation, then the result line.\n\n'
   printf 'End your reply with exactly one final line, one of:\nREVIEW RESULT: NO FINDINGS\nREVIEW RESULT: FINDINGS\nREVIEW RESULT: INCOMPLETE - <what could not be read>\n'
 }
