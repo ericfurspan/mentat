@@ -40,7 +40,7 @@ Do the starting session's half of the relays: `mentat:build` "Started sessions" 
 
 ## After merge
 
-When the maintainer says #N merged for an item in the notes file, tell the build session by session message that #N merged, forwarding the maintainer's words, or, for one the maintainer's command started, ask the maintainer to say it there; the build session runs its own after-merge steps (`after-ready.md` in `mentat:review`'s folder). Record it merged in the notes file.
+When the maintainer says #N merged for an item in the notes file, tell the build session by session message that #N merged, forwarding the maintainer's words and asking it to reply once its after-merge steps are done, so the held items are re-read on that reply's turn ("Handing over"), or, for one the maintainer's command started, ask the maintainer to say it there; when no build session runs, tell the maintainer that no session will take those steps. The build session runs its own after-merge steps (`after-ready.md` in `mentat:review`'s folder). Record it merged in the notes file.
 
 ## Notes
 
