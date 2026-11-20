@@ -1,6 +1,7 @@
 ---
 name: retro
 description: "Lists what would have made a session go better, worst first. Arguments: what to focus on."
+argument-hint: "[what to focus on]"
 disable-model-invocation: true
 ---
 
