@@ -13,7 +13,6 @@ In a repository with an external backlog, the backlog lives there, not in GitHub
 Keep an item's description short, so items look alike. It holds only these, in this order:
 
 - The opening sentence: one plain sentence, not a heading, of at most about 25 words. It says what the item is (such as a bug, a proposal, a follow-up or a question) and, from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat, written by the maintainer, found by an agent while building, or proposed by an agent and agreed. It does not restate status or waits, which the tracker's fields show, so a change of status does not rewrite it. It names only three things those fields cannot show: "parked" for an item set aside, that a parked item was agreed ("Stages"), and anything the tracker's adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.
-- The start wait, optional: one line opening `Starts after:` ("Start waits").
 - The wait block ("Marking a wait"), only while steps wait on the maintainer, in the shape "Waits on the maintainer" gives, its steps in full; remove it when the wait ends. Then, on every tracker, a section headed "Decision for the maintainer" while one is open on the item: written when it arises (`../propose/decisions.md`), removed when its answer is recorded (`agent-records.md`). These are the first headings of the description, the wait block first.
 - One `Now:` line, the item's next step: where the item stands and what comes next, replaced in place.
 - One links line.
@@ -90,7 +89,7 @@ With either tracker, before writing or reading a wait on a hand test or setup st
 
 ## Start waits
 
-With either tracker, agreed work that cannot start until another item is done, a pull request merges or a count is reached carries a start wait. Before writing or reading one, read `start-waits.md` in this skill's folder: its forms, who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
+With either tracker, agreed work that cannot start until other items are done carries a start wait: the tracker's own blocked-by link to each. Before writing or reading one, read `start-waits.md` in this skill's folder: who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
 
 ## Reading an item
 

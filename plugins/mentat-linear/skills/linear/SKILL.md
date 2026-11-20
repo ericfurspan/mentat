@@ -18,7 +18,7 @@ The Inbox is the Triage status, every issue of the project in Triage, with no la
 
 ## Start waits
 
-In `start-waits.md` in `mentat:backlog`'s folder, an `<item id>` is done only in the Done status; Canceled or Duplicate makes the wait dead.
+For `start-waits.md` in `mentat:backlog`'s folder, a start wait is the connector's blocked-by relation from the item to each item it waits on. A blocker is done only in the Done status; Canceled or Duplicate makes the wait dead. When a blocker is marked a duplicate, Linear itself moves its link to the original item, so the wait follows the original.
 
 ## Types
 
@@ -40,7 +40,7 @@ For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project'
 
 ## Where the spec lives
 
-For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of its one issue document titled exactly `Spec`. Read it from the document the issue read lists; when that read lists no documents, as for an archived issue, read it by the id the `Agent records` comment records (`Spec document: <id>`). An item with no `Spec` document and no recorded id reads a `## Spec` or `## Agreed request` section in its description instead, with the span `github.md` in `mentat:backlog`'s folder gives; that section stays last, everything else (`Starts after:`, `Now:`, links) is written above it, and nothing below it. Before creating the document, read the issue's document list and reuse the one titled `Spec`; two titled `Spec` stop the session and go to the maintainer. Creating it records its id in the `Agent records` comment, and writing the spec there removes any such section from the description. Fingerprint the body as read back from the document.
+For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of its one issue document titled exactly `Spec`. Read it from the document the issue read lists; when that read lists no documents, as for an archived issue, read it by the id the `Agent records` comment records (`Spec document: <id>`). An item with no `Spec` document and no recorded id reads a `## Spec` or `## Agreed request` section in its description instead, with the span `github.md` in `mentat:backlog`'s folder gives; that section stays last, everything else (`Now:`, links) is written above it, and nothing below it. Before creating the document, read the issue's document list and reuse the one titled `Spec`; two titled `Spec` stop the session and go to the maintainer. Creating it records its id in the `Agent records` comment, and writing the spec there removes any such section from the description. Fingerprint the body as read back from the document.
 
 ## Agent records
 
@@ -69,7 +69,7 @@ A new project's overview holds only what is unique to it: its short summary is o
 ## Moving to Linear
 
 1. Create the project as "New project shape" says, with the maintainer as lead and the team's labels ("Labels"), and make sure the team has a started status named In Review.
-2. Move the open issues, holding back any with an open closing pull request or a held-back `Starts after:` prerequisite.
-3. Before copying each spec, compute the issue's current spec fingerprint as `mentat:backlog` "Agreement" says and compare it with the one the issue records, read as `agent-records.md` in `mentat:backlog`'s folder says. Copy the spec unchanged into the new item's `Spec` document ("Where the spec lives"). Carry the issue's current assumptions and advice unchanged and, only when the two fingerprints match, its build answer with, as the fingerprint, that of the copied spec as read back from Linear, computed the same way; when they differ or none is recorded, no fingerprint or build answer is carried, so the item goes back to planning. What is carried goes in one `Agent records` comment on the new item, always with the `Spec document: <id>` record of a copied spec, the one exception to issue comments staying on the issue. Rewrite `Starts after:` lines to the new item ids.
+2. Move the open issues, holding back any with an open closing pull request or an open blocker (`gh issue view <N> --json blockedBy`).
+3. Before copying each spec, compute the issue's current spec fingerprint as `mentat:backlog` "Agreement" says and compare it with the one the issue records, read as `agent-records.md` in `mentat:backlog`'s folder says. Copy the spec unchanged into the new item's `Spec` document ("Where the spec lives"). Carry the issue's current assumptions and advice unchanged and, only when the two fingerprints match, its build answer with, as the fingerprint, that of the copied spec as read back from Linear, computed the same way; when they differ or none is recorded, no fingerprint or build answer is carried, so the item goes back to planning. What is carried goes in one `Agent records` comment on the new item, always with the `Spec document: <id>` record of a copied spec, the one exception to issue comments staying on the issue. Re-create each blocked-by link between moved issues as the connector's blocked-by relation between their new items.
 4. Change the AGENTS.md backlog line to name the project, in a pull request.
 5. Close only the moved issues once that change merges.
