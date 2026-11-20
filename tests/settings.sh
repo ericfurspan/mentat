@@ -5,8 +5,9 @@
 # ${NAME-...} or ${NAME=...}); and each listed default is the code's. A default in code is the
 # value after ":-" in its one ${NAME:-value} expansion, or, when that value is another
 # variable ($VAR or ${VAR}), the literal that variable is assigned. The list writes such a
-# default as that value in backticks; a setting with no such default in code (empty is off,
-# or an agent definition's own model) has a default in words, with no backtick.
+# default as that value in backticks. A setting with no such default in code is listed in
+# words: one read by `printenv <name>` as "The <definition> definition's own model.", the
+# definition being the agents/ file its reading line names; any other as off ("Off...").
 # Prints PASS/FAIL per check; exits 1 on any FAIL.
 # shellcheck disable=SC2016
 # (File-wide: backticks and $ in single quotes are literal on purpose.)
@@ -120,10 +121,31 @@ while IFS= read -r n; do
     else
       fail "$n's listed default is \"$doc_default\", but the code's is \`$code_default\`"
     fi
+  elif printenv_lines=$(grep -E "printenv $n([^A-Z0-9_]|\$)" <<<"$code"); then
+    # Read by printenv in a skill to set a subagent's model: the default is the definition's
+    # own model, the definition being the one agents/ file the reading line names as mentat:<name>.
+    agents=""
+    while IFS= read -r a; do
+      [ -n "$a" ] && [ -f "agents/$a.md" ] && agents="$agents $a"
+    done < <(grep -oE 'mentat:[a-z-]+' <<<"$printenv_lines" | sed 's/^mentat://' | sort -u)
+    agents=${agents# }
+    case "$agents" in
+      '' | *' '*)
+        fail "$n is read by printenv on lines naming no one agent definition (found: ${agents:-none})"
+        continue
+        ;;
+    esac
+    expected="The $(printf '%s' "$agents" | tr '-' ' ') definition's own model."
+    if [ "$doc_default" = "$expected" ]; then
+      pass "$n's listed default is the $agents definition's own model"
+    else
+      fail "$n's listed default is \"$doc_default\", but unset it runs the $agents definition's own model: \"$expected\""
+    fi
   else
+    # Read in shell code with no default: unset or empty is off.
     case "$doc_default" in
-      '' | *'`'*) fail "$n has no default in the code, so $doc must give its default in words, with no backtick, not \"$doc_default\"" ;;
-      *) pass "$n has no default in the code, and $doc gives it in words" ;;
+      Off | Off[.:]*) pass "$n has no default in the code, and $doc lists it as off" ;;
+      *) fail "$n has no default in the code, so unset it is off, but $doc lists \"$doc_default\"" ;;
     esac
   fi
 done <<<"$listed"
