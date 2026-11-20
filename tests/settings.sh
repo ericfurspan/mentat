@@ -4,7 +4,8 @@
 # an expansion or by `printenv <name>` in a skill; an empty value counts as unset (no
 # ${NAME-...} or ${NAME=...}); and each listed default is the code's. A default in code is the
 # value after ":-" in its one ${NAME:-value} expansion, or, when that value is another
-# variable ($VAR or ${VAR}), the literal that variable is assigned. The list writes such a
+# variable ($VAR or ${VAR}), the literal that variable is assigned; or the backticked value a
+# skill line reading it by printenv gives as "unset or empty, <words> is `<value>`". The list writes such a
 # default as that value in backticks. A setting with no such default in code is listed in
 # words: one read by `printenv <name>` as "The <definition> definition's own model.", the
 # definition being the agents/ file its reading line names; any other as off ("Off...").
@@ -91,8 +92,12 @@ while IFS= read -r n; do
   if grep -qE "\\\$\\{${n}[-=]" <<<"$code"; then
     fail "$n is read with \${$n-...} or \${$n=...}, so a set but empty value does not count as unset"
   fi
-  # The default in code.
-  defaults=$(grep -oE "\\\$\\{$n:-[^}]*\\}" <<<"$code" | sed -E "s/^\\\$\\{$n:-//; s/\\}\$//" | grep -v '^$')
+  # The default in code: the value of its ${NAME:-value} expansions, and of each line reading
+  # it by printenv that says "unset or empty, <words> is `<value>`".
+  defaults=$( {
+    grep -oE "\\\$\\{$n:-[^}]*\\}" <<<"$code" | sed -E "s/^\\\$\\{$n:-//; s/\\}\$//"
+    grep -E "printenv $n([^A-Z0-9_]|\$)" <<<"$code" | grep -oE 'unset or empty, [^.`]* is `[^`]+`' | sed -E 's/.*`([^`]+)`$/\1/'
+  } | grep -v '^$')
   count=$(printf '%s' "$defaults" | grep -c '^' | tr -d ' ')
   if [ "$count" -gt 1 ]; then
     fail "$n's default is named $count times in the code; name it once"
