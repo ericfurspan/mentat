@@ -10,7 +10,7 @@ The maintainer typed this to make the session the orchestrator for its repositor
 
 1. Finish the step in flight first. Never interrupt a running builder, review or test run.
 2. Read the backlog's agreed order and stages (`mentat:backlog` "The order of agreed work"), the pull requests waiting after their "Ready to merge" line ("Pause"), the notes file if one exists ("Notes"), and the host's list of the sessions this session started, to find a running build session ("The build session").
-3. For each item in the notes file with a pull request the notes do not record as merged or closed, read its state with `gh pr view <N> --json state`. For one that merged, run the after-merge steps ("After merge") now, since its build session could not pass the merge on to an ended orchestrator, and put each closing message they give (its one line, or a hand check's steps in full) in the summary below instead of ending the turn there; record one closed without merging in the notes file and name it to the maintainer. Then, as the summary, say in a few lines what it will do next.
+3. For each item in the notes file with a pull request the notes do not record as merged or closed, read its state with `gh pr view <N> --json state`. For one that merged, run the after-merge steps ("After merge") now, since its build session could not pass the merge on to an ended orchestrator, and put each closing message they give (its one line, or a hand check's steps in full) in the summary below instead of ending the turn there; record one closed without merging in the notes file and name it to the maintainer. Then read the held items ("Handing over"), and, as the summary, say in a few lines what it will do next, giving any hand check's steps from above in full.
 
 ## Planning
 
