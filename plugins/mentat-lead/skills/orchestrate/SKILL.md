@@ -9,7 +9,7 @@ The maintainer typed this to make the session the orchestrator for its repositor
 ## Start
 
 1. Finish the step in flight first. Never interrupt a running builder, review or test run.
-2. Read the backlog's agreed order and stages (`mentat:backlog` "The order of agreed work"), the open pull requests that had their "Ready to merge" line ("Pause"), the notes file if one exists ("Notes"), and the host's list of the sessions this session started, to find a running build session ("The build session"). Then say in a few lines what it will do next.
+2. Read the backlog's agreed order and stages (`mentat:backlog` "The order of agreed work"), the pull requests waiting after their "Ready to merge" line ("Pause"), the notes file if one exists ("Notes"), and the host's list of the sessions this session started, to find a running build session ("The build session"). Then say in a few lines what it will do next.
 
 ## Planning
 
@@ -27,7 +27,7 @@ An item agreed with "Agree, build later" is handed over only on the maintainer's
 
 ## Pause
 
-A pull request is waiting from its "Ready to merge" line until it merges or closes, held or not, read with `gh pr list --state open --limit 1000 --json number,body` in the repository, whatever the tracker: each open one whose Ready line the notes file records as relayed, and any other open one whose first line of its description, its Status line (`mentat:pr`), reads `Ready`, `Not reviewed: fast track agreed by the maintainer` or `Not reviewed: last push waived by the maintainer`, the states the "Ready to merge" line is given with.
+A pull request is waiting from its "Ready to merge" line until it merges or closes, held or not, read with `gh pr list --state open --limit 1000 --json number,body` in the repository, whatever the tracker: each open one whose Ready line the notes file records as relayed or whose backlog item's merge wait names it (`mentat:backlog` "Marking a wait"), and any other open one whose first line of its description, its Status line (`mentat:pr`), reads `Ready`, `Not reviewed: fast track agreed by the maintainer` or `Not reviewed: last push waived by the maintainer`, the states the "Ready to merge" line is given with.
 
 The limit N: read `MENTAT_READY_LIMIT` by name with `printenv MENTAT_READY_LIMIT`, never the whole environment; unset or empty, N is `3`. A value that is not a whole number of 1 or more counts as unset, said once.
 
