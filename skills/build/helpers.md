@@ -6,6 +6,8 @@ Read this before briefing a builder and before each push, and again after a comp
 
 The builder is the `mentat:builder` subagent. A brief names any existing design the change keeps that could affect its goal.
 
+Right before every `mentat:builder` call, a build, a CI fix and a review fix alike, read `MENTAT_BUILDER_MODEL` by name with `printenv MENTAT_BUILDER_MODEL`, never the whole environment, and pass its value as the call's model; unset or empty, the call sets no model and the builder definition's own model runs.
+
 Before fixing a raised problem, Claude Code checks likely related cases in proportion to its scope and reports a shared cause when found, keeping the fix within the agreed scope. A fix it recommends targets the cause the evidence supports; when the cause is unknown, it recommends finding the cause first.
 
 A correction during agreed work does not reopen the spec; a change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks), goes to the maintainer as one question before that part is built. Claude Code follows any correction within the agreed scope at once, and files it as an item only when the maintainer asks.
