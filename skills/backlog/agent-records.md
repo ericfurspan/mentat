@@ -6,7 +6,7 @@ Read this before writing or reading an item's agent records (its spec fingerprin
 
 An item keeps its agent records in one comment whose first line is `Agent records`. Only the main session writes it, never a builder. The fingerprint, assumptions and advice records are in public-safe words (`records.md`); the settlements follow "Plan check" and "Second opinions" below (no local path, secret or log path) and may hold private evidence (GitHub issues hold none, so there the whole comment is public-safe). Each record sits under its own label:
 
-- `Spec fingerprint: <12 hex>; build: <now|later>`, citing the agreement ("Agreement" in `SKILL.md`).
+- `Spec fingerprint: <12 hex>; build: <now|later>`, citing the agreement ("Agreement" in `SKILL.md`), then `; spec fix: <old> to <new>, <evidence>` for each spec fix (`spec-fixes.md`).
 - `Spec document: <id>`, with a tracker whose adapter keeps the spec in a document ("Where the spec lives" in `SKILL.md`), kept on every later edit.
 - `Material assumptions:` and the list, in the shape `assumptions.md` gives.
 - `Advised against: <close|shrink|not build>; reason: <one line>` ("Advice against" below).
@@ -15,11 +15,11 @@ An item keeps its agent records in one comment whose first line is `Agent record
 - `Decisions:` one line per answered decision for the maintainer: the question, the answer, its date and the rejected options in a few words ("Decision lines" below).
 - `Plan:` a current plan longer than the item's next step ("Item shape" in `SKILL.md`).
 
-A later fingerprint and build answer, assumptions list, advice or plan replaces the earlier one in place, so the current one stands. Settlements and decisions lines add one entry each. With GitHub issues, the comment holds no settlements, decisions or plan: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog, and an issue keeps its plan and decisions in its body (`github.md`).
+A later fingerprint and build answer, assumptions list, advice or plan replaces the earlier one in place, so the current one stands; a fingerprint record keeps its spec fixes. Settlements and decisions lines add one entry each. With GitHub issues, the comment holds no settlements, decisions or plan: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog, and an issue keeps its plan and decisions in its body (`github.md`).
 
 ## Writing it
 
-The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint and build answer, the spec document id, each assumption and its state, the advice, each settlement entry and decisions line, the plan), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
+The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint, build answer and spec fixes, the spec document id, each assumption and its state, the advice, each settlement entry and decisions line, the plan), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
 
 A chat request has no item yet: keep its plan check and second opinion records, and their files, for "Agreement" in `SKILL.md`, which writes them on the item it creates. If nothing is agreed, nothing is written.
 
