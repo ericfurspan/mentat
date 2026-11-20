@@ -1,18 +1,14 @@
 # Start waits
 
-A start wait is one line in an agreed item's description, in its item shape slot, opening `Starts after:`. It names one condition, in one of these forms:
+A start wait is the tracker's own blocked-by link from an agreed item to each item it waits on: with Linear, the connector's blocked-by relation (`mentat-linear:linear` "Start waits"); with GitHub issues, `gh issue edit <N> --add-blocked-by <M>` (`github.md`). A wait on anything other than another item, such as a pull request or a count, is not a start wait: the session names it in the item's next step ("Item shape" in `SKILL.md`).
 
-- `Starts after: <item id> done`: that item ends completed, not canceled or duplicate. The tracker's adapter says how it reads this.
-- `Starts after: <owner/repo>#<N> merged`: that pull request is merged.
-- `Starts after: count <what> in <where> <opened|merged> after <YYYY-MM-DD> reaches <N>`: the number of `<what>` in `<where>` opened or merged after that date reaches `<N>`, read in full (every page).
+Writing. Agreement in `mentat:propose` and its typed planning session write each link in the same write that records the agreement, then read the links back. When a link is still missing after one retry, the item is not moved to Todo, nothing starts for it, and the session tells the maintainer. Writes to the item's next step and triage leave the links unchanged.
 
-Writing. Agreement in `mentat:propose` and its typed planning session add the line in the same write that records that an agreed item must wait on one of these conditions. Writes to the item's next step ("Item shape" in `SKILL.md`) and triage leave the line unchanged. A session that finds the wait met may remove the line when it next writes the item; nothing depends on that.
+Reading. A session that decides whether an item can start reads, read-only, each blocker's own status, as the tracker's adapter says. The wait is:
 
-Reading. A session that decides whether an item can start reads its wait then, read-only. The wait is:
-
-- met when its condition holds: the item can start as if it had no line;
-- unmet while its condition does not hold, reported as "waits on <condition>";
-- unchecked when a read it needs fails, reported as "could not check its wait: <why>";
-- dead when the line matches no form, the prerequisite item ended canceled or duplicate, or the pull request closed without merging, reported by naming the item with `/mentat:propose <id>`.
+- met when every blocker ended done: the item can start as if it had no wait;
+- unmet while any blocker is open, reported as "waits on <id>";
+- dead when a blocker ended canceled or duplicate, reported by naming the item with `/mentat:propose <id>`;
+- unchecked when a read fails, reported as "could not check its wait: <why>".
 
 An unmet, unchecked or dead wait holds the item: it is not offered, built or named as next. A session walking the order passes it, reports it as above and goes on to the next item. Once the wait is met, the item can start again with no write.

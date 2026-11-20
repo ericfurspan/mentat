@@ -11,7 +11,7 @@ fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
 
 # Outside the tracker adapters, rules, skills (module skills included) and the builder agent name no tracker's
 # own statuses, fields, labels or buttons. The list is the Linear adapter's own words; the core writes "triage" in lowercase.
-linear_words="Waiting on you|Priority|No priority|Urgent|Mark as duplicate|Decline|Snooze|Linear's Accept|[a-z,;(] Triage|[(]Triage|Triage status"
+linear_words="Waiting on you|In Review|Priority|No priority|Urgent|Mark as duplicate|Decline|Snooze|Linear's Accept|[a-z,;(] Triage|[(]Triage|Triage status"
 tracker_words=$( { printf '%s\n' rules.md agents/builder.md; git ls-files -- skills 'plugins/*/skills/*'; } |
   grep -v -x -e plugins/mentat-linear/skills/linear/SKILL.md -e skills/backlog/github.md | tr '\n' '\0' |
   xargs -0 grep -n -E -e "$linear_words")
