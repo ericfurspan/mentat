@@ -27,7 +27,7 @@ An item agreed with "Agree, build later" is handed over only on the maintainer's
 
 ## Pause
 
-A pull request is waiting when it is open and the first line of its description, its Status line (`mentat:pr`), reads `Ready`, `Not reviewed: fast track agreed by the maintainer` or `Not reviewed: last push waived by the maintainer`, the states the "Ready to merge" line is given with, read with `gh pr list --state open --json number,body` in the repository, whatever the tracker.
+A pull request is waiting from its "Ready to merge" line until it merges or closes, held or not, read with `gh pr list --state open --limit 1000 --json number,body` in the repository, whatever the tracker: each open one whose Ready line the notes file records as relayed, and any other open one whose first line of its description, its Status line (`mentat:pr`), reads `Ready`, `Not reviewed: fast track agreed by the maintainer` or `Not reviewed: last push waived by the maintainer`, the states the "Ready to merge" line is given with.
 
 The limit N: read `MENTAT_READY_LIMIT` by name with `printenv MENTAT_READY_LIMIT`, never the whole environment; unset or empty, N is `3`. A value that is not a whole number of 1 or more counts as unset, said once.
 
