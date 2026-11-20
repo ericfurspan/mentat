@@ -9,7 +9,7 @@ The maintainer typed this to make the session the orchestrator for its repositor
 ## Start
 
 1. Finish the step in flight first. Never interrupt a running builder, review or test run.
-2. Read the backlog's agreed order and stages (`mentat:backlog` "The order of agreed work"), the open pull requests that had their "Ready to merge" line ("Pause"), the notes file if one exists ("Notes"), and the host's list of the sessions this session started. Then say in a few lines what it will do next.
+2. Read the backlog's agreed order and stages (`mentat:backlog` "The order of agreed work"), the open pull requests that had their "Ready to merge" line ("Pause"), the notes file if one exists ("Notes"), and the host's list of the sessions this session started, to find a running build session ("The build session"). Then say in a few lines what it will do next.
 
 ## Planning
 
@@ -17,7 +17,7 @@ Plan the next Backlog items in the agreed order, one at a time, in this session,
 
 ## The build session
 
-One build session per repository at a time. Before starting one, read the notes file and the host's list of the sessions this session started; when one is still running, hand work to it instead of starting a second. With the host's tools for starting and for messaging a session, start one in its own worktree running `/mentat:build <ids>`, which is the go-ahead for those ids (`mentat:build` step 5), and write its id and those items with their spec fingerprints in the notes file. Without them, give the maintainer the one fenced command to run, as `mentat:propose` "Starting a build" says; that session then asks the maintainer itself, with no relays, and runs its own after-merge steps, and each later handover is the same command with the item's id, for them to type there.
+One build session per repository at a time. Before starting one, read the notes file and the host's list of the sessions this session started: one on that list still running, or the build session the notes file names by id while it still runs, by the host's view of it or its reply to the takeover message ("Notes"), is this session's one build session; hand work to it and start none. With the host's tools for starting and for messaging a session, start one in its own worktree running `/mentat:build <ids>`, which is the go-ahead for those ids (`mentat:build` step 5), and write its id and those items with their spec fingerprints in the notes file. Without them, give the maintainer the one fenced command to run, as `mentat:propose` "Starting a build" says; that session then asks the maintainer itself, with no relays, and runs its own after-merge steps, and each later handover is the same command with the item's id, for them to type there.
 
 ## Handing over
 
