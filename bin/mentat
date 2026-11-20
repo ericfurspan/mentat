@@ -125,7 +125,7 @@ done
 # and MENTAT_ROOT set to this folder, where the entry finds the shared code: the copy that
 # ships with this core while it exists, so core and module are one version, else the
 # entry on PATH, where the module puts it when it is on, for a core that ships without
-# the module folder. Step 4.1 removes the shipped copy.
+# the module folder. With neither, it exits 64.
 handover() {
   local entry="mentat-$1"
   shift
