@@ -234,7 +234,9 @@ rc=$(MENTAT_REVIEW_ROUNDS=10 run 7)
 check "MENTAT_REVIEW_ROUNDS=10: the local rounds are printed against 10" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 10, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
 rc=$(MENTAT_REVIEW_ROUNDS=08 run 7)
 check "MENTAT_REVIEW_ROUNDS=08: the local rounds are printed against 8" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 8, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
-for bad in '' 0 00 abc -1 1.5; do
+rc=$(MENTAT_REVIEW_ROUNDS='' run 7)
+check "MENTAT_REVIEW_ROUNDS set but empty is unset: the local rounds are printed against 5" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+for bad in 0 00 abc -1 1.5; do
   reset; rc=$(MENTAT_REVIEW_ROUNDS=$bad run 7)
   check "MENTAT_REVIEW_ROUNDS=\"$bad\" is a usage error (exit 64) that reads nothing from GitHub" '[ "$rc" = 64 ] && grep -qxF "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$bad\"" "$STUB/err" && [ ! -s "$STUB/out" ] && [ ! -f "$STUB/calls" ]'
 done

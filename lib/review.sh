@@ -17,13 +17,13 @@ CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 CLAUDE_REVIEW_EFFORT=high
 
 # Sets the caller's limit to the local review rounds a pull request may use:
-# MENTAT_REVIEW_ROUNDS, 5 when unset; a whole number of 1 or more, leading zeros allowed
-# and dropped (08 is 8); anything else, empty included, is a usage error. Read only by
+# MENTAT_REVIEW_ROUNDS, 5 when unset or empty; a whole number of 1 or more, leading zeros
+# allowed and dropped (08 is 8); anything else is a usage error. Read only by
 # the Claude review (bin/mentat) and mentat status, not when this file is sourced, so
 # the module's entries never read it.
 round_limit() {
-  local value=${MENTAT_REVIEW_ROUNDS-5}
-  case "$value" in '' | *[!0-9]*) die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$value\"" 64 ;; esac
+  local value=${MENTAT_REVIEW_ROUNDS:-5}
+  case "$value" in *[!0-9]*) die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$value\"" 64 ;; esac
   limit=$((10#$value))
   [ "$limit" -ge 1 ] || die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$value\"" 64
 }

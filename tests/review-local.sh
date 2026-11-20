@@ -330,6 +330,8 @@ check "the default limit: with 4 completed rounds a fifth runs and posts, its re
 check "status then prints 5 of 5" 'status | grep -q "local rounds 5 of 5,"'
 rm -f "$STUB/comment" "$STUB/calls"; rc=$(run)
 check "the default limit: with 5 completed rounds the run is refused (exit 7): no model, no CI read, nothing posted" 'refused 5 5'
+reset; prior 4; rc=$(MENTAT_REVIEW_ROUNDS='' run)
+check "MENTAT_REVIEW_ROUNDS set but empty is unset: with 4 completed rounds a fifth runs, and its record names 5" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 5" ]'
 reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS=08 run)
 check "MENTAT_REVIEW_ROUNDS=08 is 8: a sixth round runs and posts, and its record names 8" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls" && [ "$(limit_line)" = "- Round limit: 8" ]'
 reset; prior 5; rc=$(MENTAT_REVIEW_ROUNDS=7 run)
@@ -345,7 +347,7 @@ reset; prior 4; mine "## Local Claude review of $H: incomplete, spec fingerprint
 jq --arg b "## Local Claude review of $H: findings, spec fingerprint none" '. + [{user: {login: "someone-else"}, body: $b}]' "$STUB/issue_comments.json" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json"
 rc=$(run)
 check "an incomplete Local Claude review, a Codex review and another account's review count toward no limit: the fifth round runs" '[ "$rc" = 0 ] && posted && grep -qx claude "$STUB/calls"'
-for bad in '' 0 00 abc -1 1.5; do
+for bad in 0 00 abc -1 1.5; do
   reset; rc=$(MENTAT_REVIEW_ROUNDS=$bad run)
   check "MENTAT_REVIEW_ROUNDS=\"$bad\" is a usage error (exit 64) before anything runs" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$bad\"" ] && [ ! -f "$STUB/calls" ]'
 done
