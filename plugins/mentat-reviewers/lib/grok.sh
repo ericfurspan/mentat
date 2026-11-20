@@ -38,8 +38,8 @@ GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
 GROK_TIMEOUT_SECONDS="${MENTAT_GROK_TIMEOUT_SECONDS:-1800}"
-# Always passed as --reasoning-effort: high when the setting is unset or empty, else its
-# value (not checked; a review's record names it, in safe characters, as the level asked for).
+# Always passed as --reasoning-effort: the setting's value, else its default (docs/settings.md)
+# (not checked; a review's record names it, in safe characters, as the level asked for).
 GROK_REASONING_EFFORT="${MENTAT_GROK_REASONING_EFFORT:-high}"
 realdir() { (cd -P "$1" 2>/dev/null && pwd -P); }
 toml_string() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }

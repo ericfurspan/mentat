@@ -60,13 +60,13 @@ Mentat reads from AGENTS.md:
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
+Every setting, such as the review and builder models, is listed with its default and where to set it in [docs/settings.md](docs/settings.md).
+
 Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
 
 ## Review tools
 
 `mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone.
-
-`MENTAT_FIRST_REVIEW_MODEL=<model>` runs each pull request's first local review, then the built-in default review model if it does not run; empty is off. `MENTAT_PLAN_CHECK_MODEL=<model>` runs plan checks; empty uses the plan checker's own model. A model outside your plan bills credits or fails.
 
 ## Git hooks
 
