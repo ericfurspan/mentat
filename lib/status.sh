@@ -91,15 +91,19 @@ status_calls_section() {
   body=${body//$cr/}
   # Drop fenced code blocks: a fence opens on a line of three or more backticks or tildes,
   # indented up to three spaces, and closes on a later line starting with at least as many
-  # of the same character; an unclosed fence runs to the end.
+  # of the same character; an unclosed fence runs to the end. Outside fences, also drop HTML
+  # comment blocks: a line starting, after up to three spaces, with <!-- opens one, which runs
+  # through the first line holding --> after that <!--; an unclosed comment runs to the end.
   body=$(awk '
     function run(s, c,   n) { n = 0; while (substr(s, n + 1, 1) == c) n++; return n }
     {
+      if (hc) { if (index($0, "-->")) hc = 0; next }
       s = $0; i = 0
       while (i < 3 && substr(s, 1, 1) == " ") { s = substr(s, 2); i++ }
       c = substr(s, 1, 1)
       if (fc == "") {
         if ((c == "`" || c == "~") && run(s, c) >= 3) { fc = c; fn = run(s, c); next }
+        if (substr(s, 1, 4) == "<!--") { if (!index(substr(s, 5), "-->")) hc = 1; next }
         print
       } else if (c == fc && run(s, c) >= fn) fc = ""
     }' <<<"$body")

@@ -205,6 +205,10 @@ reset; printf '**Status:** In review\n\n## Summary\n\n  ````markdown\n## Calls m
 check "calls section: present, when a real heading follows a closed fence, closed only by a line with as many backticks" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
 reset; printf '**Status:** In review\n\n## Summary\n\n~~~\n## Calls made without the maintainer\n~~~\n' >"$STUB/body"; rc=$(run 7)
 check "calls section: missing, when the heading is only inside a tilde fence" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
+reset; printf '**Status:** In review\n\n## Summary\n\nA change.\n\n  <!-- Template guidance:\n## Calls made without the maintainer\nList each call. -->\n\n## Risks\n\n- A risk.\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: missing, when the heading is only inside a multi-line HTML comment" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
+reset; printf '**Status:** In review\n\n## Summary\n\n<!--\n## Calls made without the maintainer\n-->\n<!-- A one-line note. -->\n\n## Calls made without the maintainer\n\nnone\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: present, when a real heading follows closed HTML comments" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
 reset; : >"$STUB/body"; rc=$(run 7)
 check "calls section: an empty description is missing" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
 reset; touch "$STUB/no_body"; rc=$(run 7)
