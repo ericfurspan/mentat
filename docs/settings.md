@@ -14,6 +14,7 @@ A model setting names a model Claude Code accepts. A model outside your plan bil
 | `MENTAT_GROK_REASONING_EFFORT` | The reasoning effort Grok runs at, in reviews and second opinions. | `high` | The default. |
 | `MENTAT_PLAN_CHECK_MODEL` | The model of the plan check. | The plan checker definition's own model. | The default. |
 | `MENTAT_BUILDER_MODEL` | The model of every builder run: a build, a CI fix and a review fix. | The builder definition's own model. | The default. |
+| `MENTAT_READY_LIMIT` | The open pull requests with a "Ready to merge" line at which `/mentat-lead:orchestrate` hands over no more items; a whole number of 1 or more. | `3` | The default. |
 
 ## Other choices
 
