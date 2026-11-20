@@ -140,15 +140,25 @@ if [ "$budget_counted" = 1 ]; then
   fi
 fi
 
-# A triage sitting is started only by the maintainer and lists its arguments.
+# A triage sitting starts when the maintainer types it, or when Claude Code starts it because the
+# maintainer asked or agreed to an offer: the skill stays callable, its description holds that guard,
+# and it lists its arguments.
 f=plugins/mentat-linear/skills/triage/SKILL.md
-for s in 'name: triage' 'disable-model-invocation: true'; do
-  if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == want { found = 1; exit 0 } END { exit !found }' want="$s" "$f"; then
-    pass "$f's frontmatter sets $s"
-  else
-    fail "$f's frontmatter must set $s"
-  fi
-done
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "name: triage" { found = 1; exit 0 } END { exit !found }' "$f"; then
+  pass "$f's frontmatter sets name: triage"
+else
+  fail "$f's frontmatter must set name: triage"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^disable-model-invocation:/ { found = 1; exit 0 } END { exit !found }' "$f"; then
+  fail "$f's frontmatter must not set disable-model-invocation, so Claude Code can start it on the maintainer's word"
+else
+  pass "$f's frontmatter does not set disable-model-invocation"
+fi
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Claude Code starts triage only if you ask or agree to an offer\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+  pass "$f's description says Claude Code starts it only on the maintainer's word"
+else
+  fail "$f's description must say Claude Code starts it only on the maintainer's word (Claude Code starts triage only if you ask or agree to an offer.)"
+fi
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description lists its arguments"
 else
