@@ -17,11 +17,11 @@ Plan the next Backlog items in the agreed order, one at a time, in this session,
 
 ## The build session
 
-One build session per repository at a time. Before starting one, read the notes file and the host's list of the sessions this session started; when one is still running, hand work to it instead of starting a second. With the host's tool for starting a session, start one in its own worktree running `/mentat:build <ids>`, hand each of those ids over at once ("Handing over"), and write its id in the notes file. Without such a tool, give the maintainer the one fenced command to run, as `mentat:propose` "Starting a build" says; that session then talks to the maintainer itself, so each later handover is the same command with the item's id, for them to type there.
+One build session per repository at a time. Before starting one, read the notes file and the host's list of the sessions this session started; when one is still running, hand work to it instead of starting a second. With the host's tools for starting and for messaging a session, start one in its own worktree running `/mentat:build <ids>`, which is the go-ahead for those ids (`mentat:build` step 5), and write its id and those items with their spec fingerprints in the notes file. Without them, give the maintainer the one fenced command to run, as `mentat:propose` "Starting a build" says; that session then asks the maintainer itself, with no relays, and runs its own after-merge steps, and each later handover is the same command with the item's id, for them to type there.
 
 ## Handing over
 
-An item agreed with "Agree and build now" is handed over to the running build session, or one is started for it, by one message naming the item, its spec fingerprint as recorded at agreement (`mentat:backlog` "Agreement") and any start wait (`mentat:backlog` "Start waits"). The build session takes it as `mentat:build` "Started sessions" says. When it has not confirmed the item with that fingerprint by the end of its next turn, tell the maintainer. A report that it did not take the item goes to the maintainer with its reason; an item it left out for its start wait is handed over again once the wait is met.
+An item agreed with "Agree and build now" is handed over to the running build session by one message naming the item, its spec fingerprint as recorded at agreement (`mentat:backlog` "Agreement") and any start wait (`mentat:backlog` "Start waits"); with none running, one is started for it as above. The build session takes it as `mentat:build` "Started sessions" says. When it has not confirmed the item with that fingerprint by the end of its next turn, tell the maintainer. A report that it did not take the item goes to the maintainer with its reason; an item it left out for its start wait is handed over again once the wait is met.
 
 An item agreed with "Agree, build later" is handed over only on the maintainer's later word: their typed `/mentat:build`, with or without ids, or a yes to a next-work offer naming it. Here both hand their items over instead of building in this session.
 
@@ -39,7 +39,7 @@ Do the starting session's half of the relays: `mentat:build` "Started sessions" 
 
 ## After merge
 
-When the maintainer says #N merged, or the build session passes on that they did, run the after-merge steps: the merged paragraph of `after-ready.md` in `mentat:review`'s folder, and the post-merge steps the repository's AGENTS.md names. Then tell the build session that #N merged and its steps are done, and end the turn as that paragraph says.
+When the maintainer says #N merged, or the build session passes on that they did, for an item of a build session this session started or took over, run the after-merge steps: the merged paragraph of `after-ready.md` in `mentat:review`'s folder, and the post-merge steps the repository's AGENTS.md names. Then tell the build session that #N merged and its steps are done, and end the turn as that paragraph says.
 
 ## Notes
 
