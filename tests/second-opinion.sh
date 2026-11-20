@@ -153,6 +153,8 @@ data() { sed -n "/^--- BEGIN IDEA DATA ---\$/,/^--- END IDEA DATA ---\$/p" "$1" 
 
 reset; rc=$(run "$idea")
 check "both deliver (exit 0): a section for each in order, and a summary of both verdict lines" '[ "$rc" = 0 ] && c=$(grep -n "^## Codex$" "$STUB/stdout" | cut -d: -f1) && g=$(grep -n "^## Grok$" "$STUB/stdout" | cut -d: -f1) && [ "$c" -lt "$g" ] && grep -q "Codex thinks it is fine." "$STUB/stdout" && grep -q "Grok has a view." "$STUB/stdout" && grep -qE "^- Codex \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout" && grep -qE "^- Grok \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT DIFFERENTLY - fewer helpers$" "$STUB/stdout"'
+check "each section ends with its timing line: exactly two (<n> seconds) lines" '[ "$(grep -cE "^\([0-9]+ seconds\)\$" "$STUB/stdout")" = 2 ]'
+check "the idea is copied no further than the prompts: no idea text in the arguments" '! grep -q "Ignore all previous" "$STUB/args" "$STUB/args_grok"'
 check "a delivered second opinion keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
 check "a delivered second opinion prints no such line on stderr" '! grep -q "no second opinion from any tool" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit read: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
@@ -316,7 +318,7 @@ wp=$!
 for _ in $(seq 100); do [ -f "$STUB/codex_pid" ] && [ -f "$STUB/grok_pid" ] && break; sleep 0.1; done
 check "both tools are running before the cancel, and a worktree is registered" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/grok_pid" ] && [ "$(worktrees)" = 2 ]'
 took=$SECONDS; kill -TERM "$wp"; wait "$wp"; rc=$?; took=$((SECONDS - took))
-check "cancelling stops both model processes and removes the worktree, the run folder and the temporary folders" '[ "$rc" != 0 ] && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/grok_pid")" 2>/dev/null && clean'
+check "cancelling exits 143, stops both model processes and removes the worktree, the run folder and the temporary folders" '[ "$rc" = 143 ] && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/grok_pid")" 2>/dev/null && clean'
 check "cancelling finishes well before the hung tools would end on their own (under 10 seconds against their 30)" '[ "$took" -lt 10 ]'
 for pidf in codex_pid grok_pid; do [ ! -f "$STUB/$pidf" ] || kill -9 "$(cat "$STUB/$pidf")" 2>/dev/null; done
 # INT to its whole process group (Ctrl-C), with default INT handling (a job this script

@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2154 # res, tool and run_pids are the caller's variables
-# The plumbing both modes of mentat second-opinion share: each review tool (Codex,
+# The plumbing of mentat second-opinion: each review tool (Codex,
 # Grok) runs in a background subshell, in parallel, and the result is printed
 # for the maintainer. Sourced by this module's bin/mentat-second-opinion.
 
@@ -56,7 +56,7 @@ pair_cancel() {
   exit 143
 }
 
-# Starts each tool's runner, named <$1>_<tool> (opinion_codex, opinion_web_grok), each in
+# Starts each tool's runner, named <$1>_<tool> (opinion_codex, opinion_grok), each in
 # its own subshell, and waits for all, writing how long each took to $res/<tool>.secs.
 # Sets the caller's run_pids.
 pair_run() { # $1 runner prefix, $2... tools
