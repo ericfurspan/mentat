@@ -5,8 +5,8 @@
 
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
 # The reviewer runs in a fresh context that never saw the build, on a configurable model.
-# The review default, the one place its value is named: usage text, skills and the README
-# name the setting.
+# The review default, the one place in code its value is named; docs/settings.md lists it,
+# and tests/settings.sh keeps the two in step.
 MENTAT_REVIEW_MODEL_DEFAULT=opus
 REVIEW_MODEL="${MENTAT_REVIEW_MODEL:-$MENTAT_REVIEW_MODEL_DEFAULT}"
 # Set and not empty, a pull request's first local Claude round runs on this model instead.
@@ -17,13 +17,13 @@ CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
 CLAUDE_REVIEW_EFFORT=high
 
 # Sets the caller's limit to the local review rounds a pull request may use:
-# MENTAT_REVIEW_ROUNDS, 5 when unset; a whole number of 1 or more, leading zeros allowed
-# and dropped (08 is 8); anything else, empty included, is a usage error. Read only by
+# MENTAT_REVIEW_ROUNDS (its default: docs/settings.md); a whole number of 1 or more, leading zeros
+# allowed and dropped (08 is 8); anything else is a usage error. Read only by
 # the Claude review (bin/mentat) and mentat status, not when this file is sourced, so
 # the module's entries never read it.
 round_limit() {
-  local value=${MENTAT_REVIEW_ROUNDS-5}
-  case "$value" in '' | *[!0-9]*) die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$value\"" 64 ;; esac
+  local value=${MENTAT_REVIEW_ROUNDS:-5}
+  case "$value" in *[!0-9]*) die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$value\"" 64 ;; esac
   limit=$((10#$value))
   [ "$limit" -ge 1 ] || die "MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$value\"" 64
 }

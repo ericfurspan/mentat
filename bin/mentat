@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# mentat: Mentat's command line. Usage errors exit 64.
+# mentat: Mentat's command line. Usage errors exit 64. Its settings, the MENTAT_* names
+# below, with each one's default and what an empty value means: docs/settings.md.
 #   mentat review <PR>  Reviews the pull request's head with a headless Claude at once, then
 #     waits for CI on that head and posts the result only once CI passed. 0 no findings,
 #     2 findings posted (link printed), 1 not reviewed (error, incomplete review or no
@@ -16,14 +17,13 @@
 #     ~/.cache); a checked reply ends the run. A Grok sign-in refusal, and a second or later
 #     failure in a row, also print one line starting "mentat: tell the maintainer now:" with
 #     the reviewer, the count, the pull requests and the reason (still exit 1).
-#     Claude runs in a fresh context, with read tools only, at --effort high, on MENTAT_REVIEW_MODEL (unset,
-#     the review default in lib/review.sh), or, with MENTAT_FIRST_REVIEW_MODEL set, on that
-#     model while the pull request has no local round (as mentat status counts them), and,
+#     Claude runs in a fresh context, with read tools only, at --effort high, on
+#     MENTAT_REVIEW_MODEL, or, with MENTAT_FIRST_REVIEW_MODEL set, on that model while the pull request has no local round (as mentat status counts them), and,
 #     when Claude reports that no model ran, once more on the review default if that is
 #     another model, whatever MENTAT_REVIEW_MODEL names; the record names the model that
 #     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
-#     MENTAT_REVIEW_TIMEOUT_SECONDS (default 1200). The round limit is MENTAT_REVIEW_ROUNDS
-#     (unset, 5; anything but a whole number of 1 or more exits 64), which the record names.
+#     MENTAT_REVIEW_TIMEOUT_SECONDS. The round limit is MENTAT_REVIEW_ROUNDS (empty counts as
+#     unset; any other value but a whole number of 1 or more exits 64), which the record names.
 #   mentat review --codex <PR>  The same with local Codex in place of Claude.
 #     --codex and --grok first read whether outside reviewers are on here, as mentat
 #     reviewers does; unless they are on, they print why, post nothing and exit 6.
@@ -33,10 +33,9 @@
 #     `mentat review --grok --stop <PR>` is the one other run, also once per pull request:
 #     the same review, whose comments say "Grok stop review" in place of "Grok review".
 #     A plain --grok is refused once this account's stop review started.
-#     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS (default 1800). Grok runs with
-#     --reasoning-effort high, in reviews and second opinions alike, unless
-#     MENTAT_GROK_REASONING_EFFORT names another level (set but empty is high too); the
-#     review's record names the level asked for.
+#     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS. Grok runs with --reasoning-effort
+#     MENTAT_GROK_REASONING_EFFORT, in reviews and second opinions alike; the review's record
+#     names the level asked for.
 #     All take `--request <file>` and `--require-ci` after the mode, if any, in any order
 #     with --stop:
 #     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran,
@@ -84,7 +83,7 @@
 #     fetches origin's default branch into a private ref, leaving origin/<default> and
 #     FETCH_HEAD as they are. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
-#     Grok's effort is high unless MENTAT_GROK_REASONING_EFFORT names another level. Grok may use its backend web search here
+#     Grok's effort is MENTAT_GROK_REASONING_EFFORT. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied.
 #   mentat second-opinion --web <question file>  Has Codex and Grok
 #     each answer any question, in parallel, each in an empty folder with no files and no
