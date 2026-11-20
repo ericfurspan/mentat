@@ -53,7 +53,7 @@ Closes #<issue, when there is one; none with an external backlog; Refs # in its 
 Head: <commit>
 
 <One line per finding fixed or answered: reviewer, round, the finding, and its fix commit or its reason.>
-<A higher round limit the maintainer named; each completed hand check, who checked and what they saw; the line of a review stop the maintainer answered.>
+<A higher round limit the maintainer named; each completed hand check, who checked and what they saw; the line of each review stop that asks the maintainer, kept from when it asks and `pending` until answered (`../review/stop.md` "Durable pause").>
 
 | Requirement | Check | Observed |
 |---|---|---|
