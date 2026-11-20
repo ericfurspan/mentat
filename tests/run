@@ -180,7 +180,7 @@ for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
 done
 
 # Skills only agents call stay out of the / menu and stay callable by the agent.
-for f in skills/pr/SKILL.md skills/review/SKILL.md skills/backlog/SKILL.md plugins/mentat-extras/skills/grill/SKILL.md plugins/mentat-linear/skills/linear/SKILL.md; do
+for f in skills/pr/SKILL.md skills/review/SKILL.md skills/backlog/SKILL.md plugins/mentat-lead/skills/grill/SKILL.md plugins/mentat-linear/skills/linear/SKILL.md; do
   if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && $0 == "user-invocable: false" { found = 1; exit 0 } END { exit !found }' "$f"; then
     pass "$f's frontmatter sets user-invocable: false"
   else

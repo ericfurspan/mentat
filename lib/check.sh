@@ -84,12 +84,12 @@ c_modules() {
   local on
   [ -n "$plugin_list" ] || return 0
   on=$(printf '%s' "$plugin_list" | jq -r '[.[] | .id | strings
-    | select(test("^mentat-(reviewers|linear|extras|public-text)@mentat$")) | sub("@mentat$"; "")]
+    | select(test("^mentat-(reviewers|linear|lead|public-text)@mentat$")) | sub("@mentat$"; "")]
     | unique | join(", ")' 2>/dev/null) || return 0
   if [ -n "$on" ]; then
     c_ok "Mentat modules installed: $on"
   else
-    c_ok "no Mentat modules installed (optional: mentat-reviewers, mentat-linear, mentat-extras, mentat-public-text)"
+    c_ok "no Mentat modules installed (optional: mentat-reviewers, mentat-linear, mentat-lead, mentat-public-text)"
   fi
 }
 # The git hooks (lib/git-hooks.sh): a warning when agents' git does not use
