@@ -154,10 +154,10 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   pass "$f's frontmatter does not set disable-model-invocation"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Claude Code starts triage only if you ask or agree to an offer\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Claude Code starts Inbox triage only if you ask or take its offer\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description says Claude Code starts it only on the maintainer's word"
 else
-  fail "$f's description must say Claude Code starts it only on the maintainer's word (Claude Code starts triage only if you ask or agree to an offer.)"
+  fail "$f's description must say Claude Code starts it only on the maintainer's word (Claude Code starts Inbox triage only if you ask or take its offer.)"
 fi
 if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description lists its arguments"
