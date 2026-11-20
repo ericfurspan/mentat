@@ -14,12 +14,12 @@ check() { if eval "$2"; then printf 'PASS: modules %s\n' "$1"; else printf 'FAIL
 
 market=.claude-plugin/marketplace.json
 settings=.claude/settings.json
-modules="mentat-reviewers mentat-linear mentat-extras mentat-public-text"
+modules="mentat-reviewers mentat-linear mentat-lead mentat-public-text"
 
 check "$market parses" 'jq -e . "$market" >/dev/null'
 mname=$(jq -r '.name // empty' "$market" 2>/dev/null)
 check "the marketplace lists exactly the core plugin and the four modules" \
-  '[ "$(jq -r "[.plugins[].name] | sort | join(\" \")" "$market")" = "mentat mentat-extras mentat-linear mentat-public-text mentat-reviewers" ]'
+  '[ "$(jq -r "[.plugins[].name] | sort | join(\" \")" "$market")" = "mentat mentat-lead mentat-linear mentat-public-text mentat-reviewers" ]'
 check "the core plugin is served from the repository root" \
   '[ "$(jq -r ".plugins[] | select(.name == \"mentat\") | .source" "$market")" = ./ ]'
 
@@ -41,7 +41,7 @@ check "$settings parses" 'jq -e . "$settings" >/dev/null'
 for m in mentat-reviewers mentat-public-text; do
   check "$settings turns on $m@$mname" '[ -n "$mname" ] && jq -e --arg k "$m@$mname" ".enabledPlugins[\$k] == true" "$settings" >/dev/null'
 done
-for m in mentat-linear mentat-extras; do
+for m in mentat-linear mentat-lead; do
   check "$settings leaves $m@$mname to each user" '! jq -e --arg k "$m@$mname" ".enabledPlugins | has(\$k)" "$settings" >/dev/null'
 done
 

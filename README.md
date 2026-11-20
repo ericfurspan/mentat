@@ -39,7 +39,7 @@ Optional modules install as `<module>@mentat`:
 - `mentat-reviewers`: the Codex and Grok commands.
 - `mentat-public-text`: blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`.
 - `mentat-linear`: the Linear adapter, and any backlog's Inbox triage: `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`.
-- `mentat-extras`: grill, an interview on open decisions, and `/mentat-extras:retro`, improvements from a session.
+- `mentat-lead`: grill, an interview on open decisions, and `/mentat-lead:retro`, improvements from a session.
 
 ## Usage
 
@@ -48,7 +48,7 @@ Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, To
 - `/mentat:propose [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
 
-Moved from core: `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-extras`.
+Moved from core: `plan` became `/mentat:propose`; `triage` went to `mentat-linear`, `grill` and `retro` to `mentat-lead`.
 
 [`rules.md`](rules.md) holds the core rules, `skills/` each step's detail.
 
