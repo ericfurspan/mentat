@@ -26,7 +26,7 @@ An item's type is one of the team's labels: `Bug`, `Feature` or `Improvement`.
 
 ## Marking a wait
 
-On a wait, and on each decision for the maintainer that blocks an item's work, in any stage, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When a wait ends or a blocking decision is answered, and the item keeps no other wait (a wait block, a merge wait or a review stop) and no blocking decision, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "Ready to merge: #N" and a review stop get the same label and assignment, and the same removal.
+On a wait, and on each decision for the maintainer that blocks an item's work, in any stage, add the `Waiting on you` label and assign the item to the project's lead, so the lead's own "My issues" list shows it. No user is named. When a wait ends or a blocking decision is answered, and the item keeps no other wait (a wait block, a merge wait or a review stop) and no blocking decision, remove the label and clear the assignee only if it is still the project's lead. A merge wait after "Ready to merge: #N" and a review stop that asks the maintainer get the same label and assignment, and the same removal.
 
 ## The order of agreed work
 
