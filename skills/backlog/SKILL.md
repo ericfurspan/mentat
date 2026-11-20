@@ -89,7 +89,7 @@ With either tracker, before writing or reading a wait on a hand test or setup st
 
 ## Start waits
 
-With either tracker, agreed work that cannot start until other items are done carries a start wait: the tracker's own blocked-by link to each. Before writing or reading one, read `start-waits.md` in this skill's folder: who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
+With either tracker, agreed work that cannot start until other items are done carries a start wait: the tracker's own blocked-by link to each. A wait on anything else is not a start wait: the session names it in the item's next step. Before writing or reading one, read `start-waits.md` in this skill's folder: who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
 
 ## Reading an item
 
