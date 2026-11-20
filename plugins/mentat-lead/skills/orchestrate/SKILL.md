@@ -39,7 +39,7 @@ Do the starting session's half of the relays: `mentat:build` "Started sessions" 
 
 ## After merge
 
-When the maintainer says #N merged, or the build session passes on that they did, for an item of a build session this session started or took over, run the after-merge steps: the merged paragraph of `after-ready.md` in `mentat:review`'s folder, and the post-merge steps the repository's AGENTS.md names. Then tell the build session that #N merged and its steps are done, and end the turn as that paragraph says.
+When the maintainer says #N merged, or the build session passes on that they did or that its recovery read found it merged, for an item of a build session this session started or took over, run the after-merge steps: the merged paragraph of `after-ready.md` in `mentat:review`'s folder, and the post-merge steps the repository's AGENTS.md names. Then tell the build session that #N merged and its steps are done, and end the turn as that paragraph says.
 
 ## Notes
 
