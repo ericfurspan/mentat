@@ -73,8 +73,8 @@ handed() { # $1 entry, $2 MENTAT_ROOT it must get, $3... the arguments it must g
 # A core that ships without the module folder: a copy of core without it.
 mkdir "$tmp/bare" && cp -R bin lib "$tmp/bare/" || exit 1
 bare=$(cd -P "$tmp/bare" && pwd) || exit 1
-out=$(MENTAT_ROOT=/elsewhere PATH="$tmp/stubs:$sys" "$bare/bin/mentat" second-opinion --web "a b" "" 2>&1); rc=$?
-check "without the module folder, second-opinion goes to mentat-second-opinion on PATH, with its arguments, MENTAT_ROOT set to core's folder and its exit status" 'handed mentat-second-opinion "$bare" --web "a b" ""'
+out=$(MENTAT_ROOT=/elsewhere PATH="$tmp/stubs:$sys" "$bare/bin/mentat" second-opinion "a b" "" 2>&1); rc=$?
+check "without the module folder, second-opinion goes to mentat-second-opinion on PATH, with its arguments, MENTAT_ROOT set to core's folder and its exit status" 'handed mentat-second-opinion "$bare" "a b" ""'
 out=$(PATH="$tmp/stubs:$sys" "$bare/bin/mentat" review --codex --request "a b" 7 2>&1); rc=$?
 check "without the module folder, review --codex goes to mentat-review-codex on PATH, with the arguments after --codex" 'handed mentat-review-codex "$bare" --request "a b" 7'
 out=$(PATH="$tmp/stubs:$sys" "$bare/bin/mentat" review --grok --stop 7 2>&1); rc=$?
@@ -96,7 +96,7 @@ out=$(PATH="$tmp/installed:$sys" "$core/bin/mentat" second-opinion "a b" 2>&1); 
 check "with an entry on PATH too, second-opinion goes to the module's copy in the checkout" 'handed mentat-second-opinion "$core" "a b"'
 # This checkout's own entries: each reads its arguments (a usage error).
 out=$(PATH="$sys" bin/mentat second-opinion 2>&1); rc=$?
-check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat second-opinion [--web] <file> (a --web file holds only the question, nothing private)" ]'
+check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat second-opinion <file>" ]'
 for args in "--codex --stop 7" "--grok --stop --stop 7"; do
   # shellcheck disable=SC2086 # the words are the arguments
   out=$(PATH="$sys" bin/mentat review $args 2>&1); rc=$?

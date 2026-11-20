@@ -85,13 +85,6 @@
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
 #     Grok's effort is MENTAT_GROK_REASONING_EFFORT. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied.
-#   mentat second-opinion --web <question file>  Has Codex and Grok
-#     each answer any question, in parallel, each in an empty folder with no files and no
-#     repository (it works outside git), with web search on. The file holds only the
-#     question, nothing private. Prints each reply with its
-#     answer line. Nothing is posted. 0 at least one tool answered, 1 none did, 64 usage.
-#     Same time limits and effort variables. Grok has web search alone; its
-#     local fetch tool is denied.
 #   review --codex, review --grok and second-opinion belong to the mentat-reviewers module:
 #     mentat hands each, with the arguments after its mode, to the module's entry
 #     mentat-review-codex, mentat-review-grok or mentat-second-opinion, in this checkout's
@@ -158,5 +151,5 @@ case "${1:-}" in
   reviewers) shift; reviewers_command "$@" ;;
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion [--web] <file> | mentat check" 64 ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check" 64 ;;
 esac

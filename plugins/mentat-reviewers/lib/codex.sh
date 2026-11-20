@@ -21,7 +21,7 @@ review_prep_codex() {
 # A failure of Codex's own run is one of its failures in a row (review_tool_failed, in
 # core's lib/review.sh); a refusal of where Codex is installed is not.
 # shellcheck disable=SC2154 # tmp and out are review_local's
-review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed disabled "" not_reviewed; }
+review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed disabled not_reviewed; }
 review_meta_codex() {
   printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "$(codex_model "$tmp/codex.log")" "$CODEX_EFFORT"
 }
@@ -118,16 +118,13 @@ codex_prefixes() {
 # On any failure it calls $4 with the reason, which exits. $5 is Codex's web
 # search mode: "disabled" for reviews, which judge the diff; "cached" (OpenAI's
 # index, no live fetches) for a second opinion on an idea, which checks current
-# practice; "live" for a second opinion with --web, which asks any question. Search
-# runs on OpenAI's side, outside the permissions profile below. $6 is optional:
-# "outside" adds --skip-git-repo-check, for the --web mode, which runs in an empty folder that is not a repository (Codex refuses
-# to start there otherwise). Every other caller passes nothing. $7, optional, is the
-# function codex_prefixes calls in place of $4 when it refuses where Codex is installed.
+# practice. Search runs on OpenAI's side, outside the permissions profile below. $6,
+# optional, is the function codex_prefixes calls in place of $4 when it refuses where
+# Codex is installed.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes outside=()
-  if [ "${6:-}" = outside ]; then outside=(--skip-git-repo-check); fi
+  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes
   log="${out%/*}/codex.log"
-  codex_prefixes "${7:-$fail}"
+  codex_prefixes "${6:-$fail}"
   filesystem=$(codex_filesystem "$dir" "$prefixes")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
   # final reply, so it cannot end with the status line the callers check.
@@ -141,7 +138,7 @@ run_codex() {
   # features.apps=false: the apps feature (the ChatGPT account's GitHub connector) is
   # on by default and --ignore-user-config does not turn it off, so Codex could read
   # GitHub beyond the change.
-  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config ${outside[@]+"${outside[@]}"} \
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
     -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \

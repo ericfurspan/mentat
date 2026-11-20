@@ -22,8 +22,7 @@
 #
 # `mentat second-opinion` runs Grok the same way on an idea, with no pull request,
 # except that it may use Grok's backend web search (the local fetch tool stays denied).
-# `mentat second-opinion --web` runs it on any question with web search alone: no file tools and
-# an empty export. The functions below that they share (grok_signin, grok_run_folder,
+# The functions below that they share (grok_signin, grok_run_folder,
 # grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
 # function named in `fail`: not_reviewed before Grok runs, grok_fail from then on; the
 # review passes its own (grok_signin_failed, grok_tool_failed), which also record Grok's
@@ -31,9 +30,9 @@
 # The pull-request steps (reading it, the diff prompt, the start comment, the
 # did-not-finish comment and posting) stay in review_grok's own functions.
 # Convention: these functions set the caller's variables by name and never return
-# values; that keeps the pull-request path and the second-opinion paths on one set of steps
+# values; that keeps the pull-request path and the second-opinion path on one set of steps
 # without passing a dozen arguments. A reader tracing a variable should start from
-# review_grok, opinion_grok and opinion_web_grok, which declare them.
+# review_grok and opinion_grok, which declare them.
 GROK_PROFILE="mentat-review"
 # Grok has its own timeout: a review has taken up to 19 minutes, and its JSON
 # arrives only at the end.
@@ -294,11 +293,9 @@ grok_args() {
   # in the sessions folder, which Grok may write and its tools may not read.
   # Web search is a backend search on xAI's side, on only for a second opinion (the
   # caller's web_search); the local fetch tool is denied in every path and web_fetch
-  # is never in the allowlist. A review has no web at all. The file tools come from
-  # the caller's grok_tools; review and the repository mode set nothing and get the
-  # three file tools. The web mode sets grok_tools="" and web_search=1, so Grok gets web search alone.
-  local tools="${grok_tools-read_file,grep,list_dir}" search=(--disable-web-search)
-  if [ -n "${web_search:-}" ]; then tools="${tools:+$tools,}web_search" search=(); fi
+  # is never in the allowlist. A review has no web at all.
+  local tools="read_file,grep,list_dir" search=(--disable-web-search)
+  if [ -n "${web_search:-}" ]; then tools="$tools,web_search" search=(); fi
   args=(--cwd "$run/export" --prompt-file "$run/in/prompt" --output-format json
     --tools "$tools" --disallowed-tools "Agent,run_terminal_command,run_terminal_cmd"
     --deny MCPTool --deny WebFetch --debug-file "$ghome/sessions/debug.log"

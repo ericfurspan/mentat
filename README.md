@@ -64,7 +64,7 @@ Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linea
 
 ## Review tools
 
-`mentat second-opinion` runs Codex and Grok on an idea, or with `--web` on a question alone.
+`mentat second-opinion` runs Codex and Grok on an idea.
 
 ## Git hooks
 
