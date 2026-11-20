@@ -153,6 +153,8 @@ data() { sed -n "/^--- BEGIN IDEA DATA ---\$/,/^--- END IDEA DATA ---\$/p" "$1" 
 
 reset; rc=$(run "$idea")
 check "both deliver (exit 0): a section for each in order, and a summary of both verdict lines" '[ "$rc" = 0 ] && c=$(grep -n "^## Codex$" "$STUB/stdout" | cut -d: -f1) && g=$(grep -n "^## Grok$" "$STUB/stdout" | cut -d: -f1) && [ "$c" -lt "$g" ] && grep -q "Codex thinks it is fine." "$STUB/stdout" && grep -q "Grok has a view." "$STUB/stdout" && grep -qE "^- Codex \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout" && grep -qE "^- Grok \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT DIFFERENTLY - fewer helpers$" "$STUB/stdout"'
+check "each section ends with its timing line: exactly two (<n> seconds) lines" '[ "$(grep -cE "^\([0-9]+ seconds\)\$" "$STUB/stdout")" = 2 ]'
+check "the idea is copied no further than the prompts: no idea text in the arguments" '! grep -q "Ignore all previous" "$STUB/args" "$STUB/args_grok"'
 check "a delivered second opinion keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
 check "a delivered second opinion prints no such line on stderr" '! grep -q "no second opinion from any tool" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit read: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
