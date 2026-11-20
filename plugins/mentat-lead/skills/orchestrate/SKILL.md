@@ -31,7 +31,7 @@ A pull request is waiting from its "Ready to merge" line until it merges or clos
 
 The limit N: read `MENTAT_READY_LIMIT` by name with `printenv MENTAT_READY_LIMIT`, never the whole environment; unset or empty, N is `3`. A value that is not a whole number of 1 or more counts as unset, said once.
 
-While N pull requests are waiting, hand over no item and start no build session; builds in flight and planning go on. Otherwise hand over at most N minus the waiting ones at a time, counting each item the build session confirmed until it reports it did not take it or its pull request has its "Ready to merge" line, merges or closes. An item held back stays agreed, is named to the maintainer, and is handed over once the count allows.
+While N pull requests are waiting, hand over no item and start no build session; builds in flight and planning go on. Otherwise hand over at most N minus the waiting ones at a time, counting each item a build session this session started or took over confirmed, or, for one the maintainer's command started, each item given to the maintainer in a command for it, until that session reports, or the maintainer says, it did not take it, or its pull request has its "Ready to merge" line, merges or closes. An item held back stays agreed, is named to the maintainer, and is handed over once the count allows.
 
 ## Relays
 
