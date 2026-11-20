@@ -10,7 +10,7 @@ The maintainer typed this to make the session the orchestrator for its repositor
 
 1. Finish the step in flight first. Never interrupt a running builder, review or test run.
 2. Read the backlog's agreed order and stages (`mentat:backlog` "The order of agreed work"), the pull requests waiting after their "Ready to merge" line ("Pause"), the notes file if one exists ("Notes"), and the host's list of the sessions this session started, to find a running build session ("The build session").
-3. For each item in the notes file with a pull request the notes do not record as merged or closed, read its state with `gh pr view <N> --json state` and record a merged or closed one in the notes file, passing a merged one on as "After merge" says, since an ended orchestrator may not have. Then read the held items ("Handing over"), and, as the summary, say in a few lines what it will do next.
+3. For each item in the notes file with a pull request the notes do not record as merged or closed, read its state with `gh pr view <N> --json state`, record a merged or closed one in the notes file and name it to the maintainer, since its build session may not have heard of a merge. Then read the held items ("Handing over"), and, as the summary, say in a few lines what it will do next.
 
 ## Planning
 
@@ -40,7 +40,7 @@ Do the starting session's half of the relays: `mentat:build` "Started sessions" 
 
 ## After merge
 
-When the maintainer says #N merged for an item this session gave its build session, tell the build session by session message that #N merged, or, for one the maintainer's command started, ask the maintainer to say it there; the build session runs its own after-merge steps (`after-ready.md` in `mentat:review`'s folder). Record it merged in the notes file.
+When the maintainer says #N merged for an item this session gave its build session, tell the build session by session message that #N merged, forwarding the maintainer's words, or, for one the maintainer's command started, ask the maintainer to say it there; the build session runs its own after-merge steps (`after-ready.md` in `mentat:review`'s folder). Record it merged in the notes file.
 
 ## Notes
 
