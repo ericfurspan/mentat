@@ -21,7 +21,7 @@ One build session per repository at a time. Before starting one, read the notes 
 
 ## Handing over
 
-An item agreed with "Agree and build now" is handed over to the running build session by one message naming the item, its spec fingerprint as recorded at agreement (`mentat:backlog` "Agreement") and any start wait (`mentat:backlog` "Start waits"); with none running, one is started for it as above. The build session takes it as `mentat:build` "Started sessions" says. When it has not confirmed the item with that fingerprint by the end of its next turn, tell the maintainer. A report that it did not take the item goes to the maintainer with its reason; an item it left out for its start wait is handed over again once the wait is met.
+An item agreed with "Agree and build now" is handed over to the running build session by one message naming the item, its spec fingerprint as recorded at agreement (`mentat:backlog` "Agreement") and any start wait (`mentat:backlog` "Start waits"); with none running, one is started for it as above. The build session takes it as `mentat:build` "Started sessions" says. When it has not confirmed the item with that fingerprint by the end of its next turn, tell the maintainer. A report that it did not take an item, handed over or in its start command, is recorded in the notes file and goes to the maintainer with its reason; an item it left out for its start wait is handed over again once the wait is met.
 
 An item agreed with "Agree, build later" is handed over only on the maintainer's later word: their typed `/mentat:build`, with or without ids, or a yes to a next-work offer naming it. Here both hand their items over instead of building in this session.
 
