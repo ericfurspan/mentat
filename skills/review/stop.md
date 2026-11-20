@@ -2,7 +2,7 @@
 
 Read this at the end of every review round, on resume and after a compaction, from `mentat:review`.
 
-A stop is pending after any completed round from round three on, before the last round within the limit, that posted findings, Codex's included, fixed or answered alike, until it is settled or answered; a finding raised again with no new evidence after its answer was recorded in Review details does not count (`findings.md`). A round with no findings from either review goes to the final check. The last round within the limit is no stop: it is neither settled nor asked, leaves no stop pending, and "Round limit" alone decides; a later raise of the limit, the maintainer's or the session's, does not make it one. Once "Ready to merge: #N" was given, `after-ready.md` applies instead.
+A stop is pending after any completed round from round three on, before the last round within the limit, that posted findings, Codex's included, fixed or answered alike, until it is settled or answered; a finding raised again with no new evidence after its answer was recorded in Review details does not count, unless it was settled by the maintainer and the text it was about changed since (`findings.md`). A round with no findings from either review goes to the final check. The last round within the limit is no stop: it is neither settled nor asked, leaves no stop pending, and "Round limit" alone decides; a later raise of the limit, the maintainer's or the session's, does not make it one. Once "Ready to merge: #N" was given, `after-ready.md` applies instead.
 
 ## Order
 
