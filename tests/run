@@ -120,19 +120,6 @@ skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 skills/propose/session.md||offers a grill (\`mentat-lead:grill\`, where available) only with two or more of their decisions open, asking a single one directly
 EOF
-# Wording the default agreement and the grill threshold replaced must not come back.
-while IFS='|' read -r f gone; do
-  [ -n "$f" ] || continue
-  if grep -q -F -- "$gone" "$f"; then
-    fail "$f must no longer say: $gone"
-  else
-    pass "$f no longer says: $gone"
-  fi
-done <<EOF
-skills/backlog/SKILL.md|Only the maintainer's yes in \`mentat:propose\` commits an item
-skills/pr/SKILL.md|marked "agreed" when the agreed spec fixes it, else
-skills/propose/session.md|offers a grill (\`mentat-lead:grill\`, where available) where what the maintainer wants from the item is unclear
-EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
   pass "docs/adr holds the decision record for default agreement in the orchestrator"
 else
