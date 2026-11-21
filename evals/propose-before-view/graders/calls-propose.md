@@ -6,4 +6,4 @@ min: 1
 arm: both
 ---
 
-The agent calls mentat:propose through the Skill tool before it gives its view.
+The agent calls mentat:propose through the Skill tool; `propose-before-view` checks that the call comes first.
