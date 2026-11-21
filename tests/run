@@ -99,6 +99,7 @@ $o|Relays|in "Start" (a closed pull request), in "After merge" (no session will 
 $o|Relays|with the plan check's verdict, each point not adopted and why, the unchecked situations that adopted changes added, any second-opinion tool that gave no answer and any plan check retried without its model
 $o|Notes|each tell owed ("Relays"), the default-agreement tell included, until given
 $o|Notes|the maintainer's word to stop planning, and any pausing new builds
+plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line and the spec fixes its fingerprint record holds
 skills/backlog/agent-records.md|The comment|replaces the answer and keeps that line
 skills/backlog/agent-records.md|The comment|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/propose/SKILL.md||nothing is built before that agreement, the one exception an item \`mentat-lead:orchestrate\` agrees by default
