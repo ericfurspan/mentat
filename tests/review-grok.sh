@@ -746,6 +746,8 @@ reset; mkdir -p "${REC%/*}" && echo "2026-01-01T00:00:00Z fail owner/repo#5 olde
 check "an older fail line without the word counts as another kind of failure: the out-of-usage failure after it is raised" 'usage_raised "Grok has failed 2 times in a row (owner/repo#5, owner/repo#7)"'
 reset; usage_fail run 7; signin_fail
 check "a sign-in refusal after an out-of-usage failure in the row is still raised" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
+reset; usage_fail srun; stub_reset; rm "$GH_USER/auth.json"; rc=$(srun); reset_signin
+check "--stop: a sign-in refusal after an out-of-usage failure in the row is still raised" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
 reset; usage_fail run 7; other_fail run 8
 check "another failure after an out-of-usage failure is the second in a row and still raised" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1;"'
 reset; usage_fail srun; other_fail srun
