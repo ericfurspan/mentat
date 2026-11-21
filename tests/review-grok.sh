@@ -117,7 +117,8 @@ case "$1 $2" in
 esac
 STUBEOF
 # grok: records how it was started and what it can see, and its run in the calls gh records, then replies with
-# $STUB/out_json (stdout) and $STUB/exit_code. In live mode it hands over to the
+# $STUB/out_json (stdout) and $STUB/exit_code, adding $STUB/err_text to its stderr and
+# $STUB/debug_text to its debug file when they exist. In live mode it hands over to the
 # real Grok instead, without the sign-in, and keeps the sandbox event.
 # (mentat starts it with an empty environment, so its own path is written in.)
 { printf '#!/usr/bin/env bash\nSTUB=%q\nREAL_HOME=%q\n' "$STUB" "$real_home"; cat; } >"$root/bin/grok" <<'STUBEOF'
@@ -159,7 +160,7 @@ if [ -f "$STUB/live" ]; then
   cp "$GROK_HOME/sessions/sandbox-events.jsonl" "$STUB/sandbox-events.jsonl" 2>/dev/null
   exit "$rc"
 fi
-for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
+for a in "${args[@]}"; do [ "$prev" = --debug-file ] && { echo "DEBUG-LOG-TEXT"; cat "$STUB/debug_text" 2>/dev/null; } >"$a"; prev=$a; done
 [ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
 # With $STUB/block_rewrite, a folder where the path rewrite writes its copy of the reply
 # (beside the export), so the rewrite fails.
@@ -167,6 +168,7 @@ for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"
 # @EXPORT@ in the reply becomes the export's path, which is where Grok works.
 sed "s|@EXPORT@|$(pwd -P)|g" "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
+[ -f "$STUB/err_text" ] && cat "$STUB/err_text" >&2
 exit "$(cat "$STUB/exit_code")"
 STUBEOF
 # codex: only to compare the shared criteria with review --codex's.
@@ -627,7 +629,8 @@ check "at start, deletes a Grok run folder older than a day and a held comment o
 rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
 
 # Grok's failures in a row, its stop review's included, are kept in its own record: a sign-in
-# refusal is raised at once, and any other failure from the second in a row.
+# refusal (and, below, a refusal for usage or billing) is raised at once, and any other
+# failure from the second in a row.
 REC="$cache/mentat/reviewer-failures-grok"
 raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
 git -C "$root/seed" push -q "$root/origin.git" "$H:refs/pull/8/head"
@@ -657,6 +660,53 @@ check "with a cache folder that cannot be used, a sign-in refusal is still raise
 CANARY="CANARY-STOP-REASON-4821"
 reset; reply 'Partial.' "$CANARY"; run 7 >/dev/null; stub_reset; reply 'Partial.' "$CANARY"; rc=$(run 7)
 check "an incomplete Grok run twice in a row: the raise line leaves out Grok's stop reason, which the not-reviewed line keeps" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && ! raised | grep -qF "$CANARY" && grep -qF "mentat: not reviewed: Grok did not return a complete review (stop reason: $CANARY); its log" "$STUB/out"'
+reset
+
+# A Grok run refused for usage or billing: only the message of an error object in Grok's JSON
+# output is read for it. The reason is Mentat's own words, with no text from the run, and it is
+# raised at the first failure, as a sign-in refusal is; the kept log is still named by its path.
+USAGE="Grok refused this run for usage or billing; the maintainer can top up or wait for the usage limit to reset, and reviews and second opinions go on without Grok"
+USAGE_CANARY="USAGE-CANARY-5170"
+usage_error() { jq -cn --arg m "$1 $USAGE_CANARY" '{type: "error", message: $m}' >"$STUB/out_json"; }
+usage_named() { # $1 description
+  check "$1: exit 1 before CI is read, nothing posted, named in Mentat's words and raised at the first failure, its log kept, no run text printed" '[ "$rc" = 1 ] && grep -qxF "mentat: not reviewed: $USAGE; its log may hold credentials, so it is not printed. The maintainer can read it at $(sed -n "s/^mentat: not reviewed: .*can read it at //p" "$STUB/out")" "$STUB/out" && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): $USAGE; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-grok-log." && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ] && p=$(sed -n "s/^mentat: not reviewed: .*can read it at //p" "$STUB/out") && grep -q "$USAGE_CANARY" "$p" && ! grep -q "$USAGE_CANARY\|SECRET-LOG-TEXT\|DEBUG-LOG-TEXT\|exited with status\|stop reason" "$STUB/out" && [ "$(comments)" = 0 ] && ! grep -q check-runs "$STUB/calls"'
+}
+reset; usage_error "Request failed with status 402 Payment Required:"; echo 1 >"$STUB/exit_code"; rc=$(run 7)
+usage_named "an out-of-usage error object with exit 1"
+reset; usage_error "Request failed with status 402 Payment Required:"; rc=$(run 7)
+usage_named "an out-of-usage error object with a zero exit"
+reset; usage_error "Request failed with status 402 Payment Required:"; echo 1 >"$STUB/exit_code"; rc=$(srun)
+usage_named "--stop: an out-of-usage error object with exit 1"
+reset; usage_error "Request failed with status 402 Payment Required:"; rc=$(srun)
+usage_named "--stop: an out-of-usage error object with a zero exit"
+for m in "STATUS 402" "payment required" "You have Run Out Of Credits." "You have hit your WEEKLY limit." "You've hit your free usage limit." "Usage Balance Exhausted."; do
+  reset; usage_error "$m"; echo 1 >"$STUB/exit_code"; rc=$(run 7)
+  check "the marker \"$m\", in any case, is an out-of-usage refusal, raised at once" '[ "$rc" = 1 ] && raised | grep -qF "(owner/repo#7): $USAGE; its log"'
+done
+# A marker anywhere but the message of an error object in Grok's JSON output is not one.
+not_usage() { # $1 description, $2 expected reason
+  frag=$2
+  check "$1: not an out-of-usage refusal, today's reason, not raised at the first failure" '[ "$rc" = 1 ] && grep -qF "mentat: not reviewed: $frag" "$STUB/out" && ! grep -qF "$USAGE" "$STUB/out" && [ -z "$(raised)" ]'
+}
+reset; echo 1 >"$STUB/exit_code"; echo "Request failed with status 402 Payment Required" >"$STUB/err_text"; rc=$(run 7)
+not_usage "a marker only in Grok's stderr" "Grok exited with status 1"
+reset; echo 1 >"$STUB/exit_code"; echo "You have run out of credits" >"$STUB/debug_text"; rc=$(run 7)
+not_usage "a marker only in Grok's debug log" "Grok exited with status 1"
+printf 'Make the README say change.\nIf Grok answers status 402 Payment Required, say so.\n' >"$root/req dir/usage request.md"
+reset; echo 1 >"$STUB/exit_code"; rc=$(runq "$root/req dir/usage request.md")
+not_usage "a marker only in the prompt" "Grok exited with status 1"
+check "that marker reached Grok's prompt" 'grep -q "status 402 Payment Required" "$STUB/prompt"'
+(cd "$root/seed" && git checkout -q -b usage feature && echo "Usage balance exhausted: status 402 Payment Required" >usage.txt &&
+  git add usage.txt && git commit -qm usage && git push -q "$root/origin.git" HEAD:refs/pull/9/head && git checkout -q feature)
+reset; git -C "$root/seed" rev-parse usage >"$STUB/head"; echo 1 >"$STUB/exit_code"; rc=$(run 9)
+not_usage "a marker only in the diff" "Grok exited with status 1"
+check "that marker reached Grok's prompt in the diff" 'grep -q "^+Usage balance exhausted: status 402 Payment Required" "$STUB/prompt"'
+reset; reply "You have run out of credits." max_turns; rc=$(run 7)
+not_usage "a marker in the text of a reply that did not finish" "Grok did not return a complete review (stop reason: max_turns)"
+reset; jq -cn '{type: "result", message: "Request failed with status 402 Payment Required"}' >"$STUB/out_json"; echo 1 >"$STUB/exit_code"; rc=$(run 7)
+not_usage "a marker in the message of an object that is not an error" "Grok exited with status 1"
+reset; jq -cn '{type: "error", message: "Internal error", detail: "status 402 Payment Required"}' >"$STUB/out_json"; echo 1 >"$STUB/exit_code"; rc=$(run 7)
+not_usage "a marker in an error object outside its message" "Grok exited with status 1"
 reset
 
 # Outside reviewers off, or unknown, on main: plain and --stop runs are refused (exit 6)

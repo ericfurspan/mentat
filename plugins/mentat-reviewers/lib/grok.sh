@@ -23,7 +23,7 @@
 # `mentat second-opinion` runs Grok the same way on an idea, with no pull request,
 # except that it may use Grok's backend web search (the local fetch tool stays denied).
 # The functions below that they share (grok_signin, grok_run_folder,
-# grok_export_head, grok_home, grok_args, grok_exec, grok_reply) report a failure by calling the caller's
+# grok_export_head, grok_home, grok_args, grok_exec, grok_reply, grok_run_failed) report a failure by calling the caller's
 # function named in `fail`: not_reviewed before Grok runs, grok_fail from then on; the
 # review passes its own (grok_signin_failed, grok_tool_failed), which also record Grok's
 # failures in a row.
@@ -369,7 +369,23 @@ grok_exec() {
   rc=$?
   # shellcheck disable=SC2034 # read by review_stop in lib/shared.sh
   review_child=""
-  [ "$rc" -eq 0 ] || "$fail" "Grok exited with status $rc"
+  [ "$rc" -eq 0 ] || grok_run_failed "Grok exited with status $rc"
+}
+
+# Grok refusing a run for usage or billing, in Mentat's own words: no text from the run.
+GROK_OUT_OF_USAGE="Grok refused this run for usage or billing; the maintainer can top up or wait for the usage limit to reset, and reviews and second opinions go on without Grok"
+# A Grok run that failed (it exited non-zero, or returned no complete reply): calls "$fail"
+# with GROK_OUT_OF_USAGE when the message of an error object in Grok's JSON output names an
+# out-of-usage or billing refusal, else with the arguments. Only that message is read, never
+# Grok's stderr, its debug log or the rest of its output, which can hold the prompt or diff;
+# output that is not JSON has no such message. Shared by review --grok and second-opinion.
+grok_run_failed() {
+  if jq -s -e 'any(.[]; type == "object" and .type == "error" and (.message | type) == "string" and
+      (.message | test("status 402|payment required|run out of credits|hit your weekly limit|hit your free usage limit|usage balance exhausted"; "i")))' \
+      "$out" >/dev/null 2>&1; then
+    "$fail" "$GROK_OUT_OF_USAGE"
+  fi
+  "$fail" "$@"
 }
 
 # Posts the start record, which keeps the review loop from starting a second Grok
@@ -397,7 +413,7 @@ grok_reply() {
   local stop
   stop=$(jq -s -r 'if length == 1 and (.[0] | type) == "object" then (.[0].stopReason // "none" | tostring) else "none" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9_-' | head -c 40)
   if ! jq -s -e 'length == 1 and (.[0] | type) == "object" and .[0].stopReason == "end_turn" and (.[0].text | type) == "string" and (.[0].text | test("\\S"))' "$out" >/dev/null 2>&1; then
-    "$fail" "Grok did not return a complete review (stop reason: ${stop:-none})" "Grok did not return a complete review"
+    grok_run_failed "Grok did not return a complete review (stop reason: ${stop:-none})" "Grok did not return a complete review"
   fi
   jq -r '.text' "$out" >"$result_file" || "$fail" "could not read Grok's reply"
 }
@@ -418,15 +434,15 @@ grok_localize() {
 
 # The review's own failure functions, which second opinions never use: a sign-in refusal
 # (grok_signin's, told apart by how it starts) is one of Grok's failures in a row and is
-# always raised; Grok's run failing from then on is one too (lib/shared.sh). Any other
-# stop records nothing.
+# always raised; Grok's run failing from then on is one too (lib/shared.sh), always raised
+# when Grok refused it for usage or billing (GROK_OUT_OF_USAGE). Any other stop records nothing.
 grok_signin_failed() {
   case "$1" in "Grok is not signed in"* | "Grok's sign-in"*) reviewer_failed grok always ;; esac
   not_reviewed "$1"
 }
 # $2, when given, is $1 without Grok's own output, for the line that tells the maintainer now.
 grok_tool_failed() {
-  reviewer_failed grok
+  if [ "$1" = "$GROK_OUT_OF_USAGE" ]; then reviewer_failed grok always; else reviewer_failed grok; fi
   grok_fail "$1" "" "${2:-}"
 }
 
