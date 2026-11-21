@@ -23,6 +23,8 @@ review_prep_codex() {
 # core's lib/review.sh); a refusal of where Codex is installed is not.
 # shellcheck disable=SC2154 # tmp and out are review_local's
 review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed disabled not_reviewed; }
+# A Codex reply with no final result line names the model asked for, as run_codex's failures do.
+review_note_codex() { codex_asked_note; }
 # The model line notes the model asked for when the header names another one.
 review_meta_codex() {
   local ran asked=""
@@ -45,6 +47,9 @@ codex_model() {
 }
 # Prints $1 with only model-name characters, at most 64.
 model_chars() { printf '%s' "$1" | tr -cd 'A-Za-z0-9._:/-' | head -c 64; }
+# No validation and no fallback: a failed Codex run names the model asked for. Prints the
+# note a failure reason ends with when MENTAT_CODEX_MODEL is set, else nothing.
+codex_asked_note() { [ -z "$codex_asked" ] || printf '; Codex was asked for model %s with MENTAT_CODEX_MODEL' "$(model_chars "$codex_asked")"; }
 
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory (outside the checkout for a
@@ -131,10 +136,9 @@ codex_prefixes() {
 # optional, is the function codex_prefixes calls in place of $4 when it refuses where
 # Codex is installed.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes asked=""
+  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes asked
   log="${out%/*}/codex.log"
-  # No validation and no fallback: a failure names the model asked for.
-  [ -z "$codex_asked" ] || asked="; Codex was asked for model $(model_chars "$codex_asked") with MENTAT_CODEX_MODEL"
+  asked=$(codex_asked_note)
   codex_prefixes "${6:-$fail}"
   filesystem=$(codex_filesystem "$dir" "$prefixes")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only

@@ -224,6 +224,10 @@ reset; rc=$(MENTAT_CODEX_MODEL="gpt stub 9" run "$idea")
 check "MENTAT_CODEX_MODEL set passes Codex --model=<value> as one argument" '[ "$rc" = 0 ] && [ "$(grep -c -- "^--model" "$STUB/args")" = 1 ] && grep -qx -- "--model=gpt stub 9" "$STUB/args" && grep -qE "^- Codex \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout"'
 reset; echo 3 >"$STUB/codex_exit"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
 check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "no second opinion (codex exited with status 3.*; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/stdout"'
+reset; printf 'Codex thinks it is fine.\n' >"$STUB/codex_out"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
+check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL)$" "$STUB/stdout"'
+reset; printf 'Codex thinks it is fine.\n' >"$STUB/codex_out"; rc=$(run "$idea")
+check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line)$" "$STUB/stdout" && ! grep -q MENTAT_CODEX_MODEL "$STUB/stdout"'
 reset; touch "$STUB/codex_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
 # More than the 3-second limit, then the 2 seconds between TERM and KILL.
 check "a Codex timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'

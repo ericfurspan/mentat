@@ -51,7 +51,7 @@ opinion_codex() {
     cat "$res/body"
   } >"$tmp/prompt" || pair_fail "could not write the prompt"
   run_codex "$tmp/tree" "$tmp/prompt" "$tmp/out" pair_fail cached
-  pair_keep "$tmp/out" opinion_verdict_ok "SECOND OPINION VERDICT"
+  pair_keep "$tmp/out" opinion_verdict_ok "SECOND OPINION VERDICT" "$(codex_asked_note)"
 }
 
 # Grok reads an export of the same commit, confined as in review --grok.

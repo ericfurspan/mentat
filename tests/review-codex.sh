@@ -310,6 +310,10 @@ reset; rm "$STUB/reply"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run)
 check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex returned no final message; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/out"'
 reset; rm "$STUB/reply"; rc=$(run)
 check "a failed Codex run with MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex returned no final message" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
+reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run)
+check "a Codex reply with no result line and MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex.s reply has no final REVIEW RESULT line; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/out" && ! posted'
+reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
+check "a Codex reply with no result line and MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex.s reply has no final REVIEW RESULT line" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
 # The issues the pull request closes reach Codex as labeled data, ahead of the description.
 ref() { printf '{"number":%s,"repository":{"name":"%s","owner":{"login":"%s"}}}' "$3" "$2" "$1"; }
 reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(run)
