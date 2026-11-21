@@ -433,16 +433,18 @@ grok_localize() {
 }
 
 # The review's own failure functions, which second opinions never use: a sign-in refusal
-# (grok_signin's, told apart by how it starts) is one of Grok's failures in a row and is
-# always raised; Grok's run failing from then on is one too (lib/shared.sh), always raised
-# when Grok refused it for usage or billing (GROK_OUT_OF_USAGE). Any other stop records nothing.
+# (grok_signin's, told apart by how it starts) is one of Grok's failures in a row in this
+# machine's record and is always raised; Grok's run failing from then on is one too
+# (lib/shared.sh), raised from the second in a row, or, when Grok refused it for usage or
+# billing (GROK_OUT_OF_USAGE), only when no earlier failure in the row was one, so once per
+# row; its not-reviewed line gives GROK_OUT_OF_USAGE either way. Any other stop records nothing.
 grok_signin_failed() {
   case "$1" in "Grok is not signed in"* | "Grok's sign-in"*) reviewer_failed grok always ;; esac
   not_reviewed "$1"
 }
 # $2, when given, is $1 without Grok's own output, for the line that tells the maintainer now.
 grok_tool_failed() {
-  if [ "$1" = "$GROK_OUT_OF_USAGE" ]; then reviewer_failed grok always; else reviewer_failed grok; fi
+  if [ "$1" = "$GROK_OUT_OF_USAGE" ]; then reviewer_failed grok usage; else reviewer_failed grok; fi
   grok_fail "$1" "" "${2:-}"
 }
 
