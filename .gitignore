@@ -7,3 +7,6 @@
 
 # Working files: plans, audits and trial kits (see AGENTS.md)
 work/
+
+# Local behavior eval results; never committed or published (see evals/README.md)
+evals/results/
