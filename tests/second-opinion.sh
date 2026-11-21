@@ -26,6 +26,7 @@ export TMPDIR="$root/tmp" XDG_CACHE_HOME="$cache"
 # A home of its own, so no review tools setting of the user's applies.
 export HOME="$root/home"
 mkdir -p "$HOME"
+unset MENTAT_CODEX_MODEL
 real_git=$(command -v git)
 
 # The user's Grok home: a sign-in, and the things that must never reach a run.
@@ -212,7 +213,17 @@ reset; echo 3 >"$STUB/codex_exit"; echo 'auth failed for token FAKE-TOKEN-123' >
 check "Codex exiting non-zero gives no second opinion (exit 0), and its log is not printed" '[ "$rc" = 0 ] && grep -q "no second opinion (codex exited with status 3" "$STUB/stdout" && grep -q "SECOND OPINION VERDICT: DO IT DIFFERENTLY" "$STUB/stdout" && ! grep -q FAKE-TOKEN-123 "$STUB/stdout" "$STUB/stderr"'
 check "that leaves nothing behind but Codex's private log" 'clean'
 reset; rm "$STUB/codex_out"; rc=$(run "$idea")
-check "Codex with no final message gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex returned no final message" "$STUB/stdout"'
+check "Codex with no final message gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex returned no final message" "$STUB/stdout" && ! grep -q MENTAT_CODEX_MODEL "$STUB/stdout"'
+# MENTAT_CODEX_MODEL: set, Codex is passed --model=<value> as one argument; unset or empty, no --model.
+no_model_arg() { ! grep -q -- "^--model" "$STUB/args" && ! grep -q "^model=" "$STUB/args"; }
+reset; rc=$(run "$idea")
+check "MENTAT_CODEX_MODEL unset passes Codex no --model" '[ "$rc" = 0 ] && codex_ran && no_model_arg'
+reset; rc=$(MENTAT_CODEX_MODEL='' run "$idea")
+check "MENTAT_CODEX_MODEL empty passes Codex no --model" '[ "$rc" = 0 ] && codex_ran && no_model_arg'
+reset; rc=$(MENTAT_CODEX_MODEL="gpt stub 9" run "$idea")
+check "MENTAT_CODEX_MODEL set passes Codex --model=<value> as one argument" '[ "$rc" = 0 ] && [ "$(grep -c -- "^--model" "$STUB/args")" = 1 ] && grep -qx -- "--model=gpt stub 9" "$STUB/args" && grep -qE "^- Codex \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout"'
+reset; echo 3 >"$STUB/codex_exit"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
+check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "no second opinion (codex exited with status 3.*; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/stdout"'
 reset; touch "$STUB/codex_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
 # More than the 3-second limit, then the 2 seconds between TERM and KILL.
 check "a Codex timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'

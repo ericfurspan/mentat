@@ -26,7 +26,8 @@
 #     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
 #     MENTAT_REVIEW_TIMEOUT_SECONDS. The round limit is MENTAT_REVIEW_ROUNDS (empty counts as
 #     unset; any other value but a whole number of 1 or more exits 64), which the record names.
-#   mentat review --codex <PR>  The same with local Codex in place of Claude.
+#   mentat review --codex <PR>  The same with local Codex in place of Claude, on the model
+#     MENTAT_CODEX_MODEL names when it is set, else Codex's own default model.
 #     --codex and --grok first read whether outside reviewers are on here, as mentat
 #     reviewers does; unless they are on, they print why, post nothing and exit 6.
 #   mentat review --grok <PR>  The same with Grok, if installed: its start comment and
@@ -85,6 +86,7 @@
 #     fetches origin's default branch into a private ref, leaving origin/<default> and
 #     FETCH_HEAD as they are. Time limits:
 #     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
+#     Codex runs on MENTAT_CODEX_MODEL when it is set, else its own default model;
 #     Grok's effort is MENTAT_GROK_REASONING_EFFORT. Grok may use its backend web search here
 #     (never in review); the local fetch tool is denied.
 #   review --codex, review --grok and second-opinion belong to the mentat-reviewers module:
