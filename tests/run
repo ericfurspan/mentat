@@ -110,6 +110,7 @@ skills/propose/SKILL.md||once the maintainer has corrected the same point twice 
 skills/propose/session.md||with two or more of the maintainer's decisions open, the grill offer of \`SKILL.md\` step 2 comes next
 skills/backlog/SKILL.md|Agreement|an item agreed by default records \`build: now\` and the default-agreement line that record gives, never as the maintainer's answer
 skills/backlog/agent-records.md|The comment|\`Agreed by default: nothing was open for the maintainer\`, never written as the maintainer's answer
+skills/backlog/spec-fixes.md||keeping its agreement citation, its build answer with any default-agreement line, and any earlier fix
 skills/propose/SKILL.md||then, for a new feature or workflow change, the survey \`decisions.md\` "Recommendations" gives, then a teammate's view
 skills/propose/decisions.md|Recommendations|a short survey of how established tools and teams solve the same problem: each source cited, each line no source confirms marked as unverified
 skills/propose/decisions.md|Recommendations|summarized in the view in a line or two, adding no stop. Small requests and fixes skip it.
