@@ -1,6 +1,6 @@
 ---
 description: "Source: rules.md, call mentat:propose before giving a view on a change; an agent gave its view on a change without planning it first."
-max_turns: 4
+max_turns: 8
 allowed_tools: [Skill]
 ---
 
