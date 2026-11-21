@@ -92,7 +92,7 @@ $o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second-opinion tool
 $o|Planning|Typed \`/mentat:propose\` sessions, chat requests and the small-request path are still asked.
 $o|Handing over|agreed by default ("Planning")
 $o|Handing over|the "Pause" count or a standing word of the maintainer's pausing new builds
-$o|Handing over|The maintainer's "later" naming an item agreed by default and still held records \`build: later\` on it
+$o|Handing over|The maintainer's "later", "stop", "not now" or like word naming a held item agreed by default records \`build: later\`
 $o|Handing over|This rule stops no item handed over or started
 $o|Handing over|A bare "later" or "stop" naming no item answers the question asked last
 $o|Relays|in "Start" (a closed pull request), in "After merge" (no session will take the steps), and the default-agreement tell
