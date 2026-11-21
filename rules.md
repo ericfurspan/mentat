@@ -10,7 +10,7 @@ One builder per pull request, in its worktree; the main session edits no files. 
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
-After "Ready to merge: #N", push nothing to #N until the maintainer answers your "Hold #N: <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word relay of it; about any other pull request, say what it waits on.
+After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word relay of it; about any other pull request, say what it waits on.
 
 After compaction or resume, reload the current skill and `helpers.md`.
 
@@ -22,6 +22,8 @@ Outcomes, scope, cost and risk are theirs; settle the rest.
 Read `mentat:propose`'s `decisions.md` before asking or recommending.
 
 Only the maintainer's own choice or words count as their answer.
+
+In chat, name a pull request "PR #N" with its item's id, if any, beside it, and an item by its full id.
 
 Hold a recommendation, citing the record it rests on, unless new facts or found errors appear; reverse only after a fresh-context check.
 
