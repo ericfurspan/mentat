@@ -53,6 +53,60 @@ else
   fail "skills/backlog/github.md must keep the spec in the issue body's ## Spec section"
 fi
 
+# Planning stops for the maintainer only where a decision is theirs. Each line below is a file, the
+# ## section that must hold the text (empty for the whole file) and the text, separated by |, which
+# the texts never hold (a tab would not do: read merges an empty field between two tabs).
+# The orchestrator agrees an item by default when nothing is open, holds or hands it over like any
+# item, owes the maintainer a tell for it, and keeps that tell in its notes file until given; the
+# planning and recording contracts name that default.
+o=plugins/mentat-lead/skills/orchestrate/SKILL.md
+while IFS='|' read -r f section want; do
+  [ -n "$f" ] || continue
+  if [ -z "$want" ]; then
+    fail "a check line for $f has no text to look for"
+    continue
+  fi
+  if [ -n "$section" ]; then
+    text=$(awk -v h="## $section" '$0 == h { on = 1; next } on && /^## / { exit } on' "$f")
+    where="$f's \"$section\""
+  else
+    text=$(cat "$f")
+    where=$f
+  fi
+  if printf '%s\n' "$text" | grep -q -F -- "$want"; then
+    pass "$where says: $want"
+  else
+    fail "$where must say: $want"
+  fi
+done <<EOF
+$o|Planning|when nothing is open, this session agrees it by default: it skips \`mentat:propose\`'s agreement question and treats the item as agreed with "Agree and build now"
+$o|Planning|the fingerprint recorded with \`build: now\` as agreed by default
+$o|Planning|no decision of the maintainer's was asked while planning the item (a grill, \`mentat:propose\` step 3 or its skeptic's pass)
+$o|Planning|the plan check gave a verdict and neither it nor any second-opinion tool said \`DON'T\`
+$o|Planning|no hand check would be offered; no material assumption stands; no fast track is proposed; no open maintainer comment bears on the agreement
+$o|Planning|the session's own advice against building does not stand
+$o|Planning|an item agreed for later before stays later, asked nothing here
+$o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second-opinion tool that gave no answer and a plan check retried without its model keep the default
+$o|Planning|Chat requests and the small-request path are still asked.
+$o|Handing over|agreed by default ("Planning")
+$o|Handing over|the "Pause" count or a standing word of the maintainer's pausing new builds
+$o|Handing over|The maintainer's "later" naming an item agreed by default and still held records \`build: later\` on it
+$o|Handing over|This rule stops no item handed over or started
+$o|Handing over|A bare "later" or "stop" naming no item answers the question asked last
+$o|Relays|in "Start" (a closed pull request), in "After merge" (no session will take the steps), and the default-agreement tell
+$o|Relays|with the plan check's verdict, each point not adopted and why, the unchecked situations that adopted changes added, any second-opinion tool that gave no answer and any plan check retried without its model
+$o|Notes|each tell owed ("Relays"), the default-agreement tell included, until given
+skills/propose/SKILL.md||nothing is built before that agreement, the one exception an item \`mentat-lead:orchestrate\` agrees by default
+skills/propose/SKILL.md||Only an Agree answer, or the one exception, that default, writes the spec
+skills/backlog/SKILL.md|Agreement|an item agreed by default records \`build: now\` and the default-agreement line that record gives, never as the maintainer's answer
+skills/backlog/agent-records.md|The comment|\`Agreed by default: nothing was open for the maintainer\`, never written as the maintainer's answer
+EOF
+if ls docs/adr/0002-*.md >/dev/null 2>&1; then
+  pass "docs/adr holds the decision record for default agreement in the orchestrator"
+else
+  fail "docs/adr must hold 0002-*.md, the decision record for default agreement in the orchestrator"
+fi
+
 # The README stays short: at most 500 words by wc -w.
 readme_words=$(wc -w <README.md | tr -d ' ')
 if [ "$readme_words" -le 500 ]; then
