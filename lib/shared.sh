@@ -20,39 +20,54 @@ not_reviewed() {
 
 # Each `mentat review` reviewer's runs on this machine, one file per reviewer in Mentat's
 # cache folder, which the start sweep leaves alone: a line per run that counts, its time,
-# fail or ok, the pull request as owner/name#N and a token for the run (its process id and
-# two random numbers); nothing from a reply or a log. A
+# fail or ok, the pull request as owner/name#N, a token for the run (its process id and
+# two random numbers) and, on a Grok out-of-usage failure only, the fixed word usage;
+# nothing from a reply or a log. A
 # failure is a Grok sign-in refusal or the reviewer tool's own (it exits non-zero, times
 # out, or returns no usable reply or no final result line); a checked reply is ok, posted
 # or not. Only the review paths record; second opinions never do. Each run appends one
 # short line, so runs at the same time each keep theirs. A record that cannot be written
 # is skipped quietly. Reads the caller's repo and pr. $1 claude, codex or grok; $2 fail or
-# ok; $3, optional, the run's token.
+# ok; $3, optional, the run's token; $4, optional, the word after it (usage).
 reviewer_record() {
   local cache=${XDG_CACHE_HOME:-$HOME/.cache}
   case "$cache" in /*) ;; *) return 1 ;; esac
-  { mkdir -p "$cache/mentat" && printf '%s %s %s#%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$2" "${repo:-unknown}" "${pr:-unknown}" "${3:-$$-$RANDOM-$RANDOM}" >>"$cache/mentat/reviewer-failures-$1"; } 2>/dev/null
+  { mkdir -p "$cache/mentat" && printf '%s %s %s#%s %s%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$2" "${repo:-unknown}" "${pr:-unknown}" "${3:-$$-$RANDOM-$RANDOM}" "${4:+ $4}" >>"$cache/mentat/reviewer-failures-$1"; } 2>/dev/null
 }
-# Records a failure of reviewer $1 (claude, codex or grok) and, from the second failure in
-# a row, or always with $2 = always (a Grok sign-in refusal), sets review_raise to the
+# Records a failure of reviewer $1 (claude, codex or grok) and may set review_raise to the
 # reviewer, how many failures in a row and their pull requests, so not_reviewed adds the
-# line that tells the maintainer now. The run is counted at this run's own line, found by
-# its token: the fail lines after the last ok before it, that line included, so a line
-# another run adds before this one reads the record changes nothing. When the record
-# cannot be written or read, or this run's line is not in it, there is no count: only a
-# sign-in refusal is raised then, as its first failure on this pull request.
+# line that tells the maintainer now. A row is this machine's record of the reviewer's
+# fail lines after the last ok, not a service-wide outage. Raised: with $2 = always (a Grok
+# sign-in refusal), every time; with $2 = usage (Grok refusing the run for usage or
+# billing), recorded with the word usage, only when no earlier fail line in the row carries
+# that word, so once per row; otherwise from the second failure in a row, older lines
+# without the word counting as other failures. The run is counted at this run's own line,
+# found by its token: the fail lines after the last ok before it, that line included, so a
+# line another run adds before this one reads the record changes nothing. When the record
+# cannot be written or read, or this run's line is not in it, there is no count: a sign-in
+# refusal or an out-of-usage failure is raised then, as its first failure on this pull
+# request, and nothing else is.
 reviewer_failed() {
-  local who n="" prs="" run token="$$-$RANDOM-$RANDOM"
+  local who n="" used="" prs="" run token="$$-$RANDOM-$RANDOM" word=""
   case "$1" in claude) who=Claude ;; codex) who=Codex ;; *) who=Grok ;; esac
-  if reviewer_record "$1" fail "$token" && run=$(awk -v token="$token" '$2 == "ok" { n = 0; prs = ""; split("", seen) }
+  [ "${2:-}" != usage ] || word=usage
+  if reviewer_record "$1" fail "$token" "$word" && run=$(awk -v token="$token" '$2 == "ok" { n = 0; u = 0; prs = ""; split("", seen) }
       $2 == "fail" { n++; if (!($3 in seen)) { seen[$3] = 1; prs = prs (prs == "" ? "" : ", ") $3 } }
-      $2 == "fail" && $4 == token { own = n " " prs }
+      $2 == "fail" && $4 == token { own = n " " (u + 0) " " prs }
+      $2 == "fail" && $5 == "usage" { u++ }
       END { if (own != "") print own }' "${XDG_CACHE_HOME:-$HOME/.cache}/mentat/reviewer-failures-$1" 2>/dev/null); then
-    n=${run%% *} prs=${run#* }
+    n=${run%% *} run=${run#* }
+    used=${run%% *} prs=${run#* }
   fi
   case "$n" in '' | *[!0-9]*) n="" ;; esac
-  if [ -z "$n" ] && [ "${2:-}" = always ]; then n=1 prs="${repo:-unknown}#${pr:-unknown}"; fi
-  [ -n "$n" ] && { [ "$n" -ge 2 ] || [ "${2:-}" = always ]; } || return 0
+  case "$used" in '' | *[!0-9]*) n="" ;; esac
+  if [ -z "$n" ] && { [ "${2:-}" = always ] || [ "${2:-}" = usage ]; }; then n=1 used=0 prs="${repo:-unknown}#${pr:-unknown}"; fi
+  [ -n "$n" ] || return 0
+  case "${2:-}" in
+    always) ;;
+    usage) [ "$used" -eq 0 ] || return 0 ;;
+    *) [ "$n" -ge 2 ] || return 0 ;;
+  esac
   if [ "$n" -eq 1 ]; then run="time"; else run="times"; fi
   review_raise="$who has failed $n $run in a row ($prs)"
 }

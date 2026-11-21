@@ -629,8 +629,8 @@ check "at start, deletes a Grok run folder older than a day and a held comment o
 rm -rf "$cache/mentat/grok-review.old" "$TMPDIR/mentat-held-comment.old"
 
 # Grok's failures in a row, its stop review's included, are kept in its own record: a sign-in
-# refusal (and, below, a refusal for usage or billing) is raised at once, and any other
-# failure from the second in a row.
+# refusal is raised at once, a refusal for usage or billing (below) at the first one in a row,
+# and any other failure from the second in a row.
 REC="$cache/mentat/reviewer-failures-grok"
 raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
 git -C "$root/seed" push -q "$root/origin.git" "$H:refs/pull/8/head"
@@ -664,7 +664,8 @@ reset
 
 # A Grok run refused for usage or billing: only the message of an error object in Grok's JSON
 # output is read for it. The reason is Mentat's own words, with no text from the run, and it is
-# raised at the first failure, as a sign-in refusal is; the kept log is still named by its path.
+# raised at the first failure when it is the first out-of-usage one in the row; the kept log
+# is still named by its path.
 USAGE="Grok refused this run for usage or billing; the maintainer can top up or wait for the usage limit to reset, and reviews and second opinions go on without Grok"
 USAGE_CANARY="USAGE-CANARY-5170"
 usage_error() { jq -cn --arg m "$1 $USAGE_CANARY" '{type: "error", message: $m}' >"$STUB/out_json"; }
@@ -707,6 +708,78 @@ reset; jq -cn '{type: "result", message: "Request failed with status 402 Payment
 not_usage "a marker in the message of an object that is not an error" "Grok exited with status 1"
 reset; jq -cn '{type: "error", message: "Internal error", detail: "status 402 Payment Required"}' >"$STUB/out_json"; echo 1 >"$STUB/exit_code"; rc=$(run 7)
 not_usage "a marker in an error object outside its message" "Grok exited with status 1"
+reset
+
+# Out-of-usage refusals in one row of Grok failures in this machine's record (the fail lines
+# after the last ok): only the first out-of-usage failure in the row is raised; a later one
+# prints its not-reviewed line in Mentat's words alone. Its fail line carries one fixed word
+# after the token, nothing from Grok's output. Other failures keep today's rule.
+usage_fail() { # $1 run or srun, $2 pull request for run
+  stub_reset; usage_error "Request failed with status 402 Payment Required:"; echo 1 >"$STUB/exit_code"
+  if [ "$1" = srun ]; then rc=$(srun); else rc=$(run "${2:-7}"); fi
+}
+other_fail() { stub_reset; echo 1 >"$STUB/exit_code"; if [ "$1" = srun ]; then rc=$(srun); else rc=$(run "${2:-7}"); fi; }
+signin_fail() { stub_reset; rm "$GH_USER/auth.json"; rc=$(run 7); reset_signin; }
+usage_quiet() { [ "$rc" = 1 ] && grep -qF "mentat: not reviewed: $USAGE; its log may hold credentials" "$STUB/out" && [ -z "$(raised)" ]; }
+# Each record line's kind, pull request, fifth field and field count; then the field counts alone.
+rec_fields() { awk '{ print $2, $3, $5, NF }' "$REC"; }
+rec_widths() { awk '{ print NF }' "$REC" | tr '\n' ' '; }
+usage_raised() { # $1 the expected "Grok has failed ..." part
+  [ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: $1: $USAGE; its log may hold credentials"
+}
+reset; usage_fail run 7; usage_fail run 8
+check "a second out-of-usage failure in the same row is not raised, and its not-reviewed line still gives Mentat's words" 'usage_quiet'
+check "each out-of-usage fail line carries the fixed word after its token, and nothing from Grok's output" '[ "$(rec_fields)" = "$(printf "fail owner/repo#7 usage 5\nfail owner/repo#8 usage 5")" ] && ! grep -q "$USAGE_CANARY" "$REC"'
+reset; usage_fail srun; usage_fail srun
+check "--stop: a second out-of-usage failure in the same row is not raised, and its not-reviewed line still gives Mentat's words" 'usage_quiet'
+reset; usage_fail run 7; usage_fail srun
+check "--stop after a plain out-of-usage failure in the same row is not raised" 'usage_quiet'
+reset; other_fail run 7; usage_fail run 8
+check "an out-of-usage failure after another kind of failure in the row is raised, counting both" 'usage_raised "Grok has failed 2 times in a row (owner/repo#7, owner/repo#8)" && [ "$(rec_widths)" = "4 5 " ]'
+usage_fail run 7
+check "the next out-of-usage failure in that row is not raised" 'usage_quiet'
+reset; signin_fail; usage_fail srun
+check "--stop: an out-of-usage failure after a sign-in refusal in the row is raised once" 'usage_raised "Grok has failed 2 times in a row (owner/repo#7)"'
+usage_fail srun
+check "--stop: the next out-of-usage failure in that row is not raised" 'usage_quiet'
+reset; mkdir -p "${REC%/*}" && echo "2026-01-01T00:00:00Z fail owner/repo#5 older-run" >"$REC"; usage_fail run 7
+check "an older fail line without the word counts as another kind of failure: the out-of-usage failure after it is raised" 'usage_raised "Grok has failed 2 times in a row (owner/repo#5, owner/repo#7)"'
+reset; usage_fail run 7; signin_fail
+check "a sign-in refusal after an out-of-usage failure in the row is still raised" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
+reset; usage_fail run 7; other_fail run 8
+check "another failure after an out-of-usage failure is the second in a row and still raised" '[ "$rc" = 1 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1;"'
+reset; usage_fail srun; other_fail srun
+check "--stop: another failure after an out-of-usage failure is the second in a row and still raised" '[ "$rc" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok exited with status 1;"'
+reset; usage_fail run 7; stub_reset; rc=$(run 7); usage_fail run 8
+check "a checked Grok reply ends the row: the next out-of-usage failure is raised again, as the first in a row" 'usage_raised "Grok has failed 1 time in a row (owner/repo#8)"'
+reset; usage_fail srun; stub_reset; rc=$(run 7); usage_fail srun
+check "--stop: after a checked Grok reply the next out-of-usage failure is raised again" 'usage_raised "Grok has failed 1 time in a row (owner/repo#7)"'
+# A record that cannot be written: a folder in its place, so Grok's run folder is still made.
+reset; mkdir -p "$REC"; usage_fail run 7; usage_fail run 7
+check "with a record that cannot be written, every out-of-usage failure is still raised, as one failure on this pull request" 'usage_raised "Grok has failed 1 time in a row (owner/repo#7)"'
+usage_fail srun; usage_fail srun
+check "--stop: with a record that cannot be written, every out-of-usage failure is still raised" 'usage_raised "Grok has failed 1 time in a row (owner/repo#7)"'
+rmdir "$REC"
+# Out-of-usage lines are counted up to this run's own line: of two runs at the same moment,
+# the one whose line comes first raises. $1 is the other run's line, added right after this
+# run's own; $2, when given, a line already there before it.
+raced_usage() {
+  (
+    rm -f "$REC"; mkdir -p "${REC%/*}" || exit 1
+    [ -z "${2:-}" ] || printf '%s\n' "$2" >"$REC"
+    # shellcheck source=/dev/null
+    . "$(dirname "$mentat")/../lib/shared.sh" || exit 1
+    eval "own_$(declare -f reviewer_record)"
+    # shellcheck disable=SC2329 # reviewer_failed calls it
+    reviewer_record() { own_reviewer_record "$@" && printf '%s\n' "$other" >>"$REC"; }
+    other=$1 repo=owner/repo pr=7
+    reviewer_failed grok usage
+    # shellcheck disable=SC2154 # set by reviewer_failed in lib/shared.sh
+    printf '%s\n' "$review_raise"
+  )
+}
+check "another run's out-of-usage line after this run's own leaves this run raised, as the first in the row" '[ "$(raced_usage "2026-01-01T00:00:02Z fail owner/repo#9 other-run usage")" = "Grok has failed 1 time in a row (owner/repo#7)" ]'
+check "another run's out-of-usage line before this run's own leaves this run not raised" '[ -z "$(raced_usage "2026-01-01T00:00:02Z ok owner/repo#9 later-run" "2026-01-01T00:00:01Z fail owner/repo#9 other-run usage")" ]'
 reset
 
 # Outside reviewers off, or unknown, on main: plain and --stop runs are refused (exit 6)
