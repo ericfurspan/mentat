@@ -55,7 +55,7 @@ fi
 
 # Planning stops for the maintainer only where a decision is theirs. Each line below is a file, the
 # ## section that must hold the text (empty for the whole file) and the text, separated by |, which
-# the texts never hold (a tab would not do: read merges an empty field between two tabs).
+# only the text may hold (a tab would not do: read merges an empty field between two tabs).
 # The orchestrator agrees an item by default when nothing is open, holds or hands it over like any
 # item, owes the maintainer a tell for it, and keeps that tell in its notes file until given; the
 # planning and recording contracts name that default; and planning offers a grill only for two or
@@ -115,6 +115,9 @@ skills/propose/decisions.md|Recommendations|Search words name nothing private, a
 skills/propose/decisions.md|Recommendations|Where the session cannot search the web, the survey rests on what the session knows, named as such; the view says when search was unavailable or found nothing useful.
 skills/propose/agreement.md|The plan check|the survey of established practice when one ran
 skills/backlog/SKILL.md|Stages|Only the maintainer's yes in \`mentat:propose\`, or \`mentat-lead:orchestrate\`'s default agreement, commits an item
+skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
+skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
+skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 EOF
 # Wording the default agreement and the grill threshold replaced must not come back.
 while IFS='|' read -r f gone; do
@@ -126,6 +129,7 @@ while IFS='|' read -r f gone; do
   fi
 done <<EOF
 skills/backlog/SKILL.md|Only the maintainer's yes in \`mentat:propose\` commits an item
+skills/pr/SKILL.md|marked "agreed" when the agreed spec fixes it, else
 EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
   pass "docs/adr holds the decision record for default agreement in the orchestrator"
