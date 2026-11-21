@@ -14,11 +14,11 @@
 #     Each reviewer's failures in a row on this machine (its tool failing, timing out or
 #     giving no usable reply or result line, and a Grok sign-in refusal) are kept in
 #     reviewer-failures-<claude|codex|grok> in Mentat's cache folder (XDG_CACHE_HOME, else
-#     ~/.cache); a checked reply ends the row. A Grok sign-in refusal, any other failure
-#     from the second in a row, and a Grok refusal for usage or billing when no earlier
-#     failure in the row was one (once per row of failures in this machine's record, not per outage),
-#     also print one line starting "mentat: tell the maintainer now:" with the reviewer,
-#     the count, the pull requests and the reason (still exit 1).
+#     ~/.cache); a checked reply ends the row. A Grok sign-in refusal, a Grok refusal for
+#     usage or billing when no earlier failure in the row was one (once per row of
+#     failures in this machine's record, not per outage), and any other failure from the
+#     second in a row, also print one line starting "mentat: tell the maintainer now:"
+#     with the reviewer, the count, the pull requests and the reason (still exit 1).
 #     Claude runs in a fresh context, with read tools only, at --effort high, on
 #     MENTAT_REVIEW_MODEL, or, with MENTAT_FIRST_REVIEW_MODEL set, on that model while the pull request has no local round (as mentat status counts them), and,
 #     when Claude reports that no model ran, once more on the review default if that is
