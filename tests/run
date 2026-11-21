@@ -89,7 +89,7 @@ $o|Planning|no hand check would be offered; no material assumption stands; no fa
 $o|Planning|the session's own advice against building does not stand
 $o|Planning|an item agreed for later before stays later, asked nothing here
 $o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second-opinion tool that gave no answer and a plan check retried without its model keep the default
-$o|Planning|Chat requests and the small-request path are still asked.
+$o|Planning|Typed \`/mentat:propose\` sessions, chat requests and the small-request path are still asked.
 $o|Handing over|agreed by default ("Planning")
 $o|Handing over|the "Pause" count or a standing word of the maintainer's pausing new builds
 $o|Handing over|The maintainer's "later" naming an item agreed by default and still held records \`build: later\` on it
@@ -98,8 +98,10 @@ $o|Handing over|A bare "later" or "stop" naming no item answers the question ask
 $o|Relays|in "Start" (a closed pull request), in "After merge" (no session will take the steps), and the default-agreement tell
 $o|Relays|with the plan check's verdict, each point not adopted and why, the unchecked situations that adopted changes added, any second-opinion tool that gave no answer and any plan check retried without its model
 $o|Notes|each tell owed ("Relays"), the default-agreement tell included, until given
+$o|Notes|the maintainer's word to stop planning, and any pausing new builds
+skills/backlog/agent-records.md|The comment|replaces the answer and keeps that line
 skills/propose/SKILL.md||nothing is built before that agreement, the one exception an item \`mentat-lead:orchestrate\` agrees by default
-skills/propose/SKILL.md||Only an Agree answer, or the one exception, that default, writes the spec
+skills/propose/SKILL.md||Only an Agree answer, or the one exception, \`mentat-lead:orchestrate\`'s default agreement, writes the spec
 skills/propose/SKILL.md||Before agreeing a new feature or workflow change with two or more of the maintainer's decisions open, it first offers a grill
 skills/propose/SKILL.md||and with one open asks it directly (step 3)
 skills/propose/SKILL.md||once the maintainer has corrected the same point twice in the session, it offers a grill
