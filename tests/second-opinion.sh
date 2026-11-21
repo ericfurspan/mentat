@@ -73,7 +73,8 @@ fi
 exit "$(cat "$STUB/codex_exit" 2>/dev/null || echo 0)"
 EOF
 # grok: records how it was started and what it can see, then replies with
-# $STUB/out_json (stdout) and $STUB/grok_exit. (mentat starts it with an empty
+# $STUB/out_json (stdout) and $STUB/grok_exit, adding $STUB/err_text to its stderr and
+# $STUB/debug_text to its debug file when they exist. (mentat starts it with an empty
 # environment, so its own path is written in.)
 { printf '#!/usr/bin/env bash\nSTUB=%q\n' "$STUB"; cat; } >"$root/tools/bin/grok" <<'EOF'
 [ "${1:-}" = --version ] && { echo "grok 9.9.9 (stub)"; exit 0; }
@@ -109,10 +110,11 @@ if [ -f "$STUB/rendezvous" ]; then
   touch "$STUB/grok_started"
   for _ in $(seq 100); do [ -f "$STUB/codex_started" ] && { echo yes >"$STUB/grok_saw_codex"; break; }; sleep 0.1; done
 fi
-for a in "${args[@]}"; do [ "$prev" = --debug-file ] && echo "DEBUG-LOG-TEXT" >"$a"; prev=$a; done
+for a in "${args[@]}"; do [ "$prev" = --debug-file ] && { echo "DEBUG-LOG-TEXT"; cat "$STUB/debug_text" 2>/dev/null; } >"$a"; prev=$a; done
 [ -f "$STUB/grok_hang" ] && exec sleep 30
 cat "$STUB/out_json"
 echo "SECRET-LOG-TEXT" >&2
+[ -f "$STUB/err_text" ] && cat "$STUB/err_text" >&2
 exit "$(cat "$STUB/grok_exit")"
 EOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/git" "$root/tools/bin/codex" "$root/tools/bin/grok"
@@ -251,6 +253,23 @@ reset; reply $'Looks fine to me.'; rc=$(run "$idea")
 grok_no_opinion "a reply without a verdict line" "no final SECOND OPINION VERDICT line"
 reset; reply $'SECOND OPINION VERDICT: DON'"'"'T - nope'; rc=$(run "$idea")
 check "a Grok reply that is only a verdict line counts" '[ "$rc" = 0 ] && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT: DON.T - nope$" "$STUB/stdout"'
+# A Grok run refused for usage or billing: only the message of an error object in Grok's JSON
+# output is read for it, and Grok's line gives Mentat's own words, with no text from the run.
+USAGE="Grok refused this run for usage or billing; the maintainer can top up or wait for the usage limit to reset, and reviews and second opinions go on without Grok"
+usage_error() { jq -cn --arg m "$1 USAGE-CANARY-5170" '{type: "error", message: $m}' >"$STUB/out_json"; }
+reset; usage_error "Request failed with status 402 Payment Required:"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
+grok_no_opinion "an out-of-usage error object with exit 1" "$USAGE; its log may hold credentials"
+check "that refusal prints no text from Grok's run, and its log is kept" '! grep -q "USAGE-CANARY-5170\|DEBUG-LOG-TEXT\|exited with status" "$STUB/stdout" "$STUB/stderr" && grok_log_kept USAGE-CANARY-5170'
+reset; usage_error "You have hit your WEEKLY limit."; rc=$(run "$idea")
+grok_no_opinion "an out-of-usage error object with a zero exit" "$USAGE; its log may hold credentials"
+check "that refusal prints no text from Grok's run either" '! grep -q "USAGE-CANARY-5170\|DEBUG-LOG-TEXT\|stop reason" "$STUB/stdout" "$STUB/stderr"'
+printf 'Use a smaller model for helpers.\nIf Grok answers status 402 Payment Required, switch.\n' >"$root/usage idea.md"
+reset; echo 1 >"$STUB/grok_exit"; rc=$(run "$root/usage idea.md")
+grok_no_opinion "a marker only in the idea, which is in the prompt" "Grok exited with status 1"
+check "that marker reached Grok's prompt and is not called out of usage" 'grep -q "status 402 Payment Required" "$STUB/prompt_grok" && ! grep -qF "$USAGE" "$STUB/stdout"'
+reset; echo 1 >"$STUB/grok_exit"; echo "Request failed with status 402 Payment Required" >"$STUB/err_text"; echo "You have run out of credits" >"$STUB/debug_text"; rc=$(run "$idea")
+grok_no_opinion "a marker only in Grok's stderr and debug log" "Grok exited with status 1"
+check "that marker is not called out of usage" '! grep -qF "$USAGE" "$STUB/stdout"'
 reset; touch "$STUB/grok_hang"; took=$SECONDS; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
 check "a Grok timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
 grok_no_opinion "a Grok timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "Grok did not finish within 3 seconds"
