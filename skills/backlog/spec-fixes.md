@@ -8,7 +8,7 @@ Only a build session makes a spec fix, in its quick check (`mentat:build` step 5
 
 1. Rewrite only the wrong value in the spec, where "Where the spec lives" in `SKILL.md` says, and read the spec back.
 2. Compute the fingerprint of the read-back body as "Agreement" in `SKILL.md` says.
-3. Re-record the fingerprint record in the item's agent records (`agent-records.md`), keeping its agreement citation, its build answer and any earlier fix, and adding this one: the old value, the new value and the evidence, in public-safe words (`records.md`). That record is the item's one record of the fix, with no decisions line or comment for it.
+3. Re-record the fingerprint record in the item's agent records (`agent-records.md`), keeping its agreement citation, its build answer with any default-agreement line, and any earlier fix, and adding this one: the old value, the new value and the evidence, in public-safe words (`records.md`). That record is the item's one record of the fix, with no decisions line or comment for it.
 
 Build readiness accepts the fingerprint step 3 recorded (`mentat:build` steps 3 and 6). The pull request's "Calls made without the maintainer" names each spec fix in one line, read from that record (`mentat:pr`).
 
