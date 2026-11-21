@@ -29,7 +29,7 @@ Stages say where an item stands. The tracker's adapter maps each to its own stat
 
 - Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work. Triage (`/mentat-linear:triage`, in the `mentat-linear` module, for any tracker) settles it; where that module is off, the maintainer settles an entry in chat with Claude Code, its outcome (accept, close, merge, later) written as the tracker's adapter says for triage outcomes. Accepting it keeps the same entry as the item.
 - Backlog: accepted, not committed. Also an item the maintainer set aside, which says "parked" in its opening sentence; one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work ("The order of agreed work"). Also an item holding only a decision for the maintainer, which is not a wait ("Marking a wait").
-- Todo: committed, agreed with a spec. Only the maintainer's yes in `mentat:propose` commits an item and moves it from Backlog to Todo.
+- Todo: committed, agreed with a spec. Only the maintainer's yes in `mentat:propose`, or `mentat-lead:orchestrate`'s default agreement, commits an item and moves it from Backlog to Todo.
 - In Progress: a branch or pull request exists.
 - Done: ended, as done, canceled or duplicate.
 
