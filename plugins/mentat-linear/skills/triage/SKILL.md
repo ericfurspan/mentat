@@ -16,7 +16,7 @@ The maintainer started one sitting, by typing it or by their word: gather new id
 - "Stop" at any question ends the asking; what was not asked stays in the Inbox as it is. Stop is a session control, not the Later outcome: it records nothing on an item.
 - Read each reader fresh from its file when the sitting starts, and again after a compaction, with the maintainer's instructions it depends on. Never ask an answer already recorded again; the record shows it.
 
-Nothing a sitting collects goes to Codex or Grok, and no `mentat second-opinion` runs inside a sitting. Accepting an item is not a commitment to build: that stays with `mentat:propose`, after its plan check, whose yes commits the item to Todo.
+No `mentat second-opinion` runs inside a sitting. Accepting an item is not a commitment to build: that stays with `mentat:propose`, after its plan check, whose yes commits the item to Todo.
 
 ## Readers
 
