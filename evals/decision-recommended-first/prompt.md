@@ -1,6 +1,6 @@
 ---
 description: "Source: mentat:propose decisions.md, a message-form decision ends with numbered answers, the recommended one first; a session asked a decision with its answers in an arbitrary order."
-max_turns: 6
+max_turns: 10
 allowed_tools: [Skill, Read]
 ---
 

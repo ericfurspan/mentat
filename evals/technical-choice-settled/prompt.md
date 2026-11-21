@@ -1,5 +1,5 @@
 ---
-description: "Source: rules.md, outcomes, scope, cost and risk go to the maintainer and the rest is settled; a session asked the maintainer to pick between two equivalent implementation details."
+description: "Source: rules.md, outcomes, scope, cost and risk go to the maintainer and the rest is settled; source incident not yet named."
 max_turns: 2
 allowed_tools: []
 ---

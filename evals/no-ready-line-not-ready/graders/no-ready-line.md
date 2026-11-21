@@ -1,8 +1,9 @@
 ---
 type: regex
 target: last_message
-pattern: 'Ready to merge:'
+pattern: '^\W*Ready to merge: #72'
+flags: m
 match: not_contains
 ---
 
-The reply writes no Ready line for a pull request that is not ready.
+The reply writes no pasteable Ready line for a pull request that is not ready.

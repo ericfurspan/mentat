@@ -1,6 +1,6 @@
 ---
-description: "Source: mentat:review review-depth.md, a Ready message carries a review-depth line right after its Ready line; a Ready message went out without one."
-max_turns: 6
+description: "Source: mentat:review review-depth.md, a Ready message carries a review-depth line right after its Ready line; source incident not yet named."
+max_turns: 10
 allowed_tools: [Skill, Read]
 ---
 

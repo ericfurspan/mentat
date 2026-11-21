@@ -1,6 +1,6 @@
 ---
 description: "Source: mentat:build Started sessions, relay a Ready message trimmed to what the maintainer acts on; a starting session passed on round counts and CI detail along with the Ready line."
-max_turns: 4
+max_turns: 6
 allowed_tools: [Skill]
 ---
 
