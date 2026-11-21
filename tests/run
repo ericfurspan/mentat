@@ -58,7 +58,8 @@ fi
 # the texts never hold (a tab would not do: read merges an empty field between two tabs).
 # The orchestrator agrees an item by default when nothing is open, holds or hands it over like any
 # item, owes the maintainer a tell for it, and keeps that tell in its notes file until given; the
-# planning and recording contracts name that default.
+# planning and recording contracts name that default; and planning offers a grill only for two or
+# more open decisions, keeping the offer after the same point is corrected twice.
 o=plugins/mentat-lead/skills/orchestrate/SKILL.md
 while IFS='|' read -r f section want; do
   [ -n "$f" ] || continue
@@ -98,6 +99,10 @@ $o|Relays|with the plan check's verdict, each point not adopted and why, the unc
 $o|Notes|each tell owed ("Relays"), the default-agreement tell included, until given
 skills/propose/SKILL.md||nothing is built before that agreement, the one exception an item \`mentat-lead:orchestrate\` agrees by default
 skills/propose/SKILL.md||Only an Agree answer, or the one exception, that default, writes the spec
+skills/propose/SKILL.md||Before agreeing a new feature or workflow change with two or more of the maintainer's decisions open, it first offers a grill
+skills/propose/SKILL.md||and with one open asks it directly (step 3)
+skills/propose/SKILL.md||once the maintainer has corrected the same point twice in the session, it offers a grill
+skills/propose/session.md||with two or more of the maintainer's decisions open, the grill offer of \`SKILL.md\` step 2 comes next
 skills/backlog/SKILL.md|Agreement|an item agreed by default records \`build: now\` and the default-agreement line that record gives, never as the maintainer's answer
 skills/backlog/agent-records.md|The comment|\`Agreed by default: nothing was open for the maintainer\`, never written as the maintainer's answer
 EOF
