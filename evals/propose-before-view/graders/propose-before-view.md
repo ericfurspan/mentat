@@ -5,4 +5,4 @@ pattern: '^(?:(?!\n(?=[^\n]*"type":"assistant")(?:(?!"name":"Skill"(?=[^\n]*ment
 match: contains
 ---
 
-The trace reaches the Skill call for mentat:propose before any assistant text of 120 or more characters (as written in the trace), so the view comes after it. A short line announcing the plan may come first.
+The trace reaches the Skill call for mentat:propose before any assistant text of 120 or more characters (as written in the trace). It is a deterministic check on the whole trace that catches only a long text before the call; it cannot tell a short view from a short announcement. `no-view-before-propose` judges the order on the trace and fails a view of any length given before the call.
