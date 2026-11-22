@@ -97,7 +97,8 @@ run_claude() {
 # review_name_r sets the caller's name, which the heading shows; review_prep_r writes
 # the prompt's opening (where to look) to stdout and any files the reviewer reads;
 # review_run_r runs it; review_meta_r prints the record's lines on the tool and the
-# model; review_check_r, where defined, runs once the repository is known. Claude's are here; another reviewer's come with the module that runs it.
+# model; review_check_r, where defined, runs once the repository is known; review_note_r, where
+# defined, prints what ends the reason when the reply has no final result line. Claude's are here; another reviewer's come with the module that runs it.
 review_name_claude() { name=Claude; }
 review_prep_claude() {
   git -C "$top" diff --no-ext-diff --no-textconv --no-color "$mb" "$head" >"$tmp/data/diff" || not_reviewed "could not diff $mb..$head"
@@ -236,9 +237,10 @@ review_local() {
     review_result_line
   } >"$tmp/prompt" || not_reviewed "could not write the prompt"
 
-  local out="$tmp/review.md" result url held
+  local out="$tmp/review.md" result url held note=""
   "review_run_$reviewer"
-  result_line "$(last_line "$out")" || review_tool_failed "$name's reply has no final REVIEW RESULT line"
+  if declare -F "review_note_$reviewer" >/dev/null; then note=$("review_note_$reviewer"); fi
+  result_line "$(last_line "$out")" || review_tool_failed "$name's reply has no final REVIEW RESULT line$note"
   # A checked reply, as the reviewer returned it, ends the reviewer's failures in a row,
   # whether or not it is posted; a failure from here on is not the reviewer's.
   reviewer_record "$reviewer" ok

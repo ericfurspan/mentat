@@ -28,11 +28,11 @@ pair_grok_fail() {
 }
 
 # Keeps a reply whose final line passes the checker function $2 (named by the caller;
-# $3 names the line in the failure) as this tool's result.
-pair_keep() { # $1 reply file, $2 checker, $3 name of the final line
+# $3 names the line in the failure; $4, optional, ends that failure's reason) as this tool's result.
+pair_keep() { # $1 reply file, $2 checker, $3 name of the final line, $4 note
   local final
   final=$(last_line "$1")
-  "$2" "$final" || pair_fail "the reply has no final $3 line"
+  "$2" "$final" || pair_fail "the reply has no final $3 line${4:-}"
   cp "$1" "$res/$tool.reply" || pair_fail "could not keep the reply"
   printf '%s\n' "$final" >"$res/$tool.final" || pair_fail "could not keep the final line"
 }

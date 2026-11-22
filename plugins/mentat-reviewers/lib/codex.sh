@@ -4,9 +4,10 @@
 # below) and the second opinion use, with core's time limit REVIEW_TIMEOUT_SECONDS.
 # Sourced by this module's bin/ entries.
 
-# Codex runs its own default model, so no model name lives here and a new release
-# needs no change. Effort is pinned.
+# Codex runs on the model MENTAT_CODEX_MODEL names when it is set, else its own default
+# model, so no model name lives here and a new release needs no change. Effort is pinned.
 CODEX_EFFORT="high"
+codex_asked=${MENTAT_CODEX_MODEL:-}
 
 # Codex as the reviewer of core's review_local (`mentat review --codex`): the functions
 # it calls for reviewer codex, beside Claude's in lib/review.sh. They read review_local's
@@ -22,8 +23,17 @@ review_prep_codex() {
 # core's lib/review.sh); a refusal of where Codex is installed is not.
 # shellcheck disable=SC2154 # tmp and out are review_local's
 review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed disabled not_reviewed; }
+# A Codex reply with no final result line names the model asked for, as run_codex's failures do.
+review_note_codex() { codex_asked_note; }
+# The model line notes the model asked for when the header names another one.
 review_meta_codex() {
-  printf -- '- Codex CLI: %s\n- Model: %s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "$(codex_model "$tmp/codex.log")" "$CODEX_EFFORT"
+  local ran asked=""
+  ran=$(codex_model "$tmp/codex.log")
+  if [ -n "$codex_asked" ] && [ "$ran" != unknown ]; then
+    asked=$(model_chars "$codex_asked")
+    if [ "$ran" = "$asked" ]; then asked=""; else asked=" (asked for $asked)"; fi
+  fi
+  printf -- '- Codex CLI: %s\n- Model: %s%s, reasoning effort %s\n' "$(codex --version 2>/dev/null)" "$ran" "$asked" "$CODEX_EFFORT"
 }
 # Prints the model Codex ran, from its log $1: the first "model: " line of the header Codex
 # writes at the start of its run, between its first two separator lines and within the
@@ -32,10 +42,14 @@ review_meta_codex() {
 # Nothing else from the log, which may hold a credential, is printed.
 codex_model() {
   local m
-  m=$(awk 'NR > 20 { exit } /^--------/ { if (++s == 2) exit; next } s == 1 && /^model: / { sub(/^model: /, ""); print; exit }' "$1" 2>/dev/null |
-    tr -cd 'A-Za-z0-9._:/-' | head -c 64)
+  m=$(model_chars "$(awk 'NR > 20 { exit } /^--------/ { if (++s == 2) exit; next } s == 1 && /^model: / { sub(/^model: /, ""); print; exit }' "$1" 2>/dev/null)")
   printf '%s' "${m:-unknown}"
 }
+# Prints $1 with only model-name characters, at most 64.
+model_chars() { printf '%s' "$1" | tr -cd 'A-Za-z0-9._:/-' | head -c 64; }
+# No validation and no fallback: a failed Codex run names the model asked for. Prints the
+# note a failure reason ends with when MENTAT_CODEX_MODEL is set, else nothing.
+codex_asked_note() { [ -z "$codex_asked" ] || printf '; Codex was asked for model %s with MENTAT_CODEX_MODEL' "$(model_chars "$codex_asked")"; }
 
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory (outside the checkout for a
@@ -122,8 +136,9 @@ codex_prefixes() {
 # optional, is the function codex_prefixes calls in place of $4 when it refuses where
 # Codex is installed.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes
+  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes asked
   log="${out%/*}/codex.log"
+  asked=$(codex_asked_note)
   codex_prefixes "${6:-$fail}"
   filesystem=$(codex_filesystem "$dir" "$prefixes")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
@@ -138,7 +153,8 @@ run_codex() {
   # features.apps=false: the apps feature (the ChatGPT account's GitHub connector) is
   # on by default and --ignore-user-config does not turn it off, so Codex could read
   # GitHub beyond the change.
-  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config \
+  # MENTAT_CODEX_MODEL, when set, is passed as one --model argument, never as config text.
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config ${codex_asked:+"--model=$codex_asked"} \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
     -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
@@ -152,7 +168,7 @@ run_codex() {
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
-      "$fail" "Codex did not finish within $REVIEW_TIMEOUT_SECONDS seconds"
+      "$fail" "Codex did not finish within $REVIEW_TIMEOUT_SECONDS seconds$asked"
     fi
     sleep 0.1
   done
@@ -164,7 +180,7 @@ run_codex() {
     # The log is Codex's raw output and may hold a credential, so it is not
     # printed into the agent's session. A copy is kept for the maintainer.
     kept=$(mktemp "${TMPDIR:-/tmp}/mentat-codex-log.XXXXXX") && cp "$log" "$kept"
-    "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed. The maintainer can read it at $kept"
+    "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed. The maintainer can read it at $kept$asked"
   fi
-  [ -s "$out" ] || "$fail" "Codex returned no final message"
+  [ -s "$out" ] || "$fail" "Codex returned no final message$asked"
 }

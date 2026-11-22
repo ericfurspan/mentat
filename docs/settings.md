@@ -2,7 +2,7 @@
 
 Every Mentat setting is an environment variable. Set it in the `env` block of Claude Code's settings: your user settings file for your own values, a project's `.claude/settings.json` for a repository's. A setting set but empty counts as unset and uses its default.
 
-A model setting names a model Claude Code accepts. A model outside your plan bills credits or fails.
+A model setting names a model Claude Code accepts; `MENTAT_CODEX_MODEL` names a model Codex accepts. A model outside your plan bills credits or fails.
 
 | Key | What it does | Default | Empty value |
 | --- | --- | --- | --- |
@@ -11,6 +11,7 @@ A model setting names a model Claude Code accepts. A model outside your plan bil
 | `MENTAT_REVIEW_ROUNDS` | The local review rounds a pull request may use; a whole number of 1 or more. A higher limit for one pull request, which the maintainer names in chat or the session takes as its own extra round, is passed to that pull request's runs only (the review skill's `stop.md` "Round limit"). | `5` | The default. |
 | `MENTAT_REVIEW_TIMEOUT_SECONDS` | The time limit, in seconds, of a Claude or Codex review and of Codex in `mentat second-opinion`. | `1200` | The default. |
 | `MENTAT_GROK_TIMEOUT_SECONDS` | The time limit, in seconds, of a Grok review or second opinion. | `1800` | The default. |
+| `MENTAT_CODEX_MODEL` | The model Codex runs, in reviews (`mentat review --codex`) and second opinions. Not checked and with no fallback: a failed Codex run names the model asked for, and a review record whose Codex ran another model adds `(asked for <model>)`. | Off: Codex runs its own default model. | Off. |
 | `MENTAT_GROK_REASONING_EFFORT` | The reasoning effort Grok runs at, in reviews and second opinions. | `high` | The default. |
 | `MENTAT_PLAN_CHECK_MODEL` | The model of the plan check. | The plan checker definition's own model. | The default. |
 | `MENTAT_BUILDER_MODEL` | The model of every builder run: a build, a CI fix and a review fix. | The builder definition's own model. | The default. |

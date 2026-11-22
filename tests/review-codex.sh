@@ -184,7 +184,7 @@ STUBEOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex" "$root/tools/bin/claude"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
-unset MENTAT_REVIEW_ROUNDS
+unset MENTAT_REVIEW_ROUNDS MENTAT_CODEX_MODEL
 
 # stub_reset clears the stubs' state; reset also clears the record of failures in a row.
 stub_reset() {
@@ -293,6 +293,27 @@ check "the prompt says the Summary second sentence gives why the change is neede
 check "the prompt finds the finding lines in the Review details" 'grep -q "description.s Review details hold one line for each finding already fixed or answered" "$STUB/prompt"'
 check "the prompt raises an answered finding again only with new evidence or a named error in the answer, and a settled one only after its text changed or with new evidence" 'grep -qF "one listed as answered, only with new evidence the answer did not address or by naming the specific error in the answer (what it got wrong, and where)" "$STUB/prompt" && grep -qF "one listed as settled by the maintainer, only when the text it was about changed since or with new evidence the settlement did not have" "$STUB/prompt"'
 check "the prompt finds the hand-check report in the Review details" 'grep -q "description.s Review details report who checked it and what they saw" "$STUB/prompt"'
+# MENTAT_CODEX_MODEL: set, Codex is passed --model=<value> as one argument; unset or empty, no
+# --model, so Codex runs its own default. A header naming another model is noted, not a failure.
+no_model_arg() { ! grep -q -- "^--model" "$STUB/args" && ! grep -q "^model=" "$STUB/args"; }
+reset; rc=$(run)
+check "MENTAT_CODEX_MODEL unset passes no --model" '[ "$rc" = 0 ] && no_model_arg'
+reset; rc=$(MENTAT_CODEX_MODEL='' run)
+check "MENTAT_CODEX_MODEL empty passes no --model" '[ "$rc" = 0 ] && no_model_arg'
+reset; codex_header "model: gpt-stub-9.1"; rc=$(MENTAT_CODEX_MODEL=gpt-stub-9.1 run)
+check "MENTAT_CODEX_MODEL set passes --model=<value>, and a header naming it adds no note" '[ "$rc" = 0 ] && [ "$(grep -c -- "^--model" "$STUB/args")" = 1 ] && grep -qx -- "--model=gpt-stub-9.1" "$STUB/args" && codex_model gpt-stub-9.1 && ! grep -q "asked for" "$STUB/comment"'
+reset; rc=$(MENTAT_CODEX_MODEL="gpt stub 9" run)
+check "MENTAT_CODEX_MODEL with a space is passed as one argument" '[ "$rc" = 0 ] && grep -qx -- "--model=gpt stub 9" "$STUB/args"'
+reset; codex_header "model: gpt-stub-9.1"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2 <b>$(x)' run)
+check "a header naming another model than MENTAT_CODEX_MODEL is posted with the filtered model asked for" '[ "$rc" = 0 ] && posted && codex_model "gpt-stub-9.1 (asked for gpt-other-2bx)"'
+reset; rm "$STUB/reply"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run)
+check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex returned no final message; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/out"'
+reset; rm "$STUB/reply"; rc=$(run)
+check "a failed Codex run with MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex returned no final message" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
+reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run)
+check "a Codex reply with no result line and MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex.s reply has no final REVIEW RESULT line; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/out" && ! posted'
+reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
+check "a Codex reply with no result line and MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex.s reply has no final REVIEW RESULT line" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
 # The issues the pull request closes reach Codex as labeled data, ahead of the description.
 ref() { printf '{"number":%s,"repository":{"name":"%s","owner":{"login":"%s"}}}' "$3" "$2" "$1"; }
 reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(run)
