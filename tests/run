@@ -62,6 +62,9 @@ fi
 # more open decisions, keeping the offer after the same point is corrected twice; and a new feature
 # or workflow change gets a short sourced survey of established practice before its view. Each Ready
 # message carries a review-depth line, which a build's final message and a starting session's relay keep.
+# The Ready line starts with an icon that every repeat or relay keeps, and its first showing in the
+# maintainer's chat sends one push, from the starting session and never a started one; holds, blocks
+# and questions get neither.
 o=plugins/mentat-lead/skills/orchestrate/SKILL.md
 while IFS='|' read -r f section want; do
   [ -n "$f" ] || continue
@@ -123,7 +126,7 @@ skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
 skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 skills/propose/session.md||offers a grill (\`mentat-lead:grill\`, where available) only with two or more of their decisions open, asking a single one directly
-skills/review/review-depth.md||Right after the "Ready to merge: #N (<item id>)" line, the Ready message carries one review-depth line
+skills/review/review-depth.md||Right after the "🔔 Ready to merge: #N (<item id>)" line, the Ready message carries one review-depth line
 skills/review/review-depth.md||\`Review: closely (<reasons>)\`, each reason in a few words, or \`Review: skim (no listed reason for closer review)\`
 skills/review/review-depth.md||The line is a prioritization aid, not a safety assessment; the maintainer still decides how to review and merges every pull request.
 skills/review/review-depth.md||It goes in chat only; the pull request description is unchanged.
@@ -135,9 +138,22 @@ skills/review/review-depth.md||the agreed spec changed during the build;
 skills/review/review-depth.md||with the reason "not reviewed" for a fast track or "last push not reviewed" for a waived push.
 skills/review/review-depth.md||A "Hold #N" line carries no review-depth line. Each new "Ready to merge: #N", after a hold or more rounds, carries a fresh line recomputed for that head.
 skills/review/SKILL.md|Final check|without the parentheses when #N has no item, then the line \`review-depth.md\` in this skill's folder gives.
-skills/build/SKILL.md||what to merge (each item's "Ready to merge: #N" line and its \`Review:\` line word for word
-skills/build/SKILL.md|Started sessions|the "Ready to merge: #N" line and its \`Review:\` line word for word, adding none when it has none;
+skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, and its \`Review:\` line word for word
+skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included, and its \`Review:\` line word for word, adding none when it has none;
 skills/build/SKILL.md|Started sessions|keeping a sentence or line when in doubt whether it is one of them
+skills/review/SKILL.md|Final check|tell the maintainer in chat: a first line "🔔 Ready to merge: #N (<item id>)"
+skills/review/review-depth.md|Push notice|The Ready line starts with "🔔 ", and every repeat or relay of it keeps it word for word, the icon included.
+skills/review/review-depth.md|Push notice|A "Hold #N" line, a Blocked or Not reviewed report and a question get no icon and no push, and the pull request's Status line stays as \`mentat:pr\` gives it.
+skills/review/review-depth.md|Push notice|A session that shows the maintainer a Ready line in its own chat for the first time then sends one push notification, when it has a push-notification tool
+skills/review/review-depth.md|Push notice|naming the repository, the pull request, the item and a few words of its title, in at most about 150 characters.
+skills/review/review-depth.md|Push notice|The line is in chat before the push, and nothing waits on the push.
+skills/review/review-depth.md|Push notice|Ready lines first shown in one turn share one push naming each.
+skills/review/review-depth.md|Push notice|A Ready line for a new head after a hold counts as first shown; one shown again, such as when listing what waits on the maintainer, sends none.
+skills/review/review-depth.md|Push notice|A session started by another session sends none; the starting session that relays the line sends it.
+skills/review/review-depth.md|Push notice|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
+skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/review-depth.md\` "Push notice" says.
+skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
+skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/review-depth.md\` "Push notice" gives.
 EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
   pass "docs/adr holds the decision record for default agreement in the orchestrator"
