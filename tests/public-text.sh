@@ -250,6 +250,11 @@ gh api repos/o/r/issues/7/comments --input "\$F"
 gh api graphql -f query="\$Q"
 cd - && gh pr comment 7 -F clean.md
 D=sub; cd \$D && gh pr comment 7 -F clean.md
+gh pr comment 7 -F"\$F"
+gh pr comment 7 --body-file"\$F"
+gh api repos/o/r/issues/7/comments -F"\$FIELD"
+gh api repos/o/r/issues/7/comments -f"\$FIELD"
+gh api graphql --input"\$F"
 EOF
 while IFS= read -r c; do expect value "$c"; done <<'EOF'
 gh pr create --title "$T" --body ok
@@ -262,6 +267,8 @@ gh release create v1 "$F" --notes ok
 gh api -X POST repos/o/r/issues/7/comments -H "X-Note: $V"
 V=comment; gh pr $V 7 --body ok
 M=POST; gh api -X $M repos/o/r/issues/7/comments -H "X-Note: ok"
+gh api -X"$M" repos/o/r/issues/7/comments
+gh release create v1 -t"$T"
 G=gh; $G pr comment 7 --body ok
 EOF
 while IFS= read -r c; do expect stdin "$c"; done <<'EOF'
@@ -292,6 +299,9 @@ gh api -X POST repos/o/r/issues/7/comments -f body=ok --jq "$Q"
 gh pr create -R "$REPO" --title t --body ok --template "$T"
 X=$(date) gh pr comment 7 --body ok
 $EDITOR x.md; gh pr comment 7 --body ok
+G=gh; $G pr view 7
+gh run "$CMD" 7
+gh pr comment 7 -R"$REPO" --body ok
 gh pr comment 7 --body ok > "$OUT"
 gh pr comment 7 -F "$HOME/missing.md"
 EOF
@@ -445,6 +455,10 @@ D=sub; cd $D && gh pr comment 7 -F only-sub.md
 V=comment; gh pr $V 7 --body "about stubcodename"
 M=POST; gh api -X $M repos/o/r/issues/7/comments -H "X-Note: about stubcodename"
 G=gh; $G pr comment 7 --body "about stubcodename"
+F=word.md; gh pr comment 7 -F"$F"
+M=POST; gh api -X"$M" repos/o/r/issues/7/comments -H "X-Note: about stubcodename"
+R=o/r; gh pr comment 7 -R"$R" --body-file word.md
+cp clean.md copy.md; gh api graphql -f query='query { viewer { login } }' -F note=@copy.md -f body="about stubcodename"
 PUBLISH
 expect deny "cat > x.md <<'EOF'
 about stubcodename

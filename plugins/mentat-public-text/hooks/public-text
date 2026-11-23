@@ -15,7 +15,8 @@
 # missing or unreadable files and other commands' words are not checked.
 # It denies, with the retry in the reason, a gh write whose text it cannot read: a
 # variable, $( ), backticks, or any $ in double quotes, in body, notes or field text or in
-# a file's name (write the text to a file and pass that); the same in another word it
+# a file's name, also a flag's attached value as in -F"$f", or a relative file after a cd
+# it cannot follow (write the text to a file and pass that); the same in another word it
 # publishes or that makes it a write, such as a title, number, branch, label or the gh
 # command itself (write the value out literally); text gh reads from standard input (-);
 # and a file a command before it in the line writes or may write (write it in an earlier
@@ -463,10 +464,21 @@ file() {
   local q=${4-}
   if [ "$2" = - ]; then unread stdin
   elif [ -z "${w_ok[$1]}" ] || ! full_path "$3"; then unread text
-  elif changed "$fp"; then unread changed
+  elif changed "$fp"; then unread changed; q=1
   elif [ -f "$fp" ] && [ -r "$fp" ]; then rd[nrd]=$fp nrd=$((nrd + 1)); return
   fi
   [ -z "$q" ] || q_unknown=1
+}
+# armed: a flag whose value came attached to it in an expansion, as -F"$f", takes no
+# next word, and its value is unread.
+armed() {
+  case "$next" in
+    file | field | raw) unread text ;;
+    input) unread text; q_seen=1 q_unknown=1 ;;
+    method) unsure=1 ;;
+    text) unread "$a_cls" ;;
+  esac
+  next=""
 }
 # field <word> <key=value> [raw]: adds a gh api field: the file after =@, unless raw, else
 # the text.
@@ -486,12 +498,12 @@ put() {
   [ -n "${w_lit[$1]}" ] || unread "$2"
 }
 # gh_write <maybe> <word>...: denies a gh write whose text has a hit or cannot be read.
-# maybe is set when the command's name is not literal, so it may be gh: then it is one
-# when its words name a gh group. A group, command or method that is not literal makes
-# the call unsure, so it counts as a write.
+# maybe is set when the command's name is not literal, so it may be gh. A group, a pr,
+# issue or release command, or a method that is not literal makes the call unsure, so
+# it counts as a write.
 gh_write() {
   local maybe=$1 unsure="" i t v p prev="" group="" verb="" tag="" endpoint="" next="" method="" fields="" pub="" got="" hit cls
-  local q_seen="" q_unknown="" why="" over="" rd=() nrd=0 k
+  local q_seen="" q_unknown="" why="" over="" rd=() nrd=0 k a_lit=1 a_cls=""
   shift
   for i in "$@"; do
     t=${w_text[i]} p=$prev prev=$t
@@ -499,6 +511,8 @@ gh_write() {
     # its literal part, so -b"$x" reads as -b.
     case "$p" in -b | --body | -n | --notes) cls=text ;; *) cls=value ;; esac
     case "$t" in --body=* | -b* | --notes=* | -n*) cls=text ;; esac
+    [ -z "$next" ] || [ -n "$a_lit" ] || armed
+    a_lit=${w_lit[i]} a_cls=$cls
     case "$next" in
       skip) next=""; continue ;;
       file) next=""; file "$i" "$t" "${w_path[i]}"; continue ;;
@@ -549,7 +563,11 @@ gh_write() {
         -t | --title | -n | --notes | --target | --discussion-category | --notes-start-tag) [ "$group" != release ] || next=text ;;
         -*) ;;
         *)
-          if [ -z "$verb" ]; then verb=$t; [ -n "${w_lit[i]}" ] || unsure=1; continue; fi
+          if [ -z "$verb" ]; then
+            verb=$t
+            [ -n "${w_lit[i]}" ] || case "$group" in pr | issue | release) unsure=1 ;; esac
+            continue
+          fi
           if [ "$group" = release ]; then
             if [ -n "$tag" ]; then
               if [ -n "${w_ok[i]}" ]; then pub+=${w_path[i]##*/}$nl; else unread value; fi
@@ -562,12 +580,11 @@ gh_write() {
     fi
     put "$i" "$cls"
   done
+  [ -z "$next" ] || [ -n "$a_lit" ] || armed
   if [ -n "$maybe" ]; then
-    case "$group" in pr | issue | release | api) unsure=1 ;; *) return 0 ;; esac
+    case "$group" in pr | issue | release | api) ;; *) return 0 ;; esac
   fi
-  if [ -n "$unsure" ]; then
-    unread value
-  else
+  if [ -z "$unsure" ]; then
     case "$group" in
       pr) case "$verb" in create | new | edit | comment | review | close) ;; *) return 0 ;; esac ;;
       issue) case "$verb" in create | new | edit | comment | close) ;; *) return 0 ;; esac ;;
@@ -582,6 +599,7 @@ gh_write() {
       *) return 0 ;;
     esac
   fi
+  [ -z "$unsure$maybe" ] || unread value
   # A file's text is read only once the command is known to be a write.
   k=0
   while [ "$k" -lt "$nrd" ]; do
