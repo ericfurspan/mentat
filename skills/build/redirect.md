@@ -12,7 +12,7 @@ Read and write only this repository's notes file, orchestrate-notes.md, where `m
 
 - No notes file, or one that names no orchestrator: build here.
 - This session is the orchestrator: it hands the items over as `mentat-lead:orchestrate` says.
-- This session is the orchestrator's build session: the notes file names this session's id as a build session, one the orchestrator started or handed items to, or records the typed ids as given to the maintainer in a command for a build session their command started. Build here.
+- This session is the orchestrator's build session: the notes file names this session's id as a build session, one the orchestrator started or handed items to, or records the typed ids as given to the maintainer in a command for a build session their command started, one no other session's id has claimed, which this session then claims by writing its own id in that build session's record there. Build here.
 - The maintainer said in this session to build here: build here.
 - The notes file records the named orchestrator's id as no longer running, or the host shows it no longer runs, which this session then records there against its id: build here.
 - The host cannot say whether it runs: ask the maintainer whether it still runs (`../propose/decisions.md`), at most once in this session, the answer standing for its later go-aheads; redirect the go-ahead if it runs, or, on a no, record that orchestrator's id in the notes file as no longer running and build here.
