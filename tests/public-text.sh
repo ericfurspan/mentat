@@ -158,7 +158,7 @@ EOF
 check "denies a temp path holding a word when it is published" '[ "$(decision "S=$tdir; gh pr edit 1 --body \"see \$S\"")" = deny ]'
 
 # Only a gh write is checked: its own words but the repository and the gh api endpoint,
-# the files it reads, and the text fed to it.
+# and the files it reads.
 # unchecked <command> <note>: the hook allows the command with that note on stderr.
 unchecked() { out=$(output "$1" 2>"$STUB/err"); rc=$?; [ "$rc" = 0 ] && [ -z "$out" ] && grep -q "^mentat-public-text: .*$2.*allowed unchecked" "$STUB/err"; }
 # Text a gh write publishes that the hook cannot read from the command alone is denied
