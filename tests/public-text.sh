@@ -166,16 +166,18 @@ unchecked() { out=$(output "$1" 2>"$STUB/err"); rc=$?; [ "$rc" = 0 ] && [ -z "$o
 text_unread="Mentat: this command builds text for a public repository from a variable or a command, which the check cannot read from the command alone, so it was not published. Write the text to a file in an earlier call, then pass that file by a path written out (--body-file, --notes-file, -F field=@file or --input)."
 value_unread="Mentat: a value this command publishes to a public repository, or one that makes it a write, comes from a variable or a command, which the check cannot read from the command alone, so it was not published. Write the value out literally."
 stdin_unread="Mentat: this command passes text for a public repository on standard input, which the check cannot read, so it was not published. Write the text to a file in an earlier call, then pass that file in place of -."
+place_unread="Mentat: this command names a file for a public repository by a relative path after a cd the check cannot follow, so it cannot read it and it was not published. Name the file by its full path, or write out the folder the cd moves to."
 changed_unread="Mentat: a file this command publishes to a public repository is written, or may be changed, earlier in the same command, so the check cannot read it and it was not published. Write the file in an earlier call, then publish it in a call of its own."
-# expect <deny|allow|text|value|stdin|changed> <command>: checks the hook's decision for
-# the command. allow means no output at all; text, value, stdin and changed mean a deny
-# with that kind's reason.
+# expect <deny|allow|text|value|stdin|place|changed> <command>: checks the hook's decision
+# for the command. allow means no output at all; text, value, stdin, place and changed mean
+# a deny with that kind's reason.
 expect() {
   local want=$1 cmd=$2 label=${2//$'\n'/ \\n } r
   case "$want" in
     text) r=$text_unread ;;
     value) r=$value_unread ;;
     stdin) r=$stdin_unread ;;
+    place) r=$place_unread ;;
     changed) r=$changed_unread ;;
   esac
   case "$want" in
@@ -251,8 +253,6 @@ gh api repos/o/r/issues/7/comments -f body="\$B"
 gh api repos/o/r/issues/7/comments -F body=@"\$F"
 gh api repos/o/r/issues/7/comments --input "\$F"
 gh api graphql -f query="\$Q"
-cd - && gh pr comment 7 -F clean.md
-D=sub; cd \$D && gh pr comment 7 -F clean.md
 gh pr comment 7 -F"\$F"
 gh pr comment 7 --body-file"\$F"
 gh api repos/o/r/issues/7/comments -F"\$FIELD"
@@ -273,6 +273,14 @@ EOF
 expect text "cat <<'EOF' >/dev/null; export TMPDIR=\"$root/work/sub\"; gh pr comment 7 -F \"\$TMPDIR/reassigned.md\"
 x
 EOF"
+# A relative file after a cd the hook cannot follow is not read either.
+while IFS= read -r c; do expect place "$c"; done <<EOF
+cd - && gh pr comment 7 -F clean.md
+D=sub; cd \$D && gh pr comment 7 -F clean.md
+cd "\$(git rev-parse --show-toplevel)" && gh pr create --title t --body-file clean.md
+mkdir -p new && cd new && gh pr comment 7 -F clean.md
+HOME="$root/work/sub"; cd && gh pr comment 7 -F reassigned.md
+EOF
 while IFS= read -r c; do expect value "$c"; done <<'EOF'
 gh pr create --title "$T" --body ok
 gh pr comment "$N" --body ok

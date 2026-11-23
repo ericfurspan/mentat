@@ -15,11 +15,11 @@
 # missing or unreadable files and other commands' words are not checked.
 # It denies, with the retry in the reason, a gh write whose text it cannot read: a
 # variable, $( ), backticks, or any $ in double quotes, in body, notes or field text or in
-# a file's name, also a flag's attached value as in -F"$f", or a relative file after a cd
-# it cannot follow (write the text to a file and pass that); the same in another word it
-# publishes or that makes it a write, such as a title, number, branch, label or the gh
-# command itself (write the value out literally); text gh reads from standard input (-);
-# and a file a command before it in the line writes or may write (write it in an earlier
+# a file's name, also a flag's attached value as in -F"$f" (write the text to a file and
+# pass that); the same in another word it publishes or that makes it a write, such as a
+# title, number, branch, label or the gh command itself (write the value out literally);
+# text gh reads from standard input (-); a relative file after a cd it cannot follow (name
+# the file by its full path, or write the cd's folder out); and a file a command before it in the line writes or may write (write it in an earlier
 # call): one written by > or >>, or one named, also after = as in of=file, by any command
 # other than cat, cd, pwd, gh, [, [[, test, ls, wc, grep, head, tail, stat, git, jq,
 # diff, echo, printf, rg, chmod, chown, touch, open, sed without -i, -I or --in-place,
@@ -90,6 +90,7 @@ unread_deny() {
     text) refuse "this command builds text for a public repository from a variable or a command, which the check cannot read from the command alone, so it was not published. Write the text to a file in an earlier call, then pass that file by a path written out (--body-file, --notes-file, -F field=@file or --input)." ;;
     value) refuse "a value this command publishes to a public repository, or one that makes it a write, comes from a variable or a command, which the check cannot read from the command alone, so it was not published. Write the value out literally." ;;
     stdin) refuse "this command passes text for a public repository on standard input, which the check cannot read, so it was not published. Write the text to a file in an earlier call, then pass that file in place of -." ;;
+    place) refuse "this command names a file for a public repository by a relative path after a cd the check cannot follow, so it cannot read it and it was not published. Name the file by its full path, or write out the folder the cd moves to." ;;
     *) refuse "a file this command publishes to a public repository is written, or may be changed, earlier in the same command, so the check cannot read it and it was not published. Write the file in an earlier call, then publish it in a call of its own." ;;
   esac
 }
@@ -477,7 +478,8 @@ unread() { [ -n "$why" ] || why=$1; }
 file() {
   local q=${4-}
   if [ "$2" = - ]; then unread stdin
-  elif [ -z "${w_ok[$1]}" ] || ! full_path "$3"; then unread text
+  elif [ -z "${w_ok[$1]}" ]; then unread text
+  elif ! full_path "$3"; then unread place
   elif changed "$fp"; then unread changed; q=1
   elif [ -f "$fp" ] && [ -r "$fp" ]; then rd[nrd]=$fp nrd=$((nrd + 1)); return
   fi
