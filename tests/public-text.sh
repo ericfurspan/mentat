@@ -256,6 +256,20 @@ gh api repos/o/r/issues/7/comments -F"\$FIELD"
 gh api repos/o/r/issues/7/comments -f"\$FIELD"
 gh api graphql --input"\$F"
 EOF
+# Once the line assigns the home, working or temporary folder's variable, a path using it
+# is unknown, however it is assigned.
+printf 'about StubCodename\n' >"$root/work/sub/reassigned.md"
+while IFS= read -r c; do expect text "$c"; done <<EOF
+export TMPDIR="$root/work/sub"; gh pr comment 7 -F "\$TMPDIR/reassigned.md"
+TMPDIR="$root/work/sub"; gh pr comment 7 --body-file "\${TMPDIR}/reassigned.md"
+declare -x TMPDIR="$root/work/sub"; gh pr comment 7 -F "\$TMPDIR/reassigned.md"
+HOME="$root/work/sub"; gh pr comment 7 -F "\$HOME/reassigned.md"
+export HOME="$root/work/sub" && gh pr comment 7 -F ~/reassigned.md
+export PWD="$root/work/sub"; gh pr comment 7 -F "\$PWD/reassigned.md"
+EOF
+expect text "cat <<'EOF' >/dev/null; export TMPDIR=\"$root/work/sub\"; gh pr comment 7 -F \"\$TMPDIR/reassigned.md\"
+x
+EOF"
 while IFS= read -r c; do expect value "$c"; done <<'EOF'
 gh pr create --title "$T" --body ok
 gh pr comment "$N" --body ok

@@ -10,8 +10,8 @@
 # command's own words but its -R/--repo, --template and --recover values, the api
 # endpoint and api --jq and --template values, which only format the reply, and a release
 # asset's folder; and the files it reads (--body-file, -F, --notes-file, --input,
-# field=@file), named literally or under ~/, $HOME, $PWD, $(pwd) or $TMPDIR, from where a
-# cd before it in the line moved. Text gh derives itself, standard input gh does not read,
+# field=@file), named literally or under ~/, $HOME, $PWD, $(pwd) or $TMPDIR unless the line
+# assigns that variable, from where a cd before it in the line moved. Text gh derives itself, standard input gh does not read,
 # missing or unreadable files and other commands' words are not checked.
 # It denies, with the retry in the reason, a gh write whose text it cannot read: a
 # variable, $( ), backticks, or any $ in double quotes, in body, notes or field text or in
@@ -146,6 +146,7 @@ re_line="^[^$nl]*"
 re_comment="^#[^$nl]*"
 re_name='^[A-Za-z_][A-Za-z0-9_]*'
 re_assign='^[A-Za-z_][A-Za-z0-9_]*='
+re_folder='^(HOME|PWD|TMPDIR)(\[[^]=]*\])?\+?='
 re_brace='^\$\{([^}]*)\}'
 re_pwd='^\$\([[:space:]]*pwd[[:space:]]*\)'
 re_op='^(&&|\|\||\|&|;;|&>>|&>|[;&|])'
@@ -164,10 +165,13 @@ w_text=() w_path=() w_ok=() w_lit=() w_quoted=() w_assign=() nw=0
 c_words=() c_outs=() nc=0
 h_delim=() h_strip=() nh=0 pend=""
 f_path=() nf=0
+# The folder variables the line assigns, each as " NAME ".
+v_set=""
 
 # value <name>: sets x_path for $name, the home, working or temporary folder; any other
-# name leaves it unknown.
+# name, or one of those the line assigns, leaves it unknown.
 value() {
+  case "$v_set" in *" $1 "*) x_ok=""; return ;; esac
   case "$1" in
     HOME) x_path=$home ;;
     PWD) x_path=$cwd; [ -n "$cwd" ] || x_ok="" ;;
@@ -254,8 +258,11 @@ word() {
   local text="" path="" ok=1 lit=1 quoted="" assign="" t c
   w_moved=""
   if [[ $src =~ $re_assign ]]; then assign=1; fi
+  # An assignment to a folder variable, in any command, makes it unknown from here on.
+  if [[ $src =~ $re_folder ]]; then v_set+=" ${BASH_REMATCH[1]} "; fi
   if [ "${src:0:1}" = '~' ]; then
     case "${src:1:1}" in '' | / | ' ' | "$tab" | "$nl" | ';' | '&' | '|' | ')' | '<' | '>') text='~' path=$home src=${src:1} w_moved=1 ;; esac
+    case "$v_set" in *" HOME "*) ok="" ;; esac
   fi
   while [ -n "$src" ]; do
     tick
@@ -445,6 +452,7 @@ change_dir() {
   local p
   while [ $# -gt 0 ]; do case "${w_text[$1]}" in -L | -P | -e | -@) shift ;; *) break ;; esac; done
   if [ $# -eq 0 ]; then
+    case "$v_set" in *" HOME "*) cwd=""; return ;; esac
     p=$home
   else
     { [ -n "${w_ok[$1]}" ] && [ "${w_text[$1]}" != - ]; } || { cwd=""; return; }
