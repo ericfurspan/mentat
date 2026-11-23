@@ -10,9 +10,10 @@
 # command's own words but its -R/--repo, --template and --recover values, the api
 # endpoint and api --jq and --template values, which only format the reply, and a release
 # asset's folder; and the files it reads (--body-file, -F, --notes-file, --input,
-# field=@file), named literally or under ~/, $HOME, $PWD, $(pwd) or $TMPDIR unless the line
-# assigns that variable, from where a cd before it in the line moved. Text gh derives itself, standard input gh does not read,
-# missing or unreadable files and other commands' words are not checked.
+# field=@file), named literally or under ~/, $HOME, ${HOME}, $PWD, $(pwd) or $TMPDIR
+# unless the line assigns that variable, from where a cd before it in the line moved.
+# Text gh derives itself, standard input gh does not read, missing or unreadable files and
+# other commands' words are not checked.
 # It denies, with the retry in the reason, a gh write whose text it cannot read: a
 # variable, $( ), backticks, or any $ in double quotes, in body, notes or field text or in
 # a file's name, also a flag's attached value as in -F"$f", and a <( ) or >( ) given as
@@ -216,7 +217,9 @@ dollar() {
       ;;
     '{')
       if [[ $src =~ $re_brace ]]; then
-        src=${src:${#BASH_REMATCH[0]}}; value "${BASH_REMATCH[1]}"
+        # Of the braced forms only ${HOME} is a known folder.
+        if [ "${BASH_REMATCH[1]}" = HOME ]; then value HOME; else x_ok=""; fi
+        src=${src:${#BASH_REMATCH[0]}}
       else
         x_text='$' x_path='$' x_lit=1 src=${src:1}
       fi
