@@ -173,6 +173,51 @@ expect() {
     *) check "allows: $label" '[ -z "$(output "$cmd" 2>&1)" ]' ;;
   esac
 }
+# A file a gh write names is read and checked, by each path form the hook resolves: a
+# clean one is allowed, one with a hit denied.
+cp "$root/work/clean.md" "$TMPDIR/clean.md"
+cp "$root/work/word.md" "$TMPDIR/word.md"
+cp "$root/work/word.md" "$HOME/word.md"
+printf '{"body": "clean"}\n' >"$root/work/clean.json"
+cp "$root/work/clean.json" "$HOME/clean.json"
+printf '{"body": "about StubCodename"}\n' >"$HOME/word.json"
+while IFS= read -r c; do
+  expect allow "${c//FILE/clean}"
+  expect deny "${c//FILE/word}"
+done <<EOF
+gh pr comment 7 --body-file FILE.md
+gh pr comment 7 --body-file $root/work/FILE.md
+gh pr comment 7 --body-file ~/FILE.md
+gh pr comment 7 --body-file "\$HOME/FILE.md"
+gh pr comment 7 --body-file "\${HOME}/FILE.md"
+gh pr comment 7 --body-file "\$PWD/FILE.md"
+gh pr comment 7 --body-file "\${PWD}/FILE.md"
+gh pr comment 7 --body-file "\$(pwd)/FILE.md"
+gh pr comment 7 --body-file "\$TMPDIR/FILE.md"
+gh pr comment 7 --body-file "\${TMPDIR}/FILE.md"
+gh pr comment 7 -F "\$HOME/FILE.md"
+gh release edit v1 --notes-file "\$TMPDIR/FILE.md"
+gh api repos/o/r/issues/7/comments -F body=@"\$HOME/FILE.md"
+gh api repos/o/r/issues/7/comments --input "\$HOME/FILE.json"
+EOF
+# A clean file only a reader names earlier in the line is read too.
+while IFS= read -r c; do expect allow "$c"; done <<'EOF'
+cat clean.md; gh pr comment 7 -F clean.md
+grep -c x clean.md && gh pr comment 7 --body-file clean.md
+[ -f clean.md ] && gh pr comment 7 -F clean.md
+sed -n 1p clean.md; awk 'NR<2' clean.md; gh pr comment 7 -F clean.md
+EOF
+# A clean file a command earlier in the line writes, or may write.
+while IFS= read -r c; do expect note "$c"; done <<'EOF'
+printf 'clean\n' > fresh.md && gh pr comment 7 -F fresh.md
+printf 'more\n' >> clean.md; gh pr comment 7 -F clean.md
+cp clean.md copy.md && gh pr comment 7 -F copy.md
+echo ok | tee clean.md; gh pr comment 7 -F clean.md
+EOF
+expect allow "cat > fresh.md <<'EOF'
+clean
+EOF
+gh pr comment 7 -F fresh.md"
 printf '{"body": "about StubCodename"}\n' >"$root/work/word.json"
 printf 'about StubCodename\n' >"$root/work/sub/only-sub.md"
 printf 'mutation { addComment(input: {body: "StubCodename"}) { clientMutationId } }\n' >"$root/work/mutation.graphql"
@@ -314,6 +359,10 @@ git add word.md; gh pr comment 7 -F - < word.md
 cp clean.md query.graphql; gh api graphql -F query=@query.graphql -f body="about stubcodename"
 jq -n '{query: "query { x }"}' | gh api graphql --input - -f body="about stubcodename"
 gh pr create -t stubcodename --body x
+D=sub; cd $D && gh pr comment 7 -F only-sub.md
+V=comment; gh pr $V 7 --body "about stubcodename"
+M=POST; gh api -X $M repos/o/r/issues/7/comments -H "X-Note: about stubcodename"
+G=gh; $G pr comment 7 --body "about stubcodename"
 PUBLISH
 expect deny "cat > x.md <<'EOF'
 about stubcodename
