@@ -121,7 +121,7 @@ Avoid: ticket
 
 ## main session
 
-The session the maintainer talks to; it plans, briefs builders and edits no files itself.
+The session that plans a change and briefs its builders, then branches, pushes and opens the pull request; it edits no files itself, whether the maintainer talks to it or another session started it.
 
 Avoid: none
 
