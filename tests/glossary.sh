@@ -66,9 +66,13 @@ expect "Avoid lines that name nothing fail" 1 "FAIL: glossary $fx/no-words.md: i
 run_check "$fx/no-avoid-line.md" "$fx/clean.md" ""
 expect "an entry with no Avoid line fails" 1 "FAIL: glossary $fx/no-avoid-line.md: entry \"tide\" has no Avoid line"
 
-# e. A file listed as not yet rewritten that is not a covered file fails.
+# e. A file listed as not yet rewritten that is not a covered file, or that is still covered
+# (tracked) but no longer on disk, fails.
 run_check "$g" "$fx/clean.md" "$fx/gone.md"
 expect "a listed file that no longer exists fails" 1 "FAIL: glossary $fx/gone.md is listed as not yet rewritten but is not a covered file"
+run_check "$g" "$fx/clean.md
+$fx/gone.md" "$fx/gone.md"
+expect "a listed file deleted but still tracked fails" 1 "FAIL: glossary $fx/gone.md is listed as not yet rewritten but does not exist"
 
 # f. One entry's word that is another entry's Avoid word, sits inside its Avoid phrase, or holds
 # its Avoid word fails.

@@ -763,8 +763,8 @@ if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$o
 # listed below uses no word an entry's Avoid line names (tests/glossary-check.sh says the format
 # and what is skipped). Its PASS lines count flagged ambiguous words and sentences over 20 words.
 # The list holds the files not yet rewritten to the glossary: the change that rewrites a file
-# removes it, nothing adds to it, and a listed file that is no longer tracked fails. A new file
-# is checked from the start.
+# removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
+# disk fails. A new file is checked from the start.
 not_yet_rewritten="agents/builder.md
 agents/plan-checker.md
 plugins/mentat-lead/skills/grill/CREDITS.md

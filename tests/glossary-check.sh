@@ -2,7 +2,8 @@
 # Checks files against a glossary's Avoid lines.
 # Usage: tests/glossary-check.sh <glossary> <covered-list> <not-yet-rewritten-list>
 # Each list file holds one path a line. Every covered file not on the not-yet-rewritten list is
-# checked; a listed file that is not a covered file fails, so the list stays true.
+# checked; a listed file that is not a covered file or is not on disk fails, so the list stays
+# true.
 #
 # The glossary's format: each entry starts at a "## <word>" heading, the word to use. In an entry,
 # "Avoid: a, b" names words or phrases not to use, matched case-insensitively on word boundaries
@@ -41,7 +42,11 @@ nlisted=0
 while IFS= read -r f; do
   [ -n "$f" ] || continue
   nlisted=$((nlisted + 1))
-  grep -qxF -- "$f" "$covered" || fail "$f is listed as not yet rewritten but is not a covered file"
+  if ! grep -qxF -- "$f" "$covered"; then
+    fail "$f is listed as not yet rewritten but is not a covered file"
+  elif [ ! -f "$f" ]; then
+    fail "$f is listed as not yet rewritten but does not exist"
+  fi
 done <"$listed"
 
 checked=()
