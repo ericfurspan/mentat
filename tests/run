@@ -95,14 +95,15 @@ $o|Planning|an item agreed for later before stays later, asked nothing here
 $o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second-opinion tool that gave no answer and a plan check retried without its model keep the default
 $o|Planning|Typed \`/mentat:propose\` sessions, chat requests and the small-request path are still asked.
 $o|Handing over|agreed by default ("Planning")
-$o|Handing over|the "Pause" count or a standing word of the maintainer's pausing new builds
-$o|Handing over|The maintainer's "later", "stop", "not now" or like word naming a held item agreed by default records \`build: later\`
+$o|Handing over|the "Pause" count or the maintainer's word to pause new builds (below)
+$o|Handing over|The maintainer's explicit word to pause new builds, recorded in the notes file in their words with any end it names, holds new handovers and new build sessions until their word to resume or until that end comes
+$o|Handing over|The maintainer's "later", "stop", "not now" or like word naming a held item records \`build: later\`
 $o|Handing over|This rule stops no item handed over or started
 $o|Handing over|A bare "later" or "stop" naming no item answers the question asked last
 $o|Relays|in "Start" (a closed pull request), in "After merge" (no session will take the steps), and the default-agreement tell
 $o|Relays|with the plan check's verdict, each point not adopted and why, the unchecked situations that adopted changes added, any second-opinion tool that gave no answer and any plan check retried without its model
 $o|Notes|each tell owed ("Relays"), the default-agreement tell included, until given
-$o|Notes|the maintainer's word to stop planning, and any pausing new builds
+$o|Notes|the maintainer's word to stop planning, and any to pause new builds, with its end ("Handing over")
 plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line and the spec fixes its fingerprint record holds
 skills/backlog/agent-records.md|The comment|replaces the answer and keeps that line
 skills/backlog/agent-records.md|The comment|the maintainer's Agree answer that re-records the fingerprint removes it
