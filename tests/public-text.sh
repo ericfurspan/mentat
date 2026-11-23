@@ -257,6 +257,13 @@ clean
 EOF
 gh pr comment 7 -F clean.md"
 expect changed "cp word.md \"\$D\" && gh pr comment 7 -F clean.md"
+# So may a file written by a relative name after a cd the hook cannot follow, even when
+# the line publishes it by its full path.
+expect changed "cd \"\$(git rev-parse --show-toplevel)\" && cat > unplaced.md <<'EOF'
+about StubCodename
+EOF
+gh pr create --title t --body-file $root/work/unplaced.md"
+expect changed "D=sub; cd \$D; printf 'clean\n' > clean.md; gh pr comment 7 -F $root/work/clean.md"
 # Text, a file name or another published value that holds an expansion, and text gh
 # reads from standard input, cannot be read from the command alone.
 while IFS= read -r c; do expect text "$c"; done <<EOF
