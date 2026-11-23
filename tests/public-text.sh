@@ -225,6 +225,9 @@ printf 'more\n' >> clean.md; gh pr comment 7 -F clean.md
 cp clean.md copy.md && gh pr comment 7 -F copy.md
 echo ok | tee clean.md; gh pr comment 7 -F clean.md
 sed -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+printf x > sub/../clean.md; gh pr comment 7 -F clean.md
+printf x > clean.md; gh pr comment 7 -F sub/./../clean.md
+printf x > ./sub//../clean.md; gh pr comment 7 -F "\$PWD/clean.md"
 EOF
 expect changed "cat > fresh.md <<'EOF'
 clean

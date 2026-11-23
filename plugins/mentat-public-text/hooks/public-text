@@ -402,18 +402,24 @@ run_pipe() {
   for id in "$@"; do run_cmd "$id" "$#"; done
 }
 
-# full_path <path>: sets fp to the path from /, without its ./ parts. Returns 1 when the
-# working folder is unknown.
+# full_path <path>: sets fp to the path from /, with its ., .. and empty parts resolved by
+# name alone, so one file has one path. Returns 1 when the working folder is unknown.
 full_path() {
+  local rest part
   fp=$1
   case "$fp" in /*) ;; *) [ -n "$cwd" ] || return 1; fp=$cwd/$fp ;; esac
-  while :; do
-    case "$fp" in
-      */./*) fp=${fp//\/.\//\/} ;;
-      */.) fp=${fp%/.} ;;
-      *) return 0 ;;
+  case "$fp" in */. | */./* | */.. | */../* | *//*) ;; *) return 0 ;; esac
+  rest=${fp#/} fp=""
+  while [ -n "$rest" ]; do
+    part=${rest%%/*}
+    case "$rest" in */*) rest=${rest#*/} ;; *) rest="" ;; esac
+    case "$part" in
+      '' | .) ;;
+      ..) fp=${fp%/*} ;;
+      *) fp+=/$part ;;
     esac
   done
+  [ -n "$fp" ] || fp=/
 }
 # changed <path>: succeeds when a command before this one in the line writes or may write
 # the file at that full path.
