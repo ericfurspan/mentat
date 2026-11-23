@@ -14,7 +14,7 @@ Avoid: none
 
 ## after-merge steps
 
-The steps a build session runs once its pull request merges, as `mentat:review` gives them, such as updating plugins and closing out the item.
+What a session does once the maintainer says its pull request merged, such as the wait block's steps, marking the item done and deleting the merged branch.
 
 Avoid: none
 
@@ -79,7 +79,7 @@ Avoid: none
 
 ## builder
 
-The subagent that edits, tests and commits one change in its own worktree.
+The subagent that edits, tests and commits one change in its own worktree; `mentat:build` also calls one builder per branch a helper until it is rewritten.
 
 Avoid: none
 Machine-read name: `mentat:builder`.
@@ -145,12 +145,6 @@ Avoid: none
 ## held item
 
 An item the orchestrator has the go-ahead to build but has not handed over yet, because of its blocked-by links, the pause count, the maintainer's word to pause new builds or a hold.
-
-Avoid: none
-
-## helper
-
-One builder run that a session briefs and waits on: the first build of an item, a CI fix, review fixes or work after a hold.
 
 Avoid: none
 
@@ -234,7 +228,7 @@ Machine-read name: `mentat-lead:orchestrate`.
 
 ## owed report
 
-Something a session must tell the maintainer first and alone in its turn, ahead of any open question, such as the orchestrator's report of an item agreed by default. The orchestrate skill, until it is rewritten, calls its own owed reports "tells".
+A report the orchestrator owes the maintainer, such as an item agreed by default or a plugin update, given first and alone in its turn ahead of any open question. The orchestrate skill, until it is rewritten, calls these "tells".
 
 Avoid: none
 
@@ -268,7 +262,7 @@ Avoid: none
 
 ## push notice
 
-The phone notification sent with a Ready line the first time it is shown; a session another session started sends none.
+The one push notification a session sends, where it has a tool for it, when it first shows the maintainer a Ready line; a session another session started sends none.
 
 Avoid: none
 
