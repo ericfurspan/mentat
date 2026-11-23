@@ -1,0 +1,3 @@
+# The orchestrator gives each batch of agreed items a fresh build session
+
+The orchestrator in `mentat-lead:orchestrate` kept one long-lived build session per repository and handed every agreed item to it, so that session went on with the Mentat rules it loaded at its start even after a merge's after-merge steps updated the plugin. Now, when no build session is mid-run, each new batch of items to hand over goes to a fresh build session, and while a running one has had a plugin update reported since its start, new items wait for its run to end. This makes each batch load the current rules at the cost of a session start per batch; each earlier session keeps its own pull requests through review and after-merge steps.
