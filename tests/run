@@ -180,6 +180,16 @@ else
   fail "README.md is $readme_words words, over 500"
 fi
 
+# No tracked text file holds an em dash (U+2014). The check matches its bytes by escape, so this file holds none.
+em_dash=$(printf '\342\200\224')
+em_dash_files=$(git ls-files -z | LC_ALL=C xargs -0 grep -I -l -F -e "$em_dash" --)
+if [ -z "$em_dash_files" ]; then
+  pass "no tracked text file holds an em dash"
+else
+  fail "tracked text files hold an em dash:"
+  printf '%s\n' "$em_dash_files"
+fi
+
 # CHANGELOG.md keeps Keep a Changelog 1.1.0's format line and an [Unreleased] section.
 if grep -qxF 'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).' CHANGELOG.md; then
   pass "CHANGELOG.md says its format is based on Keep a Changelog 1.1.0"

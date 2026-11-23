@@ -72,4 +72,4 @@ The hooks in `git-hooks/` refuse likely secrets and non-local default-branch pus
 
 ## Credits
 
-Skills' `CREDITS.md` files hold third-party licenses.
+Skills' `CREDITS.md` files credit their sources, and only some hold third-party licenses.
