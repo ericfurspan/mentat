@@ -60,11 +60,6 @@ gh api -X POST repos/o/r/issues/7/comments
 gh api --method=PATCH repos/o/r/issues/7
 gh api repos/o/r/issues/7/comments -f body=x
 FORMS
-check "denies a word in a heredoc body" '[ "$(decision "gh pr create --title t --body \"\$(cat <<EOF
-Line one
-about StubCodename
-EOF
-)\"")" = deny ]'
 check "denies a word starting with a dash, one with a space, and a last line with no newline" '[ "$(decision "gh pr comment 7 --body \"a -DASHWORD b\"")" = deny ] && [ "$(decision "gh pr comment 7 --body \"Two Words\"")" = deny ] && [ "$(decision "gh pr comment 7 --body LASTWORD")" = deny ]'
 
 # Home paths written out, by any name.
@@ -153,26 +148,236 @@ while IFS= read -r c; do
   check "allows a temp path holding a word that only locates a clean file: $c" '[ -z "$(output "$c" 2>/dev/null)" ]'
 done <<EOF
 gh pr edit 1 --body-file $tdir/pr.md
-S=$tdir; gh pr edit 1 --body-file \$S/pr.md
-sed -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
 printf x > $tdir/out.md && gh pr edit 1 --body-file $tdir/pr.md
 EOF
-check "denies a temp path holding a word when it is published" '[ "$(decision "S=$tdir; gh pr edit 1 --body \"see \$S\"")" = deny ]'
 
 # Only a gh write is checked: its own words but the repository and the gh api endpoint,
-# the files it reads, and the text fed to it.
+# and the files it reads.
 # unchecked <command> <note>: the hook allows the command with that note on stderr.
 unchecked() { out=$(output "$1" 2>"$STUB/err"); rc=$?; [ "$rc" = 0 ] && [ -z "$out" ] && grep -q "^mentat-public-text: .*$2.*allowed unchecked" "$STUB/err"; }
-# expect <deny|allow|note> <command>: checks the hook's decision for the command. allow
-# means no output at all; note means allowed with the note for a file the line changes.
+# Text a gh write publishes that the hook cannot read from the command alone is denied
+# with the retry for its kind.
+text_unread="Mentat: this command builds text for a public repository from a variable or a command, which the check cannot read from the command alone, so it was not published. Write the text to a file in an earlier call, then pass that file by a path written out (--body-file, --notes-file, -F field=@file or --input)."
+value_unread="Mentat: a value this command publishes to a public repository, or one that makes it a write, comes from a variable or a command, which the check cannot read from the command alone, so it was not published. Write the value out literally."
+stdin_unread="Mentat: this command passes text for a public repository on standard input, which the check cannot read, so it was not published. Write the text to a file in an earlier call, then pass that file in place of -."
+place_unread="Mentat: this command names a file for a public repository by a relative path after a cd the check cannot follow, so it cannot read it and it was not published. Name the file by its full path, or write out the folder the cd moves to."
+changed_unread="Mentat: a file this command publishes to a public repository is written, or may be changed, earlier in the same command, so the check cannot read it and it was not published. Write the file in an earlier call, then publish it in a call of its own."
+# expect <deny|allow|text|value|stdin|place|changed> <command>: checks the hook's decision
+# for the command. allow means no output at all; text, value, stdin, place and changed mean
+# a deny with that kind's reason.
 expect() {
-  local want=$1 cmd=$2 label=${2//$'\n'/ \\n }
+  local want=$1 cmd=$2 label=${2//$'\n'/ \\n } r
+  case "$want" in
+    text) r=$text_unread ;;
+    value) r=$value_unread ;;
+    stdin) r=$stdin_unread ;;
+    place) r=$place_unread ;;
+    changed) r=$changed_unread ;;
+  esac
   case "$want" in
     deny) check "denies: $label" '[ "$(decision "$cmd")" = deny ]' ;;
-    note) check "allows with a note: $label" 'unchecked "$cmd" "a file this command changes"' ;;
-    *) check "allows: $label" '[ -z "$(output "$cmd" 2>&1)" ]' ;;
+    allow) check "allows: $label" '[ -z "$(output "$cmd" 2>&1)" ]' ;;
+    *) check "denies as $want it cannot read: $label" '[ "$(reason "$cmd")" = "$r" ]' ;;
   esac
 }
+# A file a gh write names is read and checked, by each path form the hook resolves: a
+# clean one is allowed, one with a hit denied.
+cp "$root/work/clean.md" "$TMPDIR/clean.md"
+cp "$root/work/word.md" "$TMPDIR/word.md"
+cp "$root/work/word.md" "$HOME/word.md"
+printf '{"body": "clean"}\n' >"$root/work/clean.json"
+cp "$root/work/clean.json" "$HOME/clean.json"
+printf '{"body": "about StubCodename"}\n' >"$HOME/word.json"
+while IFS= read -r c; do
+  expect allow "${c//FILE/clean}"
+  expect deny "${c//FILE/word}"
+done <<EOF
+gh pr comment 7 --body-file FILE.md
+gh pr comment 7 --body-file $root/work/FILE.md
+gh pr comment 7 --body-file ~/FILE.md
+gh pr comment 7 --body-file "\$HOME/FILE.md"
+gh pr comment 7 --body-file "\${HOME}/FILE.md"
+gh pr comment 7 --body-file "\$PWD/FILE.md"
+gh pr comment 7 --body-file "\$(pwd)/FILE.md"
+gh pr comment 7 --body-file "\$TMPDIR/FILE.md"
+gh pr comment 7 -F "\$HOME/FILE.md"
+gh release edit v1 --notes-file "\$TMPDIR/FILE.md"
+gh api repos/o/r/issues/7/comments -F body=@"\$HOME/FILE.md"
+gh api repos/o/r/issues/7/comments --input "\$HOME/FILE.json"
+EOF
+# A file is read by its path as written, as gh opens it, through a linked folder too.
+mkdir -p "$root/work/real/dir"
+ln -s real/dir "$root/work/link"
+printf 'about StubCodename\n' >"$root/work/real/linked.md"
+expect deny "gh pr comment 7 -F link/../linked.md"
+# A file written by one name is changed under every name that leads to it: a linked
+# file, a linked folder, and .. after a linked folder.
+printf 'clean\n' >"$root/work/target.md"
+ln -s target.md "$root/work/alias.md"
+printf 'clean\n' >"$root/work/real/dir/inner.md"
+printf 'clean\n' >"$root/work/real/plain.md"
+while IFS= read -r c; do expect changed "$c"; done <<'EOF'
+printf x > target.md; gh pr comment 7 -F alias.md
+printf x > alias.md; gh pr comment 7 -F target.md
+printf x > link/inner.md; gh pr comment 7 -F real/dir/inner.md
+printf x > real/dir/inner.md; gh pr comment 7 -F link/inner.md
+printf x > link/../plain.md; gh pr comment 7 -F real/plain.md
+EOF
+# A clean file only a reader names earlier in the line is read too.
+while IFS= read -r c; do expect allow "$c"; done <<'EOF'
+cat clean.md; gh pr comment 7 -F clean.md
+grep -c x clean.md && gh pr comment 7 --body-file clean.md
+[ -f clean.md ] && gh pr comment 7 -F clean.md
+sed -n 1p clean.md; awk 'NR<2' clean.md; gh pr comment 7 -F clean.md
+EOF
+# A clean file a command earlier in the line writes, or may write, is not read.
+while IFS= read -r c; do expect changed "$c"; done <<EOF
+printf 'clean\n' > fresh.md && gh pr comment 7 -F fresh.md
+printf 'more\n' >> clean.md; gh pr comment 7 -F clean.md
+cp clean.md copy.md && gh pr comment 7 -F copy.md
+echo ok | tee clean.md; gh pr comment 7 -F clean.md
+sed -i '' 's/a/b/' $tdir/pr.md; gh pr edit 1 --body-file $tdir/pr.md
+printf x > sub/../clean.md; gh pr comment 7 -F clean.md
+printf x > clean.md; gh pr comment 7 -F sub/./../clean.md
+printf x > ./sub//../clean.md; gh pr comment 7 -F "\$PWD/clean.md"
+EOF
+expect changed "cat > fresh.md <<'EOF'
+clean
+EOF
+gh pr comment 7 -F fresh.md"
+# A file written by a name the hook cannot read may be any file the line publishes later.
+expect changed "F=new.md; cat > \$F <<'EOF'
+about StubCodename
+EOF
+gh pr comment 7 -F new.md"
+expect changed "F=clean.md; cat > \$F <<'EOF'
+clean
+EOF
+gh pr comment 7 -F clean.md"
+expect changed "cp word.md \"\$D\" && gh pr comment 7 -F clean.md"
+# So may a file written by a relative name after a cd the hook cannot follow, even when
+# the line publishes it by its full path.
+expect changed "cd \"\$(git rev-parse --show-toplevel)\" && cat > unplaced.md <<'EOF'
+about StubCodename
+EOF
+gh pr create --title t --body-file $root/work/unplaced.md"
+expect changed "D=sub; cd \$D; printf 'clean\n' > clean.md; gh pr comment 7 -F $root/work/clean.md"
+# Text, a file name or another published value that holds an expansion, and text gh
+# reads from standard input, cannot be read from the command alone.
+while IFS= read -r c; do expect text "$c"; done <<EOF
+S=$tdir; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; gh pr edit 1 --body "see \$S"
+gh pr comment 7 --body "\$NOTES"
+gh pr comment 7 --body="\$NOTES"
+gh pr comment 7 -b"\$NOTES"
+gh pr comment 7 --body "\$(git log -1 --format=%s)"
+gh pr comment 7 --body \`date\`
+gh pr comment 7 --body "costs \$ 5"
+gh pr comment 7 --body-file "\$F"
+gh pr comment 7 --body-file "\${PWD}/clean.md"
+gh pr comment 7 --body-file "\${PWD}/word.md"
+gh pr comment 7 --body-file "\${TMPDIR}/clean.md"
+gh pr comment 7 --body-file "\${TMPDIR}/word.md"
+gh pr comment 7 -F "\$F"
+gh release create v1 --notes "\$N"
+gh release edit v1 --notes-file "\$(git rev-parse --show-toplevel)/n.md"
+gh api repos/o/r/issues/7/comments -f body="\$B"
+gh api repos/o/r/issues/7/comments -F body=@"\$F"
+gh api repos/o/r/issues/7/comments --input "\$F"
+gh api graphql -f query="\$Q"
+gh pr comment 7 -F"\$F"
+gh pr comment 7 --body-file"\$F"
+gh api repos/o/r/issues/7/comments -F"\$FIELD"
+gh api repos/o/r/issues/7/comments -f"\$FIELD"
+gh api graphql --input"\$F"
+gh pr comment 7 -F <(cat clean.md)
+gh pr comment 7 -F<(cat clean.md)
+gh pr comment 7 -F >(cat)
+gh pr comment 7 --body-file <(cat clean.md)
+gh pr comment 7 --body-file=<(cat clean.md)
+gh pr comment 7 --body <(cat clean.md)
+gh release edit v1 --notes-file <(cat clean.md)
+gh api repos/o/r/issues/7/comments -F body=@<(cat clean.md)
+gh api repos/o/r/issues/7/comments -f body=<(cat clean.md)
+gh api repos/o/r/issues/7/comments --input <(cat clean.json)
+EOF
+# Once the line assigns the home, working or temporary folder's variable, a path using it
+# is unknown, however it is assigned.
+printf 'about StubCodename\n' >"$root/work/sub/reassigned.md"
+while IFS= read -r c; do expect text "$c"; done <<EOF
+export TMPDIR="$root/work/sub"; gh pr comment 7 -F "\$TMPDIR/reassigned.md"
+HOME="$root/work/sub"; gh pr comment 7 --body-file "\${HOME}/reassigned.md"
+declare -x TMPDIR="$root/work/sub"; gh pr comment 7 -F "\$TMPDIR/reassigned.md"
+HOME="$root/work/sub"; gh pr comment 7 -F "\$HOME/reassigned.md"
+export HOME="$root/work/sub" && gh pr comment 7 -F ~/reassigned.md
+export PWD="$root/work/sub"; gh pr comment 7 -F "\$PWD/reassigned.md"
+EOF
+expect text "cat <<'EOF' >/dev/null; export TMPDIR=\"$root/work/sub\"; gh pr comment 7 -F \"\$TMPDIR/reassigned.md\"
+x
+EOF"
+# A relative file after a cd the hook cannot follow is not read either.
+while IFS= read -r c; do expect place "$c"; done <<EOF
+cd - && gh pr comment 7 -F clean.md
+D=sub; cd \$D && gh pr comment 7 -F clean.md
+cd "\$(git rev-parse --show-toplevel)" && gh pr create --title t --body-file clean.md
+mkdir -p new && cd new && gh pr comment 7 -F clean.md
+HOME="$root/work/sub"; cd && gh pr comment 7 -F reassigned.md
+EOF
+while IFS= read -r c; do expect value "$c"; done <<'EOF'
+gh pr create --title "$T" --body ok
+gh pr comment "$N" --body ok
+gh pr create --title t --body ok --head "$BRANCH"
+gh pr edit 7 --add-label "$L"
+gh pr close 7 -c "$X"
+gh release create "$TAG" --notes ok
+gh release create v1 "$F" --notes ok
+gh api -X POST repos/o/r/issues/7/comments -H "X-Note: $V"
+V=comment; gh pr $V 7 --body ok
+M=POST; gh api -X $M repos/o/r/issues/7/comments -H "X-Note: ok"
+gh api -X"$M" repos/o/r/issues/7/comments
+gh release create v1 -t"$T"
+G=gh; $G pr comment 7 --body ok
+EOF
+while IFS= read -r c; do expect stdin "$c"; done <<'EOF'
+gh pr comment 7 --body-file - < clean.md
+gh pr comment 7 --body-file=- < clean.md
+gh pr comment 7 -F- < clean.md
+cat clean.md | gh pr comment 7 -F -
+gh release edit v1 --notes-file - < clean.md
+gh api repos/o/r/issues/7/comments --input - < clean.json
+gh api repos/o/r/issues/7/comments -F body=@- < clean.md
+jq -n '{body: "ok"}' | gh api repos/o/r/issues/7/comments --input -
+gh pr comment 7 -F - < <(cat clean.md)
+EOF
+expect stdin "gh pr comment 7 -F - <<'EOF'
+clean
+EOF"
+# What the hook can read, or need not, is allowed.
+while IFS= read -r c; do expect allow "$c"; done <<'EOF'
+gh pr comment 7 --body ok <<< "x"
+gh pr create --fill
+gh release create v1 --generate-notes
+gh release create v1 --notes-from-tag
+gh release create v1 "$TMPDIR/app.tgz" --notes ok
+gh pr comment 7 --body $'two\nlines'
+gh pr comment 7 --body "costs \$5"
+gh pr view 7 -q "$Q"
+gh api "repos/$O/$R/issues/7/comments" -f body=ok
+gh api -X POST repos/o/r/issues/7/comments -f body=ok --jq "$Q"
+gh pr create -R "$REPO" --title t --body ok --template "$T"
+X=$(date) gh pr comment 7 --body ok
+$EDITOR x.md; gh pr comment 7 --body ok
+G=gh; $G pr view 7
+gh run "$CMD" 7
+gh pr comment 7 -R"$REPO" --body ok
+gh pr comment 7 --body ok > "$OUT"
+gh pr comment 7 -F "$HOME/missing.md"
+gh pr comment 7 --body ok < <(cat clean.md)
+diff <(cat clean.md) <(cat clean.md); gh pr comment 7 -F clean.md
+comm <(cat clean.md) <(cat clean.md); gh pr comment 7 -F clean.md
+echo x | tee >(cat); gh pr comment 7 -F clean.md
+while read -r l; do :; done < <(cat clean.md); gh pr comment 7 -F clean.md
+EOF
 printf '{"body": "about StubCodename"}\n' >"$root/work/word.json"
 printf 'about StubCodename\n' >"$root/work/sub/only-sub.md"
 printf 'mutation { addComment(input: {body: "StubCodename"}) { clientMutationId } }\n' >"$root/work/mutation.graphql"
@@ -198,9 +403,6 @@ gh api -H "Accept: x" repos/o/stubcodename/issues/7/comments -f body=ok
 gh api -f body=ok repos/o/stubcodename/issues/7/comments
 gh api repos/o/r/x -f q=stubcodename -XGET
 gh pr create --title t --body-file /Users/stubperson/missing.md
-gh pr comment 7 --body "$(git log -1 --format=%s)"
-gh pr comment 7 --body "$NOTES"
-jq -n '{body: "stubcodename"}' | gh api repos/o/r/issues/7/comments --input -
 gh pr comment 7 --body ok <<< "stubcodename"
 gh pr comment 7 --body 'see $HOME/x'
 gh api graphql -f query='query { repository(owner: "o", name: "stubcodename") { id } }'
@@ -213,7 +415,6 @@ gh issue create --title t --body ok --template=/Users/stubperson/t.md
 gh pr create --title t --body ok --recover /Users/stubperson/r.json
 gh release create v1 /Users/stubperson/dist/app.tgz --notes ok
 gh release view v1 --json body -q stubcodename
-while read -r l; do :; done < word.md | gh pr comment 7 -F -
 cp clean.md word.md; gh pr comment 7 --body ok
 gh api -X POST repos/o/r/issues/7/comments -f body=ok --jq '.user.login | select(. != "stubcodename")'
 gh api -X POST repos/o/r/issues/7/comments -f body=ok -q .stubcodename
@@ -223,9 +424,26 @@ gh api -X POST repos/o/r/issues/7/comments -f body=ok -t '{{.html_url}} stubcode
 gh api -X POST repos/o/r/issues/7/comments -f body=ok --template='{{.html_url}} stubcodename'
 gh api -X POST repos/o/r/issues/7/comments -f body=ok -t'{{.html_url}} stubcodename'
 NOPUBLISH
+# Text from a variable, a command or standard input, which the hook does not follow.
+while IFS= read -r c; do expect text "$c"; done <<'EOF'
+gh pr comment 7 --body "$(git log -1 --format=%s)"
+gh pr comment 7 --body "$NOTES"
+cp clean.md word.md; gh pr comment 7 --body "$(cat word.md)"
+EOF
+expect text "gh pr create --title t --body \"\$(cat <<EOF
+Line one
+about StubCodename
+EOF
+)\""
+while IFS= read -r c; do expect stdin "$c"; done <<'EOF'
+jq -n '{body: "stubcodename"}' | gh api repos/o/r/issues/7/comments --input -
+while read -r l; do :; done < word.md | gh pr comment 7 -F -
+cp clean.md word.md; cat word.md | gh pr comment 7 -F -
+cp clean.md word.md; gh pr comment 7 -F - < word.md
+EOF
 # A command that can write a file makes its text unknown, so the gh write it feeds is
-# allowed with a note.
-while IFS= read -r c; do expect note "$c"; done <<'CHANGED'
+# denied.
+while IFS= read -r c; do expect changed "$c"; done <<'CHANGED'
 gh pr view 7 --json body -q .body > /Users/stubperson/b.md && gh pr edit 7 --body-file /Users/stubperson/b.md
 gh pr view 7 --json body -q .body > word.md && gh pr edit 7 --body-file word.md
 sed -i '' 's/StubCodename/it/' word.md && gh pr comment 7 -F word.md
@@ -242,9 +460,6 @@ echo clean | tee word.md && gh pr comment 7 -F word.md
 dd if=clean.md of=word.md && gh pr comment 7 -F word.md
 npx prettier --write word.md && gh pr comment 7 -F word.md
 printf 'clean\n' > word.md && gh pr comment 7 -F word.md
-cp clean.md word.md; cat word.md | gh pr comment 7 -F -
-cp clean.md word.md; gh pr comment 7 --body "$(cat word.md)"
-cp clean.md word.md; gh pr comment 7 -F - < word.md
 cp clean.md word.md; cat word.md > copy.md; gh pr comment 7 -F copy.md
 cp clean.md query.graphql; gh api graphql -F query=@query.graphql
 CHANGED
@@ -314,6 +529,14 @@ git add word.md; gh pr comment 7 -F - < word.md
 cp clean.md query.graphql; gh api graphql -F query=@query.graphql -f body="about stubcodename"
 jq -n '{query: "query { x }"}' | gh api graphql --input - -f body="about stubcodename"
 gh pr create -t stubcodename --body x
+D=sub; cd $D && gh pr comment 7 -F only-sub.md
+V=comment; gh pr $V 7 --body "about stubcodename"
+M=POST; gh api -X $M repos/o/r/issues/7/comments -H "X-Note: about stubcodename"
+G=gh; $G pr comment 7 --body "about stubcodename"
+F=word.md; gh pr comment 7 -F"$F"
+M=POST; gh api -X"$M" repos/o/r/issues/7/comments -H "X-Note: about stubcodename"
+R=o/r; gh pr comment 7 -R"$R" --body-file word.md
+cp clean.md copy.md; gh api graphql -f query='query { viewer { login } }' -F note=@copy.md -f body="about stubcodename"
 PUBLISH
 expect deny "cat > x.md <<'EOF'
 about stubcodename
@@ -328,7 +551,7 @@ expect deny 'n=$((1<<4))
 gh pr comment 7 --body "about stubcodename"'
 expect deny '(( x = 1 << 4 ))
 gh pr comment 7 --body "about stubcodename"'
-expect allow 'gh pr comment 7 -F - <<EOF
+expect stdin 'gh pr comment 7 -F - <<EOF
 see \$HOME/x and \${HOME} and \$(pwd)
 EOF'
 expect deny 'gh pr\
@@ -344,7 +567,7 @@ EOF"
 expect deny 'gh pr comment 7 -F - <<EOF
 see $HOME/x
 EOF'
-expect allow "gh pr comment 7 -F - <<'EOF'
+expect stdin "gh pr comment 7 -F - <<'EOF'
 see \$HOME/x
 EOF"
 expect deny "gh pr create --title t --body \"\$(cat <<'EOF'
@@ -372,9 +595,8 @@ reset; printf 'exact:StubExact\n' >"$LIST"
 check "a marked entry is denied only in its case and as a whole word" '[ "$(decision "gh pr comment 7 --body \"about StubExact\"")" = deny ] && [ -z "$(decision "gh pr comment 7 --body \"about stubexact\"")" ] && [ -z "$(decision "gh pr comment 7 --body \"about StubExacts\"")" ]'
 reset
 long=$(printf 'stubcodename\n%0100000d\n%0100000d' 0 0)
-check "a hit early in a long heredoc is denied under pipefail" '[ "$(decision "gh pr comment 7 -F - <<'"'"'EOF'"'"'
-$long
-EOF")" = deny ]'
+printf '%s\n' "$long" >"$root/work/long.md"
+check "a hit early in a long file is denied under pipefail" '[ "$(decision "gh pr comment 7 -F long.md")" = deny ]'
 
 # Limits: a file over 1 MB, a command over 50 KB outside heredocs, or deep nesting is
 # allowed unchecked with a note, and a file whose text reaches no gh write is not read.
@@ -403,7 +625,7 @@ for t in cat head; do
 done
 # read_word <command>: succeeds when the hook reads word.md for the command.
 read_word() { rm -f "$STUB/reads"; PATH="$root/logbin:$PATH" output "$1" >/dev/null 2>&1; grep -qF word.md "$STUB/reads" 2>/dev/null; }
-check "reads a file whose text reaches a gh write" 'read_word "cat word.md | gh pr comment 7 -F -"'
+check "reads a file whose text reaches a gh write" 'read_word "gh pr comment 7 -F word.md"'
 while IFS= read -r c; do
   check "does not read a file whose text reaches no gh write: $c" '! read_word "$c"'
 done <<'NOREAD'

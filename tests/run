@@ -66,7 +66,7 @@ fi
 # maintainer's chat sends one push, from the starting session and never a started one; holds, blocks
 # and questions get neither. Moving on to the next item to plan proposes an order once and plans through it.
 # The orchestrator starts a fresh build session when none is mid-run, and holds every item while an
-# after-merge reply is pending.
+# after-merge reply is pending. A pull request body goes to gh from a file.
 o=plugins/mentat-lead/skills/orchestrate/SKILL.md
 b=plugins/mentat-lead/skills/orchestrate/build-sessions.md
 while IFS='|' read -r f section want; do
@@ -165,6 +165,7 @@ skills/review/review-depth.md|Push notice|With no such tool, or when the push is
 skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/review-depth.md\` "Push notice" says.
 skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
 skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/review-depth.md\` "Push notice" gives.
+skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
 EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
   pass "docs/adr holds the decision record for default agreement in the orchestrator"
