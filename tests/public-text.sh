@@ -286,6 +286,16 @@ gh pr comment 7 --body-file"\$F"
 gh api repos/o/r/issues/7/comments -F"\$FIELD"
 gh api repos/o/r/issues/7/comments -f"\$FIELD"
 gh api graphql --input"\$F"
+gh pr comment 7 -F <(cat clean.md)
+gh pr comment 7 -F<(cat clean.md)
+gh pr comment 7 -F >(cat)
+gh pr comment 7 --body-file <(cat clean.md)
+gh pr comment 7 --body-file=<(cat clean.md)
+gh pr comment 7 --body <(cat clean.md)
+gh release edit v1 --notes-file <(cat clean.md)
+gh api repos/o/r/issues/7/comments -F body=@<(cat clean.md)
+gh api repos/o/r/issues/7/comments -f body=<(cat clean.md)
+gh api repos/o/r/issues/7/comments --input <(cat clean.json)
 EOF
 # Once the line assigns the home, working or temporary folder's variable, a path using it
 # is unknown, however it is assigned.
@@ -333,6 +343,7 @@ gh release edit v1 --notes-file - < clean.md
 gh api repos/o/r/issues/7/comments --input - < clean.json
 gh api repos/o/r/issues/7/comments -F body=@- < clean.md
 jq -n '{body: "ok"}' | gh api repos/o/r/issues/7/comments --input -
+gh pr comment 7 -F - < <(cat clean.md)
 EOF
 expect stdin "gh pr comment 7 -F - <<'EOF'
 clean
@@ -357,6 +368,11 @@ gh run "$CMD" 7
 gh pr comment 7 -R"$REPO" --body ok
 gh pr comment 7 --body ok > "$OUT"
 gh pr comment 7 -F "$HOME/missing.md"
+gh pr comment 7 --body ok < <(cat clean.md)
+diff <(cat clean.md) <(cat clean.md); gh pr comment 7 -F clean.md
+comm <(cat clean.md) <(cat clean.md); gh pr comment 7 -F clean.md
+echo x | tee >(cat); gh pr comment 7 -F clean.md
+while read -r l; do :; done < <(cat clean.md); gh pr comment 7 -F clean.md
 EOF
 printf '{"body": "about StubCodename"}\n' >"$root/work/word.json"
 printf 'about StubCodename\n' >"$root/work/sub/only-sub.md"

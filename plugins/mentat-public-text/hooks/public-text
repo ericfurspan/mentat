@@ -15,7 +15,8 @@
 # missing or unreadable files and other commands' words are not checked.
 # It denies, with the retry in the reason, a gh write whose text it cannot read: a
 # variable, $( ), backticks, or any $ in double quotes, in body, notes or field text or in
-# a file's name, also a flag's attached value as in -F"$f" (write the text to a file and
+# a file's name, also a flag's attached value as in -F"$f", and a <( ) or >( ) given as
+# that text or file (write the text to a file and
 # pass that); the same in another word it publishes or that makes it a write, such as a
 # title, number, branch, label or the gh command itself (write the value out literally);
 # text gh reads from standard input (-); a relative file after a cd it cannot follow (name
@@ -165,7 +166,7 @@ file_max=1048576
 # its > and >> redirects name. The files the line writes or may write are kept by name,
 # and f_any is set once it writes one by a name the walk cannot read.
 src=$cmd
-w_text=() w_path=() w_ok=() w_lit=() w_quoted=() w_assign=() nw=0
+w_text=() w_path=() w_ok=() w_lit=() w_quoted=() w_assign=() w_ps=() nw=0
 c_words=() c_outs=() nc=0
 h_delim=() h_strip=() nh=0 pend=""
 f_path=() f_raw=() f_phys=() nf=0 f_any=""
@@ -259,7 +260,7 @@ dquote() {
 # word: reads one word; $wi is its index, and w_moved is set when it read any text. ~ at
 # its start is the home folder as a file name, and stays ~ as text.
 word() {
-  local text="" path="" ok=1 lit=1 quoted="" assign="" t c
+  local text="" path="" ok=1 lit=1 quoted="" assign="" ps="" t c saved
   w_moved=""
   if [[ $src =~ $re_assign ]]; then assign=1; fi
   # An assignment to a folder variable, in any command, makes it unknown from here on.
@@ -272,6 +273,14 @@ word() {
     tick
     if [[ $src =~ $re_plain ]]; then t=${BASH_REMATCH[0]}; text+=$t path+=$t src=${src:${#t}} w_moved=1; continue; fi
     c=${src:0:1}
+    # A <( ) or >( ) in a word, at its start too, is a file name the walk cannot read.
+    case "${src:0:2}" in
+      '<(' | '>(')
+        src=${src:2} saved=$cwd; parse_list ')'; cwd=$saved; close
+        ps=1 lit="" w_moved=1
+        continue
+        ;;
+    esac
     case "$c" in \\ | "$sq" | '"' | '$' | "$bq") w_moved=1 ;; *) break ;; esac
     case "$c" in
       \\) c=${src:1:1}; src=${src:2}; quoted=1; [ "$c" = "$nl" ] || { text+=$c path+=$c; } ;;
@@ -285,7 +294,7 @@ word() {
     esac
   done
   wi=$nw nw=$((nw + 1))
-  w_text[wi]=$text w_path[wi]=$path w_ok[wi]=$ok w_lit[wi]=$lit w_quoted[wi]=$quoted w_assign[wi]=$assign
+  w_text[wi]=$text w_path[wi]=$path w_ok[wi]=$ok w_lit[wi]=$lit w_quoted[wi]=$quoted w_assign[wi]=$assign w_ps[wi]=$ps
 }
 new_cmd() { cur=$nc c_words[nc]="" c_outs[nc]="" nc=$((nc + 1)); }
 # redirect [operator]: reads a redirect of the current command, keeping the word of a >
@@ -296,6 +305,8 @@ redirect() {
   [ -n "$cur" ] || new_cmd
   case "$op" in '<(' | '>(') saved=$cwd; parse_list ')'; cwd=$saved; close; return ;; esac
   if [[ $src =~ $re_blank ]]; then src=${src:${#BASH_REMATCH[0]}}; fi
+  # A <( ) or >( ) a redirect reads or writes is no word of the command.
+  case "${src:0:2}" in '<(' | '>(') src=${src:2}; redirect "${op:0:1}("; return ;; esac
   case "${src:0:1}" in '' | "$nl" | ';' | '&' | '|' | '(' | ')' | '<' | '>') return ;; esac
   word
   case "$op" in
@@ -348,6 +359,8 @@ parse_list() {
     if [[ $src =~ $re_blank ]]; then src=${src:${#BASH_REMATCH[0]}}; fi
     [ -n "$src" ] || break
     c=${src:0:1}
+    # A <( ) or >( ) starts a word.
+    case "${src:0:2}" in '<(' | '>(') c=w ;; esac
     case "$c" in
       "$nl") src=${src:1} lead="" in_test=""; end_pipe; heredocs; flush ;;
       '#') [[ $src =~ $re_comment ]]; src=${src:${#BASH_REMATCH[0]}} ;;
@@ -516,7 +529,7 @@ unread() { [ -n "$why" ] || why=$1; }
 file() {
   local q=${4-} raw
   if [ "$2" = - ]; then unread stdin
-  elif [ -z "${w_ok[$1]}" ]; then unread text
+  elif [ -z "${w_ok[$1]}" ] || [ -n "${w_ps[$1]}" ]; then unread text
   elif ! full_path "$3"; then unread place
   else
     # Read by the path as written, as gh opens it: through a link, .. need not lead
