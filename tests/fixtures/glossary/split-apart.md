@@ -10,8 +10,8 @@ carrier bags hang by the door.
 The courier holds one parcel
 ## carrier bags
 
-The courier holds one parcel
-| carrier bags | by the door |
+| one courier | one parcel
+carrier bags hang by the door.
 
 The courier holds one parcel
 ```

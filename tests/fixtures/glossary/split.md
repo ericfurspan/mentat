@@ -5,3 +5,6 @@ and handed the second parcel
 carrier a note before the tide turned.
 The boats wait for low
 water at the wall.
+
+`lamp` lights guide the second parcel
+carrier home.

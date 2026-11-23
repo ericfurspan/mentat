@@ -52,6 +52,7 @@ expect "a possessive matches" 1 "$fx/forms.md:7: \"signal\""
 run_check "$g" "$fx/split.md" ""
 expect "a phrase split across lines matches at its first line" 1 "FAIL: glossary $fx/split.md:4: \"parcel carrier\" is avoided by entry \"courier\""
 expect "a whole phrase split across lines matches at its first line" 1 "FAIL: glossary $fx/split.md:6: \"low water\" is avoided by entry \"tide\""
+expect "a phrase split after a line that starts with a code span matches" 1 "FAIL: glossary $fx/split.md:9: \"parcel carrier\" is avoided by entry \"courier\""
 run_check "$g" "$fx/split-apart.md" ""
 expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-apart.md: no avoided words"
 

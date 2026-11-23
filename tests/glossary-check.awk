@@ -147,6 +147,8 @@ NR == FNR {
   }
   if (line ~ /^[ \t]*(```|~~~)/) { end_sentence(); flush(); fence = !fence; next }
   if (fence) next
+  # A heading or table row, read before the skips below can make a line start with |.
+  unit = (line ~ /^#/ || line ~ /^[ \t]*\|/)
 
   # Skipped: code spans, link targets, URLs, paths and file names. Each becomes a | separator,
   # so no phrase runs across it.
@@ -161,7 +163,6 @@ NR == FNR {
   # Paragraphs: a blank line, a fence or a list item starts a new one, and a heading, a table row
   # and the description are each one on their own. Avoided terms match within a paragraph.
   if (line ~ /^[ \t]*$/) { end_sentence(); flush(); next }
-  unit = (line ~ /^#/ || line ~ /^[ \t]*\|/)
   if (unit) end_sentence()
   if (unit || desc) flush()
   if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/) { end_sentence(); flush(); sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line) }
