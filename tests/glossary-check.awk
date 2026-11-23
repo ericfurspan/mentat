@@ -5,6 +5,8 @@
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
 # Lowercase; every run of characters other than letters, digits and the | separator becomes one space.
 function norm(s) { s = tolower(s); gsub(/[^a-z0-9|]+/, " ", s); return trim(s) }
+# Lowercase; tabs become spaces and every run of spaces one space. A whole phrase matches in this.
+function words_of(s) { s = tolower(s); gsub(/[ \t]+/, " ", s); return trim(s) }
 function bad(msg) { printf "FAIL: glossary %s\n", msg; failed = 1 }
 # forms(A, k, t, whole): A[k, 1..n] holds the forms of phrase t that match; returns n.
 function forms(A, k, t, whole,   n, pre, last, stem, c) {
@@ -44,23 +46,38 @@ function finish_glossary(   a, k, j, ca) {
   if (!failed) printf "PASS: glossary %s: %d entries, %d avoided terms\n", G, ne, nt
 }
 function end_sentence() { if (words > 20) long++; words = 0 }
-# A paragraph is consecutive prose lines; PB holds their normalized text, one space before each
-# line, PS[i] the length of PB before line i and PL[i] its line number.
-function add_line(t) {
-  if (t == "") return
-  if (pn == 0) PB = " "
-  pn++; PS[pn] = length(PB); PL[pn] = FNR; PB = PB t " "
+# A paragraph is consecutive prose lines; PB holds their normalized text and RB their words_of
+# text, each with one space before each line; PS[i] and WS[i] are the lengths of PB and RB before
+# line i, and PL[i] its line number.
+function add_line(t, r) {
+  if (t == "" && r == "") return
+  if (pn == 0) { PB = " "; RB = " " }
+  pn++; PS[pn] = length(PB); WS[pn] = length(RB); PL[pn] = FNR; PB = PB t " "; RB = RB r " "
 }
-# line_at(p): the paragraph line holding the text that starts after position p.
-function line_at(p,   i) { for (i = pn; i > 1; i--) if (PS[i] <= p) return i; return 1 }
+# line_at(p, O): the paragraph line holding the text that starts after position p of the buffer
+# whose line offsets O holds.
+function line_at(p, O,   i) { for (i = pn; i > 1; i--) if (O[i] <= p) return i; return 1 }
+# joins(c): whether character c joins the words beside it, so a whole phrase cannot end there.
+function joins(c) { return c ~ /[a-z0-9-]/ }
 # flush(): checks the paragraph, reporting each avoided term once per line it starts on.
-function flush(   k, j, i, s, f, p, off, hk, a) {
+function flush(   k, j, i, s, f, p, q, off, hk, a) {
   if (pn == 0) return
   for (k = 1; k <= nt; k++) {
+    if (WH[k]) {
+      # A whole phrase: its words separated by whitespace, with no letter, digit or hyphen on
+      # either side.
+      off = 0
+      while ((p = index(substr(RB, off + 1), W[k])) > 0) {
+        q = off + p
+        if (!joins(substr(RB, q - 1, 1)) && !joins(substr(RB, q + length(W[k]), 1))) hk[k, line_at(q - 1, WS)] = 1
+        off = q
+      }
+      continue
+    }
     for (j = 1; j <= TN[k]; j++) {
       s = PB; f = " " TF[k, j] " "; off = 0
       while ((p = index(s, f)) > 0) {
-        hk[k, line_at(off + p)] = 1
+        hk[k, line_at(off + p, PS)] = 1
         off += p + length(f) - 2; s = substr(s, p + length(f) - 1)
       }
     }
@@ -105,6 +122,7 @@ NR == FNR {
       p = norm(parts[i])
       if (p == "") continue
       nt++; T[nt] = p; TE[nt] = ne; TN[nt] = forms(TF, nt, p, whole)
+      if (whole) { WH[nt] = 1; W[nt] = words_of(parts[i]) }
     }
     next
   }
@@ -153,7 +171,7 @@ NR == FNR {
     if (toks[i] ~ /[.!?][)"'*_]*$/) end_sentence()
   }
   if (unit) end_sentence()
-  add_line(norm(line))
+  add_line(norm(line), words_of(line))
   if (unit || desc) flush()
 }
 

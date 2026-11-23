@@ -60,9 +60,10 @@ expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-
 run_check "$g" "$fx/skipped.md" ""
 expect "code spans, fences, link targets and paths are skipped" 0 "PASS: glossary $fx/skipped.md: no avoided words"
 
-# c. A whole-phrase Avoid line matches only the exact phrase, in any case.
+# c. A whole-phrase Avoid line matches only the exact phrase, in any case: its other forms, and
+# its words joined by a hyphen or split by a comma, pass.
 run_check "$g" "$fx/whole-forms.md" ""
-expect "a whole-phrase Avoid word's other forms pass" 0 "PASS: glossary $fx/whole-forms.md: no avoided words"
+expect "a whole-phrase Avoid word's other, hyphenated and comma-split forms pass" 0 "PASS: glossary $fx/whole-forms.md: no avoided words"
 run_check "$g" "$fx/whole-exact.md" ""
 expect "a whole-phrase Avoid phrase itself fails" 1 "$fx/whole-exact.md:3: \"low water\" is avoided by entry \"tide\""
 

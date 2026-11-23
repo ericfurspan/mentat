@@ -8,7 +8,8 @@
 # The glossary's format: each entry starts at a "## <word>" heading, the word to use. In an entry,
 # "Avoid: a, b" names words or phrases not to use, matched case-insensitively on word boundaries
 # with plural, -ed and -ing forms of the last word, hyphens and spaces alike; "Avoid (whole
-# phrase): a, b" matches only the exact phrase, in any case; "Avoid: none" names nothing; and an
+# phrase): a, b" matches only the exact phrase, in any case, its words separated by whitespace and
+# no letter, digit or hyphen on either side; "Avoid: none" names nothing; and an
 # "Ambiguous:" line flags the entry's word, which is counted, never failed. Every entry has an
 # Avoid line. Other lines, the meaning included, are never read as words to avoid.
 #
