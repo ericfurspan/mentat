@@ -218,6 +218,19 @@ mkdir -p "$root/work/real/dir"
 ln -s real/dir "$root/work/link"
 printf 'about StubCodename\n' >"$root/work/real/linked.md"
 expect deny "gh pr comment 7 -F link/../linked.md"
+# A file written by one name is changed under every name that leads to it: a linked
+# file, a linked folder, and .. after a linked folder.
+printf 'clean\n' >"$root/work/target.md"
+ln -s target.md "$root/work/alias.md"
+printf 'clean\n' >"$root/work/real/dir/inner.md"
+printf 'clean\n' >"$root/work/real/plain.md"
+while IFS= read -r c; do expect changed "$c"; done <<'EOF'
+printf x > target.md; gh pr comment 7 -F alias.md
+printf x > alias.md; gh pr comment 7 -F target.md
+printf x > link/inner.md; gh pr comment 7 -F real/dir/inner.md
+printf x > real/dir/inner.md; gh pr comment 7 -F link/inner.md
+printf x > link/../plain.md; gh pr comment 7 -F real/plain.md
+EOF
 # A clean file only a reader names earlier in the line is read too.
 while IFS= read -r c; do expect allow "$c"; done <<'EOF'
 cat clean.md; gh pr comment 7 -F clean.md

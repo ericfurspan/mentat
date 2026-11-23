@@ -20,7 +20,8 @@
 # title, number, branch, label or the gh command itself (write the value out literally);
 # text gh reads from standard input (-); a relative file after a cd it cannot follow (name
 # the file by its full path, or write the cd's folder out); and a file a command before
-# it in the line writes or may write (write it in an earlier call): one written by > or
+# it in the line writes or may write, by any name leading to it, through a link too
+# (write it in an earlier call): one written by > or
 # >>, or one named, also after = as in of=file, by any command other than cat, cd, pwd,
 # gh, [, [[, test, ls, wc, grep, head, tail, stat, git, jq, diff, echo, printf, rg, chmod,
 # chown, touch, open, sed without -i, -I or --in-place, and awk without -i or --include,
@@ -167,7 +168,7 @@ src=$cmd
 w_text=() w_path=() w_ok=() w_lit=() w_quoted=() w_assign=() nw=0
 c_words=() c_outs=() nc=0
 h_delim=() h_strip=() nh=0 pend=""
-f_path=() nf=0 f_any=""
+f_path=() f_raw=() f_phys=() nf=0 f_any=""
 # The folder variables the line assigns, each as " NAME ".
 v_set=""
 
@@ -424,14 +425,39 @@ full_path() {
   done
   [ -n "$fp" ] || fp=/
 }
-# changed <path>: succeeds when a command before this one in the line writes or may write
-# the file at that full path.
+# physical <path from />: sets pp to where the path leads on disk, its folder resolved by
+# cd -P and a linked last part followed, a bounded number of times. Returns 1 when its
+# folder does not exist or the links do not end.
+physical() {
+  local p=$1 dir base t n=0
+  while [ "$n" -lt 16 ]; do
+    n=$((n + 1))
+    dir=${p%/*} base=${p##*/}
+    [ -n "$dir" ] || dir=/
+    case "$base" in '' | . | ..) dir=$p base="" ;; esac
+    dir=$(cd -P -- "$dir" 2>/dev/null && pwd -P) || return 1
+    if [ -z "$base" ]; then pp=$dir; return 0; fi
+    p=${dir%/}/$base
+    if [ ! -L "$p" ]; then pp=$p; return 0; fi
+    t=$(readlink "$p") || return 1
+    case "$t" in /*) p=$t ;; *) p=${dir%/}/$t ;; esac
+  done
+  return 1
+}
+# changed <full path> <path as written, from />: succeeds when a command before this one
+# in the line writes or may write that file, named by the same path or by one leading to
+# the same place on disk, through a link too.
 changed() {
-  local k=$nf
+  local k=$nf mine=""
   [ -z "$f_any" ] || return 0
   while [ "$k" -gt 0 ]; do
     k=$((k - 1))
     [ "${f_path[k]}" != "$1" ] || return 0
+    # Where each path leads is looked up only here, once, as few gh writes read files.
+    if [ -z "$mine" ]; then if physical "$2"; then mine=$pp; else mine=-; fi; fi
+    [ "$mine" != - ] || continue
+    if [ -z "${f_phys[k]}" ]; then if physical "${f_raw[k]}"; then f_phys[k]=$pp; else f_phys[k]=-; fi; fi
+    [ "${f_phys[k]}" != "$mine" ] || return 0
   done
   return 1
 }
@@ -443,10 +469,18 @@ touched() {
     # A name it cannot read may be any file.
     [ -n "${w_ok[i]}" ] || { f_any=1; continue; }
     p=${w_path[i]}
-    if full_path "$p"; then f_path[nf]=$fp nf=$((nf + 1)); fi
+    record "$p"
     case "$p" in *=*) p=${p#*=} ;; *) continue ;; esac
-    if [ -n "$p" ] && full_path "$p"; then f_path[nf]=$fp nf=$((nf + 1)); fi
+    [ -z "$p" ] || record "$p"
   done
+}
+# record <path>: keeps a file the line may change, by its full path and by its path as
+# written, from /.
+record() {
+  full_path "$1" || return 0
+  f_path[nf]=$fp f_phys[nf]=""
+  case "$1" in /*) f_raw[nf]=$1 ;; *) f_raw[nf]=$cwd/$1 ;; esac
+  nf=$((nf + 1))
 }
 # writes <command> <word>...: succeeds unless the command is one the header lists as not
 # writing the files it names.
@@ -480,16 +514,17 @@ unread() { [ -n "$why" ] || why=$1; }
 # file <word> <value> <path> [query]: the file a flag names, or standard input for -. A
 # graphql query that cannot be read is unknown.
 file() {
-  local q=${4-}
+  local q=${4-} raw
   if [ "$2" = - ]; then unread stdin
   elif [ -z "${w_ok[$1]}" ]; then unread text
   elif ! full_path "$3"; then unread place
-  elif changed "$fp"; then unread changed; q=1
   else
     # Read by the path as written, as gh opens it: through a link, .. need not lead
     # where the name alone says.
-    case "$3" in /*) fp=$3 ;; *) fp=$cwd/$3 ;; esac
-    if [ -f "$fp" ] && [ -r "$fp" ]; then rd[nrd]=$fp nrd=$((nrd + 1)); return; fi
+    case "$3" in /*) raw=$3 ;; *) raw=$cwd/$3 ;; esac
+    if changed "$fp" "$raw"; then unread changed; q=1
+    elif [ -f "$raw" ] && [ -r "$raw" ]; then rd[nrd]=$raw nrd=$((nrd + 1)); return
+    fi
   fi
   [ -z "$q" ] || q_unknown=1
 }
