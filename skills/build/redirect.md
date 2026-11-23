@@ -8,14 +8,14 @@ A go-ahead here is "Agree and build now" (in a planning session, `../propose/ses
 
 ## Where it builds
 
-Read only this repository's notes file, orchestrate-notes.md, where `mentat-lead:orchestrate` "Notes" keeps it: in the main checkout's ignored working folder (the main checkout is the parent of `git rev-parse --path-format=absolute --git-common-dir`), or, with no such folder, in that git common directory. Never read another repository's, so another repository's orchestrator never takes this session's build. The orchestrator is the session the notes file names last as this repository's orchestrator. Its id only says which session to look for: find it in the host's list of sessions, which shows whether it runs and the address to message it by. To build here is to go on as with no orchestrator: as `SKILL.md` says, or, for a chat request, as `../propose/SKILL.md` says. The first of these that applies decides:
+Read and write only this repository's notes file, orchestrate-notes.md, where `mentat-lead:orchestrate` "Notes" keeps it: in the main checkout's ignored working folder (the main checkout is the parent of `git rev-parse --path-format=absolute --git-common-dir`), or, with no such folder, in that git common directory. Never read another repository's, so another repository's orchestrator never takes this session's build. The orchestrator is the session the notes file names last as this repository's orchestrator. Its id only says which session to look for: find it in the host's list of sessions, which shows whether it runs and the address to message it by. To build here is to go on as with no orchestrator: as `SKILL.md` says, or, for a chat request, as `../propose/SKILL.md` says. The first of these that applies decides:
 
 - No notes file, or one that names no orchestrator: build here.
 - This session is the orchestrator: it hands the items over as `mentat-lead:orchestrate` says.
 - This session is the orchestrator's build session: the notes file names this session's id as a build session, one the orchestrator started or handed items to, or records the typed ids as given to the maintainer in a command for a build session their command started. Build here.
 - The maintainer said in this session to build here: build here.
-- The host shows the named orchestrator no longer runs: build here.
-- The host cannot say whether it runs: ask the maintainer once whether it still runs (`../propose/decisions.md`), then redirect the go-ahead if it runs, or build here if it does not.
+- The notes file records the named orchestrator's id as no longer running, or the host shows it no longer runs, which this session then records there against its id: build here.
+- The host cannot say whether it runs: ask the maintainer whether it still runs (`../propose/decisions.md`), at most once in this session, the answer standing for its later go-aheads; redirect the go-ahead if it runs, or, on a no, record that orchestrator's id in the notes file as no longer running and build here.
 - The orchestrator runs: the go-ahead is redirected.
 
 ## Redirecting
