@@ -1,6 +1,6 @@
 # Glossary
 
-Mentat's rules, skills and agents use one word for each idea below. This file governs the files rewritten to it: `tests/run` keeps a list of the rule, skill and agent files not yet rewritten, and fails when any other of them uses a word an entry's Avoid line names. Until a skill is rewritten, a heading or label its template requires is used as written, even where this file names another word.
+Mentat's rules, skills and agents use one word for each idea below. This file governs the files rewritten to it: `tests/run` keeps a list of the rule, skill and agent files not yet rewritten, and fails when any other of them uses a word an entry's Avoid line names. Until a skill is rewritten, a heading or label its template requires is used as written, even where this file names another word; a rewritten file that cites such a heading puts it in a code span, which the check skips.
 
 Machine-read names never change here: file names, setting keys, and subagent, skill and command names. An entry notes one where it differs from the entry's word.
 
@@ -84,7 +84,7 @@ Avoid: none
 To pass a message, answer or write from one session on to another session or to the maintainer, word for word where the sending file says so.
 
 Avoid: relay
-Machine-read name: the section headings "Relays" and "Relayed writes" stay until their files are rewritten.
+Heading: the section headings "Relays" and "Relayed writes" stay until their files are rewritten; cite them in a code span until then.
 
 ## grill
 
@@ -158,12 +158,19 @@ The session running `mentat-lead:orchestrate`, which plans items, hands them to 
 Avoid: none
 Machine-read name: `mentat-lead:orchestrate`.
 
+## plan
+
+What a change will do and how its result will be checked, settled before the maintainer agrees; the proposal is the message that puts it to them.
+
+Avoid: none
+Machine-read name: `mentat:propose`, typed as `/mentat:propose`.
+
 ## plan check
 
 One round of a fresh-context check of a plan, by the plan checker subagent, before the maintainer is asked to agree.
 
 Kept: "plan review" would blur it with the reviews of a pull request.
-Avoid: plan review
+Avoid: none
 Machine-read name: `mentat:plan-checker`, `MENTAT_PLAN_CHECK_MODEL` and the reply's `PLAN CHECK VERDICT:` line.
 
 ## Ready line
@@ -173,10 +180,18 @@ The "🔔 Ready to merge: #N" line that says a pull request is ready for the mai
 Kept: it names the line by the word every copy of it starts with.
 Avoid: none
 
+## review
+
+Used in several senses: the `mentat review` run on a pull request, a Codex or Grok review, the review step that takes a pull request to ready, and the repository owner's review on GitHub.
+
+Ambiguous: say which review is meant where it is not plain.
+Avoid: none
+
 ## second opinion
 
 A plan's reading by outside tools (Codex, and Grok where installed) after its plan check.
 
+Kept: it is plain English and the command's name.
 Avoid: none
 Machine-read name: `mentat second-opinion`.
 
