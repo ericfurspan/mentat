@@ -39,7 +39,7 @@ Optional modules install as `<module>@mentat`:
 - `mentat-reviewers`: the Codex and Grok commands.
 - `mentat-public-text`: blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`.
 - `mentat-linear`: the Linear adapter, and any backlog's Inbox triage: `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`.
-- `mentat-lead`: grill, an interview on open decisions, `/mentat-lead:retro`, improvements from a session, and `/mentat-lead:orchestrate`, which plans work and hands each batch to a fresh build session. The orchestrator is in progress: public, but it changes often and may change shape.
+- `mentat-lead`: grill, an interview on open decisions, `/mentat-lead:retro`, improvements from a session, and `/mentat-lead:orchestrate`, which plans work and hands each batch to a fresh build session.
 
 ## Usage
 
