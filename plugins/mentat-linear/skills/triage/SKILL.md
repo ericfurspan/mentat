@@ -24,7 +24,7 @@ The maintainer's own instructions name channel readers for triage, in an order; 
 
 ## The Inbox
 
-For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage). Read every page of a list. Read each item the sitting asks about in full, as `mentat:backlog` "Reading an item" says. Leave out an item with a dated Later note in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again. Only its latest Later note counts. When that note says "Back when <id> is done.", read <id>'s status as `start-waits.md` in `mentat:backlog`'s folder reads a blocker's: when it ended done, canceled or duplicate, that is such a fact; while it is open, or when the read fails, the item stays left out. A latest note without that sentence is a plain-words hold, whatever older notes say.
+For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage). Read every page of a list. Read each item the sitting asks about in full, as `mentat:backlog` "Reading an item" says. Leave out an item with a dated Later note in a comment on it, unless since that note a fact behind it changed (its question names the fact) or the maintainer raised it again. Only its latest Later note counts. When that note says "Back when <id> is done.", read <id>'s status as `start-waits.md` in `mentat:backlog`'s folder reads a blocker's: when it ended done, canceled or duplicate, that is such a fact; while it is open, or when the read fails, that is no such fact. A latest note without that sentence is a plain-words hold, whatever older notes say.
 
 ## Search
 
