@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Makes this session the orchestrator: plans backlog items with the maintainer and hands agreed ones to one build session. No arguments."
+description: "Makes this session the orchestrator: plans backlog items with the maintainer and gives each batch of agreed ones a fresh build session. No arguments."
 disable-model-invocation: true
 ---
 

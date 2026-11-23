@@ -1,6 +1,6 @@
 {
   "name": "mentat-lead",
-  "description": "Mentat module: the grill, which asks the maintainer's open decisions one at a time, a session retro (/mentat-lead:retro), and an orchestrator that hands agreed work to one build session (/mentat-lead:orchestrate).",
+  "description": "Mentat module: the grill, which asks the maintainer's open decisions one at a time, a session retro (/mentat-lead:retro), and an orchestrator that hands each batch of agreed work to a fresh build session (/mentat-lead:orchestrate).",
   "author": { "name": "ericfurspan" },
   "repository": "https://github.com/ericfurspan/mentat",
   "dependencies": ["mentat"]
