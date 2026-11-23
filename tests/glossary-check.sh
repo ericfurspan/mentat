@@ -13,7 +13,9 @@
 # Avoid line. Other lines, the meaning included, are never read as words to avoid.
 #
 # In a checked file, code spans, fenced blocks, link targets, URLs, paths, file names and
-# frontmatter other than description are skipped. A sentence over 20 words (code
+# frontmatter other than description are skipped. A phrase may run across a line break inside a
+# paragraph (consecutive prose lines; a blank line, heading, list item, table row or fence ends
+# one) and is named at the line it starts on. A sentence over 20 words (code
 # spans, list markers and fenced blocks skipped) is counted in the file's PASS line.
 # tests/glossary-check.awk does the matching. Prints PASS/FAIL lines; exits 1 on any FAIL.
 set -uo pipefail

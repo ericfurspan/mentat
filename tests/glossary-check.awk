@@ -44,7 +44,45 @@ function finish_glossary(   a, k, j, ca) {
   if (!failed) printf "PASS: glossary %s: %d entries, %d avoided terms\n", G, ne, nt
 }
 function end_sentence() { if (words > 20) long++; words = 0 }
+# A paragraph is consecutive prose lines; PB holds their normalized text, one space before each
+# line, PS[i] the length of PB before line i and PL[i] its line number.
+function add_line(t) {
+  if (t == "") return
+  if (pn == 0) PB = " "
+  pn++; PS[pn] = length(PB); PL[pn] = FNR; PB = PB t " "
+}
+# line_at(p): the paragraph line holding the text that starts after position p.
+function line_at(p,   i) { for (i = pn; i > 1; i--) if (PS[i] <= p) return i; return 1 }
+# flush(): checks the paragraph, reporting each avoided term once per line it starts on.
+function flush(   k, j, i, s, f, p, off, hk, a) {
+  if (pn == 0) return
+  for (k = 1; k <= nt; k++) {
+    for (j = 1; j <= TN[k]; j++) {
+      s = PB; f = " " TF[k, j] " "; off = 0
+      while ((p = index(s, f)) > 0) {
+        hk[k, line_at(off + p)] = 1
+        off += p + length(f) - 2; s = substr(s, p + length(f) - 1)
+      }
+    }
+  }
+  for (i = 1; i <= pn; i++) {
+    for (k = 1; k <= nt; k++) {
+      if (!((k, i) in hk)) continue
+      bad(file ":" PL[i] ": \"" T[k] "\" is avoided by entry \"" E[TE[k]] "\"")
+      hits++
+    }
+  }
+  for (a = 1; a <= ne; a++) {
+    if (!flagged[a]) continue
+    for (j = 1; j <= FN[a]; j++) {
+      s = PB; f = " " FF[a, j] " "
+      while ((p = index(s, f)) > 0) { count[a]++; s = substr(s, p + length(f) - 1) }
+    }
+  }
+  pn = 0
+}
 function end_file(   a, list) {
+  flush()
   end_sentence()
   if (hits) return
   list = ""
@@ -83,13 +121,13 @@ NR == FNR {
     for (a = 1; a <= ne; a++) count[a] = 0
     if ($0 == "---") { front = 1; next }
   }
-  line = $0
+  line = $0; desc = 0
   if (front) {
     if (line == "---") { front = 0; next }
     if (line !~ /^description:/) next
-    sub(/^description:/, "", line)
+    sub(/^description:/, "", line); desc = 1
   }
-  if (line ~ /^[ \t]*(```|~~~)/) { end_sentence(); fence = !fence; next }
+  if (line ~ /^[ \t]*(```|~~~)/) { end_sentence(); flush(); fence = !fence; next }
   if (fence) next
 
   # Skipped: code spans, link targets, URLs, paths and file names. Each becomes a | separator,
@@ -102,36 +140,21 @@ NR == FNR {
 
   # Sentences: a blank line, a heading, a table row or a list item starts a new one, and a
   # word ending in ., ! or ? ends one. Only words holding a letter or digit count.
-  if (line ~ /^[ \t]*$/) end_sentence()
-  else {
-    unit = (line ~ /^#/ || line ~ /^[ \t]*\|/)
-    if (unit) end_sentence()
-    if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/) { end_sentence(); sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line) }
-    nw = split(line, toks, /[ \t]+/)
-    for (i = 1; i <= nw; i++) {
-      if (toks[i] ~ /[A-Za-z0-9]/) words++
-      if (toks[i] ~ /[.!?][)"'*_]*$/) end_sentence()
-    }
-    if (unit) end_sentence()
+  # Paragraphs: a blank line, a fence or a list item starts a new one, and a heading, a table row
+  # and the description are each one on their own. Avoided terms match within a paragraph.
+  if (line ~ /^[ \t]*$/) { end_sentence(); flush(); next }
+  unit = (line ~ /^#/ || line ~ /^[ \t]*\|/)
+  if (unit) end_sentence()
+  if (unit || desc) flush()
+  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/) { end_sentence(); flush(); sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line) }
+  nw = split(line, toks, /[ \t]+/)
+  for (i = 1; i <= nw; i++) {
+    if (toks[i] ~ /[A-Za-z0-9]/) words++
+    if (toks[i] ~ /[.!?][)"'*_]*$/) end_sentence()
   }
-
-  L = " " norm(line) " "
-  for (k = 1; k <= nt; k++) {
-    for (j = 1; j <= TN[k]; j++) {
-      if (index(L, " " TF[k, j] " ")) {
-        bad(file ":" FNR ": \"" T[k] "\" is avoided by entry \"" E[TE[k]] "\"")
-        hits++
-        break
-      }
-    }
-  }
-  for (a = 1; a <= ne; a++) {
-    if (!flagged[a]) continue
-    for (j = 1; j <= FN[a]; j++) {
-      s = L; f = " " FF[a, j] " "
-      while ((p = index(s, f)) > 0) { count[a]++; s = substr(s, p + length(f) - 1) }
-    }
-  }
+  if (unit) end_sentence()
+  add_line(norm(line))
+  if (unit || desc) flush()
 }
 
 END {

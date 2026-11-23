@@ -47,6 +47,14 @@ expect "an -ing form with a doubled consonant matches" 1 "$fx/forms.md:5: \"sign
 expect "a hyphenated plural phrase matches" 1 "$fx/forms.md:6: \"parcel carrier\""
 expect "a possessive matches" 1 "$fx/forms.md:7: \"signal\""
 
+# a. A phrase split across a line break inside one paragraph matches, named at the line where it
+# starts; a blank line, list item, heading, table row or fence between its words ends the paragraph.
+run_check "$g" "$fx/split.md" ""
+expect "a phrase split across lines matches at its first line" 1 "FAIL: glossary $fx/split.md:4: \"parcel carrier\" is avoided by entry \"courier\""
+expect "a whole phrase split across lines matches at its first line" 1 "FAIL: glossary $fx/split.md:6: \"low water\" is avoided by entry \"tide\""
+run_check "$g" "$fx/split-apart.md" ""
+expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-apart.md: no avoided words"
+
 # b. Code spans, fenced blocks, link targets, paths, URLs, file names and frontmatter other than
 # the description are skipped.
 run_check "$g" "$fx/skipped.md" ""
