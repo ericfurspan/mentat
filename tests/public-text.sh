@@ -60,11 +60,6 @@ gh api -X POST repos/o/r/issues/7/comments
 gh api --method=PATCH repos/o/r/issues/7
 gh api repos/o/r/issues/7/comments -f body=x
 FORMS
-check "denies a word in a heredoc body" '[ "$(decision "gh pr create --title t --body \"\$(cat <<EOF
-Line one
-about StubCodename
-EOF
-)\"")" = deny ]'
 check "denies a word starting with a dash, one with a space, and a last line with no newline" '[ "$(decision "gh pr comment 7 --body \"a -DASHWORD b\"")" = deny ] && [ "$(decision "gh pr comment 7 --body \"Two Words\"")" = deny ] && [ "$(decision "gh pr comment 7 --body LASTWORD")" = deny ]'
 
 # Home paths written out, by any name.
@@ -155,7 +150,6 @@ done <<EOF
 gh pr edit 1 --body-file $tdir/pr.md
 printf x > $tdir/out.md && gh pr edit 1 --body-file $tdir/pr.md
 EOF
-check "denies a temp path holding a word when it is published" '[ "$(decision "S=$tdir; gh pr edit 1 --body \"see \$S\"")" = deny ]'
 
 # Only a gh write is checked: its own words but the repository and the gh api endpoint,
 # and the files it reads.
@@ -267,6 +261,7 @@ expect changed "cp word.md \"\$D\" && gh pr comment 7 -F clean.md"
 # reads from standard input, cannot be read from the command alone.
 while IFS= read -r c; do expect text "$c"; done <<EOF
 S=$tdir; gh pr edit 1 --body-file \$S/pr.md
+S=$tdir; gh pr edit 1 --body "see \$S"
 gh pr comment 7 --body "\$NOTES"
 gh pr comment 7 --body="\$NOTES"
 gh pr comment 7 -b"\$NOTES"
@@ -426,6 +421,11 @@ gh pr comment 7 --body "$(git log -1 --format=%s)"
 gh pr comment 7 --body "$NOTES"
 cp clean.md word.md; gh pr comment 7 --body "$(cat word.md)"
 EOF
+expect text "gh pr create --title t --body \"\$(cat <<EOF
+Line one
+about StubCodename
+EOF
+)\""
 while IFS= read -r c; do expect stdin "$c"; done <<'EOF'
 jq -n '{body: "stubcodename"}' | gh api repos/o/r/issues/7/comments --input -
 while read -r l; do :; done < word.md | gh pr comment 7 -F -
