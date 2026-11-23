@@ -1,4 +1,4 @@
-# The typed planning session
+# The planning session
 
 Read this when the maintainer's own message is the `/mentat:propose` command with no argument or one id-shaped argument, as `SKILL.md` says, or is a yes to the order question of `mentat-linear:triage` "Report", and again after a compaction. Other text after the command is a chat request, not this session.
 

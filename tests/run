@@ -650,7 +650,7 @@ for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
     fail "$f is $size characters (limit 15000)"
   fi
 done
-# The typed planning session is the text of a former skill, read in place of propose's steps, so it keeps a skill's limit.
+# The planning session is the text of a former skill, read in place of propose's steps, so it keeps a skill's limit.
 f=skills/propose/session.md
 size=$(wc -c < "$f" | tr -d ' ')
 if [ "$size" -lt 15000 ]; then
