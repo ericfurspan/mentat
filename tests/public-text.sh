@@ -240,6 +240,16 @@ expect changed "cat > fresh.md <<'EOF'
 clean
 EOF
 gh pr comment 7 -F fresh.md"
+# A file written by a name the hook cannot read may be any file the line publishes later.
+expect changed "F=new.md; cat > \$F <<'EOF'
+about StubCodename
+EOF
+gh pr comment 7 -F new.md"
+expect changed "F=clean.md; cat > \$F <<'EOF'
+clean
+EOF
+gh pr comment 7 -F clean.md"
+expect changed "cp word.md \"\$D\" && gh pr comment 7 -F clean.md"
 # Text, a file name or another published value that holds an expansion, and text gh
 # reads from standard input, cannot be read from the command alone.
 while IFS= read -r c; do expect text "$c"; done <<EOF

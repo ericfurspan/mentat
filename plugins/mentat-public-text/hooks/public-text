@@ -19,11 +19,12 @@
 # pass that); the same in another word it publishes or that makes it a write, such as a
 # title, number, branch, label or the gh command itself (write the value out literally);
 # text gh reads from standard input (-); a relative file after a cd it cannot follow (name
-# the file by its full path, or write the cd's folder out); and a file a command before it in the line writes or may write (write it in an earlier
-# call): one written by > or >>, or one named, also after = as in of=file, by any command
-# other than cat, cd, pwd, gh, [, [[, test, ls, wc, grep, head, tail, stat, git, jq,
-# diff, echo, printf, rg, chmod, chown, touch, open, sed without -i, -I or --in-place,
-# and awk without -i or --include.
+# the file by its full path, or write the cd's folder out); and a file a command before
+# it in the line writes or may write (write it in an earlier call): one written by > or
+# >>, or one named, also after = as in of=file, by any command other than cat, cd, pwd,
+# gh, [, [[, test, ls, wc, grep, head, tail, stat, git, jq, diff, echo, printf, rg, chmod,
+# chown, touch, open, sed without -i, -I or --in-place, and awk without -i or --include,
+# and any file once such a command names one by a variable or a command.
 # For the GitHub MCP server's writes that carry free text (issues, pull requests, reviews,
 # comments, merges, gists, files and repositories), under current and older tool names,
 # it looks at every text value but owner and repo. A call is that server's when its input
@@ -160,12 +161,13 @@ file_max=1048576
 # What the walk keeps. A word has its text as published, its text as a file name, whether
 # that name is known (no expansion in it but the home, working and temporary folders),
 # and whether it is literal (no expansion at all). A command has its words and the words
-# its > and >> redirects name. The files the line writes or may write are kept by name.
+# its > and >> redirects name. The files the line writes or may write are kept by name,
+# and f_any is set once it writes one by a name the walk cannot read.
 src=$cmd
 w_text=() w_path=() w_ok=() w_lit=() w_quoted=() w_assign=() nw=0
 c_words=() c_outs=() nc=0
 h_delim=() h_strip=() nh=0 pend=""
-f_path=() nf=0
+f_path=() nf=0 f_any=""
 # The folder variables the line assigns, each as " NAME ".
 v_set=""
 
@@ -426,6 +428,7 @@ full_path() {
 # the file at that full path.
 changed() {
   local k=$nf
+  [ -z "$f_any" ] || return 0
   while [ "$k" -gt 0 ]; do
     k=$((k - 1))
     [ "${f_path[k]}" != "$1" ] || return 0
@@ -437,7 +440,8 @@ changed() {
 touched() {
   local i p
   for i in "$@"; do
-    [ -n "${w_ok[i]}" ] || continue
+    # A name it cannot read may be any file.
+    [ -n "${w_ok[i]}" ] || { f_any=1; continue; }
     p=${w_path[i]}
     if full_path "$p"; then f_path[nf]=$fp nf=$((nf + 1)); fi
     case "$p" in *=*) p=${p#*=} ;; *) continue ;; esac
