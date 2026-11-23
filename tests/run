@@ -64,7 +64,7 @@ fi
 # message carries a review-depth line, which a build's final message and a starting session's relay keep.
 # The Ready line starts with an icon that every repeat or relay keeps, and its first showing in the
 # maintainer's chat sends one push, from the starting session and never a started one; holds, blocks
-# and questions get neither.
+# and questions get neither. Moving on to the next item to plan proposes an order once and plans through it.
 o=plugins/mentat-lead/skills/orchestrate/SKILL.md
 while IFS='|' read -r f section want; do
   [ -n "$f" ] || continue
@@ -127,6 +127,10 @@ skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
 skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 skills/propose/session.md||offers a grill (\`mentat-lead:grill\`, where available) only with two or more of their decisions open, asking a single one directly
+skills/propose/session.md||then going on to the next without asking which
+plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
+skills/propose/SKILL.md||except on the maintainer's yes to the order question of \`mentat-linear:triage\` "Report", which starts it
+$o|Planning|keeps so a compaction or takeover goes on asking nothing
 skills/review/review-depth.md||Right after the "🔔 Ready to merge: #N (<item id>)" line, the Ready message carries one review-depth line
 skills/review/review-depth.md||\`Review: closely (<reasons>)\`, each reason in a few words, or \`Review: skim (no listed reason for closer review)\`
 skills/review/review-depth.md||The line is a prioritization aid, not a safety assessment; the maintainer still decides how to review and merges every pull request.
