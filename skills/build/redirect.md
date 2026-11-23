@@ -6,6 +6,8 @@ Read this, part of `SKILL.md` in this folder, before its step 2, and for a chat 
 
 A go-ahead here is "Agree and build now" (in a planning session, `../propose/session.md` step 8, or in a chat request), the maintainer's typed `/mentat:build` with or without ids, or a yes to a next-work offer (`../backlog/next-work.md`). Its items are the ids it names, or, for a bare `/mentat:build`, those `SKILL.md` step 2 takes with none. A run a handover or the starting session's command began, or a message asking this session to resume its own work, is not one: it runs as `SKILL.md` "Started sessions" says.
 
+Where it builds is decided before any start wait (`mentat:backlog` "Start waits") is applied, and only a build here applies it. A redirected go-ahead takes an item held by its start wait with the rest, in a planning session (`../propose/session.md` step 8) or a chat request (`../propose/SKILL.md`) alike; the orchestrator holds it by that wait.
+
 ## Where it builds
 
 Read and write only this repository's notes file, orchestrate-notes.md, where `mentat-lead:orchestrate` "Notes" keeps it: in the main checkout's ignored working folder (the main checkout is the parent of `git rev-parse --path-format=absolute --git-common-dir`), or, with no such folder, in that git common directory. Never read another repository's, so another repository's orchestrator never takes this session's build. The orchestrator is the session the notes file names last as this repository's orchestrator. Its id only says which session to look for: find it in the host's list of sessions, which shows whether it runs and the address to message it by. To build here is to go on as with no orchestrator: as `SKILL.md` says, or, for a chat request, as `../propose/SKILL.md` says. The first of these that applies decides:
@@ -20,7 +22,7 @@ Read and write only this repository's notes file, orchestrate-notes.md, where `m
 
 ## Redirecting
 
-A redirected go-ahead builds nothing in this session: no readiness check, quick check, branch or builder. Those run in the build session after the handover, and their questions reach the maintainer through the orchestrator, as for any handover (`SKILL.md` "Started sessions"). An item held by its start wait (`mentat:backlog` "Start waits") goes with the rest, even where the session would otherwise leave it out, such as `../propose/session.md` step 8; the orchestrator holds it by that wait.
+A redirected go-ahead builds nothing in this session: no readiness check, quick check, branch or builder. Those run in the build session after the handover, and their questions reach the maintainer through the orchestrator, as for any handover (`SKILL.md` "Started sessions").
 
 1. Read each item's agent records (`../backlog/agent-records.md`). An item with no recorded spec fingerprint is not sent: name it with its `/mentat:propose <id>` command, as `SKILL.md` step 3 does.
 2. Record each other item's agreement with `build: now`, as `mentat:backlog` "Agreement" and `../backlog/agent-records.md` say, changing only the answer: the recorded fingerprint stays as it is, never recomputed here, so the build session's check still finds a changed spec. One agreed for later gets `build: now` in place of `build: later`, citing the typed command or the yes as the maintainer's word; one already recorded `build: now` keeps its record.
