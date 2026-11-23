@@ -481,7 +481,11 @@ file() {
   elif [ -z "${w_ok[$1]}" ]; then unread text
   elif ! full_path "$3"; then unread place
   elif changed "$fp"; then unread changed; q=1
-  elif [ -f "$fp" ] && [ -r "$fp" ]; then rd[nrd]=$fp nrd=$((nrd + 1)); return
+  else
+    # Read by the path as written, as gh opens it: through a link, .. need not lead
+    # where the name alone says.
+    case "$3" in /*) fp=$3 ;; *) fp=$cwd/$3 ;; esac
+    if [ -f "$fp" ] && [ -r "$fp" ]; then rd[nrd]=$fp nrd=$((nrd + 1)); return; fi
   fi
   [ -z "$q" ] || q_unknown=1
 }

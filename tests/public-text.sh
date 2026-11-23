@@ -213,6 +213,11 @@ gh release edit v1 --notes-file "\$TMPDIR/FILE.md"
 gh api repos/o/r/issues/7/comments -F body=@"\$HOME/FILE.md"
 gh api repos/o/r/issues/7/comments --input "\$HOME/FILE.json"
 EOF
+# A file is read by its path as written, as gh opens it, through a linked folder too.
+mkdir -p "$root/work/real/dir"
+ln -s real/dir "$root/work/link"
+printf 'about StubCodename\n' >"$root/work/real/linked.md"
+expect deny "gh pr comment 7 -F link/../linked.md"
 # A clean file only a reader names earlier in the line is read too.
 while IFS= read -r c; do expect allow "$c"; done <<'EOF'
 cat clean.md; gh pr comment 7 -F clean.md
