@@ -135,7 +135,7 @@ NR == FNR {
   if (FNR == 1) {
     if (!done_glossary) finish_glossary()
     if (file != "") end_file()
-    file = FILENAME; hits = 0; long = 0; words = 0; fence = 0; front = 0
+    file = FILENAME; hits = 0; long = 0; words = 0; fc = ""; front = 0
     for (a = 1; a <= ne; a++) count[a] = 0
     if ($0 == "---") { front = 1; next }
   }
@@ -145,8 +145,16 @@ NR == FNR {
     if (line !~ /^description:/) next
     sub(/^description:/, "", line); desc = 1
   }
-  if (line ~ /^[ \t]*(```|~~~)/) { end_sentence(); flush(); fence = !fence; next }
-  if (fence) next
+  # A fence: a run of three or more backticks or tildes, a backtick one with no backtick after it.
+  # It closes only at a line holding just a run of its opening character at least as long.
+  if (line ~ /^[ \t]*(```|~~~)/) {
+    s = line; sub(/^[ \t]+/, "", s); c = substr(s, 1, 1)
+    if (c == "`") match(s, /^`+/); else match(s, /^~+/)
+    n = RLENGTH; rest = substr(s, n + 1)
+    if (fc == "" && !(c == "`" && index(rest, "`"))) { end_sentence(); flush(); fc = c; fl = n; next }
+    if (fc != "" && c == fc && n >= fl && rest ~ /^[ \t]*$/) { fc = ""; next }
+  }
+  if (fc != "") next
   # A heading or table row, read before the skips below can make a line start with |.
   unit = (line ~ /^#/ || line ~ /^[ \t]*\|/)
 

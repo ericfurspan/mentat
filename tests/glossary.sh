@@ -31,6 +31,16 @@ expect() {
   fi
 }
 
+# reject <what> <text the output must not hold>: the last run_check's output lacks it.
+reject() {
+  if printf '%s\n' "$out" | grep -qF -- "$2"; then
+    fail "$1 (the output holds: $2)"
+    printf '%s\n' "$out"
+  else
+    pass "$1"
+  fi
+}
+
 g=$fx/glossary.md
 
 # 3. A file holding an Avoid word fails, naming file, line and entry; one without passes.
@@ -60,6 +70,15 @@ expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-
 # the description are skipped.
 run_check "$g" "$fx/skipped.md" ""
 expect "code spans, fences, link targets and paths are skipped" 0 "PASS: glossary $fx/skipped.md: no avoided words"
+
+# b. A fenced block ends only at a fence of its opening character at least as long: a ~~~ line
+# inside a backtick fence, or a shorter backtick line inside a longer one, leaves the code after
+# it skipped, and the prose after the block's real closing line is checked.
+run_check "$g" "$fx/fences.md" ""
+expect "prose after a block holding a different fence fails" 1 "FAIL: glossary $fx/fences.md:10: \"signal\" is avoided by entry \"courier\""
+expect "prose after a block holding a shorter fence fails" 1 "FAIL: glossary $fx/fences.md:17: \"signal\" is avoided by entry \"courier\""
+reject "code after a different fence inside a block is skipped" "$fx/fences.md:7:"
+reject "code after a shorter fence inside a block is skipped" "$fx/fences.md:14:"
 
 # c. A whole-phrase Avoid line matches only the exact phrase, in any case: its other forms, and
 # its words joined by a hyphen or split by a comma, pass.
