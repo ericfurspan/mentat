@@ -173,7 +173,7 @@ skills/propose/SKILL.md||When the maintainer objects in any talk after the agree
 skills/backlog/agent-records.md|Decision lines|each objection its own clause saying what they object to, one phrased as a question included, and never a reviewer's or the session's own reasons in their place.
 skills/backlog/agent-records.md|Decision lines|With GitHub issues it is in Claude Code's words, as \`records.md\` says.
 skills/propose/agreement.md|The plan check|each objection of the maintainer's recorded on the item or on an item its work moved from (\`../backlog/agent-records.md\` "Decision lines"), with how the plan meets it or why it does not
-skills/propose/agreement.md|The agreement question|each recorded objection the idea file lists, in a few words, with how the plan, as it stands after any adopted plan-check changes, meets it or why it does not
+skills/propose/agreement.md|The agreement question|each objection of the maintainer's recorded on the item or on an item its work moved from by the time it is asked, one recorded since it was last asked included, in a few words, with how the plan, as it stands after any adopted plan-check changes, meets it or why it does not
 skills/propose/SKILL.md||no objection of the maintainer's recorded for the work (\`../backlog/agent-records.md\` "Decision lines"), such as fixing a typo)
 $o|Planning|no objection of the maintainer's is recorded for the work (\`agreement.md\` in \`mentat:propose\`'s folder)
 skills/propose/decisions.md||A conflict with an earlier answer, an adopted plan-check point or a plan's answer to a recorded objection (\`agreement.md\`) is corrected or asked as revisiting it, never silently overridden.
