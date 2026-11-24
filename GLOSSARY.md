@@ -162,7 +162,7 @@ Machine-read name: `mentat:build`, typed as `/mentat:build`, and `plugins/mentat
 The subagent that edits, tests and commits one change in its own worktree; `mentat:build` also calls one implementer per branch a helper until it is rewritten.
 
 Avoid: builder
-Machine-read name: `mentat:builder` and `MENTAT_BUILDER_MODEL`.
+Machine-read name: `mentat:builder`, `MENTAT_BUILDER_MODEL` and `skills/build/helpers.md`.
 
 ## issue
 
