@@ -179,6 +179,7 @@ $o|Planning|no objection of the maintainer's is recorded for the work (\`agreeme
 skills/propose/decisions.md||A conflict with an earlier answer, an adopted plan-check point or a plan's answer to a recorded objection (\`agreement.md\`) is corrected or asked as revisiting it, never silently overridden.
 skills/propose/agreement.md|The plan check|a later recommendation that conflicts with an adopted point is handled as \`decisions.md\` says for a conflict with an earlier answer.
 skills/propose/session.md||and to write the decisions line recording the maintainer's objections in the talk after "Not now" (\`SKILL.md\` step 4). It makes no other backlog write.
+$o|Relays|An objection of the maintainer's that this session hears at a hold reaches the build session in their exact words, as any answer to a hold does, and that session records it; one heard at a close without merging this session records as \`after-ready.md\` in \`mentat:review\`'s folder says.
 EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
   pass "docs/adr holds the decision record for default agreement in the orchestrator"
