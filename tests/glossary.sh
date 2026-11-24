@@ -71,6 +71,13 @@ expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-
 run_check "$g" "$fx/skipped.md" ""
 expect "code spans, fences, link targets and paths are skipped" 0 "PASS: glossary $fx/skipped.md: no avoided words"
 
+# b. A word joined to another by a slash is prose, not a path, at the end of a sentence or in
+# emphasis too.
+run_check "$g" "$fx/slash.md" ""
+expect "a word before a slash fails" 1 "FAIL: glossary $fx/slash.md:3: \"runner\" is avoided by entry \"courier\""
+expect "a word after a slash at a sentence's end fails" 1 "FAIL: glossary $fx/slash.md:4: \"runner\" is avoided by entry \"courier\""
+expect "a slashed word in emphasis fails" 1 "FAIL: glossary $fx/slash.md:5: \"signal\" is avoided by entry \"courier\""
+
 # b. A code span ends only at a run of as many backticks as opened it, and the prose after it is
 # checked.
 run_check "$g" "$fx/spans.md" ""

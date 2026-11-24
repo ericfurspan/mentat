@@ -66,6 +66,24 @@ function spans(s,   out, at, n, rest, p) {
   }
   return out s
 }
+# is_path(t): whether token t, which holds a /, reads as a path rather than words joined by a
+# slash: past any brackets, emphasis and closing punctuation around it, it starts with /, ./, ../
+# or ~, ends with /, holds a glob * beside a /, or ends in a file extension.
+function is_path(t) {
+  sub(/^[\[*_<]+/, "", t); sub(/[\]*_>.,;:!?]+$/, "", t)
+  return t ~ /^(\/|\.\.?\/|~)/ || t ~ /\/$/ || t ~ /\/\*|\*\// || t ~ /\.[A-Za-z][A-Za-z0-9]*$/
+}
+# paths(s): s with each path a " | " separator; words joined by a slash stay prose.
+function paths(s,   out, t) {
+  out = ""
+  while (match(s, /[^ \t()"'`]*\/[^ \t()"'`]*/)) {
+    t = substr(s, RSTART, RLENGTH)
+    out = out substr(s, 1, RSTART - 1)
+    s = substr(s, RSTART + RLENGTH)
+    out = out (is_path(t) ? " | " : t)
+  }
+  return out s
+}
 function end_sentence() { if (words > 20) long++; words = 0 }
 # A paragraph is consecutive prose lines; PB holds their normalized text and RB their words_of
 # text, each with one space before each line; PS[i] and WS[i] are the lengths of PB and RB before
@@ -184,7 +202,7 @@ NR == FNR {
   line = spans(line)
   gsub(/\]\([^)]*\)/, "] | ", line)
   gsub(/[A-Za-z][A-Za-z0-9+.-]*:\/\/[^ \t)]*/, " | ", line)
-  gsub(/[^ \t()"'`]*\/[^ \t()"'`]*/, " | ", line)
+  line = paths(line)
   gsub(/[A-Za-z0-9_.-]*[A-Za-z0-9_]\.(md|sh|json|yml|yaml|txt|toml|js|ts|py)/, " | ", line)
 
   # Sentences: a blank line, a heading, a table row or a list item starts a new one, and a

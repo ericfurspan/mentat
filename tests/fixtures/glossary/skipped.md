@@ -19,3 +19,6 @@ low water drift
 ~~~
 
 The flag ``signal`` and the span `` a `b` runner `` keep their names.
+
+The paths /runner/a, ./runner/b, ../runner/c, ~/runner, runner/, plugins/*/runner and **/signal stay.
+So do maps/runner/signal.txt, [runner/signal.md], *~/signal* and (signal/runner.json).
