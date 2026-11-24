@@ -238,7 +238,7 @@ The orchestrator's count of its open pull requests waiting from their Ready line
 
 Kept: the orchestrate skill names it by its "Pause" section, and "waiting count" would blur it with waits on the maintainer.
 Avoid: none
-Machine-read name: `MENTAT_READY_LIMIT`, the setting for the limit the count is held under, not the count itself.
+Machine-read name: `MENTAT_READY_LIMIT`, the setting for the limit the count is compared with, not the count itself.
 
 ## plan
 
