@@ -14,7 +14,9 @@
 # Avoid line. Other lines, the meaning included, are never read as words to avoid.
 #
 # In a checked file, code spans, fenced blocks, link targets, URLs, paths, file names and
-# frontmatter other than description are skipped; as in CommonMark, a code span ends only at a run
+# frontmatter other than description are skipped; a description written over several lines (a
+# block scalar or indented continuation lines, up to the next key or the closing ---) is read
+# whole, as one paragraph. As in CommonMark, a code span ends only at a run
 # of as many backticks as opened it, and a fenced block only at a fence of its opening character
 # at least as long. A path is a word holding a / that starts with /, ./, ../ or ~, ends with /,
 # holds a glob * beside a /, or ends in a file extension; other words joined by a slash are prose.

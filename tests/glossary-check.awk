@@ -174,19 +174,26 @@ NR == FNR {
   if (FNR == 1) {
     if (!done_glossary) finish_glossary()
     if (file != "") end_file()
-    file = FILENAME; hits = 0; long = 0; words = 0; fc = ""; front = 0
+    file = FILENAME; hits = 0; long = 0; words = 0; fc = ""; front = 0; indesc = 0
     for (a = 1; a <= ne; a++) count[a] = 0
     if ($0 == "---") { front = 1; next }
   }
   line = $0; desc = 0
+  # Frontmatter: only the description is read, from its key's line up to the next key or the
+  # closing ---, as one paragraph; a block-scalar indicator (>, | and its modifiers) is dropped.
   if (front) {
+    if (indesc && (line == "---" || line ~ /^[A-Za-z0-9_-]+:/)) { indesc = 0; flush() }
     if (line == "---") { front = 0; next }
-    if (line !~ /^description:/) next
-    sub(/^description:/, "", line); desc = 1
+    if (line ~ /^description:/) {
+      flush(); indesc = 1
+      sub(/^description:/, "", line); sub(/^[ \t]*[>|][-+0-9]*[ \t]*$/, "", line)
+    } else if (!indesc) next
+    if (line ~ /^[ \t]*$/) next
+    desc = 1
   }
   # A fence: a run of three or more backticks or tildes, a backtick one with no backtick after it.
   # It closes only at a line holding just a run of its opening character at least as long.
-  if (line ~ /^[ \t]*(```|~~~)/) {
+  if (!desc && line ~ /^[ \t]*(```|~~~)/) {
     s = line; sub(/^[ \t]+/, "", s); c = substr(s, 1, 1)
     if (c == "`") match(s, /^`+/); else match(s, /^~+/)
     n = RLENGTH; rest = substr(s, n + 1)
@@ -195,7 +202,7 @@ NR == FNR {
   }
   if (fc != "") next
   # A heading or table row, read before the skips below can make a line start with |.
-  unit = (line ~ /^#/ || line ~ /^[ \t]*\|/)
+  unit = !desc && (line ~ /^#/ || line ~ /^[ \t]*\|/)
 
   # Skipped: code spans, link targets, URLs, paths and file names. Each becomes a | separator,
   # so no phrase runs across it.
@@ -208,11 +215,11 @@ NR == FNR {
   # Sentences: a blank line, a heading, a table row or a list item starts a new one, and a
   # word ending in ., ! or ? ends one. Only words holding a letter or digit count.
   # Paragraphs: a blank line, a fence or a list item starts a new one, and a heading, a table row
-  # and the description are each one on their own. Avoided terms match within a paragraph.
+  # and the whole description, over however many lines, are each one on their own. Avoided terms
+  # match within a paragraph.
   if (line ~ /^[ \t]*$/) { end_sentence(); flush(); next }
-  if (unit) end_sentence()
-  if (unit || desc) flush()
-  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/) { end_sentence(); flush(); sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line) }
+  if (unit) { end_sentence(); flush() }
+  if (!desc && line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/) { end_sentence(); flush(); sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line) }
   nw = split(line, toks, /[ \t]+/)
   for (i = 1; i <= nw; i++) {
     if (toks[i] ~ /[A-Za-z0-9]/) words++
@@ -220,7 +227,7 @@ NR == FNR {
   }
   if (unit) end_sentence()
   add_line(norm(line), words_of(line))
-  if (unit || desc) flush()
+  if (unit) flush()
 }
 
 END {

@@ -73,6 +73,19 @@ expect "code spans, fences, link targets and paths are skipped" 0 "PASS: glossar
 
 # b. A word joined to another by a slash is prose, not a path, at the end of a sentence or in
 # emphasis too.
+# 2a, b. A description is prose, a description written over several lines (a block scalar or
+# continued lines) included, and is one paragraph: a phrase split across its lines matches at its
+# first line, and none joins it to the body. Frontmatter keys after it stay skipped.
+run_check "$g" "$fx/desc-one-line.md" ""
+expect "an Avoid word in a one-line description fails" 1 "FAIL: glossary $fx/desc-one-line.md:3: \"runner\" is avoided by entry \"courier\""
+run_check "$g" "$fx/desc-block.md" ""
+expect "an Avoid word on a block-scalar description's continuation line fails" 1 "FAIL: glossary $fx/desc-block.md:5: \"runner\" is avoided by entry \"courier\""
+run_check "$g" "$fx/desc-split.md" ""
+expect "a phrase split across description lines matches at its first line" 1 "FAIL: glossary $fx/desc-split.md:3: \"parcel carrier\" is avoided by entry \"courier\""
+reject "a phrase split between the description and the body does not match" "$fx/desc-split.md:4:"
+run_check "$g" "$fx/desc-later-key.md" ""
+expect "a frontmatter key after a multi-line description is skipped" 0 "PASS: glossary $fx/desc-later-key.md: no avoided words"
+
 run_check "$g" "$fx/slash.md" ""
 expect "a word before a slash fails" 1 "FAIL: glossary $fx/slash.md:3: \"runner\" is avoided by entry \"courier\""
 expect "a word after a slash at a sentence's end fails" 1 "FAIL: glossary $fx/slash.md:4: \"runner\" is avoided by entry \"courier\""
