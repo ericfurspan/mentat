@@ -16,7 +16,7 @@ Push nothing and commission no fixes until the stop is settled or answered. Fixe
 
 ## Evidence
 
-The stop is settled or asked on the reviewers' own finding text, the spec's goal (`mentat:backlog` "Where the spec lives"), Grok's stop review, and any disproved material assumption still open in the item's recorded assumptions (`mentat:backlog` "Material assumptions"). The evidence also gives how much the diff grew from the first round's reviewed range to this round's (`git diff --shortstat` of each range, read from the "Change reviewed" line of that round's local Claude review comment, a round as `mentat status` counts it) and whether the findings so far cluster in one file or area. No new subagent.
+The stop is settled or asked on the reviewers' own finding text, the spec's goal (`mentat:backlog` "Where the spec lives"), Grok's stop review, and any disproved material assumption still open in the item's recorded assumptions (`mentat:backlog` "Material assumptions"). The evidence also gives how much the diff grew from the first round's reviewed range to this round's (`git diff --shortstat` of each range, read from the "Change reviewed" line of that round's local Claude review comment, a round as `mentat status` counts it), whether the findings so far cluster in one file or area, and which outside reviewers were off, unknown or did not run or finish. No new subagent.
 
 ## The question
 
@@ -42,7 +42,7 @@ Otherwise, unless only a finding waiting on the maintainer's answer (`findings.m
 - Shrink, as "The question" says; its rebuild needs a review round, so at the limit it also takes a raise.
 - Close, as "The question" says.
 
-When a finding needs a scope change or shows the goal cannot be met, the question recommends a shrink when a scope change can meet the goal, else a close. After a raise, the session's extra round included, another raise is recommended only when none of the last round's findings was caused by the previous round's fix and each left is a fix within the agreed spec; otherwise the recommendation follows the findings' severity and the work left, saying what each answer costs (a shrink also takes a raise; a close drops the work). The maintainer may always choose a raise.
+When a finding needs a scope change or shows the goal cannot be met, the question recommends a shrink when a scope change can meet the goal, else a close. After a raise, the session's extra round included, another raise is recommended only when none of the last round's findings was caused by the previous round's fix and each left is a fix within the agreed spec; otherwise the recommendation follows the raises used, the findings per round and their severity, and the work left, saying what each answer costs (a shrink also takes a raise; a close drops the work). The maintainer may always choose a raise.
 
 ## Goal evidence
 
