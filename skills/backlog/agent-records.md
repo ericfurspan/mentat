@@ -35,6 +35,8 @@ Every reader takes a record from the `Agent records` comment, else from the olde
 
 Each skill that records the maintainer's answer on an item writes its decisions line in this comment's `Decisions:` record (with GitHub issues, the body's `## Decisions`), never a separate comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request (with GitHub issues, one comment, as `github.md` says), and the line points to it. The answered decision leaves any open decision section, and when it blocked the item's work, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
 
+An objection of the maintainer's to an item's design, plan or pull request (`../review/after-ready.md`, `mentat:propose` step 4) is recorded the same way, as one decisions line: each objection its own clause saying what they object to, one phrased as a question included, and never a reviewer's or the session's own reasons in their place. With GitHub issues it is in Claude Code's words, as `records.md` says.
+
 ## Advice against
 
 With either tracker, when Claude Code recommended closing, shrinking or not building an item and the maintainer goes ahead anyway, with an Agree answer in `mentat:propose` or Accept in triage, the session recording that answer writes the advice record. `mentat:review` "Final check" says how "Ready to merge: #N" quotes it.
