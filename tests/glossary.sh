@@ -128,6 +128,13 @@ expect "prose after a block opened on a quoted list item fails" 1 "FAIL: glossar
 run_check "$g" "$fx/fence-item-span.md" ""
 expect "a list item starting with a three-backtick code span is prose" 1 "FAIL: glossary $fx/fence-item-span.md:3: \"signal\" is avoided by entry \"courier\""
 reject "a three-backtick code span on a list item is skipped" "$fx/fence-item-span.md:3: \"runner\""
+# Inside a plain block, a code line holding a fence after a list or quote marker does not close it.
+run_check "$g" "$fx/fence-inner-item.md" ""
+expect "prose after a block holding a fence after a list marker fails" 1 "FAIL: glossary $fx/fence-inner-item.md:8: \"signal\" is avoided by entry \"courier\""
+reject "code after a fence after a list marker inside a block is skipped" "$fx/fence-inner-item.md:5:"
+run_check "$g" "$fx/fence-inner-quote.md" ""
+expect "prose after a block holding a fence after a quote marker fails" 1 "FAIL: glossary $fx/fence-inner-quote.md:8: \"signal\" is avoided by entry \"courier\""
+reject "code after a fence after a quote marker inside a block is skipped" "$fx/fence-inner-quote.md:5:"
 
 # c. A whole-phrase Avoid line matches only the exact phrase, in any case: its other forms, and
 # its words joined by a hyphen or split by a comma, pass.

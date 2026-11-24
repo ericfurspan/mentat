@@ -192,16 +192,27 @@ NR == FNR {
     desc = 1
   }
   # A fence: a run of three or more backticks or tildes, a backtick one with no backtick after it.
-  # It closes only at a line holding just a run of its opening character at least as long. Either
-  # line may start with list markers (-, *, +, 1. or 1) and a space) and quote markers (>), nested.
+  # The opening line may start with list markers (-, *, +, 1. or 1) and a space) and quote markers
+  # (>), nested; its quote depth is how many > it had. A block closes only at a line holding, after
+  # exactly that many > and any whitespace, just a run of its opening character at least as long;
+  # a closing line's list markers are not read past.
   s = line
-  while (sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s) || sub(/^[ \t]*>/, "", s)) ;
+  if (fc == "") {
+    q = 0
+    while (1) {
+      if (sub(/^[ \t]*>/, "", s)) q++
+      else if (!sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)) break
+    }
+  } else {
+    for (k = 0; k < fq && sub(/^[ \t]*>/, "", s); k++) ;
+    if (k < fq) s = ""
+  }
   sub(/^[ \t]+/, "", s)
   if (!desc && s ~ /^(```|~~~)/) {
     c = substr(s, 1, 1)
     if (c == "`") match(s, /^`+/); else match(s, /^~+/)
     n = RLENGTH; rest = substr(s, n + 1)
-    if (fc == "" && !(c == "`" && index(rest, "`"))) { end_sentence(); flush(); fc = c; fl = n; next }
+    if (fc == "" && !(c == "`" && index(rest, "`"))) { end_sentence(); flush(); fc = c; fl = n; fq = q; next }
     if (fc != "" && c == fc && n >= fl && rest ~ /^[ \t]*$/) { fc = ""; next }
   }
   if (fc != "") next
