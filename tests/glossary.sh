@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# The glossary check (tests/glossary-check.sh) behaves as specified, on invented fixtures in
+# tests/fixtures/glossary/: each input class below gets the outcome the glossary's spec gives it.
+# Prints PASS/FAIL per check; exits 1 on any FAIL.
+set -uo pipefail
+
+cd "$(dirname "$0")/.." || exit 1
+failures=0
+pass() { printf 'PASS: glossary fixtures %s\n' "$1"; }
+fail() { printf 'FAIL: glossary fixtures %s\n' "$1"; failures=$((failures + 1)); }
+
+fx=tests/fixtures/glossary
+tmp=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmp"' EXIT
+
+# run_check <glossary> <covered files> <files listed as not yet rewritten>, each list one path a line.
+run_check() {
+  printf '%s\n' "$2" >"$tmp/covered"
+  printf '%s\n' "$3" >"$tmp/listed"
+  out=$(tests/glossary-check.sh "$1" "$tmp/covered" "$tmp/listed" 2>&1)
+  rc=$?
+}
+
+# expect <what> <exit status> <text the output must hold>: the last run_check gave both.
+expect() {
+  if [ "$rc" = "$2" ] && printf '%s\n' "$out" | grep -qF -- "$3"; then
+    pass "$1"
+  else
+    fail "$1 (exit $rc, wanted $2 and the text: $3)"
+    printf '%s\n' "$out"
+  fi
+}
+
+# reject <what> <text the output must not hold>: the last run_check's output lacks it.
+reject() {
+  if printf '%s\n' "$out" | grep -qF -- "$2"; then
+    fail "$1 (the output holds: $2)"
+    printf '%s\n' "$out"
+  else
+    pass "$1"
+  fi
+}
+
+g=$fx/glossary.md
+
+# 3. A file holding an Avoid word fails, naming file, line and entry; one without passes.
+run_check "$g" "$fx/avoid.md" ""
+expect "an Avoid word fails" 1 "FAIL: glossary $fx/avoid.md:3: \"runner\" is avoided by entry \"courier\""
+run_check "$g" "$fx/clean.md" ""
+expect "a file with no Avoid word passes" 0 "PASS: glossary $fx/clean.md: no avoided words"
+
+# a. Plural, -ed, -ing, hyphenated and capitalized forms match.
+run_check "$g" "$fx/forms.md" ""
+expect "a capitalized plural matches" 1 "$fx/forms.md:3: \"runner\""
+expect "an -ed form matches" 1 "$fx/forms.md:4: \"signal\""
+expect "an -ing form with a doubled consonant matches" 1 "$fx/forms.md:5: \"signal\""
+expect "a hyphenated plural phrase matches" 1 "$fx/forms.md:6: \"parcel carrier\""
+expect "a possessive matches" 1 "$fx/forms.md:7: \"signal\""
+
+# a. A phrase split across a line break inside one paragraph matches, named at the line where it
+# starts; a blank line, list item, heading, table row or fence between its words ends the paragraph.
+run_check "$g" "$fx/split.md" ""
+expect "a phrase split across lines matches at its first line" 1 "FAIL: glossary $fx/split.md:4: \"parcel carrier\" is avoided by entry \"courier\""
+expect "a whole phrase split across lines matches at its first line" 1 "FAIL: glossary $fx/split.md:6: \"low water\" is avoided by entry \"tide\""
+expect "a phrase split after a line that starts with a code span matches" 1 "FAIL: glossary $fx/split.md:9: \"parcel carrier\" is avoided by entry \"courier\""
+run_check "$g" "$fx/split-apart.md" ""
+expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-apart.md: no avoided words"
+
+# b. Code spans, fenced blocks, link targets, paths, URLs, file names and frontmatter other than
+# the description are skipped.
+run_check "$g" "$fx/skipped.md" ""
+expect "code spans, fences, link targets and paths are skipped" 0 "PASS: glossary $fx/skipped.md: no avoided words"
+
+# b. A word joined to another by a slash is prose, not a path, at the end of a sentence or in
+# emphasis too.
+# 2a, b. A description is prose, a description written over several lines (a block scalar or
+# continued lines) included, and is one paragraph: a phrase split across its lines matches at its
+# first line, and none joins it to the body. Frontmatter keys after it stay skipped.
+run_check "$g" "$fx/desc-one-line.md" ""
+expect "an Avoid word in a one-line description fails" 1 "FAIL: glossary $fx/desc-one-line.md:3: \"runner\" is avoided by entry \"courier\""
+run_check "$g" "$fx/desc-block.md" ""
+expect "an Avoid word on a block-scalar description's continuation line fails" 1 "FAIL: glossary $fx/desc-block.md:5: \"runner\" is avoided by entry \"courier\""
+run_check "$g" "$fx/desc-split.md" ""
+expect "a phrase split across description lines matches at its first line" 1 "FAIL: glossary $fx/desc-split.md:3: \"parcel carrier\" is avoided by entry \"courier\""
+reject "a phrase split between the description and the body does not match" "$fx/desc-split.md:4:"
+run_check "$g" "$fx/desc-later-key.md" ""
+expect "a frontmatter key after a multi-line description is skipped" 0 "PASS: glossary $fx/desc-later-key.md: no avoided words"
+
+run_check "$g" "$fx/slash.md" ""
+expect "a word before a slash fails" 1 "FAIL: glossary $fx/slash.md:3: \"runner\" is avoided by entry \"courier\""
+expect "a word after a slash at a sentence's end fails" 1 "FAIL: glossary $fx/slash.md:4: \"runner\" is avoided by entry \"courier\""
+expect "a slashed word in emphasis fails" 1 "FAIL: glossary $fx/slash.md:5: \"signal\" is avoided by entry \"courier\""
+
+# b. A code span ends only at a run of as many backticks as opened it, and the prose after it is
+# checked.
+run_check "$g" "$fx/spans.md" ""
+expect "prose after a double-backtick span fails" 1 "FAIL: glossary $fx/spans.md:3: \"runner\" is avoided by entry \"courier\""
+reject "a double-backtick span holding a single backtick is skipped" "$fx/spans.md:3: \"signal\""
+
+# b. A fenced block ends only at a fence of its opening character at least as long: a ~~~ line
+# inside a backtick fence, or a shorter backtick line inside a longer one, leaves the code after
+# it skipped, and the prose after the block's real closing line is checked.
+run_check "$g" "$fx/fences.md" ""
+expect "prose after a block holding a different fence fails" 1 "FAIL: glossary $fx/fences.md:10: \"signal\" is avoided by entry \"courier\""
+expect "prose after a block holding a shorter fence fails" 1 "FAIL: glossary $fx/fences.md:17: \"signal\" is avoided by entry \"courier\""
+reject "code after a different fence inside a block is skipped" "$fx/fences.md:7:"
+reject "code after a shorter fence inside a block is skipped" "$fx/fences.md:14:"
+# A fence line with words after it does not close a block, and a line starting with a code span of
+# three backticks opens none.
+expect "prose after a block holding a fence with words fails" 1 "FAIL: glossary $fx/fences.md:24: \"signal\" is avoided by entry \"courier\""
+reject "code after a fence with words inside a block is skipped" "$fx/fences.md:21:"
+expect "a line starting with a three-backtick code span is prose" 1 "FAIL: glossary $fx/fences.md:26: \"signal\" is avoided by entry \"courier\""
+reject "a three-backtick code span is skipped" "$fx/fences.md:26: \"runner\""
+# A fence may open on a list-item or quote line, nested too: the code inside it is skipped, and
+# its closing line, indented or quoted, ends it, so the prose after it is checked.
+run_check "$g" "$fx/fence-item.md" ""
+reject "code in a block opened on a list item is skipped" "$fx/fence-item.md:4:"
+expect "prose after a block opened on a list item fails" 1 "FAIL: glossary $fx/fence-item.md:7: \"signal\" is avoided by entry \"courier\""
+run_check "$g" "$fx/fence-numbered.md" ""
+reject "code in a block opened on a numbered item is skipped" "$fx/fence-numbered.md:4:"
+expect "prose after a block opened on a numbered item fails" 1 "FAIL: glossary $fx/fence-numbered.md:7: \"signal\" is avoided by entry \"courier\""
+run_check "$g" "$fx/fence-quote.md" ""
+reject "code in a quoted block is skipped" "$fx/fence-quote.md:4:"
+expect "prose after a quoted block fails" 1 "FAIL: glossary $fx/fence-quote.md:7: \"signal\" is avoided by entry \"courier\""
+reject "code in a block opened on a quoted list item is skipped" "$fx/fence-quote.md:10:"
+expect "prose after a block opened on a quoted list item fails" 1 "FAIL: glossary $fx/fence-quote.md:13: \"signal\" is avoided by entry \"courier\""
+# A list item starting with a code span of three backticks opens no block.
+run_check "$g" "$fx/fence-item-span.md" ""
+expect "a list item starting with a three-backtick code span is prose" 1 "FAIL: glossary $fx/fence-item-span.md:3: \"signal\" is avoided by entry \"courier\""
+reject "a three-backtick code span on a list item is skipped" "$fx/fence-item-span.md:3: \"runner\""
+# Inside a plain block, a code line holding a fence after a list or quote marker does not close it.
+run_check "$g" "$fx/fence-inner-item.md" ""
+expect "prose after a block holding a fence after a list marker fails" 1 "FAIL: glossary $fx/fence-inner-item.md:8: \"signal\" is avoided by entry \"courier\""
+reject "code after a fence after a list marker inside a block is skipped" "$fx/fence-inner-item.md:5:"
+run_check "$g" "$fx/fence-inner-quote.md" ""
+expect "prose after a block holding a fence after a quote marker fails" 1 "FAIL: glossary $fx/fence-inner-quote.md:8: \"signal\" is avoided by entry \"courier\""
+reject "code after a fence after a quote marker inside a block is skipped" "$fx/fence-inner-quote.md:5:"
+
+# c. A whole-phrase Avoid line matches only the exact phrase, in any case: its other forms, and
+# its words joined by a hyphen or split by a comma, pass.
+run_check "$g" "$fx/whole-forms.md" ""
+expect "a whole-phrase Avoid word's other, hyphenated and comma-split forms pass" 0 "PASS: glossary $fx/whole-forms.md: no avoided words"
+run_check "$g" "$fx/whole-exact.md" ""
+expect "a whole-phrase Avoid phrase itself fails" 1 "$fx/whole-exact.md:3: \"low water\" is avoided by entry \"tide\""
+
+# d. A missing glossary, one whose Avoid lines name nothing, and an entry with no Avoid line fail.
+run_check "$fx/absent.md" "$fx/clean.md" ""
+expect "a missing glossary fails" 1 "FAIL: glossary $fx/absent.md is missing or empty"
+run_check "$fx/no-words.md" "$fx/clean.md" ""
+expect "Avoid lines that name nothing fail" 1 "FAIL: glossary $fx/no-words.md: its Avoid lines name no words"
+run_check "$fx/no-avoid-line.md" "$fx/clean.md" ""
+expect "an entry with no Avoid line fails" 1 "FAIL: glossary $fx/no-avoid-line.md: entry \"tide\" has no Avoid line"
+
+# e. A file listed as not yet rewritten that is not a covered file, or that is still covered
+# (tracked) but no longer on disk, fails.
+run_check "$g" "$fx/clean.md" "$fx/gone.md"
+expect "a listed file that no longer exists fails" 1 "FAIL: glossary $fx/gone.md is listed as not yet rewritten but is not a covered file"
+run_check "$g" "$fx/clean.md
+$fx/gone.md" "$fx/gone.md"
+expect "a listed file deleted but still tracked fails" 1 "FAIL: glossary $fx/gone.md is listed as not yet rewritten but does not exist"
+
+# f. One entry's word that is another entry's Avoid word, sits inside its Avoid phrase, or holds
+# its Avoid word fails.
+run_check "$fx/chosen-avoided.md" "$fx/clean.md" ""
+expect "a chosen word that another entry avoids fails" 1 "FAIL: glossary $fx/chosen-avoided.md: entry \"runner\" is avoided by entry \"courier\" (\"runner\")"
+run_check "$fx/chosen-inside.md" "$fx/clean.md" ""
+expect "a chosen word inside another entry's Avoid phrase fails" 1 "FAIL: glossary $fx/chosen-inside.md: entry \"parcel\" is avoided by entry \"courier\" (\"parcel carrier\")"
+run_check "$fx/chosen-holds.md" "$fx/clean.md" ""
+expect "a chosen word holding another entry's Avoid word fails" 1 "FAIL: glossary $fx/chosen-holds.md: entry \"lamp runner\" holds \"runner\", avoided by entry \"courier\""
+
+# g. A flagged word is counted in the PASS line, never a failure.
+run_check "$g" "$fx/flagged.md" ""
+expect "a flagged word is listed in the PASS line" 0 "PASS: glossary $fx/flagged.md: no avoided words; 0 sentence(s) over 20 words; flagged: harbor 3"
+
+# h. The glossary's own meaning and Avoid lines name avoided words, are not checked and add no
+# Avoid words of their own.
+run_check "$g" "$fx/clean.md" ""
+expect "the glossary's own lines are not checked" 0 "PASS: glossary $g: 3 entries, 5 avoided terms"
+
+# i. Sentences over 20 words are counted, skipping code spans, list markers and fenced blocks.
+run_check "$g" "$fx/long.md" ""
+expect "long sentences are counted in the PASS line" 0 "PASS: glossary $fx/long.md: no avoided words; 1 sentence(s) over 20 words; flagged: none"
+
+# j. A file still listed as not yet rewritten is not checked, whatever it holds.
+run_check "$g" "$fx/avoid.md
+$fx/clean.md" "$fx/avoid.md"
+expect "a listed file is not checked" 0 "PASS: glossary: 1 file(s) checked, 1 listed as not yet rewritten"
+
+if [ "$failures" -gt 0 ]; then exit 1; fi

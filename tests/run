@@ -759,6 +759,69 @@ if out=$(tests/settings.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' 
 # Each behavior eval case under evals/ has a prompt and at least one grader (tests/evals.sh; no model calls).
 if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/evals.sh; fi
 
+# GLOSSARY.md parses, and every tracked rule, skill (module skills included) and agent file not
+# listed below uses no word an entry's Avoid line names (tests/glossary-check.sh says the format
+# and what is skipped). Its PASS lines count flagged ambiguous words and sentences over 20 words.
+# The list holds the files not yet rewritten to the glossary: the change that rewrites a file
+# removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
+# disk fails. A new file is checked from the start.
+not_yet_rewritten="agents/builder.md
+agents/plan-checker.md
+plugins/mentat-lead/skills/grill/CREDITS.md
+plugins/mentat-lead/skills/grill/SKILL.md
+plugins/mentat-lead/skills/orchestrate/SKILL.md
+plugins/mentat-lead/skills/orchestrate/build-sessions.md
+plugins/mentat-lead/skills/retro/CREDITS.md
+plugins/mentat-lead/skills/retro/SKILL.md
+plugins/mentat-linear/skills/linear/SKILL.md
+plugins/mentat-linear/skills/triage/SKILL.md
+rules.md
+skills/backlog/SKILL.md
+skills/backlog/agent-records.md
+skills/backlog/assumptions.md
+skills/backlog/filing.md
+skills/backlog/github.md
+skills/backlog/item-reads.md
+skills/backlog/next-work.md
+skills/backlog/records.md
+skills/backlog/replies.md
+skills/backlog/spec-fixes.md
+skills/backlog/start-waits.md
+skills/backlog/waits.md
+skills/build/SKILL.md
+skills/build/helpers.md
+skills/build/redirect.md
+skills/pr/CREDITS.md
+skills/pr/SKILL.md
+skills/propose/SKILL.md
+skills/propose/agreement.md
+skills/propose/decisions.md
+skills/propose/session.md
+skills/review/CREDITS.md
+skills/review/SKILL.md
+skills/review/after-ready.md
+skills/review/fast-track.md
+skills/review/findings.md
+skills/review/ready-gate.md
+skills/review/review-depth.md
+skills/review/stop.md"
+lists=$(mktemp -d) || exit 1
+if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
+  && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
+  if out=$(tests/glossary-check.sh GLOSSARY.md "$lists/covered" "$lists/listed" 2>&1); then
+    printf '%s\n' "$out"
+  else
+    printf '%s\n' "$out"
+    fail "tests/glossary-check.sh GLOSSARY.md"
+  fi
+else
+  fail "could not list the files the glossary check covers"
+fi
+rm -rf "$lists"
+
+# The glossary check behaves as specified on invented fixtures (tests/glossary.sh).
+if out=$(tests/glossary.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/glossary.sh; fi
+
 # The marketplace, the core plugin and each module validate (warnings are fine, only a failure counts).
 if command -v claude >/dev/null 2>&1; then
   for p in . plugins/*/; do
@@ -787,7 +850,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
