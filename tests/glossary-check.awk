@@ -45,6 +45,27 @@ function finish_glossary(   a, k, j, ca) {
   }
   if (!failed) printf "PASS: glossary %s: %d entries, %d avoided terms\n", G, ne, nt
 }
+# close_run(s, n): where in s the first run of exactly n backticks starts, or 0.
+function close_run(s, n,   off) {
+  off = 0
+  while (match(s, /`+/)) {
+    if (RLENGTH == n) return off + RSTART
+    off += RSTART + RLENGTH - 1; s = substr(s, RSTART + RLENGTH)
+  }
+  return 0
+}
+# spans(s): s with each code span a " | " separator. As in CommonMark, a span opens at a run of
+# backticks and closes at the next run of the same length; a run with no such close stays text.
+function spans(s,   out, at, n, rest, p) {
+  out = ""
+  while (match(s, /`+/)) {
+    at = RSTART; n = RLENGTH; rest = substr(s, at + n)
+    out = out substr(s, 1, at - 1)
+    if ((p = close_run(rest, n)) > 0) { out = out " | "; s = substr(rest, p + n) }
+    else { out = out substr(s, at, n); s = rest }
+  }
+  return out s
+}
 function end_sentence() { if (words > 20) long++; words = 0 }
 # A paragraph is consecutive prose lines; PB holds their normalized text and RB their words_of
 # text, each with one space before each line; PS[i] and WS[i] are the lengths of PB and RB before
@@ -160,7 +181,7 @@ NR == FNR {
 
   # Skipped: code spans, link targets, URLs, paths and file names. Each becomes a | separator,
   # so no phrase runs across it.
-  gsub(/`[^`]*`/, " | ", line)
+  line = spans(line)
   gsub(/\]\([^)]*\)/, "] | ", line)
   gsub(/[A-Za-z][A-Za-z0-9+.-]*:\/\/[^ \t)]*/, " | ", line)
   gsub(/[^ \t()"'`]*\/[^ \t()"'`]*/, " | ", line)

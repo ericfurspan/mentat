@@ -71,6 +71,12 @@ expect "a phrase split by a paragraph break passes" 0 "PASS: glossary $fx/split-
 run_check "$g" "$fx/skipped.md" ""
 expect "code spans, fences, link targets and paths are skipped" 0 "PASS: glossary $fx/skipped.md: no avoided words"
 
+# b. A code span ends only at a run of as many backticks as opened it, and the prose after it is
+# checked.
+run_check "$g" "$fx/spans.md" ""
+expect "prose after a double-backtick span fails" 1 "FAIL: glossary $fx/spans.md:3: \"runner\" is avoided by entry \"courier\""
+reject "a double-backtick span holding a single backtick is skipped" "$fx/spans.md:3: \"signal\""
+
 # b. A fenced block ends only at a fence of its opening character at least as long: a ~~~ line
 # inside a backtick fence, or a shorter backtick line inside a longer one, leaves the code after
 # it skipped, and the prose after the block's real closing line is checked.

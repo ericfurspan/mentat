@@ -17,3 +17,5 @@ runner signal parcel carrier
 ~~~
 low water drift
 ~~~
+
+The flag ``signal`` and the span `` a `b` runner `` keep their names.
