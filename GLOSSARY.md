@@ -8,7 +8,7 @@ Each entry gives the word to use as its heading, its meaning, and an Avoid line.
 
 ## advice against
 
-Claude Code's advice not to build an item, recorded on the item when the maintainer goes ahead anyway and quoted by the final check.
+Claude Code's advice not to implement an item, recorded on the item when the maintainer goes ahead anyway and quoted by the final check.
 
 Avoid: none
 
@@ -26,7 +26,7 @@ Avoid: none
 
 ## agreement
 
-The maintainer's yes to build a plan, or the orchestrator's default agreement, which commits the item and writes its spec.
+The maintainer's yes to implement a plan, or the orchestrator's default agreement, which commits the item and writes its spec.
 
 Avoid: none
 
@@ -67,22 +67,9 @@ Machine-read name: the `brainstorm` argument of `/mentat-linear:triage`.
 
 ## brief
 
-The main session's instructions to the builder for one change.
+The main session's instructions to the implementer for one change.
 
 Avoid: none
-
-## build session
-
-A session that runs `mentat:build` on one or more agreed items.
-
-Avoid: none
-
-## builder
-
-The subagent that edits, tests and commits one change in its own worktree; `mentat:build` also calls one builder per branch a helper until it is rewritten.
-
-Avoid: none
-Machine-read name: `mentat:builder`.
 
 ## decision
 
@@ -125,7 +112,7 @@ Heading: the section headings "Relays" and "Relayed writes" stay until their fil
 
 ## go-ahead
 
-What lets a build start on agreed items: "Agree and build now", the maintainer's typed `/mentat:build`, a yes to a next-work offer, or a handover.
+What lets an implementation session start on agreed items: the answer `Agree and build now`, the maintainer's typed `/mentat:build`, a yes to a next-work offer, or a handover.
 
 Avoid: none
 
@@ -138,22 +125,44 @@ Avoid: none
 
 ## handover
 
-A session message from a starting session that names an item and its spec's fingerprint; it is the go-ahead to build that item.
+A session message from a starting session that names an item and its spec's fingerprint; it is the go-ahead to implement that item.
 
 Avoid: none
 
 ## held item
 
-An item the orchestrator has the go-ahead to build but has not handed over yet, because of its blocked-by links, the pause count, the maintainer's word to pause new builds or a hold.
+An item the orchestrator has the go-ahead to implement but has not handed over yet, because of its blocked-by links, the pause count, the maintainer's word to stop starting new items or a hold.
 
 Avoid: none
 
 ## hold
 
-Used in several senses: the "Hold #N" message that keeps a pull request from being pushed to, an item kept from starting, and the orchestrator keeping an item for a build session.
+Used in several senses: the "Hold #N" message that keeps a pull request from being pushed to, an item kept from starting, and the orchestrator keeping an item for an implementation session.
 
 Ambiguous: say which hold is meant where it is not plain.
 Avoid: none
+
+## implement
+
+To carry out an agreed item: make its change, test it, get it reviewed and open its pull request.
+
+Avoid: build, built
+Machine-read name: `mentat:build`, typed as `/mentat:build`, and the agent records line `build: now`.
+Heading: the description's `Built with` list and its `Builder` line, the answer `Agree and build now` and the mark `made in the build` stay until their files are rewritten; cite them in a code span until then.
+
+## implementation session
+
+A session that implements one or more agreed items.
+
+Avoid: build session
+Machine-read name: `mentat:build`, typed as `/mentat:build`, and `plugins/mentat-lead/skills/orchestrate/build-sessions.md`.
+
+## implementer
+
+The subagent that edits, tests and commits one change in its own worktree; `mentat:build` also calls one implementer per branch a helper until it is rewritten.
+
+Avoid: builder
+Machine-read name: `mentat:builder` and `MENTAT_BUILDER_MODEL`.
 
 ## issue
 
@@ -176,7 +185,7 @@ Avoid: none
 
 ## main session
 
-The session that plans a change and briefs its builders, then branches, pushes and opens the pull request; it edits no files itself, whether the maintainer talks to it or another session started it.
+The session that plans a change and briefs its implementers, then branches, pushes and opens the pull request; it edits no files itself, whether the maintainer talks to it or another session started it.
 
 Avoid: none
 
@@ -188,9 +197,15 @@ Avoid: none
 
 ## manual check
 
-A requirement the maintainer checks by hand, which holds the pull request back from merge until they report it, or runs after the merge where the spec says so.
+Something the maintainer tries and reports on that changes nothing, such as a page or a command's output; it holds the pull request back from merge until they report it, or runs after the merge where the spec says so.
 
-Avoid: hand check
+Avoid: hand check, hand test
+
+## manual step
+
+Something only the maintainer can do that changes something, such as a setting, a secret, an install or a sign-in; the work waits until they have done it.
+
+Avoid: hand step, setup step
 
 ## merge wait
 
@@ -214,14 +229,14 @@ Avoid: none
 
 ## notes file
 
-The orchestrator's one working file, which records its build sessions, held and handed-over items, owed reports and open questions, so a later orchestrator session can take over.
+The orchestrator's one working file, which records its implementation sessions, held and handed-over items, owed reports and open questions, so a later orchestrator session can take over.
 
 Avoid: none
 Machine-read name: `orchestrate-notes.md`.
 
 ## orchestrator
 
-The session running `mentat-lead:orchestrate`, which plans items, hands them to build sessions and forwards their questions.
+The session running `mentat-lead:orchestrate`, which plans items, hands them to implementation sessions and forwards their questions.
 
 Avoid: none
 Machine-read name: `mentat-lead:orchestrate`.
@@ -269,13 +284,13 @@ Avoid: none
 
 ## quick check
 
-A build session's check of each queued item before building: a fact in its spec that the current code contradicts, and a manual check only a worktree or branch copy could run.
+An implementation session's check of each queued item before implementing it: a fact in its spec that the current code contradicts, and a manual check only a worktree or branch copy could run.
 
 Avoid: none
 
 ## readiness
 
-A build session's check, before it builds an item, that the item is committed, has a spec whose fingerprint matches the recorded one, and holds no blocking decision.
+An implementation session's check, before it implements an item, that the item is committed, has a spec whose fingerprint matches the recorded one, and holds no blocking decision.
 
 Avoid: none
 
@@ -295,7 +310,7 @@ Avoid: none
 
 ## redirect
 
-Sending a go-ahead given in another session to the orchestrator's one build session, while an orchestrator runs for the repository.
+Sending a go-ahead given in another session to the orchestrator's one implementation session, while an orchestrator runs for the repository.
 
 Avoid: none
 
@@ -314,7 +329,7 @@ Avoid: none
 
 ## Review details
 
-The folded section of a pull request's description that holds its review record, its requirement table and the models that built it.
+The folded section of a pull request's description that holds its review record and its requirement table.
 
 Avoid: none
 
@@ -375,13 +390,13 @@ Avoid: none
 
 ## spec
 
-An item's agreed requirements, kept where the tracker's adapter says; the build and the review work from it.
+An item's agreed requirements, kept where the tracker's adapter says; the implementer and the reviewers work from it.
 
 Avoid: none
 
 ## spec fix
 
-A build session's correction, before the first review, of a reference in an agreed spec to something that already exists.
+An implementation session's correction, before the first review, of a reference in an agreed spec to something that already exists.
 
 Avoid: none
 
@@ -418,7 +433,7 @@ Avoid: none
 
 ## wait on the maintainer
 
-Agreed work that cannot go on until the maintainer acts, such as a test or setup step only they can run, its item marked waiting; a wait block holds the steps, and a merge wait is the kind that ends at the merge.
+Agreed work that cannot go on until the maintainer acts, such as a manual check or a manual step, its item marked waiting; a wait block holds the steps, and a merge wait is the kind that ends at the merge.
 
 Avoid: none
 
