@@ -111,6 +111,23 @@ expect "prose after a block holding a fence with words fails" 1 "FAIL: glossary 
 reject "code after a fence with words inside a block is skipped" "$fx/fences.md:21:"
 expect "a line starting with a three-backtick code span is prose" 1 "FAIL: glossary $fx/fences.md:26: \"signal\" is avoided by entry \"courier\""
 reject "a three-backtick code span is skipped" "$fx/fences.md:26: \"runner\""
+# A fence may open on a list-item or quote line, nested too: the code inside it is skipped, and
+# its closing line, indented or quoted, ends it, so the prose after it is checked.
+run_check "$g" "$fx/fence-item.md" ""
+reject "code in a block opened on a list item is skipped" "$fx/fence-item.md:4:"
+expect "prose after a block opened on a list item fails" 1 "FAIL: glossary $fx/fence-item.md:7: \"signal\" is avoided by entry \"courier\""
+run_check "$g" "$fx/fence-numbered.md" ""
+reject "code in a block opened on a numbered item is skipped" "$fx/fence-numbered.md:4:"
+expect "prose after a block opened on a numbered item fails" 1 "FAIL: glossary $fx/fence-numbered.md:7: \"signal\" is avoided by entry \"courier\""
+run_check "$g" "$fx/fence-quote.md" ""
+reject "code in a quoted block is skipped" "$fx/fence-quote.md:4:"
+expect "prose after a quoted block fails" 1 "FAIL: glossary $fx/fence-quote.md:7: \"signal\" is avoided by entry \"courier\""
+reject "code in a block opened on a quoted list item is skipped" "$fx/fence-quote.md:10:"
+expect "prose after a block opened on a quoted list item fails" 1 "FAIL: glossary $fx/fence-quote.md:13: \"signal\" is avoided by entry \"courier\""
+# A list item starting with a code span of three backticks opens no block.
+run_check "$g" "$fx/fence-item-span.md" ""
+expect "a list item starting with a three-backtick code span is prose" 1 "FAIL: glossary $fx/fence-item-span.md:3: \"signal\" is avoided by entry \"courier\""
+reject "a three-backtick code span on a list item is skipped" "$fx/fence-item-span.md:3: \"runner\""
 
 # c. A whole-phrase Avoid line matches only the exact phrase, in any case: its other forms, and
 # its words joined by a hyphen or split by a comma, pass.

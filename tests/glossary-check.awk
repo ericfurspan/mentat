@@ -192,9 +192,13 @@ NR == FNR {
     desc = 1
   }
   # A fence: a run of three or more backticks or tildes, a backtick one with no backtick after it.
-  # It closes only at a line holding just a run of its opening character at least as long.
-  if (!desc && line ~ /^[ \t]*(```|~~~)/) {
-    s = line; sub(/^[ \t]+/, "", s); c = substr(s, 1, 1)
+  # It closes only at a line holding just a run of its opening character at least as long. Either
+  # line may start with list markers (-, *, +, 1. or 1) and a space) and quote markers (>), nested.
+  s = line
+  while (sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s) || sub(/^[ \t]*>/, "", s)) ;
+  sub(/^[ \t]+/, "", s)
+  if (!desc && s ~ /^(```|~~~)/) {
+    c = substr(s, 1, 1)
     if (c == "`") match(s, /^`+/); else match(s, /^~+/)
     n = RLENGTH; rest = substr(s, n + 1)
     if (fc == "" && !(c == "`" && index(rest, "`"))) { end_sentence(); flush(); fc = c; fl = n; next }
