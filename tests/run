@@ -169,12 +169,12 @@ skills/build/SKILL.md|Started sessions|A session started by another session asks
 skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/review-depth.md\` "Push notice" gives.
 skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
 skills/review/after-ready.md||When the maintainer objects to the item's design, plan or pull request at a hold or a close without merging, the session that hears it writes one decisions line on the item recording each objection
-skills/propose/agreement.md|The agreement question|When the maintainer objects to the item's design or plan in the talk after "Not now" (\`mentat:propose\` step 4), the session writes one decisions line on the item recording each objection
+skills/propose/SKILL.md||When the maintainer objects in that talk to the item's design or plan, the session writes one decisions line on the item recording each objection (\`../backlog/agent-records.md\` "Decision lines").
 skills/backlog/agent-records.md|Decision lines|each objection its own clause saying what they object to, one phrased as a question included, and never a reviewer's or the session's own reasons in their place.
 skills/backlog/agent-records.md|Decision lines|With GitHub issues it is in Claude Code's words, as \`records.md\` says.
 skills/propose/agreement.md|The plan check|each objection of the maintainer's recorded on the item or on an item its work moved from (\`../backlog/agent-records.md\` "Decision lines"), with how the plan meets it or why it does not
 skills/propose/agreement.md|The agreement question|each recorded objection the idea file lists, in a few words, with how the plan, as it stands after any adopted plan-check changes, meets it or why it does not
-skills/propose/SKILL.md||an open maintainer comment or objection on it takes the request off this path
+skills/propose/SKILL.md||no objection of the maintainer's recorded for the work (\`../backlog/agent-records.md\` "Decision lines"), such as fixing a typo)
 $o|Planning|no objection of the maintainer's is recorded for the work (\`agreement.md\` in \`mentat:propose\`'s folder)
 skills/propose/decisions.md||A conflict with an earlier answer, an adopted plan-check point or a plan's answer to a recorded objection (\`agreement.md\`) is corrected or asked as revisiting it, never silently overridden.
 skills/propose/agreement.md|The plan check|a later recommendation that conflicts with an adopted point is handled as \`decisions.md\` says for a conflict with an earlier answer.
