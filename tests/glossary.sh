@@ -92,6 +92,12 @@ expect "prose after a block holding a different fence fails" 1 "FAIL: glossary $
 expect "prose after a block holding a shorter fence fails" 1 "FAIL: glossary $fx/fences.md:17: \"signal\" is avoided by entry \"courier\""
 reject "code after a different fence inside a block is skipped" "$fx/fences.md:7:"
 reject "code after a shorter fence inside a block is skipped" "$fx/fences.md:14:"
+# A fence line with words after it does not close a block, and a line starting with a code span of
+# three backticks opens none.
+expect "prose after a block holding a fence with words fails" 1 "FAIL: glossary $fx/fences.md:24: \"signal\" is avoided by entry \"courier\""
+reject "code after a fence with words inside a block is skipped" "$fx/fences.md:21:"
+expect "a line starting with a three-backtick code span is prose" 1 "FAIL: glossary $fx/fences.md:26: \"signal\" is avoided by entry \"courier\""
+reject "a three-backtick code span is skipped" "$fx/fences.md:26: \"runner\""
 
 # c. A whole-phrase Avoid line matches only the exact phrase, in any case: its other forms, and
 # its words joined by a hyphen or split by a comma, pass.
