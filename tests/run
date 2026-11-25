@@ -169,7 +169,7 @@ skills/plan/session.md||Write to the backlog only what \`SKILL.md\` records for 
 skills/plan/session.md||a fold's lines, writes a started session sends back
 $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:plan\` step 7)
 skills/plan/SKILL.md|Decisions|and any recommendation against the maintainer's earlier answers, goals and recorded objections, adopted plan-check points and the plan's answers to objections; correct a conflict or ask it as revisiting, never override it silently.
-skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
+skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds; a number no answer has, or one with words naming a different answer, is not-ready; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
 skills/plan/SKILL.md|Decisions|one still open when the item's pull request passes the ready gate (\`mentat:review\`), or raised after that, goes to a Backlog item instead
 skills/review/ready-gate.md||Otherwise, move the decision in any open "Decision for the maintainer" section to a Backlog item
 skills/review/ready-gate.md||a write that fails twice does not hold back the Ready line, which then quotes the decision word for word as not moved
