@@ -217,6 +217,13 @@ reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(r
 check "the second failure in a row tells the maintainer now, keyed by the adapter's name" 'grep -q "^mentat: tell the maintainer now: Beta has failed 2 times in a row (owner/repo#7): beta-tool exited with status 3" "$STUB/err" && [ -f "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" ]'
 rm -f "$STUB/beta.fails"; rm -f "$STUB/comment"; rc=$(run 7)
 check "a checked reply ends the row" '[ "$(tail -n 1 "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" | cut -d" " -f2)" = ok ] && ! grep -q "tell the maintainer" "$STUB/err"'
+# A raise is told as soon as its reviewer ends, not after the slowest one: slow is listed
+# first, so a line printed only after every reviewer ends comes after slow's local line.
+listing "slow,beta"
+reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=2 run 7)
+check "a reviewer's raise is told while a slower reviewer still runs, once" '[ "$(grep -c "^mentat: tell the maintainer now: Beta has failed 2 times in a row" "$STUB/err")" = 1 ] && [ "$(grep -n -m1 "^mentat: tell the maintainer now: Beta" "$STUB/err" | cut -d: -f1)" -lt "$(grep -n -m1 "^mentat: slow: " "$STUB/err" | cut -d: -f1)" ]'
+rm -f "$STUB/beta.fails"
+listing "alpha,beta"
 # A checked reply whose paths cannot be rewritten: recorded ok, then did not finish, not
 # counted as a failure in a row; so a tool failure after it is the first in a row again.
 reset; touch "$STUB/beta.fails"; run 7 >/dev/null

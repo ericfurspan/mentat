@@ -148,7 +148,8 @@ adapters_cancel() {
 }
 
 # Runs function $1 once per name in $2..., each in its own background subshell with name
-# set, in parallel, and waits for all, writing how long each took to $res/<name>.secs.
+# set, in parallel, and waits for all, writing how long each took to $res/<name>.secs and
+# printing, on stderr, the raise line of each as it ends.
 # A runner ends with exit, so only the runner stops. Sets the caller's run_pids.
 adapters_run() { # $1 runner, $2... names
   local runner=$1 n i alive pids=()
@@ -164,7 +165,11 @@ adapters_run() { # $1 runner, $2... names
     alive=no i=0
     for n in "$@"; do
       if kill -0 "${pids[$i]}" 2>/dev/null; then alive=yes
-      elif [ ! -e "$res/$n.secs" ]; then printf '%s\n' "$SECONDS" >"$res/$n.secs"; fi
+      elif [ ! -e "$res/$n.secs" ]; then
+        printf '%s\n' "$SECONDS" >"$res/$n.secs"
+        # Its raise is told now, not after the slowest reviewer ends.
+        [ ! -s "$res/$n.raise" ] || printf 'mentat: tell the maintainer now: %s\n' "$(cat "$res/$n.raise")" >&2
+      fi
       i=$((i + 1))
     done
     [ "$alive" = yes ] || break
@@ -177,9 +182,8 @@ adapters_run() { # $1 runner, $2... names
 adapter_shown() { if [ -s "$res/$1.display" ]; then cat "$res/$1.display"; else printf '%s\n' "$1"; fi; }
 # Why reviewer $1 did not finish, in public-safe words.
 adapter_why_text() { if [ -s "$res/$1.why" ]; then cat "$res/$1.why"; else printf 'it ended without a result\n'; fi; }
-# Prints, on stderr, what only the maintainer reads about reviewer $1's run, and the line
-# that tells the maintainer now when its failure raised one.
+# Prints, on stderr, what only the maintainer reads about reviewer $1's run. The line that
+# tells the maintainer now, when its failure raised one, adapters_run printed as it ended.
 adapter_local_lines() {
   [ ! -s "$res/$1.local" ] || printf 'mentat: %s: %s\n' "$1" "$(cat "$res/$1.local")" >&2
-  [ ! -s "$res/$1.raise" ] || printf 'mentat: tell the maintainer now: %s\n' "$(cat "$res/$1.raise")" >&2
 }
