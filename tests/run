@@ -718,40 +718,9 @@ else
   fail "$f is $size characters (limit 15000)"
 fi
 
-# A supporting file a skill names in backticks (lowercase `name.md`, or `../<skill>/name.md`)
-# exists, relative to that skill's folder. A bare name found at the repository root, such as rules.md, is not one.
-# A file named in another plugin's skill folder ("`name.md` in `mentat:backlog`'s folder", which a module skill
-# uses for a core file) exists in that skill's folder instead. Module skills too.
-in_folder="\`[a-z][a-z0-9-]*\.md\` in \`mentat(-[a-z-]+)?:[a-z-]+\`'s folder"
-for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
-  [ -e "$f" ] || continue
-  dir=${f%/SKILL.md}
-  while IFS= read -r ref; do
-    [ -n "$ref" ] || continue
-    case $ref in
-      ../*) ;;
-      *) if [ -f "$ref" ]; then continue; fi ;;
-    esac
-    if [ -f "$dir/$ref" ]; then
-      pass "$f names $ref, which exists"
-    else
-      fail "$f names $ref, but $dir/$ref is missing"
-    fi
-  done <<< "$(sed -E "s/$in_folder//g" "$f" | grep -o -E "\`(\.\./[a-z-]+/)?[a-z][a-z0-9-]*\.md\`" | tr -d '\`' | sort -u)"
-  while IFS= read -r ref; do
-    [ -n "$ref" ] || continue
-    file=${ref%% *}; owner=${ref#* in }; owner=${owner%"'s folder"}
-    case $owner in
-      mentat:*) path=skills/${owner#mentat:}/$file ;;
-      *) path=plugins/${owner%%:*}/skills/${owner#*:}/$file ;;
-    esac
-    if [ -f "$path" ]; then
-      pass "$f names $file in $owner's folder, which exists"
-    else
-      fail "$f names $file in $owner's folder, but $path is missing"
-    fi
-  done <<< "$(grep -o -E "$in_folder" "$f" | tr -d '\`' | sort -u)"
-done
+# No file names the old planning skill, its folder or the next-work file, and every file a skill
+# file, rules.md or AGENTS.md names in backticks exists (tests/references.sh says how).
+if out=$(tests/references.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/references.sh; fi
 
 # mentat reviewers, review, review --outside (with stub adapters, and with the shipped
 # adapters on stub tools), second-opinion and check behave as specified (stub gh, claude,
@@ -885,7 +854,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/references.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
