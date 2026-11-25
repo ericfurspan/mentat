@@ -21,7 +21,7 @@ With `all` or projects chosen at the opening question, every reader runs for eve
 
 ## The Inbox
 
-For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), every page read. Read each item the sitting asks about in full (`mentat:backlog` "Reading an item"). Leave out an item whose latest Later note, a dated comment, still holds: since that note no fact behind it changed (its question would name the fact) and the maintainer did not raise it again. When that note says "Back when <id> is done.", read <id>'s status as `mentat:backlog` "Blocked-by links" reads a blocker's: ended done, canceled or duplicate is such a fact; open, or a failed read, is not. A latest note without that sentence is a plain-words hold, whatever older notes say.
+For each covered project: its Inbox items (`mentat:backlog` "Stages", as the tracker's adapter maps the stage), every page read. Read each item the sitting asks about in full (`mentat:backlog` "Reading an item"). Leave out an item whose latest Later note, a dated comment, still holds: since that note no fact behind it changed (its question names the fact) and the maintainer did not raise it again. When that note says "Back when <id> is done.", read <id>'s status as `mentat:backlog` "Blocked-by links" reads a blocker's: ended done, canceled or duplicate is such a fact; open, or a failed read, is not. A latest note without that sentence is a plain-words hold, whatever older notes say.
 
 ## Search
 
@@ -33,7 +33,7 @@ With more than 10 questions, a first prompt offers a smaller set, saying how man
 
 Ask each decision alone, marked "N of M", as `mentat:plan` "Decisions" gives, each item's questions together, never interleaved with another's. First come readers' questions about no asked item, then items by project, then items with no project, each oldest created first; a reader's question about an asked item comes just before that item's.
 
-An item's prompt shows the recommended outcome ("Record each answer"), one other, that section's not-ready option and "Stop" last; its question names the outcomes not shown, and an Other answer naming one, or giving a target or reason, chooses it. Its message names every outcome, "Stop" last. An outcome given in the not-ready talk is the answer; only a talk ending with none asks the item again. An item still undecided when the sitting ends stays in the Inbox as it is: unlike Later it writes no note, and unlike "Stop" it does not end the asking. Only the maintainer's answer in the sitting ends an item.
+An item's prompt shows the recommended outcome ("Record each answer"), one other, the not-ready option of `mentat:plan` "Decisions" and "Stop" last; its question names the outcomes not shown, and an Other answer naming one chooses it. Its message names every outcome, "Stop" last. A target or reason comes through Other. An outcome given in the not-ready talk is the answer; only a talk ending with none asks the item again. An item still undecided when the sitting ends stays in the Inbox as it is: unlike Later it writes no note, and unlike "Stop" it does not end the asking. Only the maintainer's answer in the sitting ends an item.
 
 A decision that sets direction past its own item, or needs analysis or discussion that would dominate the sitting, is not asked; opening further decisions is not by itself the test. It and any decision depending on it are sent to the item's own planning session; independent questions, and the item's outcome, are still asked.
 
@@ -43,7 +43,7 @@ Record each answer before asking the next, as `mentat:backlog`, the tracker's ad
 
 - Accept: Claude Code writes the item shape through `mentat:backlog`, moves it to Backlog, not committed (`mentat:backlog` "Stages"), and reads it back, never through the tracker's own triage actions.
 - Close, with a reason: one update adds the first description line `Closed <date>: <the maintainer's reason in their terms>.` and ends the item as canceled. A retry adds no line the description already opens with.
-- Merge into a named existing item: read that item in full, mark this one its duplicate, and leave on that item one comment line naming the item merged and citing the answer, without the merged text. Scope merged into a Todo item is not committed until `mentat:plan` agrees it, after its plan check, when that item is next planned.
+- Merge into a named existing item: read that item in full, mark this one its duplicate, and leave on that item one comment line naming the item merged and citing the answer, without the merged text. Scope merged into a Todo item joins its spec only once agreed through `mentat:plan`, which asks for it, after its plan check, when that item is next planned.
 - Later: the item stays in the Inbox with a dated comment note citing the answer, and may take an approved rewording, which changes it to that exact text. When another item ending brings it back, the note says "Back when <id> is done.", naming only an item still open.
 
 An item with a decision sent to planning gets a next step (`mentat:backlog` "Item shape"): in the session's project, `/mentat:plan <id>`; else one line saying in plain words to plan it in a session where its project, named, is worked, first giving it a project if it has none. The record holds no line to paste; "Report" gives it.
