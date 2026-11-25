@@ -129,7 +129,7 @@ skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
 skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 skills/plan/session.md||settling its questions before going on to the next without asking
-skills/plan/session.md||and again after a compaction, then go on with the items not yet planned, in the stated order, skipping those it committed, closed or folded, or that the maintainer left after "Not now".
+skills/plan/session.md||and again after a compaction or a resume, then go on with the items not yet planned, in the stated order, skipping those it committed, closed or folded, or that the maintainer left after "Not now".
 skills/plan/session.md||An item not yet agreed, an agreed one whose recorded fingerprint is missing or differs from its current spec's, or one taking in scope that still needs agreement, such as a fold, goes through \`SKILL.md\` steps 2 to 8; any other agreed item gets only steps 2 and 4, the skeptic's pass and its open maintainer decisions asked and recorded, with no plan check, agreement question or spec.
 skills/plan/session.md||on an item left with an open decision, and its removal once none is open.
 skills/plan/session.md||none already answered except a skeptic's-pass finding with new evidence, asked once as revisiting (\`SKILL.md\` step 2),
