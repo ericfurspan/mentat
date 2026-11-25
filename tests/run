@@ -794,16 +794,13 @@ if out=$(tests/settings.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' 
 # Each behavior eval case under evals/ has a prompt and at least one grader (tests/evals.sh; no model calls).
 if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/evals.sh; fi
 
-# GLOSSARY.md parses, and every tracked rule, skill (module skills included) and agent file not
-# listed below uses no word an entry's Avoid line names (tests/glossary-check.sh says the format
-# and what is skipped). Its PASS lines count flagged ambiguous words and sentences over 20 words.
-# The list holds the files not yet rewritten to the glossary: the change that rewrites a file
-# removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
-# disk fails. A new file is checked from the start.
-not_yet_rewritten="plugins/mentat-linear/skills/triage/SKILL.md"
+# GLOSSARY.md parses, and every tracked rule, skill (module skills included) and agent file
+# uses no word an entry's Avoid line names (tests/glossary-check.sh says the format and what is
+# skipped). Its PASS lines count flagged ambiguous words and sentences over 20 words. Every file
+# is rewritten to the glossary, so the check's list of files not yet rewritten is empty.
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
-  && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
+  && : >"$lists/listed"; then
   if out=$(tests/glossary-check.sh GLOSSARY.md "$lists/covered" "$lists/listed" 2>&1); then
     printf '%s\n' "$out"
   else

@@ -1,6 +1,6 @@
 # Glossary
 
-Mentat's rules, skills and agents use one word for each idea below. This file governs the files rewritten to it: `tests/run` keeps a list of the rule, skill and agent files not yet rewritten, and fails when any other of them uses a word an entry's Avoid line names. Until a skill is rewritten, a heading or label its template requires is used as written, even where this file names another word; a rewritten file that cites such a heading puts it in a code span, which the check skips.
+Mentat's rules, skills and agents use one word for each idea below. This file governs every rule, skill and agent file: `tests/run` fails when one uses a word an entry's Avoid line names. A heading or label a template requires that holds such a word is cited in a code span, which the check skips.
 
 Machine-read names never change here: file names, setting keys, and subagent, skill and command names. An entry notes one where it differs from the entry's word.
 
@@ -38,7 +38,7 @@ To carry out an agreed item: make its change, test it, get it reviewed and open 
 
 Avoid: build, built
 Machine-read name: `mentat:build`, typed as `/mentat:build`, and the agent records line `build: now`.
-Heading: the answer `Agree and build now` stays until its file is rewritten; cite it in a code span until then.
+Heading: the answers `Agree and build now` and `Agree, build later` keep their form; cite them in a code span.
 
 ## implementation session
 
