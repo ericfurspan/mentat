@@ -72,7 +72,7 @@ checks() {
   done
   jq -n --argjson r "$runs" '{check_runs: $r}' >"$STUB/checks"
 }
-# The headings exactly as lib/review.sh and plugins/mentat-reviewers/lib/grok.sh write them.
+# The headings exactly as lib/review.sh and the reviewers module's lib/outside.sh write them.
 local_review() { comment "${4:-mentat-bot}" "## Local $5 review of $1: $2, spec fingerprint ${3:-none}
 
 <details><summary>Full review</summary>
@@ -81,98 +81,97 @@ local_review() { comment "${4:-mentat-bot}" "## Local $5 review of $1: $2, spec 
 </details>
 
 REVIEW RESULT: X"; }
-codex() { local_review "$1" "$2" "${3:-none}" mentat-bot Codex; }
 claude_local() { local_review "$1" "$2" "${3:-none}" "${4:-mentat-bot}" Claude; }
-grok() { comment mentat-bot "## Local Grok review of $1: $2, spec fingerprint ${3:-none}
+# outside <sha> <fingerprint> <names, comma-separated> <result lines...>: an outside review comment.
+outside() {
+  local sha=$1 fp=$2 names=$3 body
+  shift 3
+  body="## Outside review of $sha: spec fingerprint $fp, reviewers $names
+"
+  for l in "$@"; do body="$body
+- $l"; done
+  body="$body
 
-REVIEW RESULT: X"; }
+- Change reviewed: $OLD..$sha
+- Time limit: 1800 seconds
+
+<details><summary>alpha</summary>
+
+- alpha-9: findings
+REVIEW RESULT: FINDINGS
+</details>"
+  comment "${OUTSIDE_BY:-mentat-bot}" "$body"
+}
 run() { (cd "$root/work dir" && "$mentat" status "$@" >"$STUB/out" 2>"$STUB/err"); echo $?; }
 line() { [ "$(cat "$STUB/out")" = "$1" ]; }
 read_only() { [ ! -f "$STUB/writes" ] && [ -z "$(find "$root/work dir" -newer "$STUB/head" -print -quit)" ]; }
 
 reset; rc=$(run 7)
-check "with no reviews prints one line: no rounds, no review yet, no Grok, no Codex, no CI" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+check "with no reviews prints one line: no rounds, no review yet, no outside review, no CI" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), outside: none, ci: none, owner review: not requested, calls section: missing"'
 check "reads only: posts, edits and pushes nothing" 'read_only && ! grep -qv -e "^repo view " -e "^api user " -e "^pr view 7 " -e "^api --paginate repos/owner/repo/" -e "^api repos/owner/repo --jq " "$STUB/calls"'
 
-reset; claude_local "$H" findings; codex "$H" findings; comment mentat-bot "Grok review started on $H"; grok "$H" "no findings"; checks completed success; rc=$(run 7)
-check "a reviewed head: one local round, head reviewed, Grok done, Codex done on it, CI passed" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: done, grok stop: none, codex: done on 2222222 (findings, spec fingerprint none), ci: passed, owner review: not requested, calls section: missing"'
+# The outside field: the latest outside review on the last head Claude reviewed, each listed
+# reviewer's result, its spec fingerprint and the list it ran for.
+reset; claude_local "$H" "no findings"; outside "$H" none "alpha, beta-2, slow" "alpha: findings" "beta-2: no findings" "slow: did not finish (Slow did not finish within 1 seconds)"; checks completed success; rc=$(run 7)
+check "a reviewed head with an outside review: each reviewer's result, the fingerprint and the list" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: findings, beta-2: no findings, slow: did not finish; spec fingerprint none; reviewers alpha, beta-2, slow), ci: passed, owner review: not requested, calls section: missing"'
+reset; claude_local "$H" "no findings"; outside "$H" none "alpha, other-9" "alpha: no findings" "other-9: skipped (the mentat-reviewers module has no such reviewer)"; rc=$(run 7)
+check "a skipped name is reported as skipped" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: no findings, other-9: skipped; spec fingerprint none; reviewers alpha, other-9), ci: none, owner review: not requested, calls section: missing"'
 
 # The head moved after the last reviews: the reviews posted stay the old head's record.
-reset; claude_local "$OLD" findings; codex "$OLD" "no findings"; codex "$H" findings; comment mentat-bot "Grok review started on $OLD"; checks completed success in_progress -; rc=$(run 7)
-check "the head moved after the last review: names the last reviewed commit, Codex is still reported on it; Grok running, CI running" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), grok: running, grok stop: none, codex: done on 1111111 (no findings, spec fingerprint none), ci: running, owner review: not requested, calls section: missing"'
+reset; claude_local "$OLD" "no findings"; outside "$OLD" none alpha "alpha: findings"; checks completed success in_progress -; rc=$(run 7)
+check "the head moved after the last review: names the last reviewed commit, the outside review is still reported on it; CI running" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), outside: posted on 1111111 (alpha: findings; spec fingerprint none; reviewers alpha), ci: running, owner review: not requested, calls section: missing"'
+reset; claude_local "$OLD" "no findings"; outside "$OLD" none alpha "alpha: no findings"; claude_local "$H" findings; checks completed success completed failure; rc=$(run 7)
+check "an outside review of an older head than Claude's last review is not reported; CI failed" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, outside: none, ci: failed, owner review: not requested, calls section: missing"'
+reset; claude_local "$OLD" findings; claude_local "$H" incomplete; outside "$H" none alpha "alpha: no findings"; rc=$(run 7)
+check "an incomplete Local Claude review is not a round and not a reviewed head, and an outside review there is not reported" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), outside: none, ci: none, owner review: not requested, calls section: missing"'
 
-reset; claude_local "$OLD" findings; claude_local "$H" incomplete; codex "$H" "no findings"; comment mentat-bot "Grok review started on $OLD"
-comment mentat-bot "Grok review did not finish on $OLD: Grok exited with status 1"; checks completed success completed failure; rc=$(run 7)
-check "an incomplete Local Claude review is not a round and not a reviewed head, and a Codex review there is not reported; Grok did not finish; CI failed" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), grok: did not finish, grok stop: none, codex: none, ci: failed, owner review: not requested, calls section: missing"'
-
-reset; claude_local "$H" findings; comment mentat-bot "Grok review started on $H"; grok "$H" incomplete; rc=$(run 7)
-check "a Grok review posted as incomplete did not finish" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: did not finish, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
-
-reset; claude_local "$OLD" findings; claude_local "$H" "no findings"; codex "$H" findings; comment someone-else "## Local Codex review of $H: no findings, spec fingerprint none"
-comment someone-else "## Local Claude review of $OLD: findings, spec fingerprint none"
-comment someone-else "Grok review started on $H"; rc=$(run 7)
-check "counts only comments by the account gh is signed in as" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on 2222222 (findings, spec fingerprint none), ci: none, owner review: not requested, calls section: missing"'
+# Only this account's comments count, and an outside review is never a round.
+reset; claude_local "$OLD" findings; claude_local "$H" "no findings"; outside "$H" none alpha "alpha: findings"
+OUTSIDE_BY=someone-else outside "$H" none alpha "alpha: no findings"
+comment someone-else "## Local Claude review of $OLD: findings, spec fingerprint none"; rc=$(run 7)
+check "counts only comments by the account gh is signed in as" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: findings; spec fingerprint none; reviewers alpha), ci: none, owner review: not requested, calls section: missing"'
+reset; outside "$H" "$REQ_FP" alpha "alpha: findings"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+check "an outside review alone is no round and marks nothing reviewed; with no Claude review the outside field is none" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), outside: none, ci: none, spec: no review yet, owner review: not requested, calls section: missing"'
 
 # Local Claude reviews are the local rounds, with the last one's head and fingerprint.
 reset; claude_local "$OLD" findings; claude_local "$H" "no findings" "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "Local Claude reviews count as rounds, with the last one's head and spec fingerprint" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, spec: matches, owner review: not requested, calls section: missing"'
-reset; claude_local "$OLD" findings; codex "$H" findings "$REQ_FP"; claude_local "$H" incomplete; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "a Local Codex review is not a round and does not mark its head reviewed or set the spec, and an incomplete Local Claude review is not a round" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), grok: none, grok stop: none, codex: none, ci: none, spec: differs (last review none, file $REQ_FP), owner review: not requested, calls section: missing"'
+check "Local Claude reviews count as rounds, with the last one's head and spec fingerprint" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, outside: none, ci: none, spec: matches, owner review: not requested, calls section: missing"'
 reset; claude_local "$OLD" findings; claude_local "$H" findings none someone-else; rc=$(run 7)
-check "a Local Claude review by another account does not count" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; comment mentat-bot "Grok review started on $H"; grok "$H" findings "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "Grok's plain review is not a round" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: done, grok stop: none, codex: none, ci: none, spec: no review yet, owner review: not requested, calls section: missing"'
+check "a Local Claude review by another account does not count" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: no (last reviewed 1111111), outside: none, ci: none, owner review: not requested, calls section: missing"'
 
-# The codex field: Codex's state on the last head Claude reviewed, from the latest Codex
-# comment there, whichever review posted first.
+# A changed spec or a changed list on one head: the latest outside comment there is read,
+# and its fingerprint and list are printed for the review to compare.
 OTHER_FP=000000000000
-reset; codex "$H" findings "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "a Codex review alone is no round, marks nothing reviewed, and with no Claude review the codex field is none" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: none, codex: none, ci: none, spec: no review yet, owner review: not requested, calls section: missing"'
-reset; claude_local "$H" findings; codex "$H" incomplete; rc=$(run 7)
-check "an incomplete Codex review posted on Claude's head did not finish on it" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: did not finish on 2222222, ci: none, owner review: not requested, calls section: missing"'
-reset; claude_local "$H" findings; codex "$H" incomplete; codex "$H" "no findings"; rc=$(run 7)
-check "a Codex review done after an incomplete one on the same head is done" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on 2222222 (no findings, spec fingerprint none), ci: none, owner review: not requested, calls section: missing"'
-reset; claude_local "$H" findings; codex "$H" "no findings"; codex "$H" incomplete; rc=$(run 7)
-check "an incomplete Codex review after a done one on the same head did not finish" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: did not finish on 2222222, ci: none, owner review: not requested, calls section: missing"'
-BOTH="head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on 2222222 (findings, spec fingerprint $REQ_FP, spec matches), ci: none, spec: matches, owner review: not requested, calls section: missing"
-reset; codex "$H" findings "$REQ_FP"; claude_local "$H" "no findings" "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "Codex's comment before Claude's on the same head: Codex done, spec matches" '[ "$rc" = 0 ] && line "$BOTH"'
-reset; claude_local "$H" "no findings" "$REQ_FP"; codex "$H" findings "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "Codex's comment after Claude's on the same head: the same line" '[ "$rc" = 0 ] && line "$BOTH"'
-reset; claude_local "$H" findings "$OTHER_FP"; codex "$H" findings "$OTHER_FP"; claude_local "$H" "no findings" "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "the spec changed on one head: Claude's last review matches it, Codex's review of the old spec differs" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on 2222222 (findings, spec fingerprint $OTHER_FP, spec differs), ci: none, spec: matches, owner review: not requested, calls section: missing"'
+BOTH="head 2222222, local rounds 1 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: findings; spec fingerprint $REQ_FP, spec matches; reviewers alpha), ci: none, spec: matches, owner review: not requested, calls section: missing"
+reset; outside "$H" "$REQ_FP" alpha "alpha: findings"; claude_local "$H" "no findings" "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+check "the outside comment before Claude's on the same head: posted, spec matches" '[ "$rc" = 0 ] && line "$BOTH"'
+reset; claude_local "$H" "no findings" "$REQ_FP"; outside "$H" "$REQ_FP" alpha "alpha: findings"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+check "the outside comment after Claude's on the same head: the same line" '[ "$rc" = 0 ] && line "$BOTH"'
+reset; claude_local "$H" "no findings" "$OTHER_FP"; outside "$H" "$OTHER_FP" alpha "alpha: findings"; claude_local "$H" "no findings" "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+check "the spec changed on one head: Claude's last review matches it, the outside review of the old spec differs" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: findings; spec fingerprint $OTHER_FP, spec differs; reviewers alpha), ci: none, spec: matches, owner review: not requested, calls section: missing"'
+reset; claude_local "$H" "no findings"; outside "$H" none alpha "alpha: no findings"; outside "$H" none "alpha, beta-2" "alpha: no findings" "beta-2: findings"; rc=$(run 7)
+check "the list changed on one head: the latest outside review, with its list" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: no findings, beta-2: findings; spec fingerprint none; reviewers alpha, beta-2), ci: none, owner review: not requested, calls section: missing"'
 
-# The Grok stop review has its own field; the grok field reads only the plain review.
-stop_review() { comment "${4:-mentat-bot}" "## Local Grok stop review of $1: $2, spec fingerprint ${3:-none}
-
-REVIEW RESULT: X"; }
-reset; comment mentat-bot "Grok stop review started on $H"; rc=$(run 7)
-check "a stop review's start comment alone: stop running on its head, grok none" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: running on 2222222, codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" "no findings" "$REQ_FP"; rc=$(run 7)
-check "a posted stop review: done, with its head, result and spec fingerprint; grok none" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: done on 2222222 (no findings, spec fingerprint $REQ_FP), codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; comment mentat-bot "Grok stop review started on $OLD"; comment mentat-bot "Grok stop review did not finish on $OLD: Grok exited with status 1"; rc=$(run 7)
-check "a stop review that did not finish names its head" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: did not finish on 1111111, codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" incomplete; rc=$(run 7)
-check "a stop review posted as incomplete did not finish" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: did not finish on 2222222, codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; claude_local "$H" findings; comment mentat-bot "Grok review started on $OLD"; grok "$OLD" findings; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" findings "$REQ_FP"; rc=$(run 7)
-check "a plain review and a stop review: each in its own field" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: done, grok stop: done on 2222222 (findings, spec fingerprint $REQ_FP), codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; comment mentat-bot "Grok review started on $OLD"; comment mentat-bot "Grok stop review started on $H"; stop_review "$H" findings; rc=$(run 7)
-check "a stop review does not change a plain run still running" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: running, grok stop: done on 2222222 (findings, spec fingerprint none), codex: none, ci: none, owner review: not requested, calls section: missing"'
-reset; comment someone-else "Grok stop review started on $H"; stop_review "$H" findings none someone-else; comment someone-else "Grok stop review did not finish on $H: x"; rc=$(run 7)
-check "a stop review by another account does not count" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+# Comments from before outside reviews ran together are not read: a pull request open
+# across the change reports none.
+reset; claude_local "$H" "no findings"
+comment mentat-bot "## Local Alpha review of $H: findings, spec fingerprint none"
+comment mentat-bot "Alpha review started on $H"
+comment mentat-bot "## Outside review of $H: spec fingerprint none, reviewers Alpha"; rc=$(run 7)
+check "an earlier reviewer's own comments and a malformed outside heading are not read" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: none, ci: none, owner review: not requested, calls section: missing"'
 
 reset; claude_local "$H" findings "$REQ_FP"; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request: the fingerprint matches as mentat review --request computes it (a path with spaces works)" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, spec: matches, owner review: not requested, calls section: missing"'
+check "--request: the fingerprint matches as mentat review --request computes it (a path with spaces works)" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: none, ci: none, spec: matches, owner review: not requested, calls section: missing"'
 other=$(printf '%s' "$(cat "$root/work dir/other request.md")" | shasum -a 256 | cut -c1-12)
 rc=$(run 7 --request "$root/work dir/other request.md")
-check "--request: a different spec is told apart, with both fingerprints" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, spec: differs (last review $REQ_FP, file $other), owner review: not requested, calls section: missing"'
+check "--request: a different spec is told apart, with both fingerprints" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: none, ci: none, spec: differs (last review $REQ_FP, file $other), owner review: not requested, calls section: missing"'
 reset; claude_local "$H" findings; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request: a review without a fingerprint differs" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, spec: differs (last review none, file $REQ_FP), owner review: not requested, calls section: missing"'
+check "--request: a review without a fingerprint differs" '[ "$rc" = 0 ] && line "head 2222222, local rounds 1 of 5, head reviewed: yes, outside: none, ci: none, spec: differs (last review none, file $REQ_FP), owner review: not requested, calls section: missing"'
 reset; rc=$(run 7 --request "$root/work dir/agreed request.md")
-check "--request with no review yet says so" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: none, codex: none, ci: none, spec: no review yet, owner review: not requested, calls section: missing"'
+check "--request with no review yet says so" '[ "$rc" = 0 ] && line "head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), outside: none, ci: none, spec: no review yet, owner review: not requested, calls section: missing"'
 # The owner review field, next to last on the line: the review of the repository's owner ("owner"),
 # the first that holds. A read it needs that fails makes it unknown, and only it.
-NONE="head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), grok: none, grok stop: none, codex: none, ci: none"
+NONE="head 2222222, local rounds 0 of 5, head reviewed: no (no review yet), outside: none, ci: none"
 reset; echo Organization >"$STUB/owner_type"; touch "$STUB/no_reviews" "$STUB/no_requests"; rc=$(run 7)
 check "owner review: an organization's repository has no single owner, read before the reviews" '[ "$rc" = 0 ] && line "$NONE, owner review: no single owner, calls section: missing"'
 reset; pr_set '.author.login = "owner"'; touch "$STUB/no_requests"; rc=$(run 7)
@@ -183,10 +182,10 @@ reset; review owner APPROVED "$OLD"; review someone-else APPROVED "$H"; request_
 check "owner review: requested, when the owner approved only an older head and another account approved this one" '[ "$rc" = 0 ] && line "$NONE, owner review: requested, calls section: missing"'
 reset; review owner APPROVED "$H"; review owner COMMENTED "$H"; request someone-else; request_team owner; rc=$(run 7)
 check "owner review: not requested, when a comment-only review on the head follows the owner's approval and only another account and a team are requested" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
-FULL="head 2222222, local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on 2222222 (findings, spec fingerprint $REQ_FP, spec matches), ci: passed, spec: matches"
-reset; claude_local "$H" findings "$REQ_FP"; codex "$H" findings "$REQ_FP"; checks completed success; touch "$STUB/no_reviews"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+FULL="head 2222222, local rounds 1 of 5, head reviewed: yes, outside: posted on 2222222 (alpha: findings; spec fingerprint $REQ_FP, spec matches; reviewers alpha), ci: passed, spec: matches"
+reset; claude_local "$H" "no findings" "$REQ_FP"; outside "$H" "$REQ_FP" alpha "alpha: findings"; checks completed success; touch "$STUB/no_reviews"; rc=$(run 7 --request "$root/work dir/agreed request.md")
 check "owner review: reviews that cannot be read are unknown, and the rest of the line is as it was (exit 0)" '[ "$rc" = 0 ] && line "$FULL, owner review: unknown (could not read the reviews), calls section: missing"'
-reset; claude_local "$H" findings "$REQ_FP"; codex "$H" findings "$REQ_FP"; checks completed success; review owner COMMENTED "$H"; touch "$STUB/no_requests"; rc=$(run 7 --request "$root/work dir/agreed request.md")
+reset; claude_local "$H" "no findings" "$REQ_FP"; outside "$H" "$REQ_FP" alpha "alpha: findings"; checks completed success; review owner COMMENTED "$H"; touch "$STUB/no_requests"; rc=$(run 7 --request "$root/work dir/agreed request.md")
 check "owner review: requested reviewers that cannot be read are unknown, and the rest of the line is as it was (exit 0)" '[ "$rc" = 0 ] && line "$FULL, owner review: unknown (could not read the requested reviewers), calls section: missing"'
 reset; touch "$STUB/no_owner"; rc=$(run 7)
 check "owner review: a repository owner that cannot be read is unknown, and the rest of the line is as it was (exit 0)" '[ "$rc" = 0 ] && line "$NONE, owner review: unknown (could not read the repository owner), calls section: missing"'
@@ -229,13 +228,13 @@ done
 
 # The round limit in force, MENTAT_REVIEW_ROUNDS (5 when unset), follows the local rounds.
 reset; claude_local "$OLD" findings; claude_local "$H" findings; rc=$(MENTAT_REVIEW_ROUNDS=7 run 7)
-check "MENTAT_REVIEW_ROUNDS=7: the local rounds are printed against 7" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 7, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+check "MENTAT_REVIEW_ROUNDS=7: the local rounds are printed against 7" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 7, head reviewed: yes, outside: none, ci: none, owner review: not requested, calls section: missing"'
 rc=$(MENTAT_REVIEW_ROUNDS=10 run 7)
-check "MENTAT_REVIEW_ROUNDS=10: the local rounds are printed against 10" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 10, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+check "MENTAT_REVIEW_ROUNDS=10: the local rounds are printed against 10" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 10, head reviewed: yes, outside: none, ci: none, owner review: not requested, calls section: missing"'
 rc=$(MENTAT_REVIEW_ROUNDS=08 run 7)
-check "MENTAT_REVIEW_ROUNDS=08: the local rounds are printed against 8" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 8, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+check "MENTAT_REVIEW_ROUNDS=08: the local rounds are printed against 8" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 8, head reviewed: yes, outside: none, ci: none, owner review: not requested, calls section: missing"'
 rc=$(MENTAT_REVIEW_ROUNDS='' run 7)
-check "MENTAT_REVIEW_ROUNDS set but empty is unset: the local rounds are printed against 5" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci: none, owner review: not requested, calls section: missing"'
+check "MENTAT_REVIEW_ROUNDS set but empty is unset: the local rounds are printed against 5" '[ "$rc" = 0 ] && line "head 2222222, local rounds 2 of 5, head reviewed: yes, outside: none, ci: none, owner review: not requested, calls section: missing"'
 for bad in 0 00 abc -1 1.5; do
   reset; rc=$(MENTAT_REVIEW_ROUNDS=$bad run 7)
   check "MENTAT_REVIEW_ROUNDS=\"$bad\" is a usage error (exit 64) that reads nothing from GitHub" '[ "$rc" = 64 ] && grep -qxF "mentat: MENTAT_REVIEW_ROUNDS must be a whole number of 1 or more, not \"$bad\"" "$STUB/err" && [ ! -s "$STUB/out" ] && [ ! -f "$STUB/calls" ]'

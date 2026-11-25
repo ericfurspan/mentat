@@ -7,43 +7,52 @@
 #     result in time), 3 the head moved, 4 CI did not pass on the head (failing or
 #     unfinished checks printed, then the review, which is not posted and not a round),
 #     7 the pull request already has the round limit's completed local rounds (as mentat
-#     status counts them): nothing ran or was posted; --codex and --grok are never refused.
+#     status counts them): nothing ran or was posted; --outside is never refused for it.
 #     When no CI check ran on the head, a line says so.
 #     A comment that holds a local path or a private name, in a public repository, is
 #     kept in a local file and not posted (exit 1).
 #     Each reviewer's failures in a row on this machine (its tool failing, timing out or
-#     giving no usable reply or result line, and a Grok sign-in refusal) are kept in
-#     reviewer-failures-<claude|codex|grok> in Mentat's cache folder (XDG_CACHE_HOME, else
-#     ~/.cache); a checked reply ends the row. A Grok sign-in refusal, a Grok refusal for
-#     usage or billing when no earlier failure in the row was one (once per row of
-#     failures in this machine's record, not per outage), and any other failure from the
-#     second in a row, also print one line starting "mentat: tell the maintainer now:"
-#     with the reviewer, the count, the pull requests and the reason (still exit 1).
+#     giving no usable reply or result line, and a sign-in refusal) are kept in
+#     reviewer-failures-<name> in Mentat's cache folder (XDG_CACHE_HOME, else ~/.cache),
+#     the name being claude or the outside reviewer's; a checked reply ends the row. A
+#     sign-in refusal, a refusal for usage or billing when no earlier failure in the row
+#     was one (once per row of failures in this machine's record, not per outage), and any
+#     other failure from the second in a row, also print one line starting "mentat: tell
+#     the maintainer now:" with the reviewer, the count, the pull requests and the reason.
 #     Claude runs in a fresh context, with read tools only, at --effort high, on
 #     MENTAT_REVIEW_MODEL, or, with MENTAT_FIRST_REVIEW_MODEL set, on that model while the pull request has no local round (as mentat status counts them), and,
 #     when Claude reports that no model ran, once more on the review default if that is
 #     another model, whatever MENTAT_REVIEW_MODEL names; the record names the model that
-#     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. Its time limit is
-#     MENTAT_REVIEW_TIMEOUT_SECONDS. The round limit is MENTAT_REVIEW_ROUNDS (empty counts as
-#     unset; any other value but a whole number of 1 or more exits 64), which the record names.
-#   mentat review --codex <PR>  The same with local Codex in place of Claude, on the model
-#     MENTAT_CODEX_MODEL names when it is set, else Codex's own default model.
-#     --codex and --grok first read whether outside reviewers are on here, as mentat
-#     reviewers does; unless they are on, they print why, post nothing and exit 6.
-#   mentat review --grok <PR>  The same with Grok, if installed: its start comment and
-#     review are posted only once CI passed on the head it reviewed. Same exit codes.
-#     It runs once per pull request: this gh account's own start comment refuses another.
-#     `mentat review --grok --stop <PR>` is the one other run, also once per pull request:
-#     the same review, whose comments say "Grok stop review" in place of "Grok review".
-#     A plain --grok is refused once this account's stop review started.
-#     Grok's time limit is MENTAT_GROK_TIMEOUT_SECONDS. Grok runs with --reasoning-effort
-#     MENTAT_GROK_REASONING_EFFORT, in reviews and second opinions alike; the review's record
-#     names the level asked for.
-#     All take `--request <file>` and `--require-ci` after the mode, if any, in any order
-#     with --stop:
-#     `mentat review --request <file> <PR>`. With --require-ci, a head where no CI check ran,
-#     or a pull request that conflicts with its base branch or whose merge state cannot be
-#     read, exits 4 like failed CI, posting nothing; without it, such a head is reviewed and posted.
+#     ran, and MENTAT_FIRST_REVIEW_MODEL when it chose it. MENTAT_REVIEW_TIMEOUT_SECONDS is
+#     the one time limit of every reviewer, Claude and each outside one (a whole number of
+#     1 or more; any other value exits 64). The round limit is MENTAT_REVIEW_ROUNDS (empty
+#     counts as unset; any other value but a whole number of 1 or more exits 64), which the
+#     record names.
+#   mentat review --outside <PR>  Every outside reviewer this repository lists reviews the
+#     head at once, in parallel, each through its adapter in the mentat-reviewers module,
+#     read-only, on a checkout made with the head's git hooks off. The list is
+#     MENTAT_REVIEWERS, read only from the env of .claude/settings.json on origin's default
+#     branch, as mentat reviewers reads it; unless outside reviewers are on there with a
+#     name listed, it prints why, runs and posts nothing and exits 6. It runs only after
+#     Claude's latest review of that head found nothing: else it runs nothing and exits 8.
+#     It prints each reviewer's reply and one summary line per reviewer, then waits for CI
+#     and posts one comment naming the head, the spec fingerprint and the list, with each
+#     reviewer's result (findings, no findings, did not finish with a public-safe reason,
+#     or skipped for a name the module does not ship), only once CI passed and while the
+#     head has not moved. A reviewer that is missing, signed out, refused, timed out or
+#     failed did not finish and blocks nothing; what only the maintainer reads, such as a
+#     kept log's path, goes to stderr. 0 no reviewer found anything (or none finished),
+#     2 findings, 1 not reviewed (an error, such as a failed post), 3 the head moved, 4 CI
+#     did not pass, 6 outside reviewers are not on here or none is listed, 8 Claude's
+#     latest review of the head is not one that found nothing, 9 the comment held by the
+#     publish check (kept in a local file).
+#     Both review modes take `--request <file>` and `--require-ci`, after --outside if
+#     given, in any order before the number: `mentat review --request <file> <PR>`. Any
+#     other option, such as a retired mode of one reviewer, prints the usage line, which
+#     names --outside, and exits 64. With --require-ci, a head where no CI
+#     check ran, or a pull request that conflicts with its base branch or whose merge state
+#     cannot be read, exits 4 like failed CI, posting nothing; without it, such a head is
+#     reviewed and posted.
 #     The file holds the agreed request (what to build, what to leave alone, how it is checked)
 #     for a repository that keeps it outside GitHub. It is read once, before the review;
 #     a missing, unreadable or blank file is not reviewed. It goes to the reviewing tool as
@@ -53,54 +62,52 @@
 #     moved, 4 CI did not pass (failing or unfinished checks printed).
 #   mentat status <PR> [--request <file>]  Prints, read-only, one line of the pull request's
 #     review state from the comments the review commands posted as this gh account: the head
-#     commit, the local rounds (completed Local Claude reviews; a Codex review is not a
+#     commit, the local rounds (completed Local Claude reviews; an outside review is not a
 #     round) against the limit in force (MENTAT_REVIEW_ROUNDS, as for review), whether the
-#     head is the last commit Claude
-#     reviewed, the Grok state (none, running, done or did not finish), the
-#     Grok stop review's (none, or running, done or did not finish on a commit, a done one
-#     with its result and spec fingerprint), the Codex review's on the last commit Claude
-#     reviewed (none, did not finish on it, or done on it with its result and spec
-#     fingerprint) and the CI state (none, running, passed or failed). With --request, also whether the last
-#     Claude review's spec fingerprint matches the file, and a done Codex review's. Then the
-#     repository owner's review, the first that holds: no single owner (an organization owns
-#     the repository), author, approved on head (their latest submitted review), requested or
-#     not requested. Last, the calls section: present when the description has a heading
-#     "Calls made without the maintainer" at any level, else missing. Either is unknown
-#     (<why>) when a read it needs fails, which stops nothing else.
+#     head is the last commit Claude reviewed, the outside review on that commit (none, or
+#     posted, with each reviewer's result, its spec fingerprint and the list it ran for)
+#     and the CI state (none, running, passed or failed). With --request, also whether the
+#     last Claude review's spec fingerprint matches the file, and the outside review's. Then
+#     the repository owner's review, the first that holds: no single owner (an organization
+#     owns the repository), author, approved on head (their latest submitted review),
+#     requested or not requested. Last, the calls section: present when the description has
+#     a heading "Calls made without the maintainer" at any level, else missing. Either is
+#     unknown (<why>) when a read it needs fails, which stops nothing else.
 #     Posts nothing. 0 printed, 1 could not read.
-#   mentat reviewers  Prints whether outside reviewers (Codex and Grok) are on in this
-#     repository, on one line: "reviewers: on", "reviewers: off" or "reviewers: unknown -
-#     <reason>". Only .claude/settings.json on origin's default branch counts: on when it
-#     sets enabledPlugins "mentat-reviewers@mentat" to true; off when that is false or
-#     absent; unknown when it cannot be read or is anything else, or the default branch
-#     cannot be found or fetched. It fetches that branch into a private ref, deleted once
-#     read, leaving origin/<default> and FETCH_HEAD as they are. Calls no gh. 0 for each
-#     state, 64 usage.
-#   mentat second-opinion <idea file>  Has Codex and Grok each
-#     judge an idea, at HEAD and in parallel, and prints each reply with its verdict line.
-#     Nothing is posted. 0 at least one tool delivered a verdict, 1 none did, 5 the checkout
-#     is behind origin's default branch (not a tool failure: update it and run again),
-#     6 outside reviewers are not on here (not a tool failure: nothing was sent), 64 usage.
-#     After the usage checks it reads whether outside reviewers are on here, as review
-#     --codex does; unless they are on, it prints why, sends nothing and exits 6. It then
-#     fetches origin's default branch into a private ref, leaving origin/<default> and
-#     FETCH_HEAD as they are. Time limits:
-#     MENTAT_REVIEW_TIMEOUT_SECONDS (Codex) and MENTAT_GROK_TIMEOUT_SECONDS (Grok);
-#     Codex runs on MENTAT_CODEX_MODEL when it is set, else its own default model;
-#     Grok's effort is MENTAT_GROK_REASONING_EFFORT. Grok may use its backend web search here
-#     (never in review); the local fetch tool is denied.
-#   review --codex, review --grok and second-opinion belong to the mentat-reviewers module:
-#     mentat hands each, with the arguments after its mode, to the module's entry
-#     mentat-review-codex, mentat-review-grok or mentat-second-opinion, in this checkout's
-#     plugins/mentat-reviewers/bin or else on PATH, and exits 64 with neither.
+#   mentat reviewers  Prints whether outside reviewers are on in this repository and which
+#     it lists: "reviewers: on", then one line per listed name ("<name>: available",
+#     "<name>: not available (<why>)" or "<name>: skipped (<why>)", from the module's
+#     offline checks, which start no reviewer), or "reviewers: on, none listed",
+#     "reviewers: off" or "reviewers: unknown - <reason>". Only .claude/settings.json on
+#     origin's default branch counts: on when it sets enabledPlugins
+#     "mentat-reviewers@mentat" to true, its env MENTAT_REVIEWERS giving the list; off when
+#     that is false or absent; unknown when it cannot be read or is anything else, or the
+#     default branch cannot be found or fetched. It fetches that branch into a private ref,
+#     deleted once read, leaving origin/<default> and FETCH_HEAD as they are. Calls no gh.
+#     0 for each state, 64 usage.
+#   mentat second-opinion <idea file>  Has every listed outside reviewer judge an idea, at
+#     HEAD and in parallel, and prints each reply with its verdict line. Nothing is posted.
+#     0 at least one reviewer delivered a verdict, 1 none did, 5 the checkout is behind
+#     origin's default branch (not a tool failure: update it and run again), 6 outside
+#     reviewers are not on here or none is listed (not a tool failure: nothing was sent),
+#     64 usage. After the usage checks it reads the switch and the list as mentat reviewers
+#     does; then it fetches origin's default branch into a private ref, leaving
+#     origin/<default> and FETCH_HEAD as they are. The time limit is
+#     MENTAT_REVIEW_TIMEOUT_SECONDS. A reviewer may search the web here (never in review).
+#   review --outside and second-opinion belong to the mentat-reviewers module: mentat
+#     hands each, with the arguments after its mode, to the module's entry
+#     mentat-review-outside or mentat-second-opinion, in this checkout's
+#     plugins/mentat-reviewers/bin or else on PATH, and exits 64 with neither. The module's
+#     settings for each reviewer it ships are in docs/settings.md.
 #   mentat check  Checks what Mentat itself needs, changing nothing but a temporary ref
 #     (deleted after) that mentat reviewers' fetch uses: tools, the git
 #     hooks installed and the same as this copy when agents' git uses them
 #     (lib/git-hooks.sh), gh signed in, the repository readable, claude installed at a version
 #     the merge hook and the review need; prints the Mentat modules installed, whether
-#     outside reviewers are on here as mentat reviewers reads it, and whether codex and grok
-#     are installed, and warns when outside reviewers are unknown or are on with codex or
-#     grok missing, when agents' git does not use the git hooks, the private word list is unreadable, the
+#     outside reviewers are on here as mentat reviewers reads it, and each listed reviewer
+#     and whether it is available, and warns when outside reviewers are unknown, on with
+#     none listed or on with a listed one not available or skipped, when the module notes a
+#     setting it no longer reads, when agents' git does not use the git hooks, the private word list is unreadable, the
 #     list misses a private repository this account can reach, by count only, the Mentat
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.
@@ -211,11 +218,10 @@ handover() {
 case "${1:-}" in
   review)
     shift
-    case "${1:-}" in
-      --codex) shift; handover review-codex "$@" ;;
-      --grok) shift; handover review-grok "$@" ;;
-    esac
+    if [ "${1:-}" = --outside ]; then shift; handover review-outside "$@"; fi
+    # Any other option, a retired mode included, is a usage error here.
     review_args "" "$@"
+    review_timeout
     round_limit
     # shellcheck disable=SC2154 # pr is set by review_args
     review_local claude "$pr" ;;
@@ -227,5 +233,5 @@ case "${1:-}" in
   fingerprint) shift; fingerprint_command "$@" ;;
   worktree) shift; worktree_command "$@" ;;
   state) shift; state_command "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch> | mentat state show | mentat state orchestrator [set <id> | ended <id>] | mentat state owner [<item>] | mentat state session add <id> <item>... | mentat state session end <id> | mentat state session list | mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N] [--held-by TEXT] | mentat state item get <id> | mentat state item list [--stage S] | mentat state note add <hold|question> <text> | mentat state note list [<hold|question>] | mentat state note clear <id> | mentat state can-dispatch" 64 ;;
+  *) die "usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch> | mentat state show | mentat state orchestrator [set <id> | ended <id>] | mentat state owner [<item>] | mentat state session add <id> <item>... | mentat state session end <id> | mentat state session list | mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N] [--held-by TEXT] | mentat state item get <id> | mentat state item list [--stage S] | mentat state note add <hold|question> <text> | mentat state note list [<hold|question>] | mentat state note clear <id> | mentat state can-dispatch" 64 ;;
 esac

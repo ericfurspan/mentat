@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # docs/settings.md and the code agree on Mentat's settings. Every MENTAT_* name the code names
 # is a listed setting or an internal name below; every listed setting is read somewhere, by
-# an expansion or by `printenv <name>` in a skill; an empty value counts as unset (no
+# an expansion, by `printenv <name>` in a skill, or by jq as `.env.<name>` of a repository's
+# settings file; an empty value counts as unset (no
 # ${NAME-...} or ${NAME=...}); and each listed default is the code's. A default in code is the
 # value after ":-" in its one ${NAME:-value} expansion, or, when that value is another
 # variable ($VAR or ${VAR}), the literal that variable is assigned; or the backticked value a
@@ -32,7 +33,8 @@ MENTAT_ROOTS lib/shared.sh sets it for the awk program it runs
 MENTAT_REVIEW_MODEL_DEFAULT lib/review.sh assigns it, as the one place the review default is named
 MENTAT_REVIEW_INTERVAL_SECONDS only tests set it, to shorten how often a review polls CI
 MENTAT_CI_TIMEOUT_SECONDS only tests set it, to shorten the wait for CI
-MENTAT_CI_GRACE_SECONDS only tests set it, to shorten the wait for CI to start"
+MENTAT_CI_GRACE_SECONDS only tests set it, to shorten the wait for CI to start
+MENTAT_GROK_TIMEOUT_SECONDS a retired setting: the Grok adapter looks at it only so mentat check can say it is no longer read"
 internal_names=$(printf '%s\n' "$internal" | cut -d' ' -f1)
 
 # The code: scripts, hooks, skills, agents and rules, tracked or new, never tests, docs or the changelog.
@@ -82,8 +84,8 @@ done <<<"$listed"
 if [ -z "$both" ]; then pass "no internal name is listed as a setting"; else fail "$doc lists internal names:$both"; fi
 
 while IFS= read -r n; do
-  # Read somewhere: an expansion, or printenv by name.
-  if grep -qE "\\\$\\{?$n([^A-Z0-9_]|\$)|printenv $n([^A-Z0-9_]|\$)" <<<"$code"; then
+  # Read somewhere: an expansion, printenv by name, or jq reading a settings file's env.
+  if grep -qE "\\\$\\{?$n([^A-Z0-9_]|\$)|printenv $n([^A-Z0-9_]|\$)|\\.env\\.$n([^A-Z0-9_]|\$)" <<<"$code"; then
     pass "$n is read in the code"
   else
     fail "$n is listed in $doc but read nowhere in the code"
@@ -154,5 +156,16 @@ while IFS= read -r n; do
     esac
   fi
 done <<<"$listed"
+
+# A setting the general rule names as refusing an empty value says so in its row.
+refusing=$(grep -oE 'except (`MENTAT_[A-Z0-9_]+`(, | and )?)+, which refuses it' "$doc" | grep -oE 'MENTAT_[A-Z0-9_]+')
+[ -n "$refusing" ] || fail "$doc names no setting as refusing an empty value"
+for n in $refusing; do
+  doc_empty=$(printf '%s\n' "$rows" | grep -E "^\| *\`$n\` *\|" | head -n 1 | awk -F'|' '{ gsub(/^ +| +$/, "", $5); print $5 }')
+  case "$doc_empty" in
+    Refused*) pass "$n refuses an empty value, and its row says so" ;;
+    *) fail "$n refuses an empty value, but its row's empty value is \"$doc_empty\"" ;;
+  esac
+done
 
 [ "$failures" -eq 0 ] || exit 1

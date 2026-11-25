@@ -134,23 +134,32 @@ c_claude_version() {
     c_problem "Claude Code $v is older than 2.1.295, so the merge hook does not block a call when it fails and the tool limits of mentat review may not hold: update Claude Code"
   fi
 }
-# Whether outside reviewers are on here (reviewers_state in lib/shared.sh), then whether
-# codex and grok are installed: a missing one is a warning only when they are on.
-# shellcheck disable=SC2154 # reviewers, reviewers_why and reviewers_def are set by reviewers_here
+# Whether outside reviewers are on here (reviewers_state in lib/shared.sh), then each listed
+# reviewer from the module's offline check (reviewers_listing): a listed one that is not
+# available or skipped is a warning, as is on with none listed. Then the module's notes,
+# such as a setting it no longer reads, each a warning. No reviewer runs.
+# shellcheck disable=SC2154 # reviewers, reviewers_list, reviewers_why, reviewers_def and reviewers_lines are set by the functions called
 c_reviewers() {
-  local pair tool name
+  local l state rest n why
   reviewers_here
   case "$reviewers" in
-    on) c_ok "outside reviewers are on here (mentat-reviewers is on in .claude/settings.json on $reviewers_def)" ;;
+    on)
+      if [ -n "$reviewers_list" ]; then c_ok "outside reviewers are on here (mentat-reviewers is on in .claude/settings.json on $reviewers_def)"
+      else c_warn "outside reviewers are on here, none listed: MENTAT_REVIEWERS in the env of .claude/settings.json on $reviewers_def names none, so none will run"; fi ;;
     off) c_ok "outside reviewers are off here (mentat-reviewers is not on in .claude/settings.json on $reviewers_def)" ;;
-    *) c_warn "outside reviewers are unknown here: $reviewers_why; Codex and Grok will not run" ;;
+    *) c_warn "outside reviewers are unknown here: $reviewers_why; none will run" ;;
   esac
-  for pair in codex:Codex grok:Grok; do
-    tool=${pair%%:*} name=${pair#*:}
-    if command -v "$tool" >/dev/null 2>&1; then c_ok "$tool is installed"
-    elif [ "$reviewers" = on ]; then c_warn "$tool is not installed: $name reviews will not run here"
-    else c_ok "$tool is not installed"; fi
-  done
+  reviewers_listing --notes
+  while IFS= read -r l; do
+    [ -n "$l" ] || continue
+    state=${l%% *} rest=${l#* } n=${rest%% *} why=${rest#* }
+    case "$state" in
+      available) c_ok "outside reviewer $n is listed and available" ;;
+      unavailable) c_warn "outside reviewer $n is listed but not available: $why; it will not finish here" ;;
+      skipped) c_warn "outside reviewer $n is listed but skipped: $why" ;;
+      note) c_warn "$rest" ;;
+    esac
+  done < <(printf '%s\n' "$reviewers_lines")
 }
 # The review tool: Claude Code, which mentat review needs.
 c_review_tools() {

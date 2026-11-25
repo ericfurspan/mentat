@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# mentat-reviewer-list [--notes] <name>...: for mentat reviewers and mentat check, one line
+# per name on whether this module ships it and its offline check passes, as adapter_list
+# in lib/adapter.sh prints them. Runs no reviewer. 0 printed, 64 usage.
+set -uo pipefail
+
+module=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
+# shellcheck disable=SC2034 # read by lib/load.sh
+entry=mentat-reviewer-list via="mentat reviewers" core_libs="shared" module_libs="adapter"
+# shellcheck source=/dev/null
+. "$module/lib/load.sh" || exit 1
+
+adapter_list "$@"

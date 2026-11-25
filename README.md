@@ -11,12 +11,12 @@
 
 Mentat is a Claude Code plugin for building software with multiple AI agents.
 
-Claude Code plans, builds and reviews each change; you decide what gets built and merge every pull request. With `mentat-reviewers` on in committed settings, Codex reviews every round, Grok the first head. A hook blocks an agent's merge; where set up, git hooks refuse its default-branch pushes and likely secrets.
+Claude Code plans, builds and reviews each change; you decide what gets built and merge every pull request. With `mentat-reviewers` on, the outside reviewers a repository lists review each head Claude finds clean. A hook blocks an agent's merge; where set up, git hooks refuse its default-branch pushes and likely secrets.
 
 ## Requirements
 
 - macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
-- For `mentat-reviewers`: the Codex CLI, signed in, outside the home folder, and Grok Build (`grok`), signed in (`grok login`).
+- For `mentat-reviewers`: each listed reviewer's command, signed in: the Codex CLI, outside the home folder; Grok Build (`grok login`).
 - For the git hooks: `gitleaks`.
 
 ## Install
@@ -36,7 +36,7 @@ Where pull requests need approval, give the agent its own GitHub account.
 
 Optional modules install as `<module>@mentat`:
 
-- `mentat-reviewers`: the Codex and Grok commands.
+- `mentat-reviewers`: outside reviewers; Codex and Grok ship.
 - `mentat-public-text`: blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`.
 - `mentat-linear`: the Linear adapter, and any backlog's Inbox triage: `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`.
 - `mentat-lead`: grill, an interview on open decisions, `/mentat-lead:retro`, improvements from a session, and `/mentat-lead:orchestrate`, which plans work and hands each batch to a fresh build session.
@@ -58,13 +58,13 @@ Mentat reads from AGENTS.md:
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
-Every setting, such as the review and builder models, is listed with its default and where to set it in [docs/settings.md](docs/settings.md).
+[docs/settings.md](docs/settings.md) lists every setting, with its default and where to set it.
 
 Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
 
 ## Review tools
 
-`mentat second-opinion` runs Codex and Grok on an idea.
+Breaking: `mentat-reviewers` needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's `.claude/settings.json`. `MENTAT_REVIEW_TIMEOUT_SECONDS` (1800; a whole number from 1, never empty) limits every reviewer; `mentat check` warns while the unread `MENTAT_GROK_TIMEOUT_SECONDS` is set. `mentat second-opinion` runs the list on an idea.
 
 ## Git hooks
 

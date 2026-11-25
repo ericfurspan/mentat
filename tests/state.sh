@@ -340,12 +340,12 @@ line() { grep -qxF "$1" "$root/out"; }
 READY=$'**Status:** Ready\n\nThe change.'
 READY_CRLF=$'**Status:** Ready\r\n\r\nThe change.'
 FAST=$'**Status:** Not reviewed: fast track agreed by the maintainer\nThe change.'
-WAIVED=$'**Status:** Not reviewed: last push waived by the maintainer\nThe change.'
+IN_REVIEW=$'**Status:** In review\nThe change.'
 OTHER=$'The change.\n**Status:** Ready'
 
 # a. Waiting >= N: 0, exit 1.
 fresh
-prs "1|$READY" "2|$READY_CRLF" "3|$FAST" "4|$WAIVED"
+prs "1|$READY" "2|$READY_CRLF" "3|$FAST"
 dispatch
 check "a: three waiting (one CRLF, one fast track), limit 3: prints 0, exit 1" '[ "$rc" = 1 ] && line "waiting: 3 (#1 #2 #3)" && line "limit: 3" && line "can hand over: 0" && [ ! -s "$root/err" ]'
 check "e: gh pr list --state open --limit 1000 is read" 'grep -qE "^pr list .*--state open --limit 1000( |$)" "$STUB/gh_calls"'
@@ -421,15 +421,15 @@ st item set H2 --stage ready --pr 98 >/dev/null
 dispatch
 check "h: stage pr or ready with the pull request not open: neither waiting nor in flight" '[ "$rc" = 0 ] && line "waiting: 0" && line "in flight: 0" && line "can hand over: 3"'
 
-# i. Empty description, another first line, or a waived last push: not waiting.
+# i. Empty description, another first line, or a pull request in review: not waiting.
 fresh
-prs "1|" "2|$OTHER" "3|$WAIVED"
+prs "1|" "2|$OTHER" "3|$IN_REVIEW"
 jq '.[0].body = null' "$STUB/prs" >"$STUB/prs.tmp" && mv "$STUB/prs.tmp" "$STUB/prs"
 prs_null=$(jq -c '.[0].body' "$STUB/prs")
 st item set I1 --stage pr --pr 3 >/dev/null
 dispatch
-check "i: null body, other first line, waived last push: none waiting; the pr-stage one is in flight" '[ "$rc" = 0 ] && [ "$prs_null" = null ] && line "waiting: 0" && line "in flight: 1" && line "can hand over: 2"'
-prs "1|" "2|$OTHER" "3|$WAIVED"
+check "i: null body, other first line, in review: none waiting; the pr-stage one is in flight" '[ "$rc" = 0 ] && [ "$prs_null" = null ] && line "waiting: 0" && line "in flight: 1" && line "can hand over: 2"'
+prs "1|" "2|$OTHER" "3|$IN_REVIEW"
 dispatch
 check "i: empty body: not waiting" '[ "$rc" = 0 ] && line "waiting: 0"'
 

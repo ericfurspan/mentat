@@ -60,8 +60,7 @@ fi
 # item, owes the maintainer a tell for it, and keeps that tell in its notes file until given; the
 # planning and recording contracts name that default; and planning offers a grill only for two or
 # more open decisions, keeping the offer after the same point is corrected twice; and a new feature
-# or workflow change gets a short sourced survey of established practice before its view. Each Ready
-# message carries a review-depth line, which a build's final message and a starting session's relay keep.
+# or workflow change gets a short sourced survey of established practice before its view.
 # The Ready line starts with an icon that every repeat or relay keeps, and its first showing in the
 # maintainer's chat sends one push, from the starting session and never a started one; holds, blocks
 # and questions get neither. Moving on to the next item to plan proposes an order once and plans through it.
@@ -139,34 +138,22 @@ skills/propose/session.md||then going on to the next without asking which
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/propose/SKILL.md||except on the maintainer's yes to the order question of \`mentat-linear:triage\` "Report", which starts it
 $o|Planning|keeps so a compaction or takeover goes on asking nothing
-skills/review/review-depth.md||Right after the "🔔 Ready to merge: #N (<item id>)" line, the Ready message carries one review-depth line
-skills/review/review-depth.md||\`Review: closely (<reasons>)\`, each reason in a few words, or \`Review: skim (no listed reason for closer review)\`
-skills/review/review-depth.md||The line is a prioritization aid, not a safety assessment; the maintainer still decides how to review and merges every pull request.
-skills/review/review-depth.md||It goes in chat only; the pull request description is unchanged.
-skills/review/review-depth.md||a Risks line, except one only for Grok being unavailable, and except one for a changed agent instruction file whose change alters no guardrail (what an agent may do without the maintainer: merging, pushing, publishing, secrets, approvals, review gates);
-skills/review/review-depth.md||a Decisions line for a call made in the build;
-skills/review/review-depth.md||a Calls made without the maintainer line that files a defect at the round limit or settles a review stop, an extra round or a blocking finding, so a Ready at the round limit with defects filed or stops settled is closely;
-skills/review/review-depth.md||any sentence the Ready message adds, except a weaker review only because Grok is unavailable;
-skills/review/review-depth.md||the agreed spec changed during the build;
-skills/review/review-depth.md||with the reason "not reviewed" for a fast track or "last push not reviewed" for a waived push.
-skills/review/review-depth.md||A "Hold #N" line carries no review-depth line. Each new "Ready to merge: #N", after a hold or more rounds, carries a fresh line recomputed for that head.
-skills/review/SKILL.md|Final check|without the parentheses when #N has no item, then the line \`review-depth.md\` in this skill's folder gives.
-skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, and its \`Review:\` line word for word
-skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included, and its \`Review:\` line word for word, adding none when it has none;
+skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with any limit on how it was reviewed
+skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included; the item's id
 skills/build/SKILL.md|Started sessions|keeping a sentence or line when in doubt whether it is one of them
 skills/review/SKILL.md|Final check|tell the maintainer in chat: a first line "🔔 Ready to merge: #N (<item id>)"
-skills/review/review-depth.md|Push notice|The Ready line starts with "🔔 ", and every repeat or relay of it keeps it word for word, the icon included.
-skills/review/review-depth.md|Push notice|A "Hold #N" line, a Blocked or Not reviewed report and a question get no icon and no push, and the pull request's Status line stays as \`mentat:pr\` gives it.
-skills/review/review-depth.md|Push notice|A session that shows the maintainer a Ready line in its own chat for the first time then sends one push notification, when it has a push-notification tool
-skills/review/review-depth.md|Push notice|naming the repository, the pull request, the item and a few words of its title, in at most about 150 characters.
-skills/review/review-depth.md|Push notice|The line is in chat before the push, and nothing waits on the push.
-skills/review/review-depth.md|Push notice|Ready lines first shown in one turn share one push naming each.
-skills/review/review-depth.md|Push notice|A Ready line for a new head after a hold counts as first shown; one shown again, such as when listing what waits on the maintainer, sends none.
-skills/review/review-depth.md|Push notice|A session started by another session sends none; the starting session that relays the line sends it.
-skills/review/review-depth.md|Push notice|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
-skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/review-depth.md\` "Push notice" says.
+skills/review/SKILL.md|Final check|Push notice: the Ready line starts with "🔔 ", and every repeat or forward of it keeps it word for word, the icon included.
+skills/review/SKILL.md|Final check|A "Hold #N" line, a Blocked or Not reviewed report and a question get no icon and no push, and the pull request's Status line stays as \`mentat:pr\` gives it.
+skills/review/SKILL.md|Final check|A session that shows the maintainer a Ready line in its own chat for the first time then sends one push notification, when it has a push-notification tool
+skills/review/SKILL.md|Final check|The push names the repository, the pull request, the item and a few words of its title, in at most about 150 characters.
+skills/review/SKILL.md|Final check|The line is in chat before the push, and nothing waits on the push.
+skills/review/SKILL.md|Final check|Ready lines first shown in one turn share one push naming each.
+skills/review/SKILL.md|Final check|A Ready line for a new head after a hold counts as first shown; one shown again, such as when listing what waits on the maintainer, sends none.
+skills/review/SKILL.md|Final check|A session started by another session sends none; the starting session that forwards the line sends it.
+skills/review/SKILL.md|Final check|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
+skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/SKILL.md\` "Final check" says.
 skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
-skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/review-depth.md\` "Push notice" gives.
+skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/SKILL.md\` "Final check" gives.
 skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
 skills/review/after-ready.md||When the maintainer objects to the item's design, plan or pull request at a hold or a close without merging, the session that hears it writes one decisions line on the item recording each objection
 skills/propose/SKILL.md||When the maintainer objects to the item's design, plan or pull request in their reply to the agreement question or in any talk after it, the session writes one decisions line on the item recording each objection (\`../backlog/agent-records.md\` "Decision lines").
@@ -480,6 +467,47 @@ else
   pass "no script under lib/ or the reviewers module's lib/ reads FETCH_HEAD"
 fi
 
+# Core names no shipped outside reviewer: each is an adapter of the reviewers module
+# (plugins/mentat-reviewers/adapters/<name>.sh), which core reaches only by the names a
+# repository lists in MENTAT_REVIEWERS. Read: bin/, lib/, hooks/, rules.md, agents/ and
+# skills/ (tracked or new) but a skill's CREDITS.md, and the core plugin's
+# descriptions, matched in any case anywhere, joined to other letters or digits too (so
+# MENTAT_<NAME>_MODEL, CodexReview and grok2 count).
+# core_names <checkout> <names>: prints " <name> (in <files>)" for each name core there holds.
+core_names() {
+  local n at
+  for n in $2; do
+    at=$( { git -C "$1" ls-files -z --cached --others --exclude-standard -- bin lib hooks rules.md agents skills ':!skills/*CREDITS.md' | (cd "$1" && xargs -0 grep -l -i -F -- "$n")
+      jq -r .description "$1/.claude-plugin/plugin.json" | grep -q -i -F -- "$n" && echo .claude-plugin/plugin.json
+      jq -r '.plugins[] | select(.source == "./") | .description' "$1/.claude-plugin/marketplace.json" | grep -q -i -F -- "$n" && echo .claude-plugin/marketplace.json; } | sort -u | tr '\n' ' ')
+    [ -z "$at" ] || printf ' %s (in %s)' "$n" "${at% }"
+  done
+}
+joined=$(mktemp -d) || exit 1
+mkdir -p "$joined/.claude-plugin" "$joined/skills/x" "$joined/lib"
+echo '{"description": "A plugin."}' >"$joined/.claude-plugin/plugin.json"
+echo '{"plugins": [{"source": "./", "description": "Runs grok2 reviews."}]}' >"$joined/.claude-plugin/marketplace.json"
+echo 'Ask CodexReview first.' >"$joined/skills/x/SKILL.md"
+echo "m=\$MENTAT_GROK_MODEL" >"$joined/lib/a.sh"
+git -C "$joined" init -q
+if [ "$(core_names "$joined" "codex grok")" = " codex (in skills/x/SKILL.md) grok (in .claude-plugin/marketplace.json lib/a.sh)" ]; then
+  pass "the core-names check finds a shipped name joined to other letters or digits (CodexReview, grok2, MENTAT_GROK_MODEL)"
+else
+  fail "the core-names check misses a shipped name joined to other letters or digits (CodexReview, grok2, MENTAT_GROK_MODEL)"
+fi
+rm -rf "$joined"
+shipped=$(for f in plugins/mentat-reviewers/adapters/*.sh; do [ -f "$f" ] && basename "$f" .sh; done)
+if [ -z "$shipped" ]; then
+  fail "found no shipped outside reviewer under plugins/mentat-reviewers/adapters/"
+else
+  named=$(core_names . "$shipped")
+  if [ -z "$named" ]; then
+    pass "core names no shipped outside reviewer ($(printf '%s' "$shipped" | tr '\n' ' ' | sed 's/ $//'))"
+  else
+    fail "core names a shipped outside reviewer; name it only in the reviewers module or the docs:$named"
+  fi
+fi
+
 # mentat status reads review state from the headings the review commands write. Each heading it
 # matches must still be written as below; a change here also changes lib/status.sh and tests/status.sh.
 status_heading() {
@@ -492,13 +520,8 @@ status_heading() {
 }
 status_heading lib/review.sh "printf '## Local %s review of %s: %s, spec fingerprint %s\n\n' \"\$name\" \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
 status_heading lib/review.sh "review_name_claude() { name=Claude; }"
-status_heading plugins/mentat-reviewers/lib/codex.sh "review_name_codex() { name=Codex; }"
-status_heading plugins/mentat-reviewers/lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review started on \$head\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review did not finish on \$head: \$1\""
+status_heading plugins/mentat-reviewers/lib/outside.sh "printf '## Outside review of %s: spec fingerprint %s, reviewers %s\n\n' \"\$head\" \"\$request_fp\" \"\$(printf '%s' \"\$names\" | sed 's/ /, /g')\""
+status_heading plugins/mentat-reviewers/lib/outside.sh "for n in \$names; do printf -- '- %s: %s\n' \"\$n\" \"\$(outside_result \"\$n\")\"; done"
 status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
@@ -730,14 +753,15 @@ for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
   done <<< "$(grep -o -E "$in_folder" "$f" | tr -d '\`' | sort -u)"
 done
 
-# mentat reviewers, review, review --codex, review --grok, second-opinion and check behave as
-# specified (stub gh, claude, codex, grok and gitleaks), and so do the publish check, the merge hook,
+# mentat reviewers, review, review --outside (with stub adapters, and with the shipped
+# adapters on stub tools), second-opinion and check behave as specified (stub gh, claude,
+# reviewer tools and gitleaks), and so do the publish check, the merge hook,
 # the contract the merge hook keeps through hooks/lib/verdict.sh, the git hooks, and the
 # public-text module's hook. The marketplace lists the modules and the committed settings turn on
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -815,15 +839,7 @@ skills/pr/SKILL.md
 skills/propose/SKILL.md
 skills/propose/agreement.md
 skills/propose/decisions.md
-skills/propose/session.md
-skills/review/CREDITS.md
-skills/review/SKILL.md
-skills/review/after-ready.md
-skills/review/fast-track.md
-skills/review/findings.md
-skills/review/ready-gate.md
-skills/review/review-depth.md
-skills/review/stop.md"
+skills/propose/session.md"
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
   && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
@@ -869,7 +885,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else

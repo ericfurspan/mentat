@@ -18,58 +18,57 @@ not_reviewed() {
   exit 1
 }
 
-# Each `mentat review` reviewer's runs on this machine, one file per reviewer in Mentat's
-# cache folder, which the start sweep leaves alone: a line per run that counts, its time,
-# fail or ok, the pull request as owner/name#N, a token for the run (its process id and
-# two random numbers) and, on a Grok out-of-usage failure only, the fixed word usage;
-# nothing from a reply or a log. A
-# failure is a Grok sign-in refusal or the reviewer tool's own (it exits non-zero, times
-# out, or returns no usable reply or no final result line); a checked reply is ok, posted
-# or not. Only the review paths record; second opinions never do. Each run appends one
-# short line, so runs at the same time each keep theirs. A record that cannot be written
-# is skipped quietly. Reads the caller's repo and pr. $1 claude, codex or grok; $2 fail or
-# ok; $3, optional, the run's token; $4, optional, the word after it (usage).
+# Each reviewer's runs on this machine (the Claude review's and each outside reviewer's),
+# one file per reviewer name in Mentat's cache folder, which the start sweep leaves alone:
+# a line per run that counts, its time, fail or ok, the pull request as owner/name#N, a
+# token for the run (its process id and two random numbers) and, on an out-of-usage
+# failure only, the fixed word usage; nothing from a reply or a log. A failure is a
+# sign-in refusal or the reviewer tool's own (it exits non-zero, times out, or returns no
+# usable reply or no final result line); a checked reply is ok, posted or not. Only the
+# review paths record; second opinions never do. Each run appends one short line, so runs
+# at the same time each keep theirs. A record that cannot be written is skipped quietly.
+# Reads the caller's repo and pr. $1 the reviewer's name; $2 fail or ok; $3, optional, the
+# run's token; $4, optional, the word after it (usage).
 reviewer_record() {
   local cache=${XDG_CACHE_HOME:-$HOME/.cache}
   case "$cache" in /*) ;; *) return 1 ;; esac
   { mkdir -p "$cache/mentat" && printf '%s %s %s#%s %s%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$2" "${repo:-unknown}" "${pr:-unknown}" "${3:-$$-$RANDOM-$RANDOM}" "${4:+ $4}" >>"$cache/mentat/reviewer-failures-$1"; } 2>/dev/null
 }
-# Records a failure of reviewer $1 (claude, codex or grok) and may set review_raise to the
+# Records a failure of the reviewer named $1, shown as $2, and may set review_raise to the
 # reviewer, how many failures in a row and their pull requests, so not_reviewed adds the
 # line that tells the maintainer now. A row is this machine's record of the reviewer's
-# fail lines after the last ok, not a service-wide outage. Raised: with $2 = always (a Grok
-# sign-in refusal), every time; with $2 = usage (Grok refusing the run for usage or
-# billing), recorded with the word usage, only when no earlier fail line in the row carries
-# that word, so once per row; otherwise from the second failure in a row, older lines
-# without the word counting as other failures. The run is counted at this run's own line,
+# fail lines after the last ok, not a service-wide outage. Raised: with $3 = always (a
+# sign-in refusal), every time; with $3 = usage (a refusal for usage or billing), recorded
+# with the word usage, only when no earlier fail line in the row carries that word, so
+# once per row; otherwise from the second failure in a row, older lines without the word
+# counting as other failures. The run is counted at this run's own line,
 # found by its token: the fail lines after the last ok before it, that line included, so a
 # line another run adds before this one reads the record changes nothing. When the record
 # cannot be written or read, or this run's line is not in it, there is no count: a sign-in
 # refusal or an out-of-usage failure is raised then, as its first failure on this pull
 # request, and nothing else is.
-reviewer_failed() {
-  local who n="" used="" prs="" run token="$$-$RANDOM-$RANDOM" word=""
-  case "$1" in claude) who=Claude ;; codex) who=Codex ;; *) who=Grok ;; esac
-  [ "${2:-}" != usage ] || word=usage
-  if reviewer_record "$1" fail "$token" "$word" && run=$(awk -v token="$token" '$2 == "ok" { n = 0; u = 0; prs = ""; split("", seen) }
+reviewer_failed() { # $1 reviewer name, $2 its display name, $3 always, usage or nothing
+  local who=$1 shown=$2 kind=${3:-} n="" used="" prs="" run token="$$-$RANDOM-$RANDOM" word=""
+  [ "$kind" != usage ] || word=usage
+  if reviewer_record "$who" fail "$token" "$word" && run=$(awk -v token="$token" '$2 == "ok" { n = 0; u = 0; prs = ""; split("", seen) }
       $2 == "fail" { n++; if (!($3 in seen)) { seen[$3] = 1; prs = prs (prs == "" ? "" : ", ") $3 } }
       $2 == "fail" && $4 == token { own = n " " (u + 0) " " prs }
       $2 == "fail" && $5 == "usage" { u++ }
-      END { if (own != "") print own }' "${XDG_CACHE_HOME:-$HOME/.cache}/mentat/reviewer-failures-$1" 2>/dev/null); then
+      END { if (own != "") print own }' "${XDG_CACHE_HOME:-$HOME/.cache}/mentat/reviewer-failures-$who" 2>/dev/null); then
     n=${run%% *} run=${run#* }
     used=${run%% *} prs=${run#* }
   fi
   case "$n" in '' | *[!0-9]*) n="" ;; esac
   case "$used" in '' | *[!0-9]*) n="" ;; esac
-  if [ -z "$n" ] && { [ "${2:-}" = always ] || [ "${2:-}" = usage ]; }; then n=1 used=0 prs="${repo:-unknown}#${pr:-unknown}"; fi
+  if [ -z "$n" ] && { [ "$kind" = always ] || [ "$kind" = usage ]; }; then n=1 used=0 prs="${repo:-unknown}#${pr:-unknown}"; fi
   [ -n "$n" ] || return 0
-  case "${2:-}" in
+  case "$kind" in
     always) ;;
     usage) [ "$used" -eq 0 ] || return 0 ;;
     *) [ "$n" -ge 2 ] || return 0 ;;
   esac
   if [ "$n" -eq 1 ]; then run="time"; else run="times"; fi
-  review_raise="$who has failed $n $run in a row ($prs)"
+  review_raise="$shown has failed $n $run in a row ($prs)"
 }
 last_line() { grep -v '^[[:space:]]*$' "$1" | tail -n 1; }
 # Whether $1 is a final REVIEW RESULT line a review may end with.
@@ -80,8 +79,8 @@ result_line() {
   return 1
 }
 
-# The one background child a review command waits on (the model, Grok's sign-in refresh
-# or the pause between CI reads), set when it starts and cleared once it is reaped.
+# The one background child a review command waits on (the model or the pause between
+# CI reads), set when it starts and cleared once it is reaped.
 review_child=""
 # A background child ignores INT, so Ctrl-C would leave it running. The review commands
 # set these traps before their first EXIT trap: the signal stops the child (TERM, then
@@ -100,13 +99,14 @@ review_stop() { # $1 exit status
   fi
   exit "$1"
 }
-# Deletes, at the start of a review or second opinion, what stopped runs left: Grok run
-# folders older than a day, and kept logs and held comments older than seven days. It
-# follows no symlink in those folders, and a failure is ignored.
+# Deletes, at the start of a review or second opinion, what stopped runs left: an outside
+# reviewer's run folders (run-* in Mentat's cache folder) older than a day, and kept logs
+# (mentat-log.*) and held comments older than seven days. It follows no symlink in those
+# folders, and a failure is ignored.
 sweep_leftovers() {
   local cache=${XDG_CACHE_HOME:-$HOME/.cache}
-  case "$cache" in /*) find "$cache/mentat/" -mindepth 1 -maxdepth 1 -type d \( -name 'grok-review.*' -o -name 'grok-opinion.*' -o -name 'grok-opinion-web.*' \) -mmin +1440 -exec rm -rf {} + 2>/dev/null ;; esac
-  find "${TMPDIR:-/tmp}/" -mindepth 1 -maxdepth 1 -type f \( -name 'mentat-codex-log.*' -o -name 'mentat-grok-log.*' -o -name 'mentat-held-comment.*' \) -mmin +10080 -exec rm -f {} + 2>/dev/null
+  case "$cache" in /*) find "$cache/mentat/" -mindepth 1 -maxdepth 1 -type d -name 'run-*' -mmin +1440 -exec rm -rf {} + 2>/dev/null ;; esac
+  find "${TMPDIR:-/tmp}/" -mindepth 1 -maxdepth 1 -type f \( -name 'mentat-log.*' -o -name 'mentat-held-comment.*' \) -mmin +10080 -exec rm -f {} + 2>/dev/null
   return 0
 }
 
@@ -150,19 +150,25 @@ default_branch() { # $1 top level
   printf '%s' "$def"
 }
 
-# Whether outside reviewers (Codex and Grok) are on in the repository at top level $1.
-# Only .claude/settings.json on origin's default branch counts: on when its
+# Whether outside reviewers are on in the repository at top level $1, and which ones it
+# lists. Only .claude/settings.json on origin's default branch counts: on when its
 # enabledPlugins["mentat-reviewers@mentat"] is true; off when the file, enabledPlugins or
-# that key is absent, or the value is false; unknown otherwise. The working tree, local
-# and user settings and other branches never count. Sets the caller's reviewers (on, off
-# or unknown), reviewers_why (why it is unknown, else empty) and reviewers_def (the
+# that key is absent, or the value is false; unknown otherwise. While on, the list is the
+# string env.MENTAT_REVIEWERS of that file: names of lowercase letters, digits and hyphens
+# separated by commas or whitespace, each kept once, in the order given; no key, an empty
+# value or one of only separators lists none. A list that cannot be read so (env not an
+# object, a value that is not a string, a name with another character) makes the state
+# unknown, so no outside reviewer runs. The working tree, local and user settings, the
+# process environment and other branches never count. Sets the caller's reviewers (on, off
+# or unknown), reviewers_list (the names, separated by spaces; empty unless on),
+# reviewers_why (why it is unknown, else empty) and reviewers_def (the
 # default branch, or empty when none was found). The default branch is the one the remote
 # names, else the local origin/HEAD. It is fetched into a ref of this run's own deleted once
 # read, so origin/<default> and git's record of the last fetch stay as they are; a failed fetch is unknown, never a
 # stale local origin/<default>. Call it before setting an EXIT trap: it sets and clears its own.
 reviewers_state() { # $1 top level
   local top=$1 ref="refs/mentat/reviewers-$$"
-  reviewers=unknown reviewers_why="" reviewers_def=""
+  reviewers=unknown reviewers_list="" reviewers_why="" reviewers_def=""
   if ! command -v jq >/dev/null 2>&1; then reviewers_why="jq is not installed"; return 0; fi
   if ! git -C "$top" remote get-url origin >/dev/null 2>&1; then reviewers_why="the checkout has no origin remote"; return 0; fi
   reviewers_def=$(default_branch "$top")
@@ -190,23 +196,38 @@ reviewers_read() { # $1 top level, $2 ref
     *) reviewers_why="$f is not a regular file"; return 0 ;;
   esac
   # jq -s reads every JSON value in the file into one array, so an empty file or more
-  # than one value is not one object. has() tells an absent key from a null value.
+  # than one value is not one object. has() tells an absent key from a null value. The
+  # list is read only while the switch is on, and printed after "on " once checked.
   if ! got=$(git -C "$1" cat-file blob "$2:.claude/settings.json" 2>/dev/null | jq -rs '
     if length != 1 or (.[0] | type) != "object" then "not-object"
-    else .[0] | if has("enabledPlugins") | not then "off"
+    else .[0] as $s | ($s | if has("enabledPlugins") | not then "off"
       elif (.enabledPlugins | type) != "object" then "plugins-not-object"
       elif .enabledPlugins | has("mentat-reviewers@mentat") | not then "off"
       elif .enabledPlugins["mentat-reviewers@mentat"] == true then "on"
       elif .enabledPlugins["mentat-reviewers@mentat"] == false then "off"
-      else "not-boolean" end
+      else "not-boolean" end) as $sw
+      | if $sw != "on" then $sw
+        elif ($s | has("env")) | not then "on"
+        elif ($s.env | type) != "object" then "env-not-object"
+        elif ($s.env | has("MENTAT_REVIEWERS")) | not then "on"
+        elif ($s.env.MENTAT_REVIEWERS | type) != "string" then "list-not-string"
+        else [$s.env.MENTAT_REVIEWERS | splits("[,\\s]+") | select(length > 0)] as $t
+          | if any($t[]; test("^[a-z0-9-]+$") | not) then "list-bad-name"
+            else "on " + (reduce $t[] as $n ([]; if any(.[]; . == $n) then . else . + [$n] end) | join(" ")) end
+        end
     end' 2>/dev/null); then
     reviewers_why="$f could not be read as JSON"; return 0
   fi
   case "$got" in
-    on | off) reviewers=$got ;;
+    on | "on ") reviewers=on ;;
+    "on "*) reviewers=on reviewers_list=${got#on } ;;
+    off) reviewers=off ;;
     not-object) reviewers_why="$f is not one JSON object" ;;
     plugins-not-object) reviewers_why="enabledPlugins in $f is not an object" ;;
     not-boolean) reviewers_why="mentat-reviewers@mentat in $f is neither true nor false" ;;
+    env-not-object) reviewers_why="env in $f is not an object" ;;
+    list-not-string) reviewers_why="MENTAT_REVIEWERS in $f is not a string" ;;
+    list-bad-name) reviewers_why="MENTAT_REVIEWERS in $f holds a name with characters other than lowercase letters, digits and hyphens" ;;
     *) reviewers_why="$f could not be read as JSON" ;;
   esac
 }
@@ -214,27 +235,79 @@ reviewers_read() { # $1 top level, $2 ref
 reviewers_here() {
   local top
   if ! top=$(git rev-parse --show-toplevel 2>/dev/null) || [ -z "$top" ]; then
-    reviewers=unknown reviewers_why="not inside a git repository" reviewers_def=""
+    reviewers=unknown reviewers_list="" reviewers_why="not inside a git repository" reviewers_def=""
     return 0
   fi
   reviewers_state "$top"
 }
-# mentat reviewers: the switch here, on one line, exit 0 for each state.
+# The path of the reviewers module's entry mentat-$1: the copy that ships with this core
+# while it exists, else the one on PATH; returns 1 with neither. Reads the caller's root
+# (bin/mentat's folder) or MENTAT_ROOT.
+module_entry() {
+  local entry="mentat-$1" r=${root:-${MENTAT_ROOT:-}}
+  if [ -n "$r" ] && [ -x "$r/plugins/mentat-reviewers/bin/$entry" ]; then printf '%s\n' "$r/plugins/mentat-reviewers/bin/$entry"; return 0; fi
+  command -v "$entry" 2>/dev/null
+}
+# For outside reviewers on here with names listed (reviewers_here first), sets the caller's
+# reviewers_lines: one "<available|unavailable|skipped> <name> <why>" line per listed name,
+# in the list's order, from the module's offline checks (mentat-reviewer-list), which run
+# no reviewer. With $1 = --notes, also "note <text>" lines from the module. Without the
+# module every listed name is unavailable.
+# shellcheck disable=SC2120 # mentat check (lib/check.sh) passes --notes
+reviewers_listing() {
+  local entry n
+  reviewers_lines=""
+  if [ "$reviewers" != on ] || [ -z "$reviewers_list" ]; then
+    [ "${1:-}" = --notes ] || return 0
+  fi
+  if entry=$(module_entry reviewer-list) && [ -n "$entry" ]; then
+    # shellcheck disable=SC2086 # the list is plain names
+    if reviewers_lines=$(MENTAT_ROOT=${root:-${MENTAT_ROOT:-}} "$entry" ${1:+"$1"} $reviewers_list); then return 0; fi
+    reviewers_lines="" n="the mentat-reviewers module could not check it"
+  else
+    n="the mentat-reviewers module was not found"
+  fi
+  [ "$reviewers" = on ] || return 0
+  for entry in $reviewers_list; do reviewers_lines="$reviewers_lines${reviewers_lines:+$'\n'}unavailable $entry $n"; done
+}
+# Prints listing line $1 as mentat reviewers shows it: "<name>: available", "<name>: not
+# available (<why>)" or "<name>: skipped (<why>)"; nothing for a note.
+reviewers_line() {
+  local state=${1%% *} rest=${1#* } name why
+  name=${rest%% *} why=${rest#* }
+  [ "$why" != "$rest" ] || why=""
+  case "$state" in
+    available) printf '%s: available\n' "$name" ;;
+    unavailable) printf '%s: not available (%s)\n' "$name" "$why" ;;
+    skipped) printf '%s: skipped (%s)\n' "$name" "$why" ;;
+  esac
+}
+# mentat reviewers: the switch here and its list, exit 0 for each state. The first line is
+# "reviewers: off", "reviewers: unknown - <why>", "reviewers: on, none listed" or
+# "reviewers: on", the last followed by a line per listed name (reviewers_line).
 reviewers_command() {
+  local l
   [ $# -eq 0 ] || die "usage: mentat reviewers" 64
   reviewers_here
-  if [ "$reviewers" = unknown ]; then printf 'reviewers: unknown - %s\n' "$reviewers_why"
-  else printf 'reviewers: %s\n' "$reviewers"; fi
+  case "$reviewers" in
+    unknown) printf 'reviewers: unknown - %s\n' "$reviewers_why"; return 0 ;;
+    off) printf 'reviewers: off\n'; return 0 ;;
+  esac
+  if [ -z "$reviewers_list" ]; then printf 'reviewers: on, none listed\n'; return 0; fi
+  printf 'reviewers: on\n'
+  # shellcheck disable=SC2119 # no notes here
+  reviewers_listing
+  while IFS= read -r l; do [ -z "$l" ] || reviewers_line "$l"; done <<<"$reviewers_lines"
 }
-# Exits 6, posting nothing, unless outside reviewers are on here. review --codex and
-# review --grok call it before anything else, and before setting any EXIT trap.
+# Exits 6 with $1 (what did not happen) and why, before anything is sent or posted, unless
+# outside reviewers are on here with at least one name listed. Sets what reviewers_here sets.
 reviewers_gate() {
   reviewers_here
   case "$reviewers" in
-    on) return 0 ;;
-    off) die "not run: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on $reviewers_def); Claude's review is the review here" 6 ;;
-    *) die "not run: outside reviewers are unknown in this repository ($reviewers_why); Codex and Grok run only once it reads as on" 6 ;;
+    off) die "$1: outside reviewers are off in this repository (the mentat-reviewers module is not on in .claude/settings.json on $reviewers_def)" 6 ;;
+    unknown) die "$1: outside reviewers are unknown in this repository ($reviewers_why), so none runs" 6 ;;
   esac
+  [ -n "$reviewers_list" ] || die "$1: outside reviewers are on in this repository, none listed (MENTAT_REVIEWERS in the env of .claude/settings.json on $reviewers_def names none)" 6
 }
 
 # The word a posted review's heading gives for its checked REVIEW RESULT line $1.
@@ -365,8 +438,7 @@ ci() {
   printf 'CI passed on %s\n' "$head"
 }
 # The issues the pull request closes hold the original request; the description
-# is the builder's account of it. Both go to the reviewing tool, local Codex or
-# Grok, each labeled. Sets `issues` (the caller's variable) from the closing
+# is the builder's account of it. Both go to the reviewing tool, each labeled. Sets `issues` (the caller's variable) from the closing
 # references in $2, the pull request's JSON. An issue that cannot be read leaves
 # the review without its requirements: not reviewed.
 read_issues() { # $1 pr, $2 pull request JSON
@@ -384,10 +456,11 @@ read_issues() { # $1 pr, $2 pull request JSON
 # The arguments of mentat review after its mode, for every reviewer: --request <file>
 # and --require-ci, each at most once, in any order, with any flag the function named
 # by $1 takes (it returns 1 for one it does not take), then exactly one pull request
-# number ("review 7 --codex" would otherwise run the Claude review). Sets the caller's
+# number ("review 7 --outside" would otherwise run the Claude review). Sets the caller's
 # request_file, request_given, require_ci and pr; anything else is a usage error.
+REVIEW_USAGE="usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>"
 review_args() { # $1 function for more flags, or "", $2... the arguments
-  local more=$1 usage="usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>"
+  local more=$1 usage=$REVIEW_USAGE
   shift
   request_file="" request_given=no require_ci=no
   while :; do
@@ -645,6 +718,6 @@ review_result_line() {
   printf 'A vague or thin description is a finding, not INCOMPLETE, and not having run the code is a limitation to state in a complete review. '
   printf 'In the reason, name what was missing by repository-relative path or in general words, never a machine-local path or raw tool output.\n\n'
   printf 'Give no summary of the change beyond the intent sentence, and no account of how the review was done. State each limitation in one line. '
-  printf 'With no findings, the reply holds only the lines asked for above (the intent sentence, the line on the request items, the line on instruction text where it applies, and any observations asked for), one line per limitation, then the result line.\n\n'
+  printf 'With no findings, the reply holds only the lines asked for above (the intent sentence, the line on the request items, and the line on instruction text where it applies), one line per limitation, then the result line.\n\n'
   printf 'End your reply with exactly one final line, one of:\nREVIEW RESULT: NO FINDINGS\nREVIEW RESULT: FINDINGS\nREVIEW RESULT: INCOMPLETE - <what could not be read>\n'
 }
