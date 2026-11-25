@@ -137,6 +137,19 @@ fresh_stop() {
   die "the checkout is behind origin's default branch $fresh_def: HEAD lacks $fresh_behind $word on it. Update the checkout and run $1 again. This is not a tool failure: do not go on with Claude Code's own view alone." 5
 }
 
+# Prints origin's default branch for the repository at $1: the branch the remote's HEAD
+# names (a network read), else the local refs/remotes/origin/HEAD; prints nothing when
+# neither names one. Used by reviewers_state and mentat worktree branch.
+default_branch() { # $1 top level
+  local def
+  def=$(GIT_TERMINAL_PROMPT=0 git -C "$1" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
+  if [ -z "$def" ]; then
+    def=$(git -C "$1" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
+    def=${def#refs/remotes/origin/}
+  fi
+  printf '%s' "$def"
+}
+
 # Whether outside reviewers (Codex and Grok) are on in the repository at top level $1.
 # Only .claude/settings.json on origin's default branch counts: on when its
 # enabledPlugins["mentat-reviewers@mentat"] is true; off when the file, enabledPlugins or
@@ -152,11 +165,7 @@ reviewers_state() { # $1 top level
   reviewers=unknown reviewers_why="" reviewers_def=""
   if ! command -v jq >/dev/null 2>&1; then reviewers_why="jq is not installed"; return 0; fi
   if ! git -C "$top" remote get-url origin >/dev/null 2>&1; then reviewers_why="the checkout has no origin remote"; return 0; fi
-  reviewers_def=$(GIT_TERMINAL_PROMPT=0 git -C "$top" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
-  if [ -z "$reviewers_def" ]; then
-    reviewers_def=$(git -C "$top" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
-    reviewers_def=${reviewers_def#refs/remotes/origin/}
-  fi
+  reviewers_def=$(default_branch "$top")
   if [ -z "$reviewers_def" ]; then reviewers_why="origin's default branch could not be found"; return 0; fi
   # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
   trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$ref") >/dev/null 2>&1" EXIT
