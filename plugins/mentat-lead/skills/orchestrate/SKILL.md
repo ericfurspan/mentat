@@ -56,7 +56,7 @@ To plan an item in a session it starts, this session adds a `hold` note naming t
 - asks the maintainer nothing, and sends each open point to this session, which asks it ("Questions") and sends back the maintainer's exact words;
 - records the default agreement only when the message says it applies and every condition in "Planning" holds; otherwise the agreement question goes up as an open point;
 - never calls `mentat:build` and never redirects;
-- ends with one report to this session: every point it asked or that is still open, and the agreed item with its spec fingerprint, or why there is none.
+- ends with one report to this session: every point it asked or that is still open, and the agreed item with its spec fingerprint and, when agreed by default, what its line to the maintainer names ("Messages"), or why there is none.
 
 This session then holds and hands over the item as for one planned here, sends the maintainer its line, and clears the `hold` note.
 
