@@ -64,7 +64,7 @@ Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linea
 
 ## Review tools
 
-Breaking: `mentat-reviewers` now needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's committed `.claude/settings.json`. `MENTAT_REVIEW_TIMEOUT_SECONDS` (1800) limits every reviewer; `MENTAT_GROK_TIMEOUT_SECONDS` is not read. `mentat second-opinion` runs the list on an idea.
+Breaking: `mentat-reviewers` now needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's committed `.claude/settings.json`. `MENTAT_REVIEW_TIMEOUT_SECONDS` (1800) limits every reviewer and refuses any value but a whole number of 1 or more, empty included; `MENTAT_GROK_TIMEOUT_SECONDS` is not read, and `mentat check` warns while it is set. `mentat second-opinion` runs the list on an idea.
 
 ## Git hooks
 
