@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-The backlog is the external one AGENTS.md names, else the repository's GitHub issues. Every section applies to both unless it says otherwise; the adapter (`mentat-linear:linear`, or `github.md` in this skill's folder) maps each part to its tracker. With an external backlog the item is the change's only record and may hold private evidence; GitHub holds only pull requests. Only the main session touches the backlog. Read `records.md` in this skill's folder before writing a public-safe record, an item's agent records or a reply, and again after a compaction.
+The backlog is the external one AGENTS.md names, else the repository's GitHub issues. Every section applies to both unless it says otherwise; the adapter (`mentat-linear:linear`, or `github.md` in this skill's folder) maps each part to its tracker. With an external backlog the item is the change's only record and may hold private evidence; GitHub holds only pull requests. Only the main session touches the backlog. Read `records.md` in this skill's folder before writing a public-safe record, an item's agent records or a reply, and again after a compaction or a resume.
 
 ## Item shape
 
@@ -92,8 +92,8 @@ A backlog write a started implementation session sends back is made as `../build
 
 ## Tracker: Linear
 
-Where AGENTS.md names a Linear project, call the Skill tool with `mentat-linear:linear` before any Linear action, and again after a compaction. When it is not available, say the `mentat-linear` module is off and go on as "Reaching the backlog" says.
+Where AGENTS.md names a Linear project, call the Skill tool with `mentat-linear:linear` before any Linear action, and again after a compaction or a resume. When it is not available, say the `mentat-linear` module is off and go on as "Reaching the backlog" says.
 
 ## Tracker: GitHub issues
 
-Where AGENTS.md names no external backlog, read `github.md` in this skill's folder before any backlog action, and again after a compaction.
+Where AGENTS.md names no external backlog, read `github.md` in this skill's folder before any backlog action, and again after a compaction or a resume.

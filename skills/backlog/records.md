@@ -1,6 +1,6 @@
 # Records
 
-Read this before writing a record on GitHub (an issue, a pull request, a comment), one these skills call public-safe, or an item's agent records, and again after a compaction.
+Read this before writing a record on GitHub (an issue, a pull request, a comment), one these skills call public-safe, or an item's agent records, and again after a compaction or a resume.
 
 ## Public records
 
