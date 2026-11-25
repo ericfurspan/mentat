@@ -6,7 +6,7 @@ Read every applicable AGENTS.md first; it wins only on commit and title format, 
 
 Call `mentat:plan` before giving a view on or suggesting a change.
 
-One implementer (`mentat:builder`) per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
+One implementer (`agents/builder.md`) per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
