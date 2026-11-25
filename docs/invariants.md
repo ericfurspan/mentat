@@ -83,7 +83,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| After agreement, a session stops for the maintainer only when the goal or a required safeguard cannot be met without a scope change, a round budget or eval or cost cap is spent, an external, irreversible or credential block only the maintainer can clear arises, or an agreed manual check is due. | No single file states it this way; parts are in `rules.md` "What goes to the maintainer", `skills/propose/decisions.md`, `skills/review/stop.md` and `skills/review/ready-gate.md` | review only |
+| After agreement, a session stops for the maintainer only when the goal or a required safeguard cannot be met without a scope change, a round budget or eval or cost cap is spent, an external, irreversible or credential block only the maintainer can clear arises, or an agreed manual check is due. | No single file states it this way; parts are in `rules.md` "What goes to the maintainer", `skills/propose/decisions.md`, `skills/review/stop.md` and `skills/review/ready-gate.md`. The rows "A review stop is pending from round three on", "A disputed finding goes to the maintainer", "After "Ready to merge: #N", push nothing" and "Outcomes, scope, cost and risk go to the maintainer" describe asks today's files still hold beyond these four; each is kept as written until a rewrite changes that rule on purpose, and a rewrite that narrows one names it in its pull request. | review only |
 
 ### Session start
 
