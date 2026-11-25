@@ -170,8 +170,8 @@ skills/plan/session.md||a fold's lines, writes a started session sends back
 $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:plan\` step 7)
 skills/plan/SKILL.md|Decisions|and any recommendation against the maintainer's earlier answers, goals and recorded objections, adopted plan-check points and the plan's answers to objections; correct a conflict or ask it as revisiting, never override it silently.
 skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
-skills/plan/SKILL.md|Decisions|When the item's pull request merges with that section open, the decision moves to a Backlog item, asked when that item is planned.
-skills/review/after-ready.md||When the maintainer says #N merged, move the decision in any open "Decision for the maintainer" section to a Backlog item (\`mentat:plan\` "Decisions"), do the steps of the item's wait block
+skills/plan/SKILL.md|Decisions|one still open when the item's pull request passes the ready gate (\`mentat:review\`), or raised after that, goes to a Backlog item instead
+skills/review/ready-gate.md||Otherwise, move the decision in any open "Decision for the maintainer" section to a Backlog item
 $o|Relays|An objection of the maintainer's that this session hears at a hold reaches the build session in their exact words, as any answer to a hold does, and that session records it; one heard at a close without merging this session records as \`after-ready.md\` in \`mentat:review\`'s folder says.
 skills/backlog/SKILL.md|Reading an item|A read to plan an item also reads the decisions lines of each item whose work moved to it, as the item names it.
 skills/backlog/SKILL.md|Reading an item|and the older spec fingerprint, advice, assumptions list, second-opinion settlement and plan check record comments and an older comment copying a hand-made item's original text), is not theirs;
