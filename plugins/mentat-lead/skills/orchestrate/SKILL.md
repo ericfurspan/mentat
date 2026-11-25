@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Makes this session the orchestrator: plans backlog items with the maintainer and gives each batch of agreed ones a fresh implementation session. No arguments."
+description: "Makes this session the orchestrator: plans backlog items with the maintainer and hands each batch of agreed ones to a fresh session. No arguments."
 disable-model-invocation: true
 ---
 
@@ -19,9 +19,9 @@ State lives only in `mentat state`, the tracker and the host's session list, so 
 ## Start
 
 1. Finish the step in flight first. Never interrupt a running implementer, review or test run.
-2. A host that cannot start or message sessions: do not record this session as orchestrator. Say so once, then only plan ("Planning"), handing nothing over; agreed items wait for the maintainer's typed `/mentat:build`.
+2. A host that cannot start or message sessions: do not record this session as orchestrator. Say so once and skip the rest of "Start": this session only plans, by "Planning" and "Questions", writes nothing to `mentat state` and hands nothing over. It asks each agreement question, with no default agreement, and an item agreed to implement now waits for the maintainer's typed `/mentat:build`, said in one line.
 3. Read `mentat state show`, the tracker's agreed order and stages (`mentat:backlog` "The order of agreed work") and the host's session list.
-4. When `mentat state orchestrator` names another session, tell it that this session is now the orchestrator. Run `mentat state orchestrator set` with this session's id, and tell each implementation session the state lists as running that this session is now the orchestrator and that it reports here.
+4. When `mentat state orchestrator` names another session, tell it that this session is now the orchestrator. Run `mentat state orchestrator set` with this session's id, and tell each implementation session the state lists as running, and each started planning session a `hold` note names, that this session is now the orchestrator and that it reports here.
 5. An orchestrate-notes.md file in the main checkout's ignored working folder or the git common directory is not read. On finding one, say once that it is not read and that its live entries go into `mentat state`.
 6. For each item at stage `handed`, `confirmed`, `pr` or `ready` with a pull request, read it with `gh pr view <N> --json state,body`. A merged one goes on as `build-sessions.md` "After merge" says, a closed one as its "Closed" says. An open one at stage `pr` whose Status line reads `Ready` owes its Ready line: forward it ("Forwarding") and set the item `ready`.
 7. Show each open `hold` note once, ask each `re-ask:` question again ("Questions"), then go on with "Handing over" and "Planning". No summary.
@@ -67,19 +67,20 @@ This session sends the maintainer only:
 - each Ready, Hold, Blocked or Not reviewed report a session sends, as `build-sessions.md` "Forwarding" says;
 - a failed plugin update, or after-merge steps that never ran;
 - an item whose session crashed, that was dropped with no pull request, or that was not confirmed after its handover;
-- a reviewer outage, once per reviewer;
+- a reviewer outage, such as a `mentat: tell the maintainer now:` line, once per reviewer;
 - one line per item agreed by default: its plan check verdict, each point not adopted and why, any second opinion that gave no answer, any plan check retried without its model, and what holds it. Detail that does not fit goes on the item (`mentat:backlog` "Agreement");
 - one line for a redirected item it does not hold, with why;
 - `mentat state can-dispatch` unable to answer, once;
 - a host that cannot start or message sessions, once;
-- the orchestrate-notes.md line of "Start";
+- the orchestrate-notes.md line of "Start", and the open `hold` notes it shows once;
+- one line when it stops acting as orchestrator (`build-sessions.md` "Handing over");
 - its questions.
 
 Nothing else: no start summary, no list of what it told, no pull request closed without merge, no routine plugin-update reminder, no "no pull requests open", no stale worktree, no redirect echo, no folded or canceled item. A turn that owes the maintainer nothing ends with at most one line, naming no open question.
 
 ## Questions
 
-Each question to the maintainer, forwarded ones included, goes in the message form (`mentat:plan` "Decisions"), never as a prompt, so other sessions' messages do not wait behind it, and ends the turn. Record it as a `question` note whose text starts `waiting:`, naming the session that sent it, if any.
+Each question to the maintainer, forwarded ones and those of triage sittings and grills run here included, goes in the message form (`mentat:plan` "Decisions"), never as a prompt, so other sessions' messages do not wait behind it, and ends the turn. Record it as a `question` note whose text starts `waiting:`, naming the session that sent it, if any.
 
 A message owed while a question is open is sent at once, short, its first line saying what it is. Each open question it pushes aside becomes a `re-ask:` note. To change a note, add the new one first, then clear the old one, so an interruption leaves a duplicate, never a lost question; of two notes for one question, keep the newer. Change notes in the order their questions were asked, so note ids keep that order.
 
