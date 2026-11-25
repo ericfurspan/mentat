@@ -113,3 +113,90 @@ am_hook() { # $1 command
   fi
   verdict pass
 }
+
+# mentat agent-merge <N>: prints one line, exit 0: "agent merge: on", "agent merge: off" or
+# "agent merge: waits for the maintainer (<reasons>)". A read it cannot make exits non-zero
+# with no result line, which counts as waiting. It fetches origin's default branch (a normal
+# fetch, so origin/<default> moves, which is what the hook reads) and reads the settings from
+# there; with the setting off it reads nothing from GitHub. It waits unless all hold: the
+# setting is on; #N is open, based on the default branch and opened by the signed-in
+# account; its description's Status line is exactly "**Status:** Ready"; its head's CI
+# passed (no checks waits); the base branch has no merge queue rule; its head changes no
+# protected path; and no Local Claude review or Outside review comment this account posted
+# on #N, on any head, holds "(high risk)". It posts and merges nothing.
+am_wait_line() { printf 'agent merge: waits for the maintainer (%s)\n' "$1"; }
+agent_merge_command() {
+  local pr top def ref repo me json state base author head first reasons="" why rc out risky queue rules
+  [ $# -eq 1 ] || die "usage: mentat agent-merge <pull request number>" 64
+  pr=$1
+  case "$pr" in '' | *[!0-9]*) die "usage: mentat agent-merge <pull request number>" 64 ;; esac
+  command -v jq >/dev/null 2>&1 || die "jq is not installed"
+  top=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || die "not inside a git repository"
+  git -C "$top" remote get-url origin >/dev/null 2>&1 || die "the checkout has no origin remote"
+  def=$(default_branch "$top")
+  [ -n "$def" ] || die "origin's default branch could not be found"
+  ref="refs/remotes/origin/$def"
+  if ! GIT_TERMINAL_PROMPT=0 git -C "$top" fetch -q --no-tags origin "+refs/heads/$def:$ref" >/dev/null 2>&1; then
+    am_wait_line "origin's default branch $def could not be fetched"
+    return 0
+  fi
+  if [ "$(am_agent_merge "$top" "$ref")" != on ]; then
+    printf 'agent merge: off\n'
+    return 0
+  fi
+  # The hook reads the setting from the local origin/HEAD, so it must name the branch just read.
+  if [ "$(am_ref "$top" 2>/dev/null)" != "$ref" ]; then
+    am_wait_line "this checkout's origin/HEAD does not name $def, which the merge hook reads; run: git remote set-head origin $def"
+    return 0
+  fi
+  repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) && [ -n "$repo" ] || die "could not read the repository with gh"
+  me=$(gh api user --jq .login) && [ -n "$me" ] || die "could not read which GitHub account gh is signed in as"
+  json=$(gh pr view "$pr" --json state,baseRefName,headRefOid,body,author) || die "could not read pull request #$pr"
+  state=$(jq -r '.state | strings' <<<"$json") || die "could not read pull request #$pr"
+  base=$(jq -r '.baseRefName | strings' <<<"$json") || die "could not read pull request #$pr"
+  head=$(jq -r '.headRefOid | strings' <<<"$json") || die "could not read pull request #$pr"
+  author=$(jq -r '.author.login | strings' <<<"$json") || die "could not read pull request #$pr"
+  first=$(jq -r '.body | strings' <<<"$json" | head -n 1) || die "could not read pull request #$pr"
+  [ -n "$head" ] || die "could not read the head of pull request #$pr"
+  first=${first%$'\r'}
+  [ "$state" = OPEN ] || reasons="$reasons; it is not open"
+  [ "$base" = "$def" ] || reasons="$reasons; its base is not $def"
+  [ "$author" = "$me" ] || reasons="$reasons; it was opened by another account"
+  [ "$first" = '**Status:** Ready' ] || reasons="$reasons; its Status line is not exactly Ready"
+  rules=$(gh api "repos/$repo/rules/branches/$def") || die "could not read the branch rules of $def"
+  queue=$(jq -r 'any(.[]; .type == "merge_queue")' <<<"$rules") || die "could not read the branch rules of $def"
+  [ "$queue" = false ] || reasons="$reasons; $def has a merge queue"
+  if am_protected "$top" "$ref" "$head"; then
+    [ -z "$am_hits" ] || reasons="$reasons; its head changes a protected path ($(printf '%s' "$am_hits" | head -n 3 | tr '\n' ' ' | sed 's/ $//; s/ /, /g'))"
+  else
+    reasons="$reasons; its head could not be checked for protected paths ($am_why)"
+  fi
+  risky=$(gh api --paginate "repos/$repo/issues/$pr/comments" | jq -rs --arg me "$me" '
+    [.[][] | select(.user.login == $me)
+      | select((.body | split("\n")[0] | sub("\r$"; "")) as $h | ($h | startswith("## Local Claude review of ")) or ($h | startswith("## Outside review of ")))
+      | select(.body | contains("(high risk)"))] | length') || die "could not read the comments on #$pr"
+  [ "$risky" = 0 ] || reasons="$reasons; a review marked a change high risk"
+  if [ -z "$reasons" ]; then
+    # Only a pull request nothing else holds back waits for CI, which can take a while.
+    out=$(require_ci=yes wait_for_ci "$repo" "$head" "" "$pr" "mentat agent-merge" 2>/dev/null)
+    rc=$?
+    case "$rc" in
+      0) ;;
+      3) reasons="$reasons; its head moved" ;;
+      4)
+        case "$out" in
+          *"No CI checks ran"*) why="no CI checks ran on its head" ;;
+          *"conflicts with its base"*) why="CI did not run on its head, which conflicts with its base branch" ;;
+          *"did not finish"*) why="CI did not finish on its head" ;;
+          *) why="CI did not pass on its head" ;;
+        esac
+        reasons="$reasons; $why" ;;
+      *) die "could not read CI on $head" ;;
+    esac
+  fi
+  if [ -z "$reasons" ]; then
+    printf 'agent merge: on\n'
+  else
+    am_wait_line "${reasons#; }"
+  fi
+}

@@ -181,6 +181,19 @@
 #     the limit MENTAT_READY_LIMIT (a whole number of 1 or more, else the default, said once
 #     on stderr when set but not one) and how many items may be handed over (the limit less
 #     both, at least 0). 0 when at least 1, 1 when none, 2 gh failed (no count).
+#   mentat agent-merge <PR>  Whether a session may merge its own pull request here (lib/agent-merge.sh).
+#     Prints one line and exits 0: "agent merge: on", "agent merge: off" or "agent merge:
+#     waits for the maintainer (<reasons>)"; a read it cannot make exits 1 with no such line,
+#     which counts as waiting; 64 usage. It fetches origin's default branch (a failed fetch
+#     waits) and reads MENTAT_AGENT_MERGE and MENTAT_MERGE_WAIT_PATHS from .claude/settings.json
+#     there; off reads nothing from GitHub. On waits unless: the pull request is open, based
+#     on the default branch and opened by the signed-in gh account; the description's first
+#     line is exactly "**Status:** Ready"; CI passed on its head (waited for as mentat ci
+#     does, and no checks waits); the base branch has no merge queue rule; its head changes
+#     no protected path (.github/, .claude/ and the listed ones, from the merge base); no
+#     Local Claude review or Outside review comment of this account, on any head, holds
+#     "(high risk)"; and origin/HEAD here names the default branch, which the merge hook
+#     reads. It posts and merges nothing.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -192,7 +205,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review git-hooks check status worktree state; do
+for lib in shared publish review git-hooks check status worktree state agent-merge; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -233,5 +246,6 @@ case "${1:-}" in
   fingerprint) shift; fingerprint_command "$@" ;;
   worktree) shift; worktree_command "$@" ;;
   state) shift; state_command "$@" ;;
-  *) die "usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch> | mentat state show | mentat state orchestrator [set <id> | ended <id>] | mentat state owner [<item>] | mentat state session add <id> <item>... | mentat state session end <id> | mentat state session list | mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N] [--held-by TEXT] | mentat state item get <id> | mentat state item list [--stage S] | mentat state note add <hold|question> <text> | mentat state note list [<hold|question>] | mentat state note clear <id> | mentat state can-dispatch" 64 ;;
+  agent-merge) shift; agent_merge_command "$@" ;;
+  *) die "usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch> | mentat state show | mentat state orchestrator [set <id> | ended <id>] | mentat state owner [<item>] | mentat state session add <id> <item>... | mentat state session end <id> | mentat state session list | mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N] [--held-by TEXT] | mentat state item get <id> | mentat state item list [--stage S] | mentat state note add <hold|question> <text> | mentat state note list [<hold|question>] | mentat state note clear <id> | mentat state can-dispatch | mentat agent-merge <pull request number>" 64 ;;
 esac
