@@ -724,6 +724,8 @@ fi
 # No file names the old planning skill, its folder or the next-work file, and every file a skill
 # file, rules.md or AGENTS.md names in backticks exists (tests/references.sh says how).
 if out=$(tests/references.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/references.sh; fi
+# The reference check behaves as specified on invented skill files (tests/references-cases.sh).
+if out=$(tests/references-cases.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/references-cases.sh; fi
 
 # mentat reviewers, review, review --outside (with stub adapters, and with the shipped
 # adapters on stub tools), second-opinion and check behave as specified (stub gh, claude,
@@ -852,7 +854,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/references.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/references.sh tests/references-cases.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
