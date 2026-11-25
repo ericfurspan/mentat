@@ -74,4 +74,4 @@ A decision's safety effect, or another consequence listed above, still gets its 
 
 The Test plan gives each check run on the head commit and its result, the test command and CI included, and anything not checked, and why. When `../build/helpers.md` "Testing" left the test run to CI, it reports the implementer's run.
 
-The requirement table has one row per numbered requirement of the spec, by number; one check may cover several.
+The requirement table has one row per numbered requirement of the spec, by number (an older issue or item, agreed before the spec had that name and with no numbered list, is read as each requirement it states); one check may cover several.
