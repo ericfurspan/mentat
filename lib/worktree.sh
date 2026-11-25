@@ -28,13 +28,18 @@ main_checkout() {
 # branch, or detached), wt_head, wt_status (git status --porcelain, without
 # .claude/worktrees, less its final newline), wt_clean (clean or dirty) and wt_hash (the
 # SHA-256 of that command's exact output).
-# Returns 1 when the checkout cannot be read.
+# Returns 1 when the checkout cannot be read, 3 when it is on a branch named detached,
+# which the snapshot line cannot tell apart from a detached HEAD.
 wt_read() { # $1 checkout
   wt_top="" wt_branch="" wt_head="" wt_status="" wt_clean="" wt_hash=""
   [ -n "$1" ] || return 1
   if ! wt_top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || [ -z "$wt_top" ]; then return 1; fi
   wt_head=$(git -C "$wt_top" rev-parse --verify -q HEAD) || return 1
-  wt_branch=$(git -C "$wt_top" symbolic-ref -q --short HEAD) || wt_branch=detached
+  if wt_branch=$(git -C "$wt_top" symbolic-ref -q --short HEAD); then
+    [ "$wt_branch" != detached ] || return 3
+  else
+    wt_branch=detached
+  fi
   # The x keeps the output's trailing newline, so the hash is of git's exact bytes.
   wt_status=$(git -C "$wt_top" status --porcelain -- ':(exclude).claude/worktrees' && printf x) || return 1
   wt_status=${wt_status%x}
@@ -44,13 +49,22 @@ wt_read() { # $1 checkout
   [ -z "$wt_status" ] || wt_clean=dirty
 }
 
+# wt_read, exiting 2 when checkout $1 cannot be read or is on a branch named detached.
+wt_read_or_die() { # $1 checkout
+  local rc=0
+  wt_read "$1" || rc=$?
+  [ "$rc" != 3 ] || die "the checkout is on a branch named detached, which cannot be told apart from a detached HEAD in a snapshot line: $1" 2
+  [ "$rc" = 0 ] || die "could not read the checkout${1:+: $1}" 2
+}
+
 # mentat worktree snapshot [<checkout>]: one line, "<branch|detached> <HEAD> <clean|dirty>
-# <status hash>", for checkout $1, by default the main checkout. 2 when it cannot be read.
+# <status hash>", for checkout $1, by default the main checkout. 2 when it cannot be read
+# or is on a branch named detached.
 worktree_snapshot() {
   local c
   [ $# -le 1 ] || die "usage: mentat worktree snapshot [<checkout>]" 64
   if [ $# -eq 1 ]; then c=$1; else c=$(main_checkout); fi
-  wt_read "$c" || die "could not read the checkout${c:+: $c}" 2
+  wt_read_or_die "$c"
   printf '%s %s %s %s\n' "$wt_branch" "$wt_head" "$wt_clean" "$wt_hash"
 }
 
@@ -66,8 +80,9 @@ wt_hex() { # $1 text, $2 "64" for 64 only
 # the noted one, and HEAD is the noted one or moved only forward along origin/<branch> as
 # last fetched (no fetch). Detached at the snapshot, only the same HEAD passes. 0 unchanged,
 # 1 changed (each difference named, with the current status paths on a status change),
-# 2 the line cannot be parsed or the checkout cannot be read. Either way it says when the
-# snapshot's checkout was not clean, which makes the check weaker.
+# 2 the line cannot be parsed or the checkout cannot be read or is on a branch named
+# detached (never reported unchanged). Either way it says when the snapshot's checkout was
+# not clean, which makes the check weaker.
 worktree_verify() {
   local line c b h s x rest changed=no
   [ $# -eq 1 ] || [ $# -eq 2 ] || die "usage: mentat worktree verify <line> [<checkout>]" 64
@@ -80,7 +95,7 @@ worktree_verify() {
     die "could not parse the snapshot line: $line" 2
   fi
   if [ $# -eq 2 ]; then c=$2; else c=$(main_checkout); fi
-  wt_read "$c" || die "could not read the checkout${c:+: $c}" 2
+  wt_read_or_die "$c"
   if [ "$wt_branch" != "$b" ]; then
     changed=yes
     printf 'branch: was %s, now %s\n' "$b" "$wt_branch"

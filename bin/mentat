@@ -118,15 +118,17 @@
 #     for the checkout, by default the main checkout (the folder above git's common
 #     directory): "<branch|detached> <HEAD> <clean|dirty> <hash>", the hash the SHA-256 of
 #     git status --porcelain -- ':(exclude).claude/worktrees'. Changes nothing, fetches
-#     nothing. 0 printed, 2 the checkout cannot be read, 64 usage.
+#     nothing. 0 printed, 2 the checkout cannot be read or is on a branch named detached
+#     (which the line cannot tell apart from a detached HEAD), 64 usage.
 #   mentat worktree verify <line> [<checkout>]  Compares the checkout (by default the main
 #     checkout) with a snapshot line by the rule of "Main-checkout check" in
 #     skills/build/helpers.md: unchanged when the branch and status hash are the noted ones
 #     and HEAD is the noted one or moved only forward along origin/<branch> as last fetched
 #     (no fetch); detached at the snapshot, only the same HEAD passes. 0 unchanged, 1 changed
 #     (each difference named, with the current status paths on a status change), 2 the line
-#     cannot be parsed or the checkout cannot be read, 64 usage. It says when the snapshot's
-#     checkout was not clean, which makes the check weaker.
+#     cannot be parsed or the checkout cannot be read or is on a branch named detached,
+#     64 usage. It says when the snapshot's checkout was not clean, which makes the check
+#     weaker.
 #   mentat worktree cleanup <PR> <branch>  After a merge, in the current repository, follows
 #     "After merge" in skills/build/helpers.md. It reads the pull request once (gh) and,
 #     before changing anything, checks it is MERGED with head branch name <branch>; when the

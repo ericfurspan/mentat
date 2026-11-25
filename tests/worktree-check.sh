@@ -110,6 +110,20 @@ git -C "$W" checkout -q main || exit 1
 rc=$(verify "$W" "$line")
 check "verify, detached at the snapshot, on a branch now: exit 1 naming the branch" '[ "$rc" = 1 ] && said "branch"'
 
+# A branch named detached cannot be told apart from a detached HEAD in the line: snapshot
+# and verify on it exit 2, so it is never reported unchanged.
+mline=$(snap "$W")
+git -C "$W" checkout -q --detach main || exit 1
+dline=$(snap "$W")
+git -C "$W" checkout -q -b detached || exit 1
+rc=$( (cd "$W" && "$mentat" worktree snapshot >"$root/out" 2>"$root/err"); echo $?)
+check "snapshot on a branch named detached: exit 2, nothing on stdout, says why" '[ "$rc" = 2 ] && [ ! -s "$root/out" ] && grep -qF "cannot be told apart from a detached HEAD" "$root/err"'
+rc=$(verify "$W" "$dline")
+check "verify, detached at the snapshot, now on a branch named detached at the same HEAD: exit 2, says why" '[ "$rc" = 2 ] && [ ! -s "$root/out" ] && grep -qF "cannot be told apart from a detached HEAD" "$root/err"'
+rc=$(verify "$W" "$mline")
+check "verify, on main at the snapshot, now on a branch named detached: exit 2" '[ "$rc" = 2 ] && grep -qF "cannot be told apart from a detached HEAD" "$root/err"'
+git -C "$W" checkout -q main && git -C "$W" branch -q -D detached || exit 1
+
 # The snapshot's checkout was not clean: said, on an unchanged result and on a change.
 printf 'x\n' >"$W/left over.txt"
 line=$(snap "$W")
