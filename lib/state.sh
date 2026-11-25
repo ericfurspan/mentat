@@ -248,8 +248,9 @@ state_item_set() {
     case "$1" in
       --fingerprint)
         case "$2" in ????????????) ;; *) state_usage_die "the fingerprint is not 12 hex characters: $2" ;; esac
-        case "$2" in *[!0-9a-f]*) state_usage_die "the fingerprint is not 12 hex characters: $2" ;; esac
-        pairs+=(fingerprint "$2") ;;
+        case "$2" in *[!0123456789abcdefABCDEF]*) state_usage_die "the fingerprint is not 12 hex characters: $2" ;; esac
+        # Stored lowercase, as mentat fingerprint prints it, so stored ones compare alike.
+        pairs+=(fingerprint "$(printf '%s' "$2" | tr ABCDEF abcdef)") ;;
       --stage) state_stage_ok "$2" || state_usage_die "unknown stage: $2 (one of: $state_stages)"; pairs+=(stage "$2") ;;
       --session) state_name_ok "$2" || state_usage_die; pairs+=(session "$2") ;;
       --pr)

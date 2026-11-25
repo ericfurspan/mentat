@@ -267,10 +267,15 @@ for s in shipped "held handed" ""; do
   rc=$(st item set WRK-1 --stage "$s")
   check "4: unknown stage '$s': usage error naming the stage, nothing changed" '[ "$rc" = 64 ] && grep -qF "unknown stage: $s" "$root/err" && [ "$(sum)" = "$before" ]'
 done
-for f in 0123456789a 0123456789abc 0123456789ag; do
+for f in 0123456789a 0123456789abc 0123456789ag 0123456789AG 0123456789A 0123456789ABC; do
   rc=$(st item set WRK-1 --fingerprint "$f")
   check "4: fingerprint $f, not 12 hex: usage error naming it, nothing changed" '[ "$rc" = 64 ] && grep -qF "$f" "$root/err" && [ "$(sum)" = "$before" ]'
 done
+for f in ABCDEF012345 AbCdEf012345; do
+  rc=$(st item set WRK-1 --fingerprint "$f")
+  check "4: fingerprint $f, 12 hex in upper or mixed case: accepted, stored lowercase" '[ "$rc" = 0 ] && [ "$(q ".items[\"WRK-1\"].fingerprint")" = abcdef012345 ]'
+done
+before=$(sum)
 
 # v. Stage pr or ready with no PR number recorded or given: refused, nothing changed.
 for s in pr ready; do
