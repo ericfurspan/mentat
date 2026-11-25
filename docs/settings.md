@@ -1,6 +1,6 @@
 # Settings
 
-Every Mentat setting is an environment variable. Set it in the `env` block of Claude Code's settings: your user settings file for your own values, a project's `.claude/settings.json` for a repository's. A setting set but empty counts as unset and uses its default, except `MENTAT_REVIEW_TIMEOUT_SECONDS`, which refuses it. One is read only from the repository: `MENTAT_REVIEWERS`, from the `env` block of `.claude/settings.json` committed on origin's default branch; your environment, user and local settings and other branches never count for it.
+Every Mentat setting is an environment variable. Set it in the `env` block of Claude Code's settings: your user settings file for your own values, a project's `.claude/settings.json` for a repository's. A setting set but empty counts as unset and uses its default, except `MENTAT_REVIEW_TIMEOUT_SECONDS`, which refuses it. Three are read only from the repository: `MENTAT_REVIEWERS`, `MENTAT_AGENT_MERGE` and `MENTAT_MERGE_WAIT_PATHS`, from the `env` block of `.claude/settings.json` committed on origin's default branch (the merge hook reads the last two from its local copy of that file, the checkout's `origin/HEAD`, which `mentat agent-merge` updates); your environment, user and local settings, the working tree and other branches never count for them.
 
 A model setting names a model Claude Code accepts; `MENTAT_CODEX_MODEL` names a model Codex accepts. A model outside your plan bills credits or fails.
 
@@ -15,6 +15,8 @@ A model setting names a model Claude Code accepts; `MENTAT_CODEX_MODEL` names a 
 | `MENTAT_GROK_REASONING_EFFORT` | The reasoning effort Grok runs at, in reviews and second opinions. | `high` | The default. |
 | `MENTAT_PLAN_CHECK_MODEL` | The model of the plan check. | The plan checker definition's own model. | The default. |
 | `MENTAT_BUILDER_MODEL` | The model of every builder run: a build, a CI fix and a review fix. | The builder definition's own model. | The default. |
+| `MENTAT_AGENT_MERGE` | The value `on` lets a session merge its own pull request once its reviews and CI pass, as `mentat:review` says, except one that changes a path in `MENTAT_MERGE_WAIT_PATHS` or that a reviewer marked high risk, which wait for the maintainer. Any other value is off. Read only from the repository, as above. | Off: the maintainer merges every pull request. | Off. |
+| `MENTAT_MERGE_WAIT_PATHS` | The paths whose change makes a pull request wait for the maintainer even with `MENTAT_AGENT_MERGE` on: names separated by commas or whitespace; an entry ending in `/` covers that folder, any other entry is one file. `.github/` and `.claude/` are always on the list. Read only from the repository, as above. | Off: only `.github/` and `.claude/` wait. | Off: only `.github/` and `.claude/` wait. |
 | `MENTAT_READY_LIMIT` | The open pull requests with a "Ready to merge" line at which `/mentat-lead:orchestrate` hands over no more items; a whole number of 1 or more. | `3` | The default. |
 
 `MENTAT_GROK_TIMEOUT_SECONDS`, Grok's own time limit before, is no longer read: `MENTAT_REVIEW_TIMEOUT_SECONDS` is the one limit, and `mentat check` says so while it is set.
