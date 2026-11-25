@@ -39,6 +39,7 @@ adapter_list() {
   for n in "$@"; do
     if ! adapter_shipped "$n"; then printf 'skipped %s the mentat-reviewers module has no such reviewer\n' "$n"; continue; fi
     (
+      # shellcheck disable=SC2030 # this subshell's own, as each runner's is
       adapter_why="" adapter_display=$n
       # shellcheck source=/dev/null
       . "$module/adapters/$n.sh" >/dev/null 2>&1 || { printf 'unavailable %s the mentat-reviewers module could not load it\n' "$n"; exit 0; }
@@ -68,6 +69,7 @@ adapter_fail() { # $1 public reason, $2 local detail, $3 kind, $4 tool text for 
   local shown_local="${4:-}${4:+${2:+; }}${2:-}"
   review_raise=""
   if [ "${adapter_mode:-}" = review ] && [ "${3:-}" != none ]; then
+    # shellcheck disable=SC2031 # set in this runner by adapter_go
     reviewer_failed "$name" "${adapter_display:-$name}" "${3:-}"
   fi
   printf '%s\n' "$(printf '%s' "$1" | tr '\n' ' ')" >"$res/$name.why"
@@ -89,11 +91,13 @@ adapter_wait() { # $1 pid, $2 local detail on a timeout
       sleep 2
       kill -9 "$1" 2>/dev/null
       wait "$1" 2>/dev/null
+      # shellcheck disable=SC2031 # set in this runner by adapter_go
       adapter_fail "$adapter_display did not finish within $REVIEW_TIMEOUT_SECONDS seconds" "${2:-}"
     fi
     sleep 0.1
   done
   wait "$1"
+  # shellcheck disable=SC2034 # read by the adapter that called it
   adapter_rc=$?
 }
 
@@ -101,6 +105,7 @@ adapter_wait() { # $1 pid, $2 local detail on a timeout
 # $reply. A name the module does not ship is skipped; one whose offline check fails did
 # not finish.
 adapter_go() { # $1 review or opinion
+  # shellcheck disable=SC2034 # adapter_roots is set by the adapter and read by outside_runner
   adapter_mode=$1 adapter_display=$name adapter_why="" adapter_kind=none adapter_roots=()
   if ! adapter_shipped "$name"; then
     printf 'the mentat-reviewers module has no such reviewer\n' >"$res/$name.skipped"

@@ -253,6 +253,7 @@ module_entry() {
 # in the list's order, from the module's offline checks (mentat-reviewer-list), which run
 # no reviewer. With $1 = --notes, also "note <text>" lines from the module. Without the
 # module every listed name is unavailable.
+# shellcheck disable=SC2120 # mentat check (lib/check.sh) passes --notes
 reviewers_listing() {
   local entry n
   reviewers_lines=""
@@ -294,6 +295,7 @@ reviewers_command() {
   esac
   if [ -z "$reviewers_list" ]; then printf 'reviewers: on, none listed\n'; return 0; fi
   printf 'reviewers: on\n'
+  # shellcheck disable=SC2119 # no notes here
   reviewers_listing
   while IFS= read -r l; do [ -z "$l" ] || reviewers_line "$l"; done <<<"$reviewers_lines"
 }

@@ -42,7 +42,8 @@ outside_result() {
 }
 
 outside_review() {
-  local pr repo info head base title body top tmp mb issues request request_fp me lines n result url held now kind sha res_word fp clean="" any=no
+  local pr repo info head base title body top tmp mb issues request request_fp me lines n result url held now kind sha res_word clean="" any=no
+  # shellcheck disable=SC2034 # run_pids is set by adapters_run and read by adapters_cancel
   local tree data res="" run_pids="" names
   review_args "" "$@"
   case "$pr" in '' | *[!0-9]*) die "$OUTSIDE_USAGE" 64 ;; esac
@@ -65,7 +66,7 @@ outside_review() {
   if ! me=$(gh api user --jq .login) || [ -z "$me" ] || ! lines=$(status_comments "$repo" "$pr" "$me"); then
     not_reviewed "could not read this account's comments on #$pr"
   fi
-  while read -r kind sha res_word fp; do
+  while read -r kind sha res_word _; do
     [ "$kind" = local ] && [ "$sha" = "$head" ] && clean=$res_word
   done <<<"$lines"
   case "$clean" in
