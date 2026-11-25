@@ -57,7 +57,7 @@ check() {
       # A merge path built from an expansion: "$p/merge", "${p}/merge", "$p"/merge.
       # ${...} and $(...) run to the last closer before /merge, so nested ones count.
       expansion="[$]([[:alnum:]_]+|[{].*[}]|[(].*[)])|\`[^\`]*\`"
-      if grep -Eq "${api}(${expansion})[\"']?/merges?([[:space:]\"'?]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
+      if grep -Eq "${api}(${expansion})[\"']?/merges?([[:space:]\"'?;&|()<>]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
       verdict pass
       ;;
     *)

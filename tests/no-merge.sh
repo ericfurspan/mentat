@@ -75,6 +75,9 @@ gh api -X PUT "`cat p.txt`/merge"
 gh api "${b}/merges?x=1"
 gh api -X PUT "$(printf '%s' 'repos/o/r/pulls/7)' | tr -d ')')/merge"
 gh api -X PUT "${p:-${fallback}}/merge"
+gh api -X PUT $p/merge; echo done
+gh api -X PUT $p/merge&& echo done
+gh api -X PUT $p/merge|cat
 DENY
 # A merge query or path held in a variable, heredoc or file written earlier in the call.
 mutation='mutation{mergePullRequest(input:{pullRequestId:"X"}){clientMutationId}}'
