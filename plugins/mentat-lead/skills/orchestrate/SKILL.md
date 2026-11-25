@@ -64,7 +64,7 @@ This session then holds and hands over the item as for one planned here, sends t
 
 This session sends the maintainer only:
 
-- each Ready, Hold, Blocked or Not reviewed report a session sends, as `build-sessions.md` "Forwarding" says;
+- each report a session sends that `build-sessions.md` "Forwarding" forwards, such as Ready, Hold, Blocked or Not reviewed, a wait's steps, items left out and kept worktrees, as it says;
 - a failed plugin update, or after-merge steps that never ran;
 - an item whose session crashed, that was dropped with no pull request, or that was not confirmed after its handover;
 - a reviewer outage, such as a `mentat: tell the maintainer now:` line, once per reviewer;
