@@ -341,7 +341,7 @@ reset; rc=$(tools_run "$root/noreviewers")
 check "off, with codex and grok not installed: no reviewer line and no warning" 'no_tools && [ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (0 warning(s))" ]'
 reset; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 tools_run "$root/reviewers")
 check "MENTAT_GROK_TIMEOUT_SECONDS set: one warning says it is not read, though outside reviewers are off" '[ "$rc" = 0 ] && grep -qxF "WARN: MENTAT_GROK_TIMEOUT_SECONDS is set but not read: MENTAT_REVIEW_TIMEOUT_SECONDS is the one time limit for every reviewer" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
-reset; rc=$(MENTAT_GROK_TIMEOUT_SECONDS= tools_run "$root/reviewers")
+reset; rc=$(MENTAT_GROK_TIMEOUT_SECONDS='' tools_run "$root/reviewers")
 check "MENTAT_GROK_TIMEOUT_SECONDS set but empty: the same one warning" '[ "$rc" = 0 ] && grep -qxF "WARN: MENTAT_GROK_TIMEOUT_SECONDS is set but not read: MENTAT_REVIEW_TIMEOUT_SECONDS is the one time limit for every reviewer" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
 origin_has "$LISTED" || exit 1
 reset; rc=$(tools_run "$root/reviewers")
