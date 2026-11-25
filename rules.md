@@ -30,10 +30,10 @@ Hold a recommendation, citing the record it rests on, unless new facts or found 
 Restate a repeated correction in one line, then follow it.
 
 ## Approval
-The maintainer merges every pull request.
+The maintainer merges every pull request, except that where the repository turns on `MENTAT_AGENT_MERGE`, a session merges its own pull request once its reviews and CI pass on that head, as `mentat:review` says, and the rest wait for the maintainer.
 
 ## What agents never do
-Merge pull requests, turn on auto-merge, use `--admin`, or work around a merge refusal.
+Merge pull requests beyond "Approval", turn on auto-merge, use `--admin`, or work around a merge refusal.
 
 Create releases, deploy, publish, change secrets, run production migrations or destructive outside operations, beyond preparing them.
 
