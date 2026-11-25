@@ -62,18 +62,15 @@ adapter_list() {
 # no local path and holds no tool output. $2, optional, is what only the maintainer reads,
 # such as where a kept log is. $3: empty, a failure of the reviewer's own that counts in
 # its failures in a row; usage or always, the same, raised as reviewer_failed says; none,
-# not counted. Only a review counts; a second opinion never does. $4, optional, is text
-# from the tool's own output, such as a stop reason: it goes on the maintainer's local
-# line ahead of $2, never into the raise line.
-adapter_fail() { # $1 public reason, $2 local detail, $3 kind, $4 tool text for the local line
-  local shown_local="${4:-}${4:+${2:+; }}${2:-}"
+# not counted. Only a review counts; a second opinion never does.
+adapter_fail() { # $1 public reason, $2 local detail, $3 kind
   review_raise=""
   if [ "${adapter_mode:-}" = review ] && [ "${3:-}" != none ]; then
     # shellcheck disable=SC2031 # set in this runner by adapter_go
     reviewer_failed "$name" "${adapter_display:-$name}" "${3:-}"
   fi
   printf '%s\n' "$(printf '%s' "$1" | tr '\n' ' ')" >"$res/$name.why"
-  [ -z "$shown_local" ] || printf '%s\n' "$(printf '%s' "$shown_local" | tr '\n' ' ')" >"$res/$name.local"
+  [ -z "${2:-}" ] || printf '%s\n' "$(printf '%s' "$2" | tr '\n' ' ')" >"$res/$name.local"
   [ -z "$review_raise" ] || printf '%s: %s%s\n' "$review_raise" "$1" "${2:+; $2}" >"$res/$name.raise"
   exit 1
 }

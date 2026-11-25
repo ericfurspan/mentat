@@ -327,7 +327,7 @@ not_finished "Grok exiting non-zero" "Grok exited with status 3"
 check "it keeps a private copy of the raw log for the maintainer, named on the local line only" 'p=$(kept_log); [ -n "$p" ] && grep -q SECRET-LOG-TEXT "$p" && ! grep -qF "$p" "$C"'
 reset; reply $'Looks fine.\n\nREVIEW RESULT: NO FINDINGS' max_turn_requests; rc=$(run)
 not_finished "a failure stop reason with a plausible result line" "Grok did not return a complete review"
-check "the stop reason is on the local line only" 'local_line | grep -q "^stop reason: max_turn_requests; its log may hold credentials" && ! grep -q max_turn_requests "$C"'
+check "Grok's stop reason appears nowhere in the run's output or the comment; the local line holds only the kept log" 'local_line | grep -q "^its log may hold credentials" && ! grep -q "max_turn_requests\|stop reason" "$STUB/out" "$C"'
 reset; reply $'Looks fine.\n\nREVIEW RESULT: NO FINDINGS' future_reason; rc=$(run)
 not_finished "an unknown stop reason" "Grok did not return a complete review"
 reset; echo '{"type":"error","message":"Not signed in. SECRET-LOG-TEXT"}' >"$STUB/out_json"; rc=$(run)
@@ -445,10 +445,10 @@ check "a Grok reply with no result line after a checked reply is the first failu
 mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
 stub_reset; rm "$GH_USER/auth.json"; rc=$(XDG_CACHE_HOME="$root/badcache" run 7); reset_signin
 check "with a cache folder that cannot be used, a sign-in refusal is still raised, as one failure on this pull request" '[ "$rc" = 0 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
-# The raise line and the comment hold no text from Grok's output; the local line keeps its stop reason.
+# The raise line, the comment and the rest of the run's output hold no text from Grok's output.
 CANARY="CANARY-STOP-REASON-4821"
 reset; reply 'Partial.' "$CANARY"; run 7 >/dev/null; stub_reset; reply 'Partial.' "$CANARY"; rc=$(run 7)
-check "an incomplete Grok run twice in a row: the raise line and the comment leave out Grok's stop reason, which the local line keeps" '[ "$rc" = 0 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && ! raised | grep -qF "$CANARY" && ! grep -qF "$CANARY" "$C" && local_line | grep -qF "stop reason: $CANARY; its log"'
+check "an incomplete Grok run twice in a row: the raise line, the comment and the run's output leave out Grok's stop reason" '[ "$rc" = 0 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && ! raised | grep -qF "$CANARY" && ! grep -qF "$CANARY" "$C" && ! grep -qF "$CANARY" "$STUB/out"'
 reset
 
 # A Grok run refused for usage or billing: only the message of an error object in Grok's JSON

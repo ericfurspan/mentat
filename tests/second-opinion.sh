@@ -257,15 +257,15 @@ grok_local() { grep -q "^mentat: grok: .*$1" "$STUB/stderr"; }
 check "it keeps a private copy of Grok's raw log for the maintainer, under the temporary folder" 'grok_log_kept SECRET-LOG-TEXT && ! grep -q "SECRET-LOG-TEXT" "$STUB/stdout" "$STUB/stderr"'
 reset; reply $'Looks fine.\n\nSECOND OPINION VERDICT: DO IT' max_turn_requests; rc=$(run "$idea")
 grok_no_opinion "a stop reason other than end_turn, with a verdict line in its text" "Grok did not return a complete review)"
-check "that stop reason is on Grok's local line only" 'grok_local "stop reason: max_turn_requests" && ! grep -q max_turn_requests "$STUB/stdout"'
+check "that stop reason appears nowhere in the run's output" '! grep -q "max_turn_requests\|stop reason" "$STUB/stdout" "$STUB/stderr"'
 reset; reply $'Looks fine.\n\nSECOND OPINION VERDICT: DO IT' future_reason; rc=$(run "$idea")
 grok_no_opinion "an unknown stop reason" "Grok did not return a complete review)"
-check "that stop reason is on Grok's local line only" 'grok_local "stop reason: future_reason" && ! grep -q future_reason "$STUB/stdout"'
+check "that stop reason appears nowhere in the run's output" '! grep -q "future_reason\|stop reason" "$STUB/stdout" "$STUB/stderr"'
 reset; printf '{"text": "Nothing.\\n\\nSECOND OPINION VERDICT: DO IT' >"$STUB/out_json"; rc=$(run "$idea")
 grok_no_opinion "incomplete JSON whose text holds a verdict line" "complete review"
 reset; echo '{"type":"error","message":"Not signed in. SECRET-LOG-TEXT"}' >"$STUB/out_json"; rc=$(run "$idea")
 grok_no_opinion "an error object with a zero exit" "Grok did not return a complete review)"
-check "that has stop reason none on Grok's local line" 'grok_local "stop reason: none"'
+check "that prints no stop reason" '! grep -q "stop reason" "$STUB/stdout" "$STUB/stderr"'
 reset; reply "   "; rc=$(run "$idea")
 grok_no_opinion "an empty text" "complete review"
 reset; { cat "$STUB/out_json"; cat "$STUB/out_json"; } >"$STUB/out_json.2"; mv "$STUB/out_json.2" "$STUB/out_json"; rc=$(run "$idea")
