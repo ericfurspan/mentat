@@ -4,7 +4,7 @@ description: "Reads or changes the backlog: GitHub issues, or an external backlo
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint record ("Agreement"), "Where the spec lives", the item shape as `github.md` gives it, no progress comments on an item (progress is on the pull request once one exists), "Filing", "Titles", "Advice against", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the sections from "Reaching the backlog" to "Plan check record".
+With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint record ("Agreement"), "Where the spec lives", the item shape as `github.md` gives it, no progress comments on an item (progress is on the pull request once one exists), "Filing", "Titles", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the sections from "Reaching the backlog" to "Plan check record".
 
 In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
 
@@ -70,10 +70,6 @@ With either tracker, before filing an entry or item, read `filing.md` in this sk
 ## Titles
 
 With either tracker, when an item's or issue's agreed spec, or a not-agreed item's current plan, changes so the title no longer says what the item does, the same write rewrites the item's title, keeping its identifier. Scope triage merged in but not yet agreed does not change the title until `mentat:plan` agrees it.
-
-## Advice against
-
-With either tracker, when Claude Code advised against an item and the maintainer goes ahead anyway, record the advice as `agent-records.md` in this skill's folder says: when, its shape, and how `mentat:review` "Final check" quotes it.
 
 ## Material assumptions
 

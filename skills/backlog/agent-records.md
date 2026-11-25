@@ -1,25 +1,24 @@
 # Agent records
 
-Read this before writing or reading an item's agent records (its spec fingerprint and build answer, material assumptions, advice against, plan check and second opinion settlements, decisions and longer plan), and again after a compaction.
+Read this before writing or reading an item's agent records (its spec fingerprint and build answer, material assumptions, plan check and second opinion settlements, decisions and longer plan), and again after a compaction.
 
 ## The comment
 
-An item keeps its agent records in one comment whose first line is `Agent records`. Only the main session writes it, never a builder. The fingerprint, assumptions and advice records are in public-safe words (`records.md`); the settlements follow "Plan check" and "Second opinions" below (no local path, secret or log path) and may hold private evidence (GitHub issues hold none, so there the whole comment is public-safe). Each record sits under its own label:
+An item keeps its agent records in one comment whose first line is `Agent records`. Only the main session writes it, never a builder. The fingerprint and assumptions records are in public-safe words (`records.md`); the settlements follow "Plan check" and "Second opinions" below (no local path, secret or log path) and may hold private evidence (GitHub issues hold none, so there the whole comment is public-safe). Each record sits under its own label:
 
 - `Spec fingerprint: <12 hex>; build: <now|later>`, citing the agreement ("Agreement" in `SKILL.md`). An item `mentat-lead:orchestrate` agreed by default keeps `build: now` and adds, on its own line below, `Agreed by default: nothing was open for the maintainer`, never written as the maintainer's answer, with the default-agreement tell's detail that did not fit in chat and each unchecked situation adopted changes added, unless its plan check record holds them. A later `build: later` (the maintainer's "later", "stop", "not now" or like word for a held item) replaces the answer and keeps that line; the maintainer's Agree answer that re-records the fingerprint removes it.
 - `Spec document: <id>`, with a tracker whose adapter keeps the spec in a document ("Where the spec lives" in `SKILL.md`), kept on every later edit.
 - `Material assumptions:` and the list, in the shape `assumptions.md` gives.
-- `Advised against: <close|shrink|not build>; reason: <one line>` ("Advice against" below).
 - `Plan check:` the plan check's settlement ("Plan check" below).
 - `Second opinion, round <n>:` that round's settlement ("Second opinions" below).
 - `Decisions:` one line per answered decision for the maintainer: the question, the answer, its date and the rejected options in a few words ("Decision lines" below).
 - `Plan:` a current plan longer than the item's next step ("Item shape" in `SKILL.md`).
 
-A later fingerprint and build answer, assumptions list, advice or plan replaces the earlier one in place, so the current one stands. Settlements and decisions lines add one entry each. With GitHub issues, the comment holds no settlements, decisions or plan: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog, and an issue keeps its plan and decisions in its body (`github.md`).
+A later fingerprint and build answer, assumptions list or plan replaces the earlier one in place, so the current one stands. Settlements and decisions lines add one entry each. With GitHub issues, the comment holds no settlements, decisions or plan: "Plan check record" and "Second opinion records" in `SKILL.md` apply only with an external backlog, and an issue keeps its plan and decisions in its body (`github.md`).
 
 ## Writing it
 
-The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint, build answer, any default-agreement line, the spec document id, each assumption and its state, the advice, each settlement entry and decisions line, the plan), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
+The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint, build answer, any default-agreement line, the spec document id, each assumption and its state, each settlement entry and decisions line, the plan), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
 
 A chat request has no item yet: keep its plan check and second opinion records, and their files, for "Agreement" in `SKILL.md`, which writes them on the item it creates. If nothing is agreed, nothing is written.
 
@@ -36,10 +35,6 @@ Every reader takes a record from the `Agent records` comment, else from the olde
 Each skill that records the maintainer's answer on an item writes its decisions line in this comment's `Decisions:` record (with GitHub issues, the body's `## Decisions`), never a separate comment, except a triage outcome (accept, close, merge, later), recorded as triage and the tracker's adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request (with GitHub issues, one comment, as `github.md` says), and the line points to it. The answered decision leaves any open decision section, and when it blocked the item's work, the same writer removes the tracker's wait mark as "Marking a wait" in `SKILL.md` says.
 
 An objection of the maintainer's to an item's design, plan or pull request (`../review/after-ready.md`, `mentat:plan` step 7) is recorded the same way, as one decisions line: each objection its own clause saying what they object to, one phrased as a question included, and never a reviewer's or the session's own reasons in their place. With GitHub issues it is in Claude Code's words, as `records.md` says.
-
-## Advice against
-
-With either tracker, when Claude Code recommended closing, shrinking or not building an item and the maintainer goes ahead anyway, with an Agree answer in `mentat:plan` or Accept in triage, the session recording that answer writes the advice record. `mentat:review` "Final check" says how "Ready to merge: #N" quotes it.
 
 ## Plan check
 
