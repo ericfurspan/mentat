@@ -123,7 +123,7 @@ rules.md||A session another session started asks the maintainer nothing: it send
 skills/build/redirect.md|Where it is implemented|Read only this repository's \`mentat state\`.
 skills/build/redirect.md|Where it is implemented|\`mentat state owner\` exits 1, with no running orchestrator recorded: implement here.
 skills/build/redirect.md||When the message cannot be sent, implement nothing, and say in one line which session could not be reached.
-plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line, with,
+plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|Carry its agreement answer (\`build: now\` or \`build: later\`) with any \`Agreed by default\` line only when the two fingerprints match
 skills/backlog/records.md|Agent records|replaces the answer and keeps that line
 skills/backlog/records.md|Agent records|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/plan/SKILL.md||Nothing is implemented before the maintainer agrees; the one exception is an item \`mentat-lead:orchestrate\` agrees by default.
@@ -800,8 +800,7 @@ if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$o
 # The list holds the files not yet rewritten to the glossary: the change that rewrites a file
 # removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
 # disk fails. A new file is checked from the start.
-not_yet_rewritten="plugins/mentat-linear/skills/linear/SKILL.md
-plugins/mentat-linear/skills/triage/SKILL.md"
+not_yet_rewritten="plugins/mentat-linear/skills/triage/SKILL.md"
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
   && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
