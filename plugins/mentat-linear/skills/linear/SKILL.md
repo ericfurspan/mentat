@@ -34,7 +34,7 @@ Merge wait: "Ready to merge: #N" sets In Review, assigns the lead and writes #N'
 
 ## Pull request and issue references
 
-In text written to Linear, name a pull request or GitHub issue by a Markdown link to its full URL, whose text may be the short form (`[#N](https://github.com/<owner>/<repo>/pull/N)`), "Hold #N" and "Ready to merge: #N" lines included: Linear can link a bare `#N` or `PR #N` to the same number in another connected repository. Text copied unchanged, such as a moved spec or an `Original text`, stays as it is.
+In text written to Linear, name a pull request or GitHub issue by a Markdown link to its full URL, whose text may be the short form (`[#N](https://github.com/<owner>/<repo>/pull/N)`), "Hold #N" and "Ready to merge: #N" lines included. Never write a bare `#N` or `PR #N`: Linear can link it to the same number in another connected repository. Text copied unchanged, such as a moved spec or an `Original text`, stays as it is.
 
 ## The order of agreed work
 
@@ -46,7 +46,7 @@ For `mentat:backlog` "Reading an item": the maintainer is the project's lead. Li
 
 ## Where the spec lives
 
-For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of its one issue document titled exactly `Spec`, found in the issue read's document list or, when that lists none (an archived issue), by the `Spec document: <id>` its `Agent records` comment records. With neither, it is the description's last section, `## Spec` or `## Agreed request`, with the span `github.md` in `mentat:backlog`'s folder gives. Before creating the document, reuse one already titled `Spec`; two stop the session and go to the maintainer. Creating it records its id in the `Agent records` comment; writing the spec there removes any such section.
+For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of its one issue document titled exactly `Spec`, found in the issue read's document list or, when that lists none (an archived issue), by the `Spec document: <id>` its `Agent records` comment records. With neither, it is a `## Spec` or `## Agreed request` section of the description, with the span `github.md` in `mentat:backlog`'s folder gives; that section stays last, everything else (`Now:`, links) written above it and nothing below. Before creating the document, reuse one already titled `Spec`; two stop the session and go to the maintainer. Creating it records its id in the `Agent records` comment; writing the spec there removes any such section.
 
 ## Agent records
 
@@ -70,7 +70,7 @@ A session listing this project to choose or plan work reads each open item's wai
 
 1. Set back to In Progress each Done item (never Canceled or Duplicate) still labeled `Waiting on you` with a wait block holding a manual check after the merge, which the GitHub integration can move to Done at merge.
 2. Merge wait: for each In Review item, and each item just set back whose `Now:` line holds a pull request's full URL, read that pull request with `gh pr view` in its repository. An In Review item with no such URL is left unchanged and named.
-   - Merged, or closed without merging: make only the item update `after-ready.md` in `mentat:review`'s folder gives for that case. After a merge, run the repository's own post-merge steps unless the session can establish that they ran, and go on with the listing.
+   - Merged, or closed without merging: make only the item update `after-ready.md` in `mentat:review`'s folder gives for that case, the wait block's steps included after a merge. After a merge, run the repository's own post-merge steps unless the session can establish that they ran, and go on with the listing.
    - Still open, or the lookup fails: leave the item unchanged.
 3. Manual wait: for each open item with a wait block, no merge wait and no linked pull request still open, read its comments.
    - A comment reporting the wait's `Ends when` result ends it: remove the block, and the label and assignee as "Marking a wait" says. Comments reporting each manual check after the merge, pass or fail, end it and mark the item done, each failed one first filed as a follow-up.
