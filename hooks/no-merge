@@ -25,9 +25,10 @@ check() {
   case "$tool" in
     Bash)
       cmd=$(field '.tool_input.command') || verdict deny "no-merge could not read the command, so it blocks this call."
-      # A backslash-newline continues a line; every other newline still ends a command.
+      # A backslash-newline continues a line and, as in bash, is removed outright, even
+      # inside a word; every other newline still ends a command.
       # awk and tr, not ${cmd//...}, which takes minutes on long input in bash 3.2.
-      joined=$(awk '{ if (sub(/\\$/, "")) printf "%s ", $0; else print }' <<<"$cmd") ||
+      joined=$(awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' <<<"$cmd") ||
         verdict deny "no-merge could not read the command, so it blocks this call."
       flat=$(tr '\n' ' ' <<<"$joined") || verdict deny "no-merge could not read the command, so it blocks this call."
       # Flags (and a value each) may sit around "pr": gh -R o/r pr merge. A flag or

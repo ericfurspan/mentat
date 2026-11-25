@@ -64,6 +64,11 @@ cmd=$(printf 'gh -R o/r \\\npr merge 5')
 check "denies gh pr merge split by a backslash-newline" '[ "$(decision Bash "$cmd")" = deny ]'
 cmd=$(printf 'gh \\\n  --repo "o/r" \\\n  pr \\\n  merge 5')
 check "denies gh pr merge split over several continuation lines" '[ "$(decision Bash "$cmd")" = deny ]'
+# Bash removes a backslash-newline outright, so one inside a word still runs the merge.
+cmd=$(printf 'gh -R "o/r" pr mer\\\nge 5')
+check "denies gh pr merge with a continuation inside merge" '[ "$(decision Bash "$cmd")" = deny ]'
+cmd=$(printf 'gh -R o/r p\\\nr merge 5')
+check "denies gh pr merge with a continuation inside pr" '[ "$(decision Bash "$cmd")" = deny ]'
 cmd=$(printf "gh api graphql -f query='\nmutation {\n  mergePullRequest(input: {pullRequestId: \"X\"}) {\n    clientMutationId\n  }\n}'")
 check "denies a GraphQL merge written over several lines" '[ "$(decision Bash "$cmd")" = deny ]'
 cmd=$(printf 'gh \\\napi -X POST repos/o/r/merges -f base=main -f head=feat')
