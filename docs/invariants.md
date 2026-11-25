@@ -10,7 +10,8 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| The maintainer merges every pull request; agents never merge, turn on auto-merge, use `--admin` or work around a merge refusal. | `rules.md` "Approval", "What agents never do"; also `AGENTS.md` | `merge-request-declined`; `tests/run` text check against `tests/fixtures/rules-safety.md` |
+| The maintainer merges every pull request; agents never merge or turn on auto-merge. | `rules.md` "Approval", "What agents never do"; also `AGENTS.md` | `merge-request-declined`; `tests/run` text check against `tests/fixtures/rules-safety.md` |
+| Agents never use `--admin` or work around a merge refusal. | `rules.md` "What agents never do"; also `AGENTS.md` | `tests/run` text check against `tests/fixtures/rules-safety.md`; review only |
 | Rare safety net: the merge hook denies `gh pr merge` (`--auto` included), the merge API through `gh api` and the desktop auto-merge tool, and fails closed when it cannot decide. | `hooks/no-merge`, `hooks/hooks.json`, `hooks/lib/verdict.sh` | `tests/no-merge.sh`, `tests/hook-contract.sh`; review only |
 | Agents never push code to the default branch, force-push shared branches or change repository settings. | `rules.md` "What agents never do" | `tests/run` text check against `tests/fixtures/rules-safety.md`; review only |
 | Rare safety net: the default-branch refusal: agents' pre-push hook refuses an update, force push or deletion of the remote's default branch, and the first branch pushed to a remote with none; a push to a local path or `file://` URL may update any branch. | `git-hooks/hooks/pre-push` | `tests/git-hooks.sh`; review only |
@@ -24,7 +25,8 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| GitHub records are public-safe: Claude Code's words; no chat quotes, private repository or project names, local paths, account, billing or session details. | `rules.md`, `skills/backlog/records.md` | `no-local-path-in-pr` |
+| GitHub records hold no local paths. | `rules.md`, `skills/backlog/records.md` | `no-local-path-in-pr` |
+| GitHub records are public-safe: Claude Code's words; no chat quotes, private repository or project names, account, billing or session details. | `rules.md`, `skills/backlog/records.md` | review only |
 | A spec and a pull request body never name the backlog's workspace or item. | `skills/backlog/SKILL.md` "Agreement", `skills/pr/SKILL.md` step 1 | review only |
 | Rare safety net: the public-text check: the `mentat-public-text` hook denies a listed `gh` write or GitHub MCP write whose text holds a private word or a local home path, or whose text it cannot read. | `plugins/mentat-public-text/hooks/public-text`, `plugins/mentat-public-text/hooks/hooks.json` | `tests/public-text.sh`; review only |
 
@@ -61,16 +63,20 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | Nothing is built before the maintainer's agreement; the one exception is an item `mentat-lead:orchestrate` agrees by default when nothing is open for the maintainer, recorded as agreed by default, never as their answer. | `skills/propose/SKILL.md`, `plugins/mentat-lead/skills/orchestrate/SKILL.md` "Planning", `skills/backlog/SKILL.md` "Agreement", `docs/adr/0002-orchestrator-agrees-by-default.md` | `tests/run` text check; review only |
 | One agreement, after the plan check: the plan check's `DO IT` is not the agreement; the maintainer agrees once, asked after the plan check; agreed work gets no further plan check. | `skills/propose/SKILL.md` step 4, `skills/propose/agreement.md` | review only |
 | A request that changes what an agent is told in `rules.md`, skills, the builder prompt or standing agent instructions is not small and gets the plan check, however short. | `skills/propose/SKILL.md` | `instruction-change-not-small` |
-| Objections recorded: an objection to the design, plan or pull request, in the reply to the agreement question or any talk after it, a hold or a close, is recorded as one decisions line on the item, and is not an agreement. | `skills/propose/SKILL.md` step 4, `skills/review/after-ready.md`, `skills/backlog/agent-records.md` "Decision lines" | `objection-in-agreement-reply`; `tests/run` text check |
-| Objections addressed: a later plan names each recorded objection with how it meets it or why it does not, and a conflict with a plan's answer to a recorded objection is corrected or asked as revisiting, never silently overridden; the plan check flags a plan that proposes again a choice a decision record rejected. | `skills/propose/agreement.md`, `skills/propose/decisions.md`, `agents/plan-checker.md` | `objection-kept-on-replan` |
+| Objections recorded: an objection in the reply to the agreement question is recorded on the item, and that reply is not an agreement. | `skills/propose/SKILL.md` step 4 | `objection-in-agreement-reply`; `tests/run` text check |
+| Objections recorded: each objection to the design, plan or pull request is recorded as one decisions line on the item, also when made in any talk after the agreement question, at a hold or at a close, and is not an agreement. | `skills/propose/SKILL.md` step 4, `skills/review/after-ready.md`, `skills/backlog/agent-records.md` "Decision lines" | `tests/run` text check; review only |
+| Objections addressed: a later plan names each recorded objection with how it meets it. | `skills/propose/agreement.md` | `objection-kept-on-replan` |
+| Objections addressed: a plan that does not meet a recorded objection says why it does not; a conflict with a plan's answer to a recorded objection is corrected or asked as revisiting, never silently overridden; the plan check flags a plan that proposes again a choice a decision record rejected. | `skills/propose/agreement.md`, `skills/propose/decisions.md`, `agents/plan-checker.md` | review only |
 | A rejected idea is never proposed again. | No single file states it this way; the nearest are `agents/plan-checker.md` (flags a plan that proposes again a choice a decision record rejected) and `skills/propose/agreement.md` (a later plan names each recorded objection) | review only |
 | A settled answer is not asked again: no decision already answered, in the session or recorded on the item, unless the skeptic's pass revisits it with evidence; a point already answered with no new evidence is not raised; settled scope is not asked again. | `skills/propose/SKILL.md` steps 1 and 3, `skills/propose/session.md` step 4, `skills/build/SKILL.md` step 5 | review only |
 | Hold a recommendation, citing the record it rests on, unless new facts or found errors appear; reverse only after a fresh-context check. | `rules.md` "What goes to the maintainer" | review only |
 | Outcomes, scope, cost and risk go to the maintainer; the session settles the rest, such as approach, code, tests and wording. | `rules.md` "What goes to the maintainer", `skills/propose/decisions.md` | `two-points-asks-only-scope` |
 | Only the maintainer's own choice or words count as their answer. | `rules.md` "What goes to the maintainer", `skills/propose/decisions.md` | review only |
-| The main session edits no files; one builder per pull request, in its worktree. | `rules.md`, `skills/build/helpers.md` "One helper per branch" | `build-main-no-edit`; `tests/run` (the builder runs in its own worktree) |
+| The main session edits no files. | `rules.md` | `build-main-no-edit` |
+| One builder per pull request, in its worktree. | `rules.md`, `skills/build/helpers.md` "One helper per branch" | `tests/run` (the builder runs in its own worktree); review only |
 | A builder changes neither the main checkout nor the session's own; on any other difference no further builder starts. | `skills/build/helpers.md` "Main-checkout check" | `tests/worktree-check.sh`; review only |
-| The spec fingerprint is checked before a build: an item whose recorded fingerprint is missing or differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
+| The spec fingerprint is checked before a build: an item whose recorded fingerprint differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
+| The spec fingerprint is checked before a build: an item with no recorded fingerprint goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | review only |
 | The build run never merges. | `skills/build/SKILL.md` step 6, `agents/builder.md` | review only |
 
 ### When a session stops for the maintainer
