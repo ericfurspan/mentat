@@ -19,7 +19,7 @@ cat >"$root/bin/gh" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
 case "$1 $2" in
-  "auth status") [ -f "$STUB/signed_out" ] && exit 1; echo "token: gho_secret"; exit 0 ;;
+  "auth status") [ -f "$STUB/signed_out" ] && { echo "token: gho_secret_signed_out" >&2; exit 1; }; echo "token: gho_secret"; exit 0 ;;
   "repo view") [ -f "$STUB/no_repo" ] && exit 1; echo owner/repo ;;
   "api -X")
     [ "$3" = GET ] || { echo "$*" >>"$STUB/writes"; exit 98; }
@@ -150,7 +150,7 @@ mv "$INSTALLED/scan" "$root/scan.away"; printf '# changed\n' >>"$INSTALLED/hooks
 mv "$root/scan.away" "$INSTALLED/scan"; cp -p "$(dirname "$mentat")/../git-hooks/hooks/commit-msg" "$INSTALLED/hooks/commit-msg"
 check "each problem with the git hooks is its own problem line" '[ "$rc" = 1 ] && [ "$(last)" = "Check failed: 3 problem(s)" ] && grep -qF "differ from this copy of Mentat (hooks/commit-msg)" "$STUB/out"'
 reset; touch "$STUB/signed_out"; rc=$(run)
-check "gh signed out fails (exit 1)" '[ "$rc" = 1 ] && grep -q "PROBLEM: gh is not signed in" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ]'
+check "gh signed out fails (exit 1), naming both ways to sign it in" '[ "$rc" = 1 ] && grep -qxF "PROBLEM: gh is not signed in here: run gh auth login, or give gh a token another way, such as GH_TOKEN" "$STUB/out" && [ "$(last)" = "Check failed: 1 problem(s)" ] && ! grep -q gho_secret "$STUB/out"'
 reset; touch "$STUB/unreadable"; rc=$(run)
 check "an unreadable repository fails" '[ "$rc" = 1 ] && grep -q "PROBLEM: could not read owner/repo" "$STUB/out"'
 reset; rc=$(run)

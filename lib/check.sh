@@ -179,7 +179,7 @@ check() {
   elif [ -f "$PRIVATE_WORDS" ] && [ -r "$PRIVATE_WORDS" ]; then c_ok "the private word list is readable"; list_ok=1
   else c_warn "the private word list ~/.config/mentat/private-words is unreadable: the publish check looks only for the home path"; fi
   # Exit status only: gh auth status can print token details.
-  if gh auth status >/dev/null 2>&1; then c_ok "gh is signed in"; else c_problem "gh is not signed in (run gh auth login)"; c_finish; fi
+  if gh auth status >/dev/null 2>&1; then c_ok "gh is signed in"; else c_problem "gh is not signed in here: run gh auth login, or give gh a token another way, such as GH_TOKEN"; c_finish; fi
   [ -z "$list_ok" ] || c_word_list_covers_repos
   repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || repo=""
   [ -n "$repo" ] || { c_problem "could not tell which GitHub repository this is; run mentat check inside a checkout of it"; c_finish; }
