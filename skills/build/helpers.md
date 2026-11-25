@@ -8,7 +8,7 @@ The implementer is the `mentat:builder` subagent. Right before every call, read 
 
 A brief names the branch, the session's own checkout and the main checkout ("One implementer per branch"), what to change and what to leave alone, how the result will be checked, the test command, and any existing design the change keeps that could affect its goal. A brief for an item carries the item's current assumptions list as given, read from its agent records right before the brief, when one stands (`../backlog/records.md` "Assumptions").
 
-Before fixing a raised problem, check likely related cases in proportion to its scope and report a shared cause when found, keeping the fix within the agreed scope; a fix targets the cause the evidence supports, and with the cause unknown, finding it comes first. A correction during agreed work does not reopen the spec: follow one within the agreed scope at once, and file it only when the maintainer asks. A change of scope goes to the maintainer as one question before that part is implemented; any other outcome the spec leaves open is settled and logged as a call made without the maintainer in the pull request (`mentat:pr`).
+Before fixing a raised problem, check likely related cases in proportion to its scope and report a shared cause when found, keeping the fix within the agreed scope; a fix targets the cause the evidence supports, and with the cause unknown, finding it comes first. A correction during agreed work does not reopen the spec: follow one within the agreed scope at once, and file it only when the maintainer asks. A change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks), goes to the maintainer as one question before that part is implemented.
 
 ## Worktree
 
@@ -24,7 +24,7 @@ A round is finished only when its report says the brief's work is done and commi
 
 ## Main-checkout check
 
-Before each brief, run `mentat worktree snapshot` for the main checkout, and `mentat worktree snapshot <checkout>` for the session's own when it is another directory, and keep each line. After the implementer reports, run `mentat worktree verify <line> [<checkout>]` with each. Exit 0: unchanged (the branch and status are the noted ones, and `HEAD` is the noted one or moved only forward along origin's copy of the branch as last fetched); when it says the snapshot's checkout was not clean, the run's final message says the check was weaker. Exit 1 or 2: start no further implementer, change nothing in either checkout, and tell the maintainer the paths and what it printed. The check does not see writes to ignored paths.
+Before each brief, run `mentat worktree snapshot` for the main checkout, and `mentat worktree snapshot <checkout>` for the session's own when it is another directory, and keep each line; on exit 2, start no implementer and tell the maintainer what it printed. After the implementer reports, run `mentat worktree verify "<line>" [<checkout>]` with each, the line quoted as one argument. Exit 0: unchanged (the branch and status are the noted ones, and `HEAD` is the noted one or moved only forward along origin's copy of the branch as last fetched); when it says the snapshot's checkout was not clean, the run's final message says the check was weaker. Exit 1 or 2: start no further implementer, change nothing in either checkout, and tell the maintainer the paths and what it printed. The check does not see writes to ignored paths.
 
 ## Testing
 
