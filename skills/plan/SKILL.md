@@ -36,7 +36,7 @@ Nothing is implemented before the maintainer agrees; the one exception is an ite
 
 ## Small requests
 
-A small, clear request (one line, nothing for the maintainer to decide, no assumption, failure requirement or situation, no open maintainer comment in its item's full read, and no objection of the maintainer's recorded for the work (`../backlog/records.md` "Decision lines"), such as fixing a typo) gets steps 1 and 2 and a one-line view with any manual-check offer, answered `Agree and build now`, `Agree, build later` or `Not now`, and recorded as step 8 says. A request that changes the meaning of what an agent is told in Mentat's `rules.md`, skills or implementer prompt, or in a repository's `AGENTS.md` or other standing agent instructions, is not small and gets the plan check, however short.
+A small, clear request (one line, nothing for the maintainer to decide, no assumption, failure requirement or situation, no open maintainer comment in its item's full read, and no objection of the maintainer's recorded for the work (`../backlog/records.md` "Decision lines"), such as fixing a typo) gets steps 1 and 2 and a one-line view with any manual-check offer or fast track (step 5), answered `Agree and build now`, `Agree, build later` or `Not now`, and recorded as step 8 says. A request that changes the meaning of what an agent is told in Mentat's `rules.md`, skills or implementer prompt, or in a repository's `AGENTS.md` or other standing agent instructions, is not small and gets the plan check, however short.
 
 ## Starting implementation
 
