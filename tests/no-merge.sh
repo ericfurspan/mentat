@@ -58,7 +58,27 @@ gh api "repos/$REPO/merges"
 gh api "repos/$O/$R/merges" -f base=main
 gh api https://api.github.com/repos/o/r/merges
 gh pr view 5; gh api repos/o/r/merges -f base=main -f head=feat
+q='mutation{mergePullRequest(input:{pullRequestId:"X"}){clientMutationId}}'; gh api graphql -f query="$q"
+q='mutation{enablePullRequestAutoMerge(input:{pullRequestId:"X"}){clientMutationId}}'; gh api graphql -f query="$q"
+q='mutation{mergeBranch(input:{repositoryId:"X",base:"main",head:"feat"}){clientMutationId}}'; gh api graphql -f query="$q"
+q='mutation{enqueuePullRequest(input:{pullRequestId:"X"}){clientMutationId}}'; gh api graphql -f query="$q"
+p=repos/o/r/merges; gh api -X POST "$p" -f base=main -f head=feat
+p=repos/o/r/pulls/7/merge; gh api -X PUT $p
+echo '{"query":"mutation{mergePullRequest(input:{pullRequestId:\"X\"}){clientMutationId}}"}' | gh api graphql --input -
+echo 'mutation{mergePullRequest(input:{pullRequestId:"X"}){clientMutationId}}' >q.txt; gh api graphql -f query="`cat q.txt`"
+p=repos/o/r/pulls/7; gh api -X PUT "$p/merge"
+p=repos/o/r/pulls/7; gh api -X PUT "${p}/merge"
+p=repos/o/r/pulls/7; gh api -X PUT "$p"/merge
+base=repos/o/r; gh api -X POST "$base/merges" -f base=main -f head=feat
 DENY
+# A merge query or path held in a variable, heredoc or file written earlier in the call.
+mutation='mutation{mergePullRequest(input:{pullRequestId:"X"}){clientMutationId}}'
+cmd=$(printf "cat >q.graphql <<'EOF'\n%s\nEOF\ngh api graphql -F query=@q.graphql" "$mutation")
+check "denies a heredoc mutation passed as -F query=@file" '[ "$(decision Bash "$cmd")" = deny ]'
+cmd=$(printf "cat >q.graphql <<'EOF'\n%s\nEOF\ngh api graphql -F query=\"@q.graphql\"" "$mutation")
+check "denies a heredoc mutation passed as -F query=\"@file\"" '[ "$(decision Bash "$cmd")" = deny ]'
+cmd=$(printf "q='%s'\ngh api graphql -f query=\"\$q\"" "$mutation")
+check "denies a mutation held in a variable on an earlier line" '[ "$(decision Bash "$cmd")" = deny ]'
 # Split across lines: a backslash-newline continuation, or a query over several lines.
 cmd=$(printf 'gh -R o/r \\\npr merge 5')
 check "denies gh pr merge split by a backslash-newline" '[ "$(decision Bash "$cmd")" = deny ]'
@@ -85,6 +105,8 @@ cmd=$(printf "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequ
 check "denies a GraphQL merge followed by a script over 100 KB" '[ "${#cmd}" -gt 100000 ] && [ "$(decision Bash "$cmd")" = deny ]'
 cmd=$(printf '%s\ngh api -X POST repos/o/r/merges -f base=main -f head=feat' "$long")
 check "denies a /merges call after a script over 100 KB" '[ "${#cmd}" -gt 100000 ] && [ "$(decision Bash "$cmd")" = deny ]'
+cmd=$(printf "q='%s'\n%s\ngh api graphql -f query=\"\$q\"" "$mutation" "$long")
+check "denies a mutation in a variable passed to gh api after a script over 100 KB" '[ "${#cmd}" -gt 100000 ] && [ "$(decision Bash "$cmd")" = deny ]'
 cont=$(i=0; while [ "$i" -lt 8000 ]; do printf -- '-f k%d=v \\\n' "$i"; i=$((i + 1)); done)
 cmd=$(printf 'gh -R o/r \\\n%s\npr merge 5' "$cont")
 check "denies gh pr merge after over 100 KB of continuation lines" '[ "${#cmd}" -gt 100000 ] && [ "$(decision Bash "$cmd")" = deny ]'
@@ -103,6 +125,9 @@ git commit -m "deny mergePullRequest"
 gh pr create --title "repos/o/r/merges"
 gh api repos/o/r/pulls/5/commits
 gh api repos/o/r/contents/x/merges
+q='query{viewer{login}}'; gh api graphql -f query="$q"
+gh api "repos/$R/pulls/5/commits"
+p=repos/o/r/pulls/7; gh api "$p/mergeable"
 PASS
 # Only a backslash-newline joins lines: a merge word on the next line is another command.
 cmd=$(printf 'gh pr\nmerge 5')
@@ -129,7 +154,7 @@ mcp__github__pull_request_read no pass
 mcp__linear__merge_diff no pass
 TOOLS
 check "the reason says the maintainer merges and how to pass text that only mentions a merge" \
-  '[ "$(output Bash "gh pr merge 7" | jq -r .hookSpecificOutput.permissionDecisionReason)" = "Mentat: the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)." ]'
+  '[ "$(output Bash "gh pr merge 7" | jq -r .hookSpecificOutput.permissionDecisionReason)" = "Mentat: the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file written in an earlier call (-F or --body-file)." ]'
 check "reads nothing from GitHub" '[ ! -f "$STUB/calls" ]'
 
 [ "$failures" -eq 0 ]
