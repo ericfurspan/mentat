@@ -437,18 +437,18 @@ git -C "$root/seed" push -q "$root/origin.git" "$H:refs/pull/8/head"
 reset; rm "$GH_USER/auth.json"; rc=$(run 7); reset_signin
 check "a Grok sign-in refusal is raised at once: one line naming Grok, one failure, the pull request and the reason" '[ "$rc" = 0 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ] && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ] && ! grok_ran'
 stub_reset; echo 1 >"$STUB/exit_code"; rc=$(run 8)
-check "a Grok run failure next is the second in a row: raised with both pull requests and its kept log by path only, no log text" '[ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && ! grep -q "SECRET-LOG-TEXT\|DEBUG-LOG-TEXT" "$STUB/out"'
+check "a Grok run failure next is the second in a row: raised with both pull requests and its kept log by path only, no log text" '[ "$rc" = 0 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && ! grep -q "SECRET-LOG-TEXT\|DEBUG-LOG-TEXT" "$STUB/out"'
 stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
 check "a checked Grok reply ends the run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 stub_reset; reply 'No result line here.'; rc=$(run 7)
 check "a Grok reply with no result line after a checked reply is the first failure in a row, not raised" '[ "$(summary)" = "did not finish (Grok'"'"'s reply has no final REVIEW RESULT line)" ] && [ -z "$(raised)" ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "fail owner/repo#7" ]'
 mkdir -p "$root/badcache" && : >"$root/badcache/mentat"
 stub_reset; rm "$GH_USER/auth.json"; rc=$(XDG_CACHE_HOME="$root/badcache" run 7); reset_signin
-check "with a cache folder that cannot be used, a sign-in refusal is still raised, as one failure on this pull request" '[ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
+check "with a cache folder that cannot be used, a sign-in refusal is still raised, as one failure on this pull request" '[ "$rc" = 0 ] && [ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
 # The raise line and the comment hold no text from Grok's output; the local line keeps its stop reason.
 CANARY="CANARY-STOP-REASON-4821"
 reset; reply 'Partial.' "$CANARY"; run 7 >/dev/null; stub_reset; reply 'Partial.' "$CANARY"; rc=$(run 7)
-check "an incomplete Grok run twice in a row: the raise line and the comment leave out Grok's stop reason, which the local line keeps" '[ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && ! raised | grep -qF "$CANARY" && ! grep -qF "$CANARY" "$C" && local_line | grep -qF "stop reason: $CANARY; its log"'
+check "an incomplete Grok run twice in a row: the raise line and the comment leave out Grok's stop reason, which the local line keeps" '[ "$rc" = 0 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok did not return a complete review; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && ! raised | grep -qF "$CANARY" && ! grep -qF "$CANARY" "$C" && local_line | grep -qF "stop reason: $CANARY; its log"'
 reset
 
 # A Grok run refused for usage or billing: only the message of an error object in Grok's JSON
@@ -459,7 +459,7 @@ USAGE="Grok refused this run for usage or billing; the maintainer can top up or 
 USAGE_CANARY="USAGE-CANARY-5170"
 usage_error() { jq -cn --arg m "$1 $USAGE_CANARY" '{type: "error", message: $m}' >"$STUB/out_json"; }
 usage_named() { # $1 description
-  check "$1: did not finish in Mentat's words, raised at the first failure, its log kept, no run text printed or posted" '[ "$(summary)" = "did not finish ($USAGE)" ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): $USAGE; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ] && p=$(kept_log) && grep -q "$USAGE_CANARY" "$p" && ! grep -q "$USAGE_CANARY\|SECRET-LOG-TEXT\|DEBUG-LOG-TEXT\|exited with status\|stop reason" "$STUB/out" "$C"'
+  check "$1: did not finish in Mentat's words, raised at the first failure, its log kept, no run text printed or posted" '[ "$rc" = 0 ] && [ "$(summary)" = "did not finish ($USAGE)" ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 1 time in a row (owner/repo#7): $USAGE; its log may hold credentials, so it is not printed. The maintainer can read it at $TMPDIR/mentat-log.grok." && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ] && p=$(kept_log) && grep -q "$USAGE_CANARY" "$p" && ! grep -q "$USAGE_CANARY\|SECRET-LOG-TEXT\|DEBUG-LOG-TEXT\|exited with status\|stop reason" "$STUB/out" "$C"'
 }
 reset; usage_error "Request failed with status 402 Payment Required:"; echo 1 >"$STUB/exit_code"; rc=$(run 7)
 usage_named "an out-of-usage error object with exit 1"
@@ -528,7 +528,7 @@ check "an older fail line without the word counts as another kind of failure: th
 reset; usage_fail 7; signin_fail
 check "a sign-in refusal after an out-of-usage failure in the row is still raised" '[ "$(raised)" = "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7): Grok is not signed in: there is no auth.json in its home (run grok login)" ]'
 reset; usage_fail 7; other_fail 8
-check "another failure after an out-of-usage failure is the second in a row and still raised" '[ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1;"'
+check "another failure after an out-of-usage failure is the second in a row and still raised" '[ "$rc" = 0 ] && [ "$(raised | wc -l | tr -d " ")" = 1 ] && raised | grep -qF "mentat: tell the maintainer now: Grok has failed 2 times in a row (owner/repo#7, owner/repo#8): Grok exited with status 1;"'
 reset; usage_fail 7; stub_reset; rc=$(run 7); usage_fail 8
 check "a checked Grok reply ends the row: the next out-of-usage failure is raised again, as the first in a row" 'usage_raised "Grok has failed 1 time in a row (owner/repo#8)"'
 # A record that cannot be written: a folder in its place, so Grok's run folder is still made.
