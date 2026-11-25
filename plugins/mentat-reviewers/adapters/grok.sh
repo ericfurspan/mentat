@@ -290,10 +290,11 @@ grok_keep_log() {
 }
 
 # Once Grok has run, a failure of Grok's own keeps a copy of its log for the maintainer
-# and counts in its failures in a row ($2: empty, or usage).
-grok_failed() { # $1 public reason, $2 kind
+# and counts in its failures in a row ($2: empty, or usage). $3, Grok's stop reason
+# when there is one, is shown only on the maintainer's local line.
+grok_failed() { # $1 public reason, $2 kind, $3 stop reason
   grok_keep_log
-  adapter_fail "$1" "${kept:+its log may hold credentials, so it is not printed. The maintainer can read it at $kept}" "${2:-}"
+  adapter_fail "$1" "${kept:+its log may hold credentials, so it is not printed. The maintainer can read it at $kept}" "${2:-}" "${3:+stop reason: $3}"
 }
 
 # Runs Grok in the rebuilt environment under the time limit, and fails unless it exits 0.
@@ -326,7 +327,8 @@ grok_keep_log_on_timeout() { # $1 pid
 GROK_OUT_OF_USAGE="Grok refused this run for usage or billing; the maintainer can top up or wait for the usage limit to reset, and reviews and second opinions go on without Grok"
 # A Grok run that failed (it exited non-zero, or returned no complete reply): fails with
 # GROK_OUT_OF_USAGE, counted as usage, when the message of an error object in Grok's JSON
-# output names an out-of-usage or billing refusal, else with $1. Only that message is
+# output names an out-of-usage or billing refusal, else with $1 ($2, Grok's stop reason,
+# goes only on the maintainer's local line). Only that message is
 # read, never Grok's stderr, its debug log or the rest of its output, which can hold the
 # prompt or diff; output that is not JSON has no such message.
 grok_run_failed() {
@@ -335,7 +337,7 @@ grok_run_failed() {
       "$out" >/dev/null 2>&1; then
     grok_failed "$GROK_OUT_OF_USAGE" usage
   fi
-  grok_failed "$1"
+  grok_failed "$1" "" "${2:-}"
 }
 
 # Reads Grok's reply from $out into $result_file, and fails unless it is a complete
@@ -345,7 +347,7 @@ grok_reply() {
   local stop
   stop=$(jq -s -r 'if length == 1 and (.[0] | type) == "object" then (.[0].stopReason // "none" | tostring) else "none" end' "$out" 2>/dev/null | tr -cd 'A-Za-z0-9_-' | head -c 40)
   if ! jq -s -e 'length == 1 and (.[0] | type) == "object" and .[0].stopReason == "end_turn" and (.[0].text | type) == "string" and (.[0].text | test("\\S"))' "$out" >/dev/null 2>&1; then
-    grok_run_failed "Grok did not return a complete reply (stop reason: ${stop:-none})"
+    grok_run_failed "Grok did not return a complete review" "${stop:-none}"
   fi
   jq -r '.text' "$out" >"$result_file" || grok_failed "could not read Grok's reply"
 }
