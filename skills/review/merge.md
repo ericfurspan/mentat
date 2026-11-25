@@ -9,7 +9,8 @@ Where the repository turns on `MENTAT_AGENT_MERGE` (`docs/settings.md`), the ses
 - the Ready message would carry none of the sentences "Final check" adds after the first line (a fast track, a weaker review, a removal or reversal of what the maintainer asked for, a blocking finding answered instead of fixed, advice against the item);
 - no `AGENTS.md` that applies keeps this merge for the maintainer;
 - #N's head is the one the review covered: `mentat status <N>` says `head reviewed: yes` for the head `gh pr view <N> --json headRefOid` gives;
-- no review of #N this session read, posted or not, marked a finding `(high risk)`.
+- no review of #N this session read, posted or not, marked a finding `(high risk)`;
+- no real defect was left unfixed at the round limit and filed as a follow-up for #N (`stop.md` "Round limit"): such a pull request goes out as Ready for the maintainer.
 
 When the session sorts an unposted reply holding a `(high risk)` mark, it records that mark in the description's Review details line for the finding (`mentat:pr`), so the last condition holds after a compaction.
 
