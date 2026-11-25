@@ -1,6 +1,6 @@
 ---
 name: builder
-description: Builds one change that the main session has already planned, in a worktree the host makes for it. Before any edit it checks that worktree, switches to the branch its brief names and deletes the branch it started on; then it builds, runs the repository's test command and reports. Use when the plan is written down and the remaining work is mostly editing.
+description: Implements one change the main session planned, in its own worktree on the branch its brief names, then runs the test command and reports.
 model: opus
 tools: Read, Edit, Write, Bash, Grep, Glob
 effort: medium
