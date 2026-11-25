@@ -181,7 +181,7 @@ check "an unreadable private word list skips the comparison" '! grep -q "user/re
 # The word list against the account's private repositories. Every case but the failed
 # lookup's has names on the stub, and none may be printed.
 ALL_MATCH="OK: the private word list has every private repository this account can reach"
-no_name() { ! grep -qi -e stubword -e stubkept -e stubmissing -e stubleakedrepo -e stubother "$STUB/out"; }
+no_name() { ! grep -qi -e stubword -e stubkept -e stubmissing -e stubleakedrepo -e stubother -e stubreponame -e stubexact -e stubplain "$STUB/out"; }
 reset; rc=$(run)
 check "none missing is OK with no warning" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ] && no_name'
 check "asks once for private repositories as owner, organization member or collaborator" '[ "$(grep -cxF "api -X GET user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100 --paginate --jq .[].name" "$STUB/calls")" = 1 ]'
@@ -221,7 +221,13 @@ check "blank and # list lines cover nothing" '[ "$rc" = 0 ] && grep -q "^WARN: 1
 reset; echo stubother >"$STUB/repos"; cp "$LIST" "$LIST.keep"; : >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
 check "an empty list misses every repository" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
 reset; printf 'stubword\nSTUBWORD\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo exact:stubword >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
-check "a marked list line covers its repository, ignoring case" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && no_name'
+check "a marked list line covers its repository only in its own case" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
+reset; echo StubRepoName >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo exact:stubreponame >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a marked list line in another case does not cover the repository" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && no_name'
+reset; echo StubRepoName >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo exact:StubRepoName >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a marked list line in the same case covers the repository" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && no_name'
+reset; echo StubRepoName >"$STUB/repos"; cp "$LIST" "$LIST.keep"; echo stubreponame >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
+check "a plain list line in another case covers the repository" '[ "$rc" = 0 ] && grep -qxF "$ALL_MATCH" "$STUB/out" && no_name'
 reset; printf 'stubother\nexact\n' >"$STUB/repos"; cp "$LIST" "$LIST.keep"; printf 'exact:\n' >"$LIST"; rc=$(run); mv "$LIST.keep" "$LIST"
 check "a list line that is only exact: covers nothing" '[ "$rc" = 0 ] && grep -q "^WARN: 2 private repository name(s)" "$STUB/out" && no_name'
 
@@ -237,6 +243,24 @@ reset; printf 'stubword\nstubmissing-one\n' >"$STUB/repos"; cp "$LIST" "$LIST.ke
 warn_command=$(sed -n 's/^WARN: .* private word list; to list them, run: //p' "$STUB/out")
 warn_out=$(bash -c "$warn_command" 2>&1); mv "$LIST.keep" "$LIST"
 check "the warning's command, with a marked line, lists only the missing names" '[ -n "$warn_command" ] && [ "$warn_out" = stubmissing-one ]'
+# warned <list> <repos>: runs check with that list and those repositories, and sets
+# warn_out to what the warning's command prints.
+warned() {
+  reset; printf '%b' "$2" >"$STUB/repos"; cp "$LIST" "$LIST.keep"; printf '%b' "$1" >"$LIST"; rc=$(run)
+  warn_command=$(sed -n 's/^WARN: .* private word list; to list them, run: //p' "$STUB/out")
+  warn_out=$(bash -c "$warn_command" 2>&1); mv "$LIST.keep" "$LIST"
+}
+warned 'stubword\n\n# stubmissing-one\nstubplain\nexact:stubexact\n' 'stubword\nSTUBPLAIN\nstubexact\nSTUBEXACT\nstubmissing-one\n'
+check "plain and marked lines together give the count and the command the names missing" '[ "$rc" = 0 ] && grep -q "^WARN: 2 private repository name(s)" "$STUB/out" && [ "$warn_out" = "STUBEXACT
+stubmissing-one" ] && no_name'
+check "the warning's command matches plain lines ignoring case and marked lines by case" '[ "$(printf "%s\n" "$warn_command" | grep -o "| grep -vixF " | wc -l | tr -d " ")" = 1 ] && [ "$(printf "%s\n" "$warn_command" | grep -o "| grep -vxF " | wc -l | tr -d " ")" = 1 ]'
+warned '' 'stubother\nstubmissing-one\n'
+check "with an empty list, the count and the command name every repository" '[ "$rc" = 0 ] && grep -q "^WARN: 2 private repository name(s)" "$STUB/out" && [ "$warn_out" = "stubother
+stubmissing-one" ] && no_name'
+warned '\n#stubother\n  \n# a comment\nstubkept\n' 'stubother\nstubkept\n'
+check "blank and # list lines cover nothing, in the count and the command" '[ "$rc" = 0 ] && grep -q "^WARN: 1 private repository name(s)" "$STUB/out" && [ "$warn_out" = stubother ] && no_name'
+warned 'exact:stubkept\n' 'StubKept\n'
+check "the warning's command names a repository a marked line has in another case" '[ "$rc" = 0 ] && [ "$warn_out" = StubKept ] && no_name'
 
 # The Mentat plugin's copies, from the stub claude. Every entry names a path and a project,
 # and none may be printed.
