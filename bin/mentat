@@ -114,6 +114,19 @@
 #     upstream (the default branch found as mentat reviewers finds it). 0 made, 1 the branch
 #     already exists (nothing fetched), 2 the fetch failed or the default branch could not be
 #     found; no branch is made unless it exits 0. 64 usage.
+#   mentat worktree snapshot [<checkout>]  Prints one line of four space-separated tokens
+#     for the checkout, by default the main checkout (the folder above git's common
+#     directory): "<branch|detached> <HEAD> <clean|dirty> <hash>", the hash the SHA-256 of
+#     git status --porcelain -- ':(exclude).claude/worktrees'. Changes nothing, fetches
+#     nothing. 0 printed, 2 the checkout cannot be read, 64 usage.
+#   mentat worktree verify <line> [<checkout>]  Compares the checkout (by default the main
+#     checkout) with a snapshot line by the rule of "Main-checkout check" in
+#     skills/build/helpers.md: unchanged when the branch and status hash are the noted ones
+#     and HEAD is the noted one or moved only forward along origin/<branch> as last fetched
+#     (no fetch); detached at the snapshot, only the same HEAD passes. 0 unchanged, 1 changed
+#     (each difference named, with the current status paths on a status change), 2 the line
+#     cannot be parsed or the checkout cannot be read, 64 usage. It says when the snapshot's
+#     checkout was not clean, which makes the check weaker.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -166,5 +179,5 @@ case "${1:-}" in
   check) shift; check "$@" ;;
   fingerprint) shift; fingerprint_command "$@" ;;
   worktree) shift; worktree_command "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name>" 64 ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>]" 64 ;;
 esac
