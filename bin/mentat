@@ -105,6 +105,10 @@
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.
 #     0 Mentat can work (warnings printed), 1 it cannot.
+#   mentat fingerprint <file> [<expected>]  Prints the file's spec fingerprint, read as
+#     review --request reads it (the first 12 hex characters of the SHA-256 of its text
+#     without trailing newlines). With <expected>, prints both: 0 they match, 1 they differ.
+#     2 the file is missing, unreadable or blank (no fingerprint printed), 64 usage.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -155,5 +159,6 @@ case "${1:-}" in
   reviewers) shift; reviewers_command "$@" ;;
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check" 64 ;;
+  fingerprint) shift; fingerprint_command "$@" ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>]" 64 ;;
 esac
