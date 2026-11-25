@@ -25,6 +25,15 @@ printf '%s\n' "$*" >>"$STUB/gh_calls"
 exit 99
 STUBEOF
 chmod +x "$root/bin/gh"
+# The shipped reviewers' tools: a codex that is installed, and a grok that is installed with no
+# sign-in in its home, so the list reads the same on any machine. Neither may run.
+for t in codex grok; do
+  printf '#!/bin/sh\necho "%s $*" >>"$STUB/tool_calls"\nexit 99\n' "$t" >"$root/bin/$t"
+  chmod +x "$root/bin/$t"
+done
+mkdir -p "$root/grok home"
+export GROK_HOME="$root/grok home"
+unset MENTAT_REVIEWERS
 export PATH="$root/bin:$PATH"
 
 ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
@@ -64,8 +73,8 @@ state() { # $1 what main's settings hold, $2 the settings (main_has), $3 the lin
   check "$1: $want" 'said "$want"'
 }
 
-state "true" "$ON" "reviewers: on"
-state "true among other settings" '{"model":"opus","enabledPlugins":{"other@mentat":false,"mentat-reviewers@mentat":true}}' "reviewers: on"
+state "true" "$ON" "reviewers: on, none listed"
+state "true among other settings" '{"model":"opus","enabledPlugins":{"other@mentat":false,"mentat-reviewers@mentat":true}}' "reviewers: on, none listed"
 state "false" "$OFF" "reviewers: off"
 state "the key absent" '{"enabledPlugins":{"other@mentat":true}}' "reviewers: off"
 state "enabledPlugins empty" '{"enabledPlugins":{}}' "reviewers: off"
@@ -91,7 +100,7 @@ tracked_settings() { git -C "$W" cat-file blob refs/remotes/origin/main:.claude/
 last_fetch() { cksum "$W/.git/FETCH_HEAD" 2>/dev/null || echo none; }
 main_has "$OFF"; git -C "$W" fetch -q origin; main_has "$ON"
 before=$(tracking) before_fetch=$(last_fetch); rc=$(run)
-check "main turned on after the last fetch, origin/main still off: on" 'said "reviewers: on" && [ "$(tracked_settings)" = "$OFF" ]'
+check "main turned on after the last fetch, origin/main still off: on" 'said "reviewers: on, none listed" && [ "$(tracked_settings)" = "$OFF" ]'
 check "the read leaves origin/main and the last-fetch record as they were" '[ "$(tracking)" = "$before" ] && [ "$(last_fetch)" = "$before_fetch" ] && [ "$before_fetch" != none ]'
 git -C "$W" fetch -q origin; main_has "$OFF"
 before=$(tracking) before_fetch=$(last_fetch); rc=$(run)
@@ -119,25 +128,25 @@ main_has "$ON"
 printf '%s' "$OFF" >"$W/.claude/settings.json"; printf '%s' "$OFF" >"$W/.claude/settings.local.json"; printf '%s' "$OFF" >"$HOME/.claude/settings.json"
 rc=$(run)
 git -C "$W" checkout -q -- .claude/settings.json; rm "$W/.claude/settings.local.json" "$HOME/.claude/settings.json"
-check "on in main, off in the working tree, local and user settings: on" 'said "reviewers: on"'
+check "on in main, off in the working tree, local and user settings: on" 'said "reviewers: on, none listed"'
 
 # From a subdirectory, the top level's repository is read.
 mkdir -p "$W/sub dir/deeper"
 rc=$(run "$W/sub dir/deeper")
-check "from a subdirectory: on, as at the top level" 'said "reviewers: on"'
+check "from a subdirectory: on, as at the top level" 'said "reviewers: on, none listed"'
 
 # The default branch is the one origin's HEAD names, not main, and not the clone's own
 # record of it (origin/HEAD, still main).
 main_has "$ON"; git -C "$SEED" push -q origin HEAD:trunk || exit 1
 main_has "$OFF"; git -C "$O" symbolic-ref HEAD refs/heads/trunk
 rc=$(run)
-check "origin's HEAD names trunk, on, while main is off: on" 'said "reviewers: on" && [ "$(git -C "$W" symbolic-ref refs/remotes/origin/HEAD)" = refs/remotes/origin/main ]'
+check "origin's HEAD names trunk, on, while main is off: on" 'said "reviewers: on, none listed" && [ "$(git -C "$W" symbolic-ref refs/remotes/origin/HEAD)" = refs/remotes/origin/main ]'
 main_has '{'; git -C "$SEED" push -q -f origin HEAD:trunk || exit 1; main_has "$ON"
 rc=$(run)
 check "trunk invalid while main is on: unknown, naming trunk" 'said "reviewers: unknown - .claude/settings.json on trunk could not be read as JSON"'
 git -C "$O" symbolic-ref HEAD refs/heads/main
 rc=$(run)
-check "origin's HEAD back on main: on" 'said "reviewers: on"'
+check "origin's HEAD back on main: on" 'said "reviewers: on, none listed"'
 
 # Where no default branch can be found or read: unknown.
 main_has "$ON"; git -C "$W" fetch -q origin
@@ -148,7 +157,7 @@ rc=$(run)
 check "origin's HEAD names no branch and the clone has no origin/HEAD: unknown" 'said "reviewers: unknown - origin'"'"'s default branch could not be found"'
 git -C "$O" symbolic-ref HEAD refs/heads/main && git -C "$W" remote set-head origin main >/dev/null || exit 1
 rc=$(run)
-check "with origin/HEAD back, on again" 'said "reviewers: on"'
+check "with origin/HEAD back, on again" 'said "reviewers: on, none listed"'
 git init -q -b main "$root/no remote" && (cd "$root/no remote" && mkdir .claude && printf '%s' "$ON" >.claude/settings.json && git add -A && git commit -qm on) || exit 1
 rc=$(run "$root/no remote")
 check "a repository with no origin remote, its own file on: unknown" 'said "reviewers: unknown - the checkout has no origin remote"'
@@ -160,6 +169,67 @@ mkdir "$root/nojq"
 for t in bash env dirname readlink git sed head cat; do ln -s "$(command -v "$t")" "$root/nojq/$t"; done
 rc=$(cd "$W" && PATH="$root/nojq" "$mentat" reviewers >"$STUB/out" 2>"$STUB/err"; echo $?)
 check "without jq: unknown" 'said "reviewers: unknown - jq is not installed"'
+
+# The list: MENTAT_REVIEWERS in the env object of the same file on the default branch, read
+# only while the module is on. Each listed name gets a line: available, not available with
+# why (the shipped reviewer's own offline check), or skipped when the module has no such
+# reviewer. No tool runs and gh is never called.
+said_lines() { # $1 the whole output
+  [ "$rc" = 0 ] && [ "$(cat "$STUB/out")" = "$1" ] && [ ! -s "$STUB/err" ] && [ ! -f "$STUB/gh_calls" ] &&
+    [ ! -f "$STUB/tool_calls" ] && [ -z "$(git -C "$W" for-each-ref refs/mentat)" ]
+}
+listing() { # $1 what main's settings hold, $2 the settings, $3 the whole output
+  want=$3
+  main_has "$2"; rc=$(run)
+  check "$1" 'said_lines "$want"'
+}
+on_with() { printf '{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":%s}' "$1"; }
+NOGROK="grok: not available (Grok is not signed in: there is no auth.json in its home (run grok login))"
+listing "list codex,grok: each listed reviewer and whether it is available" "$(on_with '{"MENTAT_REVIEWERS":"codex,grok"}')" "reviewers: on
+codex: available
+$NOGROK"
+listing "list separated by spaces, tabs and a newline, in another order: the order given" "$(on_with '{"MENTAT_REVIEWERS":" grok\t codex\n"}')" "reviewers: on
+$NOGROK
+codex: available"
+listing "a name listed twice is counted once" "$(on_with '{"MENTAT_REVIEWERS":"codex, codex grok,codex"}')" "reviewers: on
+codex: available
+$NOGROK"
+listing "a name the module does not ship is skipped and named; the rest are listed" "$(on_with '{"MENTAT_REVIEWERS":"codex,other-9"}')" "reviewers: on
+codex: available
+other-9: skipped (the mentat-reviewers module has no such reviewer)"
+listing "the env object with no MENTAT_REVIEWERS: on, none listed" "$(on_with '{"OTHER":"codex"}')" "reviewers: on, none listed"
+listing "an empty list: on, none listed" "$(on_with '{"MENTAT_REVIEWERS":""}')" "reviewers: on, none listed"
+listing "a list of only commas and whitespace: on, none listed" "$(on_with '{"MENTAT_REVIEWERS":" ,, \t,"}')" "reviewers: on, none listed"
+listing "a name with an uppercase letter: unknown, naming the problem" "$(on_with '{"MENTAT_REVIEWERS":"codex,Grok"}')" "reviewers: unknown - MENTAT_REVIEWERS in $F holds a name with characters other than lowercase letters, digits and hyphens"
+listing "a name with an underscore: unknown" "$(on_with '{"MENTAT_REVIEWERS":"co_dex"}')" "reviewers: unknown - MENTAT_REVIEWERS in $F holds a name with characters other than lowercase letters, digits and hyphens"
+listing "a list that is not a string: unknown" "$(on_with '{"MENTAT_REVIEWERS":["codex"]}')" "reviewers: unknown - MENTAT_REVIEWERS in $F is not a string"
+listing "a null list: unknown" "$(on_with '{"MENTAT_REVIEWERS":null}')" "reviewers: unknown - MENTAT_REVIEWERS in $F is not a string"
+listing "env that is not an object: unknown" "$(on_with '"MENTAT_REVIEWERS=codex"')" "reviewers: unknown - env in $F is not an object"
+listing "the module off with a malformed list: off" '{"enabledPlugins":{"mentat-reviewers@mentat":false},"env":{"MENTAT_REVIEWERS":"Codex"}}' "reviewers: off"
+listing "the module off with a list: off" '{"enabledPlugins":{"mentat-reviewers@mentat":false},"env":{"MENTAT_REVIEWERS":"codex"}}' "reviewers: off"
+# Only the default branch's committed list counts: never the process environment, local or
+# user settings, the working tree or a checked-out branch.
+main_has "$ON"
+rc=$(MENTAT_REVIEWERS=codex run)
+check "MENTAT_REVIEWERS in the process environment is not read" 'said_lines "reviewers: on, none listed"'
+printf '%s' "$(on_with '{"MENTAT_REVIEWERS":"codex"}')" >"$W/.claude/settings.local.json"
+printf '%s' "$(on_with '{"MENTAT_REVIEWERS":"codex"}')" >"$HOME/.claude/settings.json"
+printf '%s' "$(on_with '{"MENTAT_REVIEWERS":"codex"}')" >"$W/.claude/settings.json"
+rc=$(run)
+git -C "$W" checkout -q -- .claude/settings.json; rm "$W/.claude/settings.local.json" "$HOME/.claude/settings.json"
+check "a list in local settings, user settings and the working tree is not read" 'said_lines "reviewers: on, none listed"'
+main_has "$(on_with '{"MENTAT_REVIEWERS":"codex"}')"
+(cd "$SEED" && git checkout -q -b listing && printf '%s' "$(on_with '{"MENTAT_REVIEWERS":"grok"}')" >.claude/settings.json && git commit -qam grok && git push -q origin listing && git checkout -q main) || exit 1
+git -C "$W" fetch -q origin && git -C "$W" checkout -q -b listing origin/listing || exit 1
+rc=$(run)
+git -C "$W" checkout -q main || exit 1
+check "a checked-out branch that lists another reviewer: the default branch's list counts" 'said_lines "reviewers: on
+codex: available"'
+# A core with no module folder and no entry on PATH: each listed name is not available.
+mkdir "$root/bare" && cp -R "$(dirname "$mentat")/../bin" "$(dirname "$mentat")/../lib" "$root/bare/" || exit 1
+rc=$(cd "$W" && PATH="$root/bin:$(dirname "$(command -v jq)"):/usr/bin:/bin" "$root/bare/bin/mentat" reviewers >"$STUB/out" 2>"$STUB/err"; echo $?)
+check "without the reviewers module, each listed name is not available, saying why" 'said_lines "reviewers: on
+codex: not available (the mentat-reviewers module was not found)"'
 
 # Usage: no arguments.
 rc=$(cd "$W" && "$mentat" reviewers on >"$STUB/out" 2>"$STUB/err"; echo $?)

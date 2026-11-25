@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016,SC2034
 # (File-wide: each check is a string evaluated after its case runs.)
-# Behavior tests for `mentat review --codex`, using a real git origin, a stub gh
-# and a stub codex. Prints PASS/FAIL per case; exits 1 on any FAIL. One case also
+# Behavior tests for the Codex adapter, through `mentat review --outside` with codex the
+# one reviewer listed, using a real git origin, a stub gh and a stub codex. Prints PASS/FAIL per case; exits 1 on any FAIL. One case also
 # replays the permissions settings the review passes to Codex through the real
 # `codex sandbox` (macOS only, no model call): see "Live sandbox check" below.
 set -uo pipefail
@@ -90,13 +90,13 @@ export TMPDIR="$root/tmp" XDG_CACHE_HOME="$root/cache"
 LIST="$HOME/.config/mentat/private-words"
 mkdir -p "$STUB" "$root/tools/bin" "$(dirname "$LIST")" "$TMPDIR"
 failures=0
-check() { if eval "$2"; then printf 'PASS: review --codex %s\n' "$1"; else printf 'FAIL: review --codex %s\n' "$1"; failures=$((failures + 1)); fi; }
+check() { if eval "$2"; then printf 'PASS: review --outside, codex %s\n' "$1"; else printf 'FAIL: review --outside, codex %s\n' "$1"; failures=$((failures + 1)); fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 # An origin with main and pull request 7, whose head changes README. Outside reviewers are
-# on in main's .claude/settings.json, so review --codex runs.
-REVIEWERS_ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
+# on in main's .claude/settings.json and list codex alone, so review --outside runs Codex.
+REVIEWERS_ON='{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":{"MENTAT_REVIEWERS":"codex"}}'
 git init -q --bare -b main "$root/origin.git"
 git init -q -b main "$root/seed"
 (cd "$root/seed" && echo base >README && mkdir .claude && printf '%s\n' "$REVIEWERS_ON" >.claude/settings.json &&
@@ -169,8 +169,8 @@ pwd >"$STUB/tree"; pwd -P >"$STUB/treep"
 [ -f "$STUB/hang" ] && { echo $$ >"$STUB/model_pid"; exec sleep 30; }
 while [ $# -gt 0 ]; do [ "$1" = -o ] && sed -e "s|@TREE@|$(pwd)|g" -e "s|@TREEP@|$(pwd -P)|g" "$STUB/reply" >"$2"; shift; done
 STUBEOF
-# claude: --codex never runs it. A call is recorded outside $STUB, which every case clears;
-# --version passes through to a real claude, for the live check's line.
+# claude: review --outside never runs it. A call is recorded outside $STUB, which every case
+# clears; --version passes through to a real claude, for the live check's line.
 cat >"$root/tools/bin/claude" <<'STUBEOF'
 #!/usr/bin/env bash
 if [ "$*" = --version ]; then
@@ -184,7 +184,7 @@ STUBEOF
 chmod +x "$root/tools/bin/gh" "$root/tools/bin/codex" "$root/tools/bin/claude"
 # CI waits are short, as in tests/review.sh; a passed check with no finish time returns at once.
 export PATH="$root/tools/bin:$PATH" MENTAT_REVIEW_INTERVAL_SECONDS=1 MENTAT_CI_TIMEOUT_SECONDS=2 MENTAT_CI_GRACE_SECONDS=1
-unset MENTAT_REVIEW_ROUNDS MENTAT_CODEX_MODEL
+unset MENTAT_REVIEW_ROUNDS MENTAT_CODEX_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS MENTAT_REVIEWERS
 
 # stub_reset clears the stubs' state; reset also clears the record of failures in a row.
 stub_reset() {
@@ -194,16 +194,27 @@ stub_reset() {
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
 reset() { stub_reset; rm -f "$XDG_CACHE_HOME"/mentat/reviewer-failures-*; }
-run() { (cd "$root/work" && "$mentat" review --codex "${1:-7}" >"$STUB/out" 2>&1); echo $?; }
+# Outside reviewers run only on a head Claude's latest review found nothing on: before each
+# run, once per case, this account's Local Claude review of the head GitHub reports says so.
+claude_clean() {
+  [ -f "$STUB/claude_clean" ] && return 0
+  jq --arg b "## Local Claude review of $(cat "$STUB/head"): no findings, spec fingerprint none" '. + [{user: {login: "agent-bot"}, body: $b}]' \
+    <<<"$(cat "$STUB/issue_comments.json" 2>/dev/null || echo '[]')" >"$STUB/ic.tmp" && mv "$STUB/ic.tmp" "$STUB/issue_comments.json" && touch "$STUB/claude_clean"
+}
+runrc() { claude_clean; (cd "$root/work" && "$mentat" review --outside "$@" >"$STUB/out" 2>&1); echo $?; }
+run() { runrc "${1:-7}"; }
 posted() { [ -f "$STUB/comment" ]; }
-# The posted review: a heading line, then the bullets and the reply folded; the reply's own
-# result line is the last line inside the fold, and nothing follows the fold.
-heading() { [ "$(head -n 1 "$STUB/comment")" = "## Local Codex review of $H: $1, spec fingerprint ${2:-none}" ]; }
-folded() { sed -n '/^<details><summary>Full review<\/summary>$/,/^<\/details>$/p' "$STUB/comment"; }
+# The posted review: a heading line naming the head, the spec fingerprint and the list, then
+# Codex's result line, the run's bullets, and its reply folded with the record of the run;
+# the reply's own result line is the last line inside the fold, and nothing follows the fold.
+heading() { [ "$(head -n 1 "$STUB/comment")" = "## Outside review of $H: spec fingerprint ${2:-none}, reviewers codex" ] && grep -qxF -- "- codex: $1" "$STUB/comment"; }
+INCOMPLETE_ROW="did not finish (Codex says the review is incomplete)"
+NO_RESULT_ROW="did not finish (Codex's reply has no final REVIEW RESULT line)"
+folded() { sed -n '/^<details><summary>Codex<\/summary>$/,/^<\/details>$/p' "$STUB/comment"; }
 # The last non-blank line before the fold closes, in file $1.
 last_in_fold() { grep -v '^[[:space:]]*$' "$1" | tail -n 2 | head -n 1; }
 fold_shape() { # $1 the final REVIEW RESULT line
-  [ "$(sed -n '/^<details><summary>Full review<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 1 "$STUB/comment")" = "</details>" ] &&
+  [ "$(sed -n '/^<details><summary>Codex<\/summary>$/{n;s/^$/blank/;p;}' "$STUB/comment")" = blank ] && [ "$(tail -n 1 "$STUB/comment")" = "</details>" ] &&
     [ "$(grep -c '^</details>$' "$STUB/comment")" = 1 ] && [ "$(last_in_fold "$STUB/comment")" = "$1" ] && [ "$(grep -cxF -- "$1" "$STUB/comment")" = 1 ]
 }
 
@@ -225,28 +236,25 @@ race() { PATH="$root/racebin:$PATH" run; }
 runs() { printf '{"check_runs":[{"name":"test","status":"%s","conclusion":%s}]}\n' "$1" "$2"; }
 # The model run, the CI reads and the post, in the order gh and codex saw them.
 order() { sed -n -e 's/^codex$/model/p' -e 's#.*/check-runs$#ci#p' -e 's/^pr comment .*/post/p' "$STUB/calls" | uniq | tr '\n' ' '; }
-# The text printed after the exit-4 line naming the head, without the blank line that follows it.
-unposted() { sed "1,/^Review of $H, not posted and not a round:\$/d" "$STUB/out" | sed 1d; }
+# The reply as printed before the wait for CI, under its reviewer's name.
+unposted() { sed -n '/^## codex$/,/^codex: /p' "$STUB/out" | sed '1,2d;$d'; }
 status() { (cd "$root/work" && "$mentat" status 7 2>&1); }
-# A Local Claude review of the head, posted by this account before Codex runs: mentat
-# status reports Codex's state on the head Claude reviewed, and a Codex review is no round.
-claude_reviewed() { jq -n --arg b "## Local Claude review of $H: findings, spec fingerprint none" '[{user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; }
-reset; claude_reviewed; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
+reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "a review that finishes before CI is posted only after CI passes on its head (exit 0)" '[ "$rc" = 0 ] && posted && [ "$(order)" = "model ci post " ] && [ "$(cat "$STUB/ci_reads")" -ge 2 ] && grep -q "found nothing on $H" "$STUB/out" && ! grep -q "not posted" "$STUB/out"'
-check "a posted review is Codex done on the head Claude reviewed, and adds no round" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: done on ${H:0:7} (no findings, spec fingerprint none), ci:"'
-reset; claude_reviewed; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
+check "a posted review is the outside review on the head Claude reviewed, and adds no round" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, outside: posted on ${H:0:7} (codex: no findings; spec fingerprint none; reviewers codex), ci:"'
+reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs in_progress null >"$STUB/check_runs.json"; runs completed '"failure"' >"$STUB/check_runs_later.json"; rc=$(run)
 check "CI failing after the review exits 4, posts nothing and names the failing check" '[ "$rc" = 4 ] && ! posted && ! grep -q "pr comment" "$STUB/calls" && [ "$(order)" = "model ci " ] && grep -q "CI did not pass on $H" "$STUB/out" && grep -qx -- "- test" "$STUB/out"'
-check "CI failing after the review prints the review after a line saying it was not posted and is not a round" '[ "$(unposted)" = "$(cat "$STUB/reply")" ]'
-check "a review not posted for failed CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
-# The round limit is the Claude review's alone: --codex runs with the limit's rounds used, and
+check "CI failing after the review: the review was printed, with its result, before the wait" '[ "$(unposted)" = "$(cat "$STUB/reply")" ] && grep -qx "codex: findings" "$STUB/out"'
+check "a review not posted for failed CI leaves the outside review none on the head Claude reviewed" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, outside: none, ci:"'
+# The round limit is the Claude review's alone: --outside runs with the limit's rounds used, and
 # neither reads nor checks MENTAT_REVIEW_ROUNDS, and its record names no limit.
-at_limit() { jq -n --arg b "## Local Claude review of $H: findings, spec fingerprint none" '[range(5) | {user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; }
+at_limit() { jq -n --arg b "## Local Claude review of $H: no findings, spec fingerprint none" '[range(5) | {user: {login: "agent-bot"}, body: $b}]' >"$STUB/issue_comments.json"; touch "$STUB/claude_clean"; }
 reset; at_limit; rc=$(run)
-check "the round limit's 5 local rounds used: --codex is not refused, and posts with no round limit line" '[ "$rc" = 0 ] && posted && heading "no findings" && ! grep -q "Round limit" "$STUB/comment"'
+check "the round limit's 5 local rounds used: --outside is not refused, and posts with no round limit line" '[ "$rc" = 0 ] && posted && heading "no findings" && ! grep -q "Round limit" "$STUB/comment"'
 reset; at_limit; rc=$(MENTAT_REVIEW_ROUNDS=2 run)
-check "MENTAT_REVIEW_ROUNDS=2 with 5 local rounds used: --codex is not refused" '[ "$rc" = 0 ] && posted && heading "no findings"'
+check "MENTAT_REVIEW_ROUNDS=2 with 5 local rounds used: --outside is not refused" '[ "$rc" = 0 ] && posted && heading "no findings"'
 reset; rc=$(MENTAT_REVIEW_ROUNDS=abc run)
-check "MENTAT_REVIEW_ROUNDS=abc: --codex does not check it, and posts" '[ "$rc" = 0 ] && posted && heading "no findings"'
+check "MENTAT_REVIEW_ROUNDS=abc: --outside does not check it, and posts" '[ "$rc" = 0 ] && posted && heading "no findings"'
 reset; printf -- '- (non-blocking) README:1 still running\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; runs queued null >"$STUB/check_runs.json"; rc=$(run)
 check "CI still running at the timeout exits 4, posts nothing and prints the review" '[ "$rc" = 4 ] && ! posted && grep -q "CI did not finish on $H within 2 seconds" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ]'
 reset; runs in_progress null >"$STUB/check_runs.json"; runs completed '"success"' >"$STUB/check_runs_later.json"; echo 3333333333333333333333333333333333333333 >"$STUB/push_on_ci"; rc=$(run)
@@ -258,11 +266,11 @@ check "a head that moves while CI on the reviewed head never finishes exits 3, n
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(run)
 check "no CI check on the head: says so, then posts (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx "No CI checks ran on $H" "$STUB/out"'
 reset; printf 'Looks fine to me.\n' >"$STUB/reply"; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run)
-check "a reply without a result line is not reviewed before any wait for CI" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! grep -q check-runs "$STUB/calls" && ! posted'
+check "a reply without a result line did not finish, and failing CI still holds the post (exit 4)" '[ "$rc" = 4 ] && grep -qxF "codex: $NO_RESULT_ROW" "$STUB/out" && ! posted'
 reset; rc=$(run)
-check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Local Codex review of $H" "$STUB/comment"'
-check "the comment opens with one heading line: the head, no findings and the fingerprint" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "<details><summary>Full review</summary>" ]'
-check "the bullets and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Agreed request fingerprint: none" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
+check "no findings exits 0 and posts the review" '[ "$rc" = 0 ] && grep -q "found nothing on $H: https://example.test/comment" "$STUB/out" && grep -q "^## Outside review of $H" "$STUB/comment"'
+check "the comment opens with one heading line, a blank line, then Codex's result" 'heading "no findings" none && [ "$(sed -n 2p "$STUB/comment")" = "" ] && [ "$(sed -n 3p "$STUB/comment")" = "- codex: no findings" ]'
+check "the record and the whole reply are folded, a blank line follows the summary, the reply's result line is last inside the fold, and nothing follows the fold" 'fold_shape "REVIEW RESULT: NO FINDINGS" && folded | grep -qx -- "- Codex CLI: codex-stub" && folded | grep -qx -- "---" && [ "$(folded | sed -n "/^---\$/,\$p" | sed "1,2d;\$d")" = "$(cat "$STUB/reply")" ]'
 check "reviews the pull request head, not the dirty checkout" '[ "$(cat "$STUB/codex_head")" = "$H" ] && [ "$(cat "$STUB/codex_readme")" = change ]'
 # The model the record names comes only from the model: line of the header Codex writes at
 # the start of its run, between its two separator lines; nothing else from the log is posted.
@@ -307,13 +315,11 @@ check "MENTAT_CODEX_MODEL with a space is passed as one argument" '[ "$rc" = 0 ]
 reset; codex_header "model: gpt-stub-9.1"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2 <b>$(x)' run)
 check "a header naming another model than MENTAT_CODEX_MODEL is posted with the filtered model asked for" '[ "$rc" = 0 ] && posted && codex_model "gpt-stub-9.1 (asked for gpt-other-2bx)"'
 reset; rm "$STUB/reply"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run)
-check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex returned no final message; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/out"'
+check "a failed Codex run with MENTAT_CODEX_MODEL set did not finish, naming the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -qxF "codex: did not finish (Codex returned no final message; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL)" "$STUB/out" && heading "did not finish (Codex returned no final message; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL)"'
 reset; rm "$STUB/reply"; rc=$(run)
-check "a failed Codex run with MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex returned no final message" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
-reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run)
-check "a Codex reply with no result line and MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex.s reply has no final REVIEW RESULT line; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/out" && ! posted'
+check "a failed Codex run with MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 0 ] && grep -qxF "codex: did not finish (Codex returned no final message)" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
 reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
-check "a Codex reply with no result line and MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex.s reply has no final REVIEW RESULT line" "$STUB/out" && ! grep -q "MENTAT_CODEX_MODEL" "$STUB/out"'
+check "a Codex reply with no result line did not finish, and is not folded" '[ "$rc" = 0 ] && grep -qxF "codex: $NO_RESULT_ROW" "$STUB/out" && heading "$NO_RESULT_ROW" && ! grep -q "<details>" "$STUB/comment"'
 # The issues the pull request closes reach Codex as labeled data, ahead of the description.
 ref() { printf '{"number":%s,"repository":{"name":"%s","owner":{"login":"%s"}}}' "$3" "$2" "$1"; }
 reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(run)
@@ -326,7 +332,7 @@ reset; rc=$(run)
 check "no linked issue: no issue block" '[ "$rc" = 0 ] && ! grep -q "BEGIN LINKED ISSUE DATA" "$STUB/prompt"'
 check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$STUB/args"'
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
-reset; rc=$(cd "$root/work" && "$mentat" review --codex 7 >"$STUB/out" 2>&1; echo $?)
+reset; rc=$(run)
 gitdir=$(git -C "$root/work" rev-parse --path-format=absolute --git-common-dir)
 check "limits Codex's shell to core environment variables and no user git config" '[ "$rc" = 0 ] && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args" && grep -qx "shell_environment_policy.set={GIT_CONFIG_GLOBAL=\"/dev/null\"}" "$STUB/args"'
 check "the profile reads the main checkout's git directory, which a worktree's .git points to" '[ "$rc" = 0 ] && case "$gitdir" in */work/.git) true ;; *) false ;; esac && grep -qF "\"$gitdir\"=\"read\"" "$STUB/args" && ! grep -q -- "--sandbox" "$STUB/args"'
@@ -365,15 +371,16 @@ cp "$nodep/bin/node" "$npm/bin/node"
 reset; rc=$(PATH="$npm/bin:$PATH" run)
 rm -f "$npm/bin/node"
 check "an npm codex with node in the same prefix: the profile names that prefix once" '[ "$rc" = 0 ] && [ "$(grep -oF "\"$(real "$npm")\"=\"read\"" "$STUB/args" | wc -l | tr -d " ")" = 1 ]'
-# Installs in, inside or above the home folder are refused before Codex starts.
+# Installs in, inside or above the home folder are refused before Codex starts: Codex did
+# not finish, and the run goes on without it.
 refused() { # $1 who is installed there
-  [ "$rc" = 1 ] && grep -qxF "mentat: not reviewed: $1 installed in or above the home folder, which the Codex profile never grants" "$STUB/out" && [ ! -e "$STUB/args" ] && ! posted
+  [ "$rc" = 0 ] && grep -qxF "codex: did not finish ($1 installed in or above the home folder, which the Codex profile never grants)" "$STUB/out" && [ ! -e "$STUB/args" ]
 }
 refuse_at() { # $1 the folder to hold bin/codex, $2 where that is
   mkdir -p "$1/bin" && cp "$root/tools/bin/codex" "$1/bin/codex"
   reset; rc=$(PATH="$1/bin:$PATH" run)
   rm -rf "${1:?}/bin"
-  check "a codex installed $2 is not reviewed, and says why" 'refused "Codex is"'
+  check "a codex installed $2 does not run, and says why" 'refused "Codex is"'
 }
 refuse_at "$HOME" "in the home folder"
 refuse_at "$HOME/.local" "inside the home folder"
@@ -381,7 +388,7 @@ refuse_at "$root" "in a folder holding the home folder"
 nvm="$HOME/.nvm/versions/node/v1"
 mkdir -p "$nvm/bin" && cp "$nodep/bin/node" "$nvm/bin/node"
 reset; rc=$(PATH="$npm/bin:$nvm/bin:$PATH" run)
-check "an npm codex whose node is inside the home folder is not reviewed, and says why" 'refused "node, which runs Codex, is"'
+check "an npm codex whose node is inside the home folder does not run, and says why" 'refused "node, which runs Codex, is"'
 
 # A later round's head: the range still starts at the merge base, not at the head reviewed before.
 (cd "$root/seed" && echo fix >>README && git commit -qam fix && git push -q "$root/origin.git" HEAD:refs/pull/8/head)
@@ -391,9 +398,9 @@ check "a later round's head is still reviewed from the merge base, not from the 
 
 reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted findings on $H" "$STUB/out" && grep -q "(blocking) README:1" "$STUB/comment"'
-check "a FINDINGS reply's heading says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- (blocking) README:1 wrong text"'
+check "a FINDINGS reply's result line says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- (blocking) README:1 wrong text"'
 reset; printf 'REVIEW RESULT: NO FINDINGS\n\n- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
-check "the heading's result comes from the reply's final line only" '[ "$rc" = 2 ] && heading findings none && fold_shape "REVIEW RESULT: FINDINGS"'
+check "the result comes from the reply's final line only" '[ "$rc" = 2 ] && heading findings none && fold_shape "REVIEW RESULT: FINDINGS"'
 
 # Codex runs in a temporary checkout and may cite files by its absolute path, as created or
 # resolved. The posted comment holds neither, and links the file at the reviewed commit.
@@ -422,7 +429,7 @@ REVIEW RESULT: FINDINGS" ]'
 reset; printf -- '- (non-blocking) see @TREE@-other/z and /Users/other/tree/w\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a path that only starts with the checkout's name, and other absolute paths, are left alone" '[ "$rc" = 2 ] && grep -qxF -- "- (non-blocking) see $(cat "$STUB/tree")-other/z and /Users/other/tree/w" "$STUB/comment"'
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - could not read @TREE@/lib/z.sh\n' >"$STUB/reply"; rc=$(run)
-check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 1 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -q "incomplete: could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
+check "an INCOMPLETE reason that names the temporary checkout is posted and printed as a repository path" '[ "$rc" = 0 ] && ! leaked && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/comment" && heading "$INCOMPLETE_ROW" none && fold_shape "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" && grep -qx "REVIEW RESULT: INCOMPLETE - could not read lib/z.sh" "$STUB/out" && ! grep -qF "$(cat "$STUB/tree")" "$STUB/out"'
 # Link forms: an angle-bracket target, parentheses in a file name, and a line given only in the link text.
 reset; cat >"$STUB/reply" <<'REPLYEOF'
 - (non-blocking) [a dir/a file.txt:7](<@TREE@/a dir/a file.txt:7>): angle target
@@ -461,22 +468,24 @@ printf -- '- (blocking) [README:1](%s/README:1): wrong\n- (non-blocking) %s/lib/
 check "a checkout path with spaces and special characters is rewritten, and only that path" '(. "$(dirname "$mentat")/../lib/shared.sh" && localize_review_paths "$STUB/odd.md" owner/repo "$H" "$odd") && [ "$(cat "$STUB/odd.md")" = "- (blocking) [README:1]($REPO_URL/README#L1): wrong
 - (non-blocking) lib/a b.sh:3 and $odd""2/keep" ]'
 
-# The publish check, on the final comment, right before the post.
+# The publish check, on the final comment, right before the post: a held comment is not
+# posted (exit 9) and is kept whole; no mentat: line repeats the match. The reply was
+# already printed to this terminal, as every reply is before the wait for CI.
 held_file() { sed -n 's/.*the maintainer can read it at //p' "$STUB/out"; }
-held() { # $1 category, $2 the match: not posted, not reviewed, kept whole, and no message repeats it
-  [ "$rc" = 1 ] && ! posted && grep -q "not reviewed: the comment holds $1, so it was not posted" "$STUB/out" &&
-    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Local Codex review of $H" "$(held_file)" && [ "$(last_in_fold "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep -qiF -- "$2" "$STUB/out"
+held() { # $1 category, $2 the match
+  [ "$rc" = 9 ] && ! posted && grep -q "^mentat: not posted: the comment holds $1, so it was not posted" "$STUB/out" &&
+    grep -qiF -- "$2" "$(held_file)" && grep -q "^## Outside review of $H" "$(held_file)" && [ "$(last_in_fold "$(held_file)")" = "$(tail -n 1 "$STUB/reply")" ] && ! grep "^mentat:" "$STUB/out" | grep -qiF -- "$2"
 }
 printf '# a comment\n\nStubCodename\n' >"$LIST"
 reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$HOME" >"$STUB/reply"; rc=$(run)
-check "a comment with the home path is not posted, exits as not reviewed, is kept, and no message repeats it" 'held "a local path" "$HOME"'
+check "a comment with the home path is not posted (exit 9), is kept, and no mentat: line repeats it" 'held "a local path" "$HOME"'
 check "a hit looks up the reviewed repository" 'grep -qF "repo view owner/repo --json isPrivate" "$STUB/calls"'
 rm -f "$(held_file)"
 reset; printf -- '- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a comment with a word from the list, in another case, is the same" 'held "a configured private name" stubcodename'
 rm -f "$(held_file)"
 reset; printf 'Stopped at stubcodename.\n\nREVIEW RESULT: INCOMPLETE - could not read stubcodename\n' >"$STUB/reply"; rc=$(run)
-check "an INCOMPLETE reason is checked before it is posted or printed" 'held "a configured private name" stubcodename'
+check "an INCOMPLETE reason is checked before it is posted" 'held "a configured private name" stubcodename'
 rm -f "$(held_file)"
 reset; touch "$STUB/lookup_fails"; printf -- '- (non-blocking) about stubcodename\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "a failed visibility lookup counts as public" 'held "a configured private name" stubcodename'
@@ -492,21 +501,18 @@ reset; printf -- '- (non-blocking) %s/notes.md\n\nREVIEW RESULT: FINDINGS\n' "$H
 check "with a missing word list the home path is still found" 'held "a local path" "$HOME"'
 rm -f "$(held_file)"
 
-reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run)
-check "a reply without a result line is not reviewed and not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'
-
 # A reply that could not read a material file or the diff ends INCOMPLETE: it is posted,
-# so the reason is on the pull request, and it is not reviewed.
+# so the reason is on the pull request, and Codex did not finish the review.
 reset; printf 'I could not read the linked issue.\n\nREVIEW RESULT: INCOMPLETE - the linked issue could not be read\n' >"$STUB/reply"; rc=$(run)
-check "an INCOMPLETE reply with a reason is posted and not reviewed (exit 1), with the reason" '[ "$rc" = 1 ] && posted && heading incomplete none && fold_shape "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" && folded | grep -qx "I could not read the linked issue." && grep -q "not reviewed: Codex says the review is incomplete: the linked issue could not be read" "$STUB/out" && ! grep -q "posted findings\|found nothing" "$STUB/out"'
+check "an INCOMPLETE reply with a reason is posted, folded with its reason, and did not finish (exit 0)" '[ "$rc" = 0 ] && posted && heading "$INCOMPLETE_ROW" none && fold_shape "REVIEW RESULT: INCOMPLETE - the linked issue could not be read" && folded | grep -qx "I could not read the linked issue." && grep -qxF "codex: $INCOMPLETE_ROW" "$STUB/out" && ! grep -q "posted findings" "$STUB/out"'
 for bare in 'REVIEW RESULT: INCOMPLETE' 'REVIEW RESULT: INCOMPLETE -' 'REVIEW RESULT: INCOMPLETE -   '; do
   reset; printf 'Could not finish.\n\n%s\n' "$bare" >"$STUB/reply"; rc=$(run)
-  check "an INCOMPLETE line without a reason ('$bare') is no final result line and is not posted" '[ "$rc" = 1 ] && grep -q "no final REVIEW RESULT line" "$STUB/out" && ! posted'
+  check "an INCOMPLETE line without a reason ('$bare') is no final result line, and its reply is not posted" '[ "$rc" = 0 ] && grep -qxF "codex: $NO_RESULT_ROW" "$STUB/out" && heading "$NO_RESULT_ROW" && ! grep -q "Could not finish" "$STUB/comment"'
 done
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; echo 3333333333333333333333333333333333333333 >"$STUB/moved_head"; rc=$(run)
 check "an INCOMPLETE reply whose head moved is exit 3 and not posted" '[ "$rc" = 3 ] && ! posted'
 reset; printf 'Could not finish.\n\nREVIEW RESULT: INCOMPLETE - the diff could not be read\n' >"$STUB/reply"; touch "$STUB/comment_fails"; rc=$(run)
-check "an INCOMPLETE reply that cannot be posted is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post the review" "$STUB/out" && ! grep -q "Codex says the review is incomplete" "$STUB/out"'
+check "an INCOMPLETE reply that cannot be posted is an error (exit 1)" '[ "$rc" = 1 ] && grep -q "could not post the outside review" "$STUB/out"'
 reset; rc=$(run)
 check "the prompt offers the three final lines" '[ "$rc" = 0 ] && grep -qx "REVIEW RESULT: NO FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: FINDINGS" "$STUB/prompt" && grep -qx "REVIEW RESULT: INCOMPLETE - <what could not be read>" "$STUB/prompt"'
 
@@ -529,9 +535,9 @@ check "a review leaves the checkout's origin/main alone" '[ "$rc" = 0 ] && [ "$(
 git -C "$root/work" update-ref refs/remotes/origin/main "$BASE"
 
 reset; touch "$STUB/comment_fails"; rc=$(run)
-check "a failed post is not reviewed" '[ "$rc" = 1 ] && grep -q "could not post the review" "$STUB/out"'
+check "a failed post is an error (exit 1)" '[ "$rc" = 1 ] && grep -q "could not post the outside review" "$STUB/out"'
 
-rc=$("$mentat" review --codex abc >/dev/null 2>&1; echo $?)
+rc=$("$mentat" review --outside abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 # --request <file>: the agreed request, kept apart from the description. Read before CI;
@@ -540,12 +546,12 @@ REQ_TEXT=$'Make the README say change.\nLeave every other file alone.\nChecked b
 REQ_FP=71fca9a263e9  # shasum -a 256 of REQ_TEXT, first 12 hex characters, computed independently
 mkdir -p "$root/req dir"
 printf '%s\n' "$REQ_TEXT" >"$root/req dir/agreed request.md"
-runq() { (cd "$root/work" && "$mentat" review --codex --request "$1" "${2:-7}" >"$STUB/out" 2>&1); echo $?; }
+runq() { runrc --request "$1" "${2:-7}"; }
 reset; rc=$(runq "$root/req dir/agreed request.md")
 check "--request: the request reaches Codex in its own labeled block, a path with spaces works" '[ "$rc" = 0 ] && sed -n "/^--- BEGIN AGREED REQUEST DATA ---\$/,/^--- END AGREED REQUEST DATA ---\$/p" "$STUB/prompt" | grep -qxF "Leave every other file alone." && grep -qx -- "--- END AGREED REQUEST DATA ---" "$STUB/prompt" && grep -q "BEGIN PULL REQUEST DATA" "$STUB/prompt"'
-check "--request: the posted comment records the request fingerprint (first 12 hex of its SHA-256), in the heading and in the fold" 'grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment" && [ "${#REQ_FP}" = 12 ] && heading "no findings" "$REQ_FP" && folded | grep -qx -- "- Agreed request fingerprint: $REQ_FP"'
+check "--request: the posted comment's heading records the request fingerprint (first 12 hex of its SHA-256)" '[ "${#REQ_FP}" = 12 ] && heading "no findings" "$REQ_FP"'
 reset; rc=$(run)
-check "no --request: no agreed request block, and the comment says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && grep -qx -- "- Agreed request fingerprint: none" "$STUB/comment" && heading "no findings" none && folded | grep -qx -- "- Agreed request fingerprint: none"'
+check "no --request: no agreed request block, and the heading says the fingerprint is none" '[ "$rc" = 0 ] && ! grep -q "AGREED REQUEST DATA" "$STUB/prompt" && heading "no findings" none'
 reset; echo "[$(ref owner repo 3)]" >"$STUB/closes"; printf 'Make the README say change\nThe README must say change, nothing else.\n' >"$STUB/issue_owner_repo_3"; rc=$(runq "$root/req dir/agreed request.md")
 check "--request with a linked issue: both blocks reach Codex" '[ "$rc" = 0 ] && grep -qx -- "--- BEGIN AGREED REQUEST DATA ---" "$STUB/prompt" && grep -qx -- "--- BEGIN LINKED ISSUE DATA ---" "$STUB/prompt" && grep -q "Issue owner/repo#3: Make the README say change" "$STUB/prompt"'
 printf ' \n\t\n\n' >"$root/blank.md"
@@ -560,25 +566,24 @@ reset; unread "with an unreadable file" "$root/locked.md" "could not read the ag
 reset; unread "with a directory" "$root" "could not read the agreed request file"
 reset; unread "with an empty file name (an empty variable)" "" "request file name for #7 is empty"
 chmod 600 "$root/locked.md"
-rc=$("$mentat" review --codex --request >"$STUB/out" 2>&1; echo $?)
+rc=$("$mentat" review --outside --request >"$STUB/out" 2>&1; echo $?)
 check "--request without a file and a pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 
 # --require-ci: a head where no CI check ran is not a pass.
-runrc() { (cd "$root/work" && "$mentat" review --codex "$@" >"$STUB/out" 2>&1); echo $?; }
-reset; claude_reviewed; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
+reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci 7)
 check "--require-ci with no CI check on the head exits 4, says so, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
-check "--require-ci: a review not posted for a head with no CI leaves Codex none on the head Claude reviewed" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, grok: none, grok stop: none, codex: none, ci:"'
+check "--require-ci: a review not posted for a head with no CI leaves the outside review none on the head Claude reviewed" 'status | grep -qF "local rounds 1 of 5, head reviewed: yes, outside: none, ci:"'
 reset; echo '{"check_runs":[]}' >"$STUB/check_runs.json"; rc=$(runrc --require-ci --request "$root/req dir/agreed request.md" 7)
 check "--require-ci before --request works the same" '[ "$rc" = 4 ] && ! posted && grep -qx "No CI checks ran on $H" "$STUB/out" && grep -q "BEGIN AGREED REQUEST DATA" "$STUB/prompt"'
 reset; rc=$(runrc --request "$root/req dir/agreed request.md" --require-ci 7)
-check "--require-ci after --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && posted && grep -qx -- "- Agreed request fingerprint: $REQ_FP" "$STUB/comment"'
+check "--require-ci after --request, with CI passed, posts as usual (exit 0)" '[ "$rc" = 0 ] && posted && heading "no findings" "$REQ_FP"'
 # --require-ci: a pull request that conflicts with its base branch is not a pass (tests/review-local.sh covers the rest).
 reset; printf -- '- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; echo CONFLICTING >"$STUB/mergeable"; rc=$(runrc --require-ci 7)
 check "--require-ci with every check passed on a conflicting pull request exits 4, says it conflicts, prints the review and posts nothing" '[ "$rc" = 4 ] && ! posted && grep -qxF "Pull request #7 conflicts with its base branch, so its tests did not run on $H. Resolve the conflict and push." "$STUB/out" && [ "$(unposted)" = "$(cat "$STUB/reply")" ] && [ "$(order)" = "model ci " ]'
 for args in "--require-ci --require-ci 7" "--require-ci" "--require-ci 7 8"; do
   # shellcheck disable=SC2086 # the words are the arguments
-  rc=$("$mentat" review --codex $args >/dev/null 2>&1; echo $?)
-  check "usage error (exit 64) for: review --codex $args" '[ "$rc" = 64 ]'
+  rc=$("$mentat" review --outside $args >/dev/null 2>&1; echo $?)
+  check "usage error (exit 64) for: review --outside $args" '[ "$rc" = 64 ]'
 done
 
 # Interrupts. mentat runs in its own process group with default INT handling (a job this
@@ -588,11 +593,12 @@ done
 worktrees() { git -C "$root/work" worktree list | wc -l | tr -d ' '; }
 interrupt() { # $1 model or ci, $2 signal, $3 group or pid
   local i
+  claude_clean
   (
     cd "$root/work" || exit 1
     # A long pause between CI reads, which the signal must not wait out.
     [ "$1" = model ] || export MENTAT_REVIEW_INTERVAL_SECONDS=30 MENTAT_CI_TIMEOUT_SECONDS=120
-    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --codex 7 >"$STUB/out" 2>&1
+    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --outside 7 >"$STUB/out" 2>&1
   ) &
   ip=$! ready=no
   for i in $(seq 100); do
@@ -616,43 +622,45 @@ reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
 check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 
-# Codex's failures in a row are kept in its own record; from the second, a line tells the
-# maintainer now. A refusal of where Codex is installed is not Codex's failure.
+# Codex's failures in a row are kept in its own record, keyed by the adapter's name; from the
+# second, a line tells the maintainer now. A refusal of where Codex is installed is not
+# Codex's failure.
 REC="$XDG_CACHE_HOME/mentat/reviewer-failures-codex"
 raised() { grep '^mentat: tell the maintainer now:' "$STUB/out"; }
-reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run 7)
-check "a first Codex failure (its time limit) is recorded and not raised" '[ "$rc" = 1 ] && grep -q "^mentat: not reviewed: Codex did not finish within 0 seconds" "$STUB/out" && [ -z "$(raised)" ] && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ]'
+reset; touch "$STUB/hang"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run 7)
+check "a first Codex failure (the time limit) is recorded and not raised" '[ "$rc" = 0 ] && grep -qxF "codex: did not finish (Codex did not finish within 1 seconds)" "$STUB/out" && [ -z "$(raised)" ] && [ "$(cut -d" " -f2,3 "$REC")" = "fail owner/repo#7" ]'
+check "the timed-out Codex was stopped" '! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null'
 stub_reset; echo "$H2" >"$STUB/head"; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 8)
-check "a second Codex failure in a row (no result line), on another pull request, is raised naming Codex, both pull requests and the reason" '[ "$rc" = 1 ] && [ "$(raised)" = "mentat: tell the maintainer now: Codex has failed 2 times in a row (owner/repo#7, owner/repo#8): Codex'"'"'s reply has no final REVIEW RESULT line" ] && [ ! -e "$XDG_CACHE_HOME/mentat/reviewer-failures-claude" ]'
+check "a second Codex failure in a row (no result line), on another pull request, is raised naming Codex, both pull requests and the reason" '[ "$rc" = 0 ] && [ "$(raised)" = "mentat: tell the maintainer now: Codex has failed 2 times in a row (owner/repo#7, owner/repo#8): Codex'"'"'s reply has no final REVIEW RESULT line" ] && [ ! -e "$XDG_CACHE_HOME/mentat/reviewer-failures-claude" ]'
 lines=$(wc -l <"$REC")
 mkdir -p "$HOME/bin" && cp "$root/tools/bin/codex" "$HOME/bin/codex"
 stub_reset; rc=$(PATH="$HOME/bin:$PATH" run 7)
 rm -rf "${HOME:?}/bin"
-check "a refusal of where Codex is installed changes nothing in the record and is not raised" '[ "$rc" = 1 ] && grep -q "installed in or above the home folder" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
+check "a refusal of where Codex is installed changes nothing in the record and is not raised" '[ "$rc" = 0 ] && grep -q "installed in or above the home folder" "$STUB/out" && [ -z "$(raised)" ] && [ "$(wc -l <"$REC")" = "$lines" ]'
 stub_reset; rc=$(run 7)
 check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
-check "a Codex failure after a checked reply is not raised" '[ "$rc" = 1 ] && [ -z "$(raised)" ]'
+check "a Codex failure after a checked reply is not raised" '[ "$rc" = 0 ] && [ -z "$(raised)" ]'
 reset
 
-# At start, Grok run folders older than a day, and kept logs and held comments older than
-# seven days, are deleted. Newer ones, other names, symlinks and their targets stay.
+# At start, reviewers' run folders older than a day, and kept logs and held comments older
+# than seven days, are deleted. Newer ones, other names, symlinks and their targets stay.
 ago() { touch -h -t "$(date -v-"$1"M +%Y%m%d%H%M.%S)" "$2"; } # $1 minutes ago, $2 path
 c="$XDG_CACHE_HOME/mentat" elsewhere="$root/elsewhere"
 mkdir -p "$c" "$elsewhere/dir" && echo keep >"$elsewhere/dir/f" && echo keep >"$elsewhere/file"
-for d in grok-review.old grok-opinion.old grok-opinion-web.old grok-review.new grok-reviewx; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
-ln -s "$elsewhere/dir" "$c/grok-review.link"
-for f in mentat-codex-log.old mentat-grok-log.old mentat-held-comment.old mentat-codex-log.new mentat-codex-logs; do echo x >"$TMPDIR/$f"; done
-ln -s "$elsewhere/file" "$TMPDIR/mentat-grok-log.link"
-for p in grok-review.old grok-opinion.old grok-opinion-web.old; do ago 1445 "$c/$p"; done
-ago 1435 "$c/grok-review.new"
-for p in "$c/grok-reviewx" "$c/grok-review.link" "$elsewhere/dir"; do ago 2880 "$p"; done
-for p in mentat-codex-log.old mentat-grok-log.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
-ago 10075 "$TMPDIR/mentat-codex-log.new"
-for p in "$TMPDIR/mentat-codex-logs" "$TMPDIR/mentat-grok-log.link" "$elsewhere/file"; do ago 20160 "$p"; done
+for d in run-grok.old run-other.old run-grok.new runx-grok; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
+ln -s "$elsewhere/dir" "$c/run-grok.link"
+for f in mentat-log.codex.old mentat-log.grok.old mentat-held-comment.old mentat-log.codex.new mentat-logs; do echo x >"$TMPDIR/$f"; done
+ln -s "$elsewhere/file" "$TMPDIR/mentat-log.grok.link"
+for p in run-grok.old run-other.old; do ago 1445 "$c/$p"; done
+ago 1435 "$c/run-grok.new"
+for p in "$c/runx-grok" "$c/run-grok.link" "$elsewhere/dir"; do ago 2880 "$p"; done
+for p in mentat-log.codex.old mentat-log.grok.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
+ago 10075 "$TMPDIR/mentat-log.codex.new"
+for p in "$TMPDIR/mentat-logs" "$TMPDIR/mentat-log.grok.link" "$elsewhere/file"; do ago 20160 "$p"; done
 reset; rc=$(run)
-check "at start, deletes Grok run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/grok-review.old" ] && [ ! -e "$c/grok-opinion.old" ] && [ ! -e "$c/grok-opinion-web.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ] && [ ! -e "$TMPDIR/mentat-grok-log.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
-check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/grok-review.new/f" ] && [ -f "$c/grok-reviewx/f" ] && [ -L "$c/grok-review.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-codex-log.new" ] && [ -f "$TMPDIR/mentat-codex-logs" ] && [ -L "$TMPDIR/mentat-grok-log.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
+check "at start, deletes run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/run-grok.old" ] && [ ! -e "$c/run-other.old" ] && [ ! -e "$TMPDIR/mentat-log.codex.old" ] && [ ! -e "$TMPDIR/mentat-log.grok.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
+check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/run-grok.new/f" ] && [ -f "$c/runx-grok/f" ] && [ -L "$c/run-grok.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-log.codex.new" ] && [ -f "$TMPDIR/mentat-logs" ] && [ -L "$TMPDIR/mentat-log.grok.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
 rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
 
 # Outside reviewers off, or unknown, on main: refused (exit 6) before anything else. Each
@@ -664,17 +672,17 @@ gate_clone() { # $1 name, $2 main's .claude/settings.json
     (cd "$root/$1 seed" && printf '%s' "$2" >.claude/settings.json && git commit -qam settings && git push -q origin HEAD:main) &&
     git clone -q --no-local "$root/$1 origin.git" "$root/$1 work"
 }
-gate_clone off '{"enabledPlugins":{"mentat-reviewers@mentat":false}}' || exit 1
+gate_clone off '{"enabledPlugins":{"mentat-reviewers@mentat":false},"env":{"MENTAT_REVIEWERS":"codex"}}' || exit 1
 gate_clone unknown '{"enabledPlugins":' || exit 1
-OFF_LINE="mentat: not run: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on main); Claude's review is the review here"
-UNKNOWN_LINE="mentat: not run: outside reviewers are unknown in this repository (.claude/settings.json on main could not be read as JSON); Codex and Grok run only once it reads as on"
-gate_run() { (cd "$root/$1 work" && shift && "$mentat" review --codex "$@" >"$STUB/out" 2>&1); echo $?; }
+OFF_LINE="mentat: not run: outside reviewers are off in this repository (the mentat-reviewers module is not on in .claude/settings.json on main)"
+UNKNOWN_LINE="mentat: not run: outside reviewers are unknown in this repository (.claude/settings.json on main could not be read as JSON), so none runs"
+gate_run() { (cd "$root/$1 work" && shift && "$mentat" review --outside "$@" >"$STUB/out" 2>&1); echo $?; }
 gate_refused() { # $1 the clone, $2 the one line printed
   [ "$rc" = 6 ] && [ "$(cat "$STUB/out")" = "$2" ] && [ ! -f "$STUB/calls" ] && [ ! -f "$STUB/prompt" ] && ! posted &&
-    [ -f "$TMPDIR/mentat-codex-log.old" ] && ! git -C "$root/$1 work" cat-file -e "$H^{commit}" 2>/dev/null &&
+    [ -f "$TMPDIR/mentat-log.codex.old" ] && ! git -C "$root/$1 work" cat-file -e "$H^{commit}" 2>/dev/null &&
     [ -z "$(git -C "$root/$1 work" for-each-ref refs/mentat)" ] && [ "$(git -C "$root/$1 work" worktree list | wc -l | tr -d ' ')" = 1 ]
 }
-echo x >"$TMPDIR/mentat-codex-log.old" && ago 10085 "$TMPDIR/mentat-codex-log.old"
+echo x >"$TMPDIR/mentat-log.codex.old" && ago 10085 "$TMPDIR/mentat-log.codex.old"
 reset; rc=$(gate_run off 7)
 check "outside reviewers off: exit 6, says so, and reads, posts, sweeps, fetches and runs nothing" 'gate_refused off "$OFF_LINE"'
 reset; rc=$(gate_run off --require-ci 7)
@@ -683,7 +691,7 @@ reset; rc=$(gate_run unknown 7)
 check "outside reviewers unknown: exit 6, says why, and reads, posts, sweeps, fetches and runs nothing" 'gate_refused unknown "$UNKNOWN_LINE"'
 reset; rc=$(gate_run off abc)
 check "outside reviewers off, a pull request that is not a number is still a usage error (exit 64), reading nothing" '[ "$rc" = 64 ] && grep -q "usage: mentat review" "$STUB/out" && [ ! -f "$STUB/calls" ]'
-rm -f "$TMPDIR/mentat-codex-log.old"
+rm -f "$TMPDIR/mentat-log.codex.old"
 
 check "never runs claude" '[ ! -e "$root/claude_called" ]'
 
@@ -693,7 +701,7 @@ check "never runs claude" '[ ! -e "$root/claude_called" ]'
 # behaves the same, and it says nothing about Linux or model-backed behavior.
 # A control that cannot run (a missing tool, or the outer sandbox of an agent session
 # blocking one) fails, like a probe that is broken (the launcher failed).
-live="review --codex live sandbox"
+live="review --outside, codex live sandbox"
 live_fail() {
   printf 'FAIL: %s: %s\n' "$live" "$1"
   failures=$((failures + 1))

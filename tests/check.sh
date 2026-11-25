@@ -320,30 +320,41 @@ unreadable "a copy with no scope" '[{"id":"mentat@mentat","version":"1.0.0"}]'
 unreadable "a version that holds a path" "[$(entry mentat@mentat user 1.0.0),$(entry mentat@mentat project /stubleakedpath/stubprojectname)]"
 unreadable "a scope that holds a project name" "[$(entry mentat@mentat user 1.0.0),$(entry mentat@mentat "project stubprojectname" 1.1.0)]"
 
-# Outside reviewers, and the codex and grok lines. A closed PATH holds the tools check
-# needs, with no codex or grok, or with stub ones. Origin's main changes while the clone's
+# Outside reviewers: the switch, then each listed reviewer from the module's offline check,
+# and the module's notes. A closed PATH holds the tools check needs, with no codex or grok,
+# or with stub ones; Grok's home holds a sign-in. Origin's main changes while the clone's
 # origin/main stays as cloned (off), so each read is fresh.
-mkdir "$root/noreviewers" "$root/reviewers"
+mkdir "$root/noreviewers" "$root/reviewers" "$root/grok home"
+printf '{"fake":"credential"}\n' >"$root/grok home/auth.json"
 for t in git jq; do ln -s "$(command -v $t)" "$root/noreviewers/$t" && ln -s "$(command -v $t)" "$root/reviewers/$t"; done
 ln -s "$root/bin/gh" "$root/bin/claude" "$root/bin/gitleaks" "$root/noreviewers/" && ln -s "$root/bin/gh" "$root/bin/claude" "$root/bin/gitleaks" "$root/reviewers/"
-for t in codex grok; do printf '#!/bin/sh\nexit 0\n' >"$root/reviewers/$t" && chmod +x "$root/reviewers/$t"; done
-tools_run() { (cd "$root/cwd" && PATH="$1:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1); echo $?; }
+for t in codex grok; do printf '#!/bin/sh\necho "$0 $*" >>"$STUB/tool_calls"\nexit 0\n' >"$root/reviewers/$t" && chmod +x "$root/reviewers/$t"; done
+unset MENTAT_GROK_TIMEOUT_SECONDS MENTAT_REVIEWERS
+tools_run() { (cd "$root/cwd" && GROK_HOME="$root/grok home" PATH="$1:/usr/bin:/bin" "$mentat" check >"$STUB/out" 2>&1); echo $?; }
 no_tools() { (PATH="$root/noreviewers:/usr/bin:/bin"; ! command -v codex >/dev/null && ! command -v grok >/dev/null); }
+no_reviewer_lines() { ! grep -q 'outside reviewer ' "$STUB/out" && [ ! -f "$STUB/tool_calls" ]; }
 REVIEWERS_ON_LINE="OK: outside reviewers are on here (mentat-reviewers is on in .claude/settings.json on main)"
+LISTED='{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":{"MENTAT_REVIEWERS":"codex,grok"}}'
 reset; rc=$(tools_run "$root/noreviewers")
-check "off, with codex and grok not installed: each is OK, with no warning" 'no_tools && [ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && grep -qx "OK: codex is not installed" "$STUB/out" && grep -qx "OK: grok is not installed" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+check "off, with codex and grok not installed: no reviewer line and no warning" 'no_tools && [ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (0 warning(s))" ]'
+reset; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 tools_run "$root/reviewers")
+check "MENTAT_GROK_TIMEOUT_SECONDS set: one warning says it is not read, though outside reviewers are off" '[ "$rc" = 0 ] && grep -qxF "WARN: MENTAT_GROK_TIMEOUT_SECONDS is set but not read: MENTAT_REVIEW_TIMEOUT_SECONDS is the one time limit for every reviewer" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
+origin_has "$LISTED" || exit 1
 reset; rc=$(tools_run "$root/reviewers")
-check "off, with codex and grok installed: each is OK" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && grep -qx "OK: codex is installed" "$STUB/out" && grep -qx "OK: grok is installed" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
-origin_has "$REVIEWERS_ON" || exit 1
+check "on in main on origin, though the clone's origin/main says off, listing codex and grok, both available: OK lines, no warning, no tool run" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "OK: outside reviewer codex is listed and available" "$STUB/out" && grep -qx "OK: outside reviewer grok is listed and available" "$STUB/out" && [ ! -f "$STUB/tool_calls" ] && [ "$(last)" = "Check OK (0 warning(s))" ] && [ "$(git -C "$root/cwd" cat-file blob refs/remotes/origin/main:.claude/settings.json)" = "$REVIEWERS_OFF" ]'
 reset; rc=$(tools_run "$root/noreviewers")
-check "on in main on origin, though the clone's origin/main says off; codex and grok missing warn, still exit 0" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "WARN: codex is not installed: Codex reviews will not run here" "$STUB/out" && grep -qx "WARN: grok is not installed: Grok reviews will not run here" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ] && [ "$(git -C "$root/cwd" cat-file blob refs/remotes/origin/main:.claude/settings.json)" = "$REVIEWERS_OFF" ]'
-reset; rc=$(tools_run "$root/reviewers")
-check "on, with codex and grok installed: each is OK, with no warning" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "OK: codex is installed" "$STUB/out" && grep -qx "OK: grok is installed" "$STUB/out" && [ "$(last)" = "Check OK (0 warning(s))" ]'
+check "on, listing codex and grok, neither installed: one warning each, naming why, still exit 0" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "WARN: outside reviewer codex is listed but not available: codex is not installed; it will not finish here" "$STUB/out" && grep -qx "WARN: outside reviewer grok is listed but not available: grok is not installed; it will not finish here" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ]'
 reset; touch "$STUB/signed_out"; rc=$(run)
 check "the outside reviewers line prints though check stops at the gh sign-in" '[ "$rc" = 1 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -q "^PROBLEM: gh is not signed in" "$STUB/out"'
+origin_has '{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":{"MENTAT_REVIEWERS":"codex other-9"}}' || exit 1
+reset; rc=$(tools_run "$root/reviewers")
+check "on, listing a name the module does not ship: one warning names it as skipped and why; the rest are checked" '[ "$rc" = 0 ] && grep -qx "OK: outside reviewer codex is listed and available" "$STUB/out" && grep -qx "WARN: outside reviewer other-9 is listed but skipped: the mentat-reviewers module has no such reviewer" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+origin_has "$REVIEWERS_ON" || exit 1
+reset; rc=$(tools_run "$root/reviewers")
+check "on, none listed: one warning says so and that none will run" '[ "$rc" = 0 ] && grep -qxF "WARN: outside reviewers are on here, none listed: MENTAT_REVIEWERS in the env of .claude/settings.json on main names none, so none will run" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
 origin_has '{"enabledPlugins":' || exit 1
 reset; rc=$(tools_run "$root/noreviewers")
-check "unknown: one warning says why and that Codex and Grok will not run, and codex and grok missing are OK" '[ "$rc" = 0 ] && grep -qxF "WARN: outside reviewers are unknown here: .claude/settings.json on main could not be read as JSON; Codex and Grok will not run" "$STUB/out" && grep -qx "OK: codex is not installed" "$STUB/out" && grep -qx "OK: grok is not installed" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+check "unknown: one warning says why and that none will run" '[ "$rc" = 0 ] && grep -qxF "WARN: outside reviewers are unknown here: .claude/settings.json on main could not be read as JSON; none will run" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
 origin_has "$REVIEWERS_OFF" || exit 1
 
 rc=$("$mentat" check owner/repo >/dev/null 2>&1; echo $?)

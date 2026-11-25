@@ -76,8 +76,21 @@ reset; runs completed skipped >"$STUB/check_runs.json"; rc=$(runci)
 check "ci does not let a skipped check block (exit 0)" '[ "$rc" = 0 ] && grep -q "CI passed on $H" "$STUB/out"'
 rc=$("$mentat" ci abc >/dev/null 2>&1; echo $?)
 check "ci with a bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
-rc=$("$mentat" review 7 --codex >"$STUB/out" 2>&1; echo $?)
-check "an argument after the number is a usage error, not ignored (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" "$STUB/out"'
+rc=$("$mentat" review 7 --outside >"$STUB/out" 2>&1; echo $?)
+check "an argument after the number is a usage error, not ignored (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" "$STUB/out"'
+# A reviewer's own mode is gone: every outside reviewer runs with --outside. Each such
+# flag exits 64 before reading anything, and names --outside.
+for args in "--codex 7" "--grok 7" "--grok --stop 7" "--codex --request f 7" "--stop 7"; do
+  reset
+  # shellcheck disable=SC2086 # split on purpose
+  rc=$("$mentat" review $args >"$STUB/out" 2>&1; echo $?)
+  check "mentat review $args exits 64, posts and reads nothing, and names --outside" '[ "$rc" = 64 ] && grep -qF "mentat review --outside <pull request number>" "$STUB/out" && [ ! -f "$STUB/calls" ]'
+done
+# The one time limit, MENTAT_REVIEW_TIMEOUT_SECONDS: a whole number of 1 or more.
+for bad in 0 00 abc -1 1.5 " 5"; do
+  reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=$bad "$mentat" review 7 >"$STUB/out" 2>&1; echo $?)
+  check "MENTAT_REVIEW_TIMEOUT_SECONDS=\"$bad\" is a usage error (exit 64) that reads nothing" '[ "$rc" = 64 ] && grep -qxF "mentat: MENTAT_REVIEW_TIMEOUT_SECONDS must be a whole number of 1 or more, not \"$bad\"" "$STUB/out" && [ ! -f "$STUB/calls" ]'
+done
 rc=$("$mentat" review abc >/dev/null 2>&1; echo $?)
 check "bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ]'
 

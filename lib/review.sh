@@ -1,9 +1,17 @@
 # shellcheck shell=bash
-# The local review (`mentat review`, and the reviewers module's `--codex`) and
-# its default reviewer, a headless Claude: run_claude. Sourced by
-# bin/mentat and by the reviewers module's entries.
+# The local review (`mentat review`) and its reviewer, a headless Claude: run_claude.
+# Sourced by bin/mentat and by the reviewers module's entries, which share the time
+# limit, the fetch and the checkout.
 
-REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1200}"
+# The one time limit for every reviewer, Claude and each outside reviewer alike.
+REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1800}"
+# Every command that runs a reviewer calls this first: anything but a whole number of 1
+# or more (leading zeros allowed and dropped) is a usage error.
+review_timeout() {
+  case "$REVIEW_TIMEOUT_SECONDS" in '' | *[!0-9]*) die "MENTAT_REVIEW_TIMEOUT_SECONDS must be a whole number of 1 or more, not \"$REVIEW_TIMEOUT_SECONDS\"" 64 ;; esac
+  [ $((10#$REVIEW_TIMEOUT_SECONDS)) -ge 1 ] || die "MENTAT_REVIEW_TIMEOUT_SECONDS must be a whole number of 1 or more, not \"$REVIEW_TIMEOUT_SECONDS\"" 64
+  REVIEW_TIMEOUT_SECONDS=$((10#$REVIEW_TIMEOUT_SECONDS))
+}
 # The reviewer runs in a fresh context that never saw the build, on a configurable model.
 # The review default, the one place in code its value is named; docs/settings.md lists it,
 # and tests/settings.sh keeps the two in step.
@@ -13,7 +21,7 @@ REVIEW_MODEL="${MENTAT_REVIEW_MODEL:-$MENTAT_REVIEW_MODEL_DEFAULT}"
 FIRST_REVIEW_MODEL="${MENTAT_FIRST_REVIEW_MODEL:-}"
 # Read tools only, and no shell: the runner hands the diff and the commit log over as files.
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob"
-# Effort is pinned, as Codex's is; the record names it as the level asked for.
+# Effort is pinned; the record names it as the level asked for.
 CLAUDE_REVIEW_EFFORT=high
 
 # Sets the caller's limit to the local review rounds a pull request may use:
@@ -53,7 +61,7 @@ run_claude() {
   # $SECONDS counts whole seconds, so a limit stops Claude up to a second late, never early.
   secs=$SECONDS
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$REVIEW_TIMEOUT_SECONDS" -eq 0 ] || [ $((SECONDS - secs)) -gt "$REVIEW_TIMEOUT_SECONDS" ]; then
+    if [ $((SECONDS - secs)) -gt "$REVIEW_TIMEOUT_SECONDS" ]; then
       kill "$pid" 2>/dev/null
       sleep 2
       kill -9 "$pid" 2>/dev/null
@@ -163,7 +171,7 @@ first_round_not_reviewed() { review_tool_failed "$1; $first_note" "${2:-$1}; $fi
 # given, is the reason without the reviewer's own text, for the line that tells the
 # maintainer now.
 review_tool_failed() {
-  reviewer_failed "$reviewer"
+  reviewer_failed "$reviewer" "$name"
   not_reviewed "$1" "${2:-$1}"
 }
 review_meta_claude() {
@@ -180,15 +188,41 @@ review_meta_claude() {
   printf '\n- Effort asked for: %s\n' "$CLAUDE_REVIEW_EFFORT"
 }
 
+# Fetches the pull request's head and its base into refs of this run's own, named with the
+# process id, not through git's one per-checkout record of the last fetch, nor the shared
+# origin/<base> tracking ref: the review skill may run more than one review of a pull
+# request at once in this checkout, and with those shared the fetches of one could
+# overwrite or lock out the other (--refmap= keeps the configured mapping from also
+# updating origin/<base>). The refs go once the merge base is known (the commits stay),
+# and at exit if the run stops before that. Reads the caller's top, pr, head and base and
+# sets its mb; exits 3, saying to run $1 again, when the head moved.
+review_fetch() { # $1 the command to run again
+  local fetched headref="refs/mentat/review-$pr-$$/head" baseref="refs/mentat/review-$pr-$$/base"
+  # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
+  trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$headref") >/dev/null 2>&1; git -C $(printf %q "$top") update-ref -d $(printf %q "$baseref") >/dev/null 2>&1" EXIT
+  git -C "$top" fetch -q --no-write-fetch-head --refmap= origin "+pull/$pr/head:$headref" "+refs/heads/$base:$baseref" || not_reviewed "could not fetch pull request #$pr or $base"
+  fetched=$(git -C "$top" rev-parse --verify "$headref") || not_reviewed "could not read the fetched head"
+  [ "$fetched" = "$head" ] || die "the head moved from $head; run $1 again" 3
+  mb=$(git -C "$top" merge-base "$head" "$baseref") || not_reviewed "could not find where #$pr branches from $base"
+  git -C "$top" update-ref -d "$headref" || not_reviewed "could not remove the ref fetched for #$pr"
+  git -C "$top" update-ref -d "$baseref" || not_reviewed "could not remove the ref fetched for $base"
+}
+# Checks out commit $2 (the caller's head when not given) of the repository at the
+# caller's top as a detached worktree at $1, with core.hooksPath=/dev/null, so a pull
+# request's own hooks never run on the reviewer's machine.
+review_checkout() { # $1 folder, $2 commit
+  git -C "$top" -c core.hooksPath=/dev/null worktree add -q --detach "$1" "${2:-$head}" || not_reviewed "could not check out ${2:-$head}"
+}
+
 # A local review reads the pull request's head as GitHub has it, never this
 # checkout's working tree: it fetches that commit, reviews it in a temporary
 # worktree, then waits for CI on that commit, and posts the result only once CI
-# passed there and the head has not moved since. $1 is the reviewer: claude, the
-# default, or one whose functions (above) a module defines.
+# passed there and the head has not moved since. $1 is the reviewer, claude, whose
+# functions are above.
 review_local() {
-  local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb fetched now issues request request_fp headref baseref claude_models="" claude_model="" claude_key="" rounds=""
+  local reviewer="$1" pr="${2:-}" name repo info head base title body top tmp mb now issues request request_fp claude_models="" claude_model="" claude_key="" rounds=""
   "review_name_$reviewer"
-  case "$pr" in '' | *[!0-9]*) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number>" 64 ;; esac
+  case "$pr" in '' | *[!0-9]*) die "$REVIEW_USAGE" 64 ;; esac
   sweep_leftovers
   review_traps
   read_request "$pr"
@@ -208,26 +242,11 @@ review_local() {
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
   read_issues "$pr" "$info"
-  # Fetch the head and the base into refs of this run's own, named with the process id,
-  # not through git's one per-checkout record of the last fetch, nor the shared
-  # origin/<base> tracking ref: the review skill runs a local and a Grok review at once
-  # in this checkout, and with those shared the fetches of one could overwrite or lock
-  # out the other (--refmap= keeps the configured mapping from also updating origin/<base>).
-  # The refs go once the merge base is known (the commits stay), and at
-  # exit if the run stops before that.
-  headref="refs/mentat/review-$pr-$$/head" baseref="refs/mentat/review-$pr-$$/base"
-  # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
-  trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$headref") >/dev/null 2>&1; git -C $(printf %q "$top") update-ref -d $(printf %q "$baseref") >/dev/null 2>&1" EXIT
-  git -C "$top" fetch -q --no-write-fetch-head --refmap= origin "+pull/$pr/head:$headref" "+refs/heads/$base:$baseref" || not_reviewed "could not fetch pull request #$pr or $base"
-  fetched=$(git -C "$top" rev-parse --verify "$headref") || not_reviewed "could not read the fetched head"
-  [ "$fetched" = "$head" ] || die "the head moved from $head; run mentat review again" 3
-  mb=$(git -C "$top" merge-base "$head" "$baseref") || not_reviewed "could not find where #$pr branches from $base"
-  git -C "$top" update-ref -d "$headref" || not_reviewed "could not remove the ref fetched for #$pr"
-  git -C "$top" update-ref -d "$baseref" || not_reviewed "could not remove the ref fetched for $base"
+  review_fetch "mentat review"
   tmp=$(mktemp -d) || not_reviewed "could not create a temporary directory"
   # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
   trap "git -C $(printf %q "$top") worktree remove --force $(printf %q "$tmp/tree") >/dev/null 2>&1; rm -rf $(printf %q "$tmp")" EXIT
-  git -C "$top" worktree add -q --detach "$tmp/tree" "$head" || not_reviewed "could not check out $head"
+  review_checkout "$tmp/tree"
   mkdir "$tmp/data" || not_reviewed "could not create a temporary directory"
 
   {

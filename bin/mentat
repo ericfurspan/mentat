@@ -212,10 +212,12 @@ case "${1:-}" in
   review)
     shift
     case "${1:-}" in
-      --codex) shift; handover review-codex "$@" ;;
-      --grok) shift; handover review-grok "$@" ;;
+      --outside) shift; handover review-outside "$@" ;;
+      --request | --require-ci) ;;
+      -*) die "$1 is not a mode of mentat review: outside reviewers run together with mentat review --outside <pull request number>" 64 ;;
     esac
     review_args "" "$@"
+    review_timeout
     round_limit
     # shellcheck disable=SC2154 # pr is set by review_args
     review_local claude "$pr" ;;

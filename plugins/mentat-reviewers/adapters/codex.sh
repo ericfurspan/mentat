@@ -1,34 +1,44 @@
 # shellcheck shell=bash
-# The Codex side of mentat: the Codex sandbox profile and run_codex, which the
-# local review's --codex mode (core's lib/review.sh, through the reviewer functions
-# below) and the second opinion use, with core's time limit REVIEW_TIMEOUT_SECONDS.
-# Sourced by this module's bin/ entries.
+# shellcheck disable=SC2034,SC2154 # adapter_* are read, and the run's variables set, by lib/adapter.sh
+# The Codex adapter (lib/adapter.sh says what an adapter is): local Codex, read-only under
+# a permissions profile that denies the temporary folders, the home folder outside the
+# install prefixes and the credential files in the checkout. It reads a checkout of the
+# head and runs git itself.
+adapter_display=Codex
 
 # Codex runs on the model MENTAT_CODEX_MODEL names when it is set, else its own default
 # model, so no model name lives here and a new release needs no change. Effort is pinned.
 CODEX_EFFORT="high"
 codex_asked=${MENTAT_CODEX_MODEL:-}
 
-# Codex as the reviewer of core's review_local (`mentat review --codex`): the functions
-# it calls for reviewer codex, beside Claude's in lib/review.sh. They read review_local's
-# variables.
-# shellcheck disable=SC2034 # name is review_local's
-review_name_codex() { name=Codex; }
-# shellcheck disable=SC2154 # pr, head and mb are review_local's
-review_prep_codex() {
-  printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
-  printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
+adapter_available() {
+  command -v codex >/dev/null 2>&1 && return 0
+  adapter_why="codex is not installed"
+  return 1
 }
-# A failure of Codex's own run is one of its failures in a row (review_tool_failed, in
-# core's lib/review.sh); a refusal of where Codex is installed is not.
-# shellcheck disable=SC2154 # tmp and out are review_local's
-review_run_codex() { run_codex "$tmp/tree" "$tmp/prompt" "$out" review_tool_failed disabled not_reviewed; }
-# A Codex reply with no final result line names the model asked for, as run_codex's failures do.
-review_note_codex() { codex_asked_note; }
+
+# A review reads the change with git in the checkout; a second opinion judges the idea at
+# the commit and may use OpenAI's cached web index.
+adapter_run() {
+  local search=disabled
+  {
+    if [ "$1" = review ]; then
+      printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
+      printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
+      review_body ""
+    else
+      search=cached
+      printf 'The working directory is a detached git worktree at commit %s; read-only commands are allowed.\n\n' "$head"
+      cat "$res/body"
+    fi
+  } >"$work/prompt" || adapter_fail "could not write the prompt" "" none
+  run_codex "$tree" "$work/prompt" "$reply" "$search"
+}
+
 # The model line notes the model asked for when the header names another one.
-review_meta_codex() {
+adapter_meta() {
   local ran asked=""
-  ran=$(codex_model "$tmp/codex.log")
+  ran=$(codex_model "$work/codex.log")
   if [ -n "$codex_asked" ] && [ "$ran" != unknown ]; then
     asked=$(model_chars "$codex_asked")
     if [ "$ran" = "$asked" ]; then asked=""; else asked=" (asked for $asked)"; fi
@@ -104,42 +114,42 @@ install_prefix() {
 
 # Sets the caller's prefixes to the install prefixes Codex needs, one per line:
 # codex's and, for a script run by node, node's. One that cannot be resolved is left
-# out. Calls $1 with the reason, which exits, when one is /, the home folder, in it
-# or holds it.
+# out. Refuses the run (adapter_fail, not one of Codex's failures in a row) when one is
+# /, the home folder, in it or holds it.
+codex_refused() { adapter_fail "$1" "" none; }
 codex_prefixes() {
-  local fail="$1" home f p first name who
+  local home f p first prog who
   prefixes=""
-  home=$(cd -P "$HOME" 2>/dev/null && pwd -P) || "$fail" "the home folder cannot be resolved, so the Codex profile cannot keep it out"
-  for name in codex node; do
-    if [ "$name" = codex ]; then
+  home=$(cd -P "$HOME" 2>/dev/null && pwd -P) || codex_refused "the home folder cannot be resolved, so the Codex profile cannot keep it out"
+  # Not "name": that is the reviewer's name, which adapter_fail writes under.
+  for prog in codex node; do
+    if [ "$prog" = codex ]; then
       who="Codex is"
     else
       first=$(head -c 256 "$f" 2>/dev/null | tr -d '\000' | head -n 1)
       case "$first" in '#!'*node*) who="node, which runs Codex, is" ;; *) return 0 ;; esac
     fi
-    f=$(command -v "$name") && f=$(real_file "$f") || return 0
+    f=$(command -v "$prog") && f=$(real_file "$f") || return 0
     p=$(install_prefix "$f") || continue
     who="$who installed in or above the home folder, which the Codex profile never grants"
     # Inside the home folder, then the home folder or one holding it, / included.
-    case "$p/" in "$home"/*) "$fail" "$who" ;; esac
-    case "$home/" in "${p%/}"/*) "$fail" "$who" ;; esac
+    case "$p/" in "$home"/*) codex_refused "$who" ;; esac
+    case "$home/" in "${p%/}"/*) codex_refused "$who" ;; esac
     prefixes="$prefixes$p
 "
   done
 }
 
-# Runs Codex in directory $1 on prompt file $2 and writes its final message to $3.
-# On any failure it calls $4 with the reason, which exits. $5 is Codex's web
-# search mode: "disabled" for reviews, which judge the diff; "cached" (OpenAI's
-# index, no live fetches) for a second opinion on an idea, which checks current
-# practice. Search runs on OpenAI's side, outside the permissions profile below. $6,
-# optional, is the function codex_prefixes calls in place of $4 when it refuses where
-# Codex is installed.
+# Runs Codex in directory $1 on prompt file $2 and writes its final message to $3; any
+# failure ends the run (adapter_fail). $4 is Codex's web search mode: "disabled" for
+# reviews, which judge the diff; "cached" (OpenAI's index, no live fetches) for a second
+# opinion on an idea, which checks current practice. Search runs on OpenAI's side,
+# outside the permissions profile below.
 run_codex() {
-  local dir="$1" prompt="$2" out="$3" fail="$4" search="$5" log rc secs=0 pid kept filesystem prefixes asked
+  local dir="$1" prompt="$2" out="$3" search="$4" log kept filesystem prefixes asked
   log="${out%/*}/codex.log"
   asked=$(codex_asked_note)
-  codex_prefixes "${6:-$fail}"
+  codex_prefixes
   filesystem=$(codex_filesystem "$dir" "$prefixes")
   # Plain `codex exec`, not `codex exec review`: review mode forces a JSON-only
   # final reply, so it cannot end with the status line the callers check.
@@ -160,27 +170,12 @@ run_codex() {
     -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c "web_search=\"$search\"" -o "$out" - <"$prompt") >"$log" 2>&1 &
-  pid=$! review_child=$!
-  # $SECONDS counts whole seconds, so a limit stops Codex up to a second late, never early.
-  secs=$SECONDS
-  while kill -0 "$pid" 2>/dev/null; do
-    if [ "$REVIEW_TIMEOUT_SECONDS" -eq 0 ] || [ $((SECONDS - secs)) -gt "$REVIEW_TIMEOUT_SECONDS" ]; then
-      kill "$pid" 2>/dev/null
-      sleep 2
-      kill -9 "$pid" 2>/dev/null
-      "$fail" "Codex did not finish within $REVIEW_TIMEOUT_SECONDS seconds$asked"
-    fi
-    sleep 0.1
-  done
-  wait "$pid"
-  rc=$?
-  # shellcheck disable=SC2034 # read by review_stop in lib/shared.sh
-  review_child=""
-  if [ "$rc" -ne 0 ]; then
-    # The log is Codex's raw output and may hold a credential, so it is not
-    # printed into the agent's session. A copy is kept for the maintainer.
-    kept=$(mktemp "${TMPDIR:-/tmp}/mentat-codex-log.XXXXXX") && cp "$log" "$kept"
-    "$fail" "codex exited with status $rc; its log may hold credentials, so it is not printed. The maintainer can read it at $kept$asked"
+  adapter_wait "$!"
+  if [ "$adapter_rc" -ne 0 ]; then
+    # The log is Codex's raw output and may hold a credential, so it is not printed
+    # into the agent's session or posted. A copy is kept for the maintainer.
+    kept=$(mktemp "${TMPDIR:-/tmp}/mentat-log.codex.XXXXXX") && cp "$log" "$kept" || kept=""
+    adapter_fail "codex exited with status $adapter_rc$asked" "${kept:+its log may hold credentials, so it is not printed. The maintainer can read it at $kept}"
   fi
-  [ -s "$out" ] || "$fail" "Codex returned no final message$asked"
+  [ -s "$out" ] || adapter_fail "Codex returned no final message$asked"
 }
