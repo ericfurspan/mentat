@@ -58,13 +58,13 @@ Mentat reads from AGENTS.md:
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
-Every setting, such as the review and builder models, is listed with its default and where to set it in [docs/settings.md](docs/settings.md).
+[docs/settings.md](docs/settings.md) lists every setting, with its default and where to set it.
 
 Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
 
 ## Review tools
 
-Breaking: `mentat-reviewers` now needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's committed `.claude/settings.json`. `MENTAT_REVIEW_TIMEOUT_SECONDS` (1800) limits every reviewer and refuses any value but a whole number of 1 or more, empty included; `MENTAT_GROK_TIMEOUT_SECONDS` is not read, and `mentat check` warns while it is set. `mentat second-opinion` runs the list on an idea.
+Breaking: `mentat-reviewers` needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's `.claude/settings.json`. `MENTAT_REVIEW_TIMEOUT_SECONDS` (1800; a whole number from 1, never empty) limits every reviewer; `mentat check` warns while the unread `MENTAT_GROK_TIMEOUT_SECONDS` is set. `mentat second-opinion` runs the list on an idea.
 
 ## Git hooks
 
