@@ -15,7 +15,7 @@ An item keeps its agent records in one comment whose first line is `Agent record
 - `Spec document: <id>`, with a tracker whose adapter keeps the spec in a document, kept on every later edit.
 - `Material assumptions:` and the list ("Assumptions").
 - `Plan check:` and `Second opinion, round <n>:`, the settlements ("Plan check and second opinions").
-- `Decisions:` one line per answered decision for the maintainer: the question, the answer, its date and the rejected options in a few words ("Decision lines").
+- `Decisions:` one line per answered decision for the maintainer or call made without them: the question, the answer, its date and the rejected options in a few words ("Decision lines").
 - `Plan:` a current plan longer than the item's next step (`SKILL.md` "Item shape").
 
 A later fingerprint and answer, assumptions list or plan replaces the earlier one in place; settlements and decisions lines add one entry each. With GitHub issues the comment holds no settlements, decisions or plan: the issue keeps its plan and decisions in its body (`github.md`).
@@ -24,7 +24,7 @@ The first record posts the comment; every later one edits it in place, never pos
 
 ## Decision lines
 
-Each skill that records the maintainer's answer on an item writes its decisions line in the `Decisions:` record (with GitHub issues, the body's `## Decisions`), never a separate comment, except a triage outcome, recorded as triage and the adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request (with GitHub issues, one comment, as `github.md` says), and the line points to it. The answered decision leaves any open decision section, and when it blocked the item's work, the same writer removes the wait mark (`SKILL.md` "Marking a wait").
+Each skill that records on an item the maintainer's answer, or a call it settled without them marked "made without the maintainer", writes its decisions line in the `Decisions:` record (with GitHub issues, the body's `## Decisions`), never a separate comment, except a triage outcome, recorded as triage and the adapter say. A line is never rewritten except to correct it; evidence it needs goes to an attachment or the pull request (with GitHub issues, one comment, as `github.md` says), and the line points to it. The answered decision leaves any open decision section, and when it blocked the item's work, the same writer removes the wait mark (`SKILL.md` "Marking a wait").
 
 An objection of the maintainer's to an item's design, plan or pull request (`../review/after-ready.md`, `mentat:plan` step 7) is recorded the same way, as one decisions line: each objection its own clause saying what they object to, one phrased as a question included, and never a reviewer's or the session's own reasons in their place. With GitHub issues it is in Claude Code's words, as `records.md` says.
 
