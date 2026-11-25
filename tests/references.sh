@@ -2,7 +2,7 @@
 # Names and file references in the instruction text. Prints PASS/FAIL lines; exits 1 on any FAIL.
 #
 # Planning is mentat:plan, with no alias: no file but CHANGELOG.md and the decision records in
-# docs/adr/ names the old planning skill or its folder, or the removed next-work ending's file.
+# docs/adr/ names the old planning skill or its folder, or the next-work file.
 # The names are built from pieces, so this file holds none of them.
 #
 # A file a skill file (SKILL.md, a supporting file or CREDITS.md, module skills included), rules.md
