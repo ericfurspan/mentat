@@ -1,6 +1,6 @@
 # Invariants
 
-The guardrails and workflow rules each 1.0 rewrite stage must keep. A stage is reviewed against every line here: a rewrite that drops or loosens one is a finding, whatever the text it replaces.
+The guardrails and workflow rules each 1.0 rewrite stage must keep. A stage is reviewed against every line here: a rewrite that drops or loosens one is a finding, whatever the text it replaces, except narrowing an after-agreement ask toward the four stop conditions, as the line under "When a session stops for the maintainer" says.
 
 Each line gives the rule, the file that holds it today and how it is checked: a behavior eval case under `evals/` by name (its score kept as `evals/README.md` "Keeps the score" says), or, for a line no eval case covers, "review only", read against the line by the reviewer, with any `tests/run` check that also covers it named beside it. A check named "`tests/run` text check" only shows that the rule's words are still there. A line marked "rare safety net" is kept whatever its fire count: it rarely fires, and that is not a reason to drop it.
 
@@ -83,7 +83,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| After agreement, a session stops for the maintainer only when the goal or a required safeguard cannot be met without a scope change, a round budget or eval or cost cap is spent, an external, irreversible or credential block only the maintainer can clear arises, or an agreed manual check is due. | No single file states it this way; parts are in `rules.md` "What goes to the maintainer", `skills/propose/decisions.md`, `skills/review/stop.md` and `skills/review/ready-gate.md`. The rows "A review stop is pending from round three on", "A disputed finding goes to the maintainer", "After "Ready to merge: #N", push nothing" and "Outcomes, scope, cost and risk go to the maintainer" describe asks today's files still hold beyond these four; each is kept as written until a rewrite changes that rule on purpose, and a rewrite that narrows one names it in its pull request. | review only |
+| After agreement, a session stops for the maintainer only when the goal or a required safeguard cannot be met without a scope change, a round budget or eval or cost cap is spent, an external, irreversible or credential block only the maintainer can clear arises, or an agreed manual check is due. | No single file states it this way; parts are in `rules.md` "What goes to the maintainer", `skills/propose/decisions.md`, `skills/review/stop.md` and `skills/review/ready-gate.md`. These four conditions are the agreed target for the rewrites. Today's files still ask the maintainer after agreement in further cases, in the rows "A review stop is pending from round three on", "A disputed finding goes to the maintainer", "After "Ready to merge: #N", push nothing" and "Outcomes, scope, cost and risk go to the maintainer"; a rewrite may narrow those after-agreement asks toward these four conditions, naming each in its pull request, but may not add a stop outside them, and nothing here lets a rewrite drop or narrow an ask before agreement or any other part of those rows. | review only |
 
 ### Session start
 
