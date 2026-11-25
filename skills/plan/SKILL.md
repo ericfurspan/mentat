@@ -50,7 +50,7 @@ A chat request's `Agree and build now` goes on in this session, unless `../build
 - Prompt form, when one sentence says it all: one `AskUserQuestion` prompt of about 25 words, options of about 12, with a not-ready option that records nothing and opens a talk.
 - In chat, name a pull request "PR #N" with its item's id, if any, beside it, and an item by its full id.
 - Message form, when they need more: at most about 150 words in short labeled lines (what they get, what it costs or risks, why the first answer), then the question and its answers numbered from 1. The turn carries nothing else but one line for a failure still blocking work and the planning order (`session.md` step 3).
-- A named or numbered answer chooses it, with any condition it adds; a plain yes chooses the first; any other reply is not-ready. Only the maintainer's own choice or words count as their answer.
+- A named or numbered answer chooses it, with any condition it adds; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready. Only the maintainer's own choice or words count as their answer.
 - A decision of theirs that blocks no current work goes in its item's "Decision for the maintainer" section (`mentat:backlog` "Item shape"), asked when the item is next planned.
 
 ### Recommendations
