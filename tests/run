@@ -120,6 +120,9 @@ $b|Sessions|An implementation session is mid-run from its start until it sends i
 $b|Sessions|When no session is mid-run, a fresh implementation session starts for them
 $b|Holds|A merge passed on to an implementation session waits for its after-merge reply (a \`hold\` note): no session starts and no item joins a run until it arrives
 rules.md||A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to the session that started it, which forwards the maintainer's exact words back.
+skills/build/redirect.md|Where it is implemented|Read only this repository's \`mentat state\`.
+skills/build/redirect.md|Where it is implemented|\`mentat state owner\` exits 1, with no running orchestrator recorded: implement here.
+skills/build/redirect.md||When the message cannot be sent, implement nothing, and say in one line which session could not be reached.
 plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line, with,
 skills/backlog/records.md|Agent records|replaces the answer and keeps that line
 skills/backlog/records.md|Agent records|the maintainer's Agree answer that re-records the fingerprint removes it
@@ -801,8 +804,7 @@ not_yet_rewritten="plugins/mentat-lead/skills/grill/CREDITS.md
 plugins/mentat-lead/skills/grill/SKILL.md
 plugins/mentat-linear/skills/linear/SKILL.md
 plugins/mentat-linear/skills/triage/SKILL.md
-rules.md
-skills/build/redirect.md"
+rules.md"
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
   && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
