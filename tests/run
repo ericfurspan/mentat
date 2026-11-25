@@ -128,6 +128,7 @@ skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
 skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 skills/plan/session.md||settling its questions before going on to the next without asking
+skills/plan/session.md||any other agreed item gets only its open maintainer decisions asked and recorded, with no plan check, agreement question or spec.
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/plan/SKILL.md||or says yes to the order question of \`mentat-linear:triage\` "Report", read \`session.md\`
 $o|Planning|keeps so a compaction or takeover goes on asking nothing
