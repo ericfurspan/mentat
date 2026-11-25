@@ -136,7 +136,7 @@ skills/plan/session.md||none already answered except a skeptic's-pass finding wi
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/plan/SKILL.md||or says yes to the order question of \`mentat-linear:triage\` "Report", read \`session.md\`
 $o|Planning|keeps so a compaction or takeover goes on asking nothing
-skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with any limit on how it was reviewed
+skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with the sentences \`mentat:review\` "Final check" adds after it)
 skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included; the item's id
 skills/build/SKILL.md|Started sessions|keeping a sentence or line when in doubt whether it is one of them
 skills/review/SKILL.md|Final check|tell the maintainer in chat: a first line "🔔 Ready to merge: #N (<item id>)"
