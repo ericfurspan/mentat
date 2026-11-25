@@ -124,6 +124,7 @@ skills/build/redirect.md|Where it is implemented|Read only this repository's \`m
 skills/build/redirect.md|Where it is implemented|\`mentat state owner\` exits 1, with no running orchestrator recorded: implement here.
 skills/build/redirect.md||When the message cannot be sent, implement nothing, and say in one line which session could not be reached.
 plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|Carry its agreement answer (\`build: now\` or \`build: later\`) with any \`Agreed by default\` line only when the two fingerprints match
+plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|with the copied spec's fingerprint (\`mentat:backlog\` "Agreement")
 skills/backlog/records.md|Agent records|replaces the answer and keeps that line
 skills/backlog/records.md|Agent records|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/plan/SKILL.md||Nothing is implemented before the maintainer agrees; the one exception is an item \`mentat-lead:orchestrate\` agrees by default.
