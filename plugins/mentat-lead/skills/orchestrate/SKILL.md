@@ -24,7 +24,7 @@ State lives only in `mentat state`, the tracker and the host's session list, so 
 4. When `mentat state orchestrator` names another session, tell it that this session is now the orchestrator, and make each open `waiting:` or `re-ask:` note a `re-ask:` note ("Questions") naming this session where it named that one, since its question was asked in that session's chat. Then run `mentat state orchestrator set` with this session's id, and tell each implementation session `mentat state session list` records and the host's list still shows running, whether or not its run ended, and each started planning session a `hold` note names, that this session is now the orchestrator and that it reports here.
 5. An orchestrate-notes.md file in the main checkout's ignored working folder or the git common directory is not read. On finding one, say once that it is not read and that its live entries go into `mentat state`.
 6. For each item at stage `handed`, `confirmed`, `pr` or `ready` with a pull request, read it with `gh pr view <N> --json state,body`. A merged one goes on as `build-sessions.md` "After merge" says, a closed one as its "Closed" says. An open one at stage `pr` whose Status line reads `Ready` owes its Ready line: forward it ("Forwarding") and set the item `ready`.
-7. Show each open `hold` note once, ask each `re-ask:` question again ("Questions"), then go on with "Handing over" and "Planning". No summary.
+7. Show each open `hold` note once, then go on with "Handing over" and "Planning". `re-ask:` questions are asked again as "Questions" says, from the next turn that owes nothing else. No summary.
 
 ## Planning
 
