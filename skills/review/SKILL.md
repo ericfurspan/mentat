@@ -53,7 +53,7 @@ A reviewer that is missing, signed out, refused, timed out or failed shows `<nam
 ## Fast track
 
 - On a fast track the maintainer agreed (`mentat:propose`), its reason one line in the spec, check the whole diff (`gh pr diff <N>`): it qualifies only when it cannot change what code does or what an agent is told, such as typos, punctuation, broken links or formatting; on any doubt, or whitespace in source, configuration or lockfiles, or a URL a program fetches, the normal loop runs.
-- Then run no review: run `mentat ci <N>` after each push and handle its exit as step 2 does for CI, then the final check, with the Status line `Not reviewed: fast track agreed by the maintainer` and a Risks line and a Ready sentence saying no review ran; a later push gets the diff check again, and a diff that no longer qualifies runs the normal loop with every round of the limit.
+- Then run no review: run `mentat ci <N>` after each push and handle its exit as step 2 does for CI, then, once every comment and review the maintainer left is answered as Ready requires, the final check, with the Status line `Not reviewed: fast track agreed by the maintainer` and a Risks line and a Ready sentence saying no review ran; a later push gets the diff check again, and a diff that no longer qualifies runs the normal loop with every round of the limit.
 
 ## Spec
 
