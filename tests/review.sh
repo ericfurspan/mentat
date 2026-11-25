@@ -79,12 +79,12 @@ check "ci with a bad pull request number is a usage error (exit 64)" '[ "$rc" = 
 rc=$("$mentat" review 7 --outside >"$STUB/out" 2>&1; echo $?)
 check "an argument after the number is a usage error, not ignored (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" "$STUB/out"'
 # A reviewer's own mode is gone: every outside reviewer runs with --outside. Each such
-# flag exits 64 before reading anything, and names --outside.
+# flag exits 64 before reading anything, with the usage line, which names --outside.
 for args in "--codex 7" "--grok 7" "--grok --stop 7" "--codex --request f 7" "--stop 7"; do
   reset
   # shellcheck disable=SC2086 # split on purpose
   rc=$("$mentat" review $args >"$STUB/out" 2>&1; echo $?)
-  check "mentat review $args exits 64, posts and reads nothing, and names --outside" '[ "$rc" = 64 ] && grep -qF "mentat review --outside <pull request number>" "$STUB/out" && [ ! -f "$STUB/calls" ]'
+  check "mentat review $args exits 64, posts and reads nothing, and names --outside" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" ] && [ ! -f "$STUB/calls" ]'
 done
 # The one time limit, MENTAT_REVIEW_TIMEOUT_SECONDS: a whole number of 1 or more.
 for bad in 0 00 abc -1 1.5 " 5"; do
