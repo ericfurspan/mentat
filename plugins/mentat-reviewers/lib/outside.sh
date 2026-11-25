@@ -101,10 +101,14 @@ outside_review() {
     if [ -s "$res/$n.reply" ]; then printf '## %s\n\n' "$n"; cat "$res/$n.reply"; printf '\n'; fi
     adapter_local_lines "$n"
   done
+  # A reviewer that did not finish but whose kept reply marks a finding, (blocking) or
+  # (non-blocking) as the review brief asks, counts toward the findings exit: those
+  # findings still need sorting.
   for n in $names; do
     result=$(outside_result "$n")
     printf '%s: %s\n' "$n" "$result"
     [ "$result" != findings ] || any=yes
+    case "$result" in "did not finish"*) grep -q -E '\((non-)?blocking\)' "$res/$n.reply" 2>/dev/null && any=yes ;; esac
   done
   wait_for_ci "$repo" "$head" "" "$pr" "mentat review --outside"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"

@@ -202,6 +202,11 @@ check "a failing tool did not finish; its log is named only on stderr, never pos
 printf 'Could not read it.\n\nREVIEW RESULT: INCOMPLETE - README could not be read\n' >"$STUB/beta.review"
 rm -f "$STUB/beta.fails" "$STUB/comment"; rc=$(run 7)
 check "an INCOMPLETE reply did not finish, and its reply is still printed and folded" 'row "beta: did not finish (Beta says the review is incomplete)" && grep -qxF "REVIEW RESULT: INCOMPLETE - README could not be read" "$STUB/out" && grep -qxF "<details><summary>Beta</summary>" "$STUB/comment"'
+# Findings in a reply that did not finish still need sorting: the run exits as for findings.
+listing "beta"
+reset; printf 'README:1 says change (blocking)\nCould not read the rest.\n\nREVIEW RESULT: INCOMPLETE - lib could not be read\n' >"$STUB/beta.review"; rc=$(run 7)
+check "an INCOMPLETE reply holding findings did not finish, and the run exits 2 as for findings" '[ "$rc" = 2 ] && posted && row "beta: did not finish (Beta says the review is incomplete)" && grep -qxF "README:1 says change (blocking)" "$STUB/out" && said "The outside review posted findings on $H: https://example.test/comment"'
+listing "alpha,beta"
 # Failures in a row, keyed by the adapter's name: the second in a row tells the maintainer now.
 reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(run 7)
 check "the second failure in a row tells the maintainer now, keyed by the adapter's name" 'grep -q "^mentat: tell the maintainer now: Beta has failed 2 times in a row (owner/repo#7): beta-tool exited with status 3" "$STUB/err" && [ -f "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" ]'

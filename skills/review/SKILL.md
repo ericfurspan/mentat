@@ -48,7 +48,7 @@ Outside reviewers run only on a head Claude's latest local review found nothing 
 - 9: the publish check held the comment, kept in a local file. Sort the findings already printed, tell the maintainer in chat where the file is, and Ready says the result was held.
 - 1: the run failed, its reason printed. Sort any findings already printed; Ready names the reason.
 
-A reviewer that is missing, signed out, refused, timed out or failed shows `<name>: did not finish (<why>)`. It never blocks and is not a pass; the final check names it. A failed post or a not-finished reviewer is not run again to reach Ready.
+A reviewer that is missing, signed out, refused, timed out or failed shows `<name>: did not finish (<why>)`. It never blocks and is not a pass, findings it printed are sorted as step 3 says whatever the exit, and the final check names it. A failed post or a not-finished reviewer is not run again to reach Ready.
 
 ## Fast track
 
