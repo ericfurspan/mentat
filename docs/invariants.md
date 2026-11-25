@@ -10,9 +10,9 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| The maintainer merges every pull request; agents never merge or turn on auto-merge. | `rules.md` "Approval", "What agents never do"; also `AGENTS.md` | `merge-request-declined`; `tests/run` text check against `tests/fixtures/rules-safety.md` |
+| The maintainer merges every pull request, except that where the repository turns on `MENTAT_AGENT_MERGE`, a session merges its own pull request once its reviews and CI pass, and never one that changes a protected path or that a reviewer marks high risk; agents never turn on auto-merge. | `rules.md` "Approval", "What agents never do"; also `AGENTS.md` | `merge-request-declined`; `tests/run` text check against `tests/fixtures/rules-safety.md` |
 | Agents never use `--admin` or work around a merge refusal. | `rules.md` "What agents never do"; also `AGENTS.md` | `tests/run` text check against `tests/fixtures/rules-safety.md`; review only |
-| Rare safety net: the merge hook denies `gh pr merge` (`--auto` included), the merge API through `gh api` and the desktop auto-merge tool, and fails closed when it cannot decide. | `hooks/no-merge`, `hooks/hooks.json`, `hooks/lib/verdict.sh` | `tests/no-merge.sh`, `tests/hook-contract.sh`; review only |
+| Rare safety net: the merge hook denies `gh pr merge` (`--auto` included), the merge API through `gh api` and the desktop auto-merge tool, and fails closed when it cannot decide; only with `MENTAT_AGENT_MERGE` on does it pass one command, `gh pr merge <N> --merge --match-head-commit <sha>` (after at most one `PATH=` assignment), and not for a commit that changes a protected path. | `hooks/no-merge`, `hooks/hooks.json`, `hooks/lib/verdict.sh`, `lib/agent-merge.sh` | `tests/no-merge.sh`, `tests/agent-merge.sh`, `tests/hook-contract.sh`; review only |
 | Agents never push code to the default branch, force-push shared branches or change repository settings. | `rules.md` "What agents never do" | `tests/run` text check against `tests/fixtures/rules-safety.md`; review only |
 | Rare safety net: the default-branch refusal: agents' pre-push hook refuses an update, force push or deletion of the remote's default branch, and the first branch pushed to a remote with none; a push to a local path or `file://` URL may update any branch. | `git-hooks/hooks/pre-push` | `tests/git-hooks.sh`; review only |
 | A build branch is cut from origin's default branch with no upstream (`--no-track`), so a bare `git push` never aims at the default branch. | `skills/build/helpers.md` "Worktree" | `tests/worktree-branch.sh`; review only |
@@ -80,7 +80,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | A builder changes neither the main checkout nor the session's own: after each builder both are compared with the note taken before its brief, and on any difference other than a `HEAD` moved only forward along origin's copy of its branch, no further builder starts, neither checkout is changed and the maintainer is told. | `skills/build/helpers.md` "Main-checkout check" | `tests/worktree-check.sh`; review only |
 | The spec fingerprint is checked before a build: an item whose recorded fingerprint, or the one a spec fix re-recorded, differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
 | The spec fingerprint is checked before a build: an item with no recorded fingerprint goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | review only |
-| The build run never merges. | `skills/build/SKILL.md` step 6, `agents/builder.md` | review only |
+| The build run merges only as `mentat:review` allows, right after an item's final check; a builder never merges. | `skills/build/SKILL.md` step 6, `agents/builder.md` | review only |
 
 ### When a session stops for the maintainer
 
@@ -106,11 +106,11 @@ From `AGENTS.md`; Mentat inherits them here like any other repository's choices,
 | The one test command is `tests/run`; it is run once with its output saved to a file, and its last line is read. | `AGENTS.md` | review only |
 | CI runs the test command on every pull request. | `AGENTS.md`, `.github/workflows/tests.yml` | review only |
 | The CI workflow declares `permissions` explicitly, pins third-party actions to a commit SHA, and gives a job no secrets, write permissions or deploy access it does not need. | `AGENTS.md` "Code Review Rules", `.github/workflows/tests.yml` | `tests/run` (permissions declared and actions pinned); review only for least privilege |
-| No change weakens a guardrail: `tests/run`, the merge hook, the public-text hook and its MCP write matcher, and the git hooks are not loosened or narrowed, and no instruction lets an agent deploy, publish, release or merge; the hooks are nets for mistakes, not security boundaries, so another command form they miss is not a finding. | `AGENTS.md` "Code Review Rules" | review only |
+| No change weakens a guardrail: `tests/run`, the merge hook, the public-text hook and its MCP write matcher, and the git hooks are not loosened or narrowed, and no instruction lets an agent deploy, publish or release, or merge beyond its own pull request with `MENTAT_AGENT_MERGE` on; the hooks are nets for mistakes, not security boundaries, so another command form they miss is not a finding. | `AGENTS.md` "Code Review Rules" | review only |
 | The agent account cannot approve its own pull requests. | `AGENTS.md` | review only |
 | Scripts are plain bash that also runs on macOS's bash 3.2. | `AGENTS.md` | review only |
 | A setting the user switches keeps the same key in every configuration; only its value changes. | `AGENTS.md` | review only |
 | Only a release pull request edits `CHANGELOG.md`; the maintainer merges it and creates the tag, and a session never does either. | `AGENTS.md` | `tests/run` (format line and `[Unreleased]` section only); review only |
 | A hard-to-reverse choice, surprising without context and a real trade-off, gets a decision record in `docs/adr/` in the same pull request; one that reverses a record adds a new one and marks the old one superseded. | `AGENTS.md` | review only |
-| After the maintainer merges a pull request here, the session runs the plugin and module update commands. | `AGENTS.md` | review only |
+| After any pull request merges here, whoever merges it, the session runs the plugin and module update commands. | `AGENTS.md` | review only |
 | Working files go in `work/`, which git ignores. | `AGENTS.md` | review only |

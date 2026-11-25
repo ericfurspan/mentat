@@ -4,6 +4,8 @@
     "mentat-public-text@mentat": true
   },
   "env": {
-    "MENTAT_REVIEWERS": "codex,grok"
+    "MENTAT_REVIEWERS": "codex,grok",
+    "MENTAT_AGENT_MERGE": "on",
+    "MENTAT_MERGE_WAIT_PATHS": "hooks/ git-hooks/ plugins/mentat-public-text/ lib/agent-merge.sh tests/fixtures/rules-safety.md CHANGELOG.md"
   }
 }
