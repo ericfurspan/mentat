@@ -336,7 +336,7 @@ check "turns web search off for reviews" 'grep -qx "web_search=\"disabled\"" "$S
 # The stub is not Codex, so its environment says nothing about Codex's shell; the options do.
 reset; rc=$(run)
 gitdir=$(git -C "$root/work" rev-parse --path-format=absolute --git-common-dir)
-check "limits Codex's shell to core environment variables and no user git config" '[ "$rc" = 0 ] && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args" && grep -qx "shell_environment_policy.set={GIT_CONFIG_GLOBAL=\"/dev/null\"}" "$STUB/args"'
+check "limits Codex's shell to core environment variables and no user or system git config" '[ "$rc" = 0 ] && grep -qx "shell_environment_policy.inherit=\"core\"" "$STUB/args" && grep -qx "shell_environment_policy.set={GIT_CONFIG_GLOBAL=\"/dev/null\", GIT_CONFIG_NOSYSTEM=\"1\"}" "$STUB/args"'
 check "the profile reads the main checkout's git directory, which a worktree's .git points to" '[ "$rc" = 0 ] && case "$gitdir" in */work/.git) true ;; *) false ;; esac && grep -qF "\"$gitdir\"=\"read\"" "$STUB/args" && ! grep -q -- "--sandbox" "$STUB/args"'
 check "denies /var/tmp and turns the apps feature off for reviews too" 'grep -qF "\"/var/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/var/tmp\"=\"deny\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args"'
 check "denies credential files inside the checkout for reviews too" 'grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
