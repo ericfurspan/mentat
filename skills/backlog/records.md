@@ -74,4 +74,4 @@ After each `mentat second-opinion` round, its settlement names the round and the
 
 ## Attached files
 
-Upload each file from disk as the adapter says (`mentat-linear:linear` "Agent records").
+Upload each file from disk as the adapter says (`mentat-linear:linear` "Agent records"); when that fails, the settlement says the reply was not attached and the file stays where it is.
