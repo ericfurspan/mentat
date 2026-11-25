@@ -25,8 +25,8 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| GitHub records hold no local paths. | `rules.md`, `skills/backlog/records.md` | `no-local-path-in-pr` |
-| GitHub records are public-safe: Claude Code's words; no chat quotes, private repository or project names, account, billing or session details. | `rules.md`, `skills/backlog/records.md` | review only |
+| A pull request description holds no local paths. | `rules.md`, `skills/backlog/records.md` | `no-local-path-in-pr` |
+| GitHub records (issues, pull requests, comments) are public-safe: Claude Code's words; no chat quotes, private repository or project names, local paths, account, billing or session details. | `rules.md`, `skills/backlog/records.md` | review only |
 | A spec and a pull request body never name the backlog's workspace or item. | `skills/backlog/SKILL.md` "Agreement", `skills/pr/SKILL.md` step 1 | review only |
 | Rare safety net: the public-text check: the `mentat-public-text` hook denies a listed `gh` write or GitHub MCP write whose text holds a private word or a local home path, or whose text it cannot read. | `plugins/mentat-public-text/hooks/public-text`, `plugins/mentat-public-text/hooks/hooks.json` | `tests/public-text.sh`; review only |
 
