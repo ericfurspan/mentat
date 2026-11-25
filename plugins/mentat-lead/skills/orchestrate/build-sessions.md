@@ -26,7 +26,7 @@ An item free to hand over is held (a held item, "Handing over") while any of the
 
 ## Pause
 
-A pull request is waiting from its "Ready to merge" line until it merges or closes, held or not, read with `gh pr list --state open --limit 1000 --json number,body` in the repository, whatever the tracker: each open one whose Ready line the notes file records as relayed or whose backlog item's merge wait names it (`mentat:backlog` "Marking a wait"), and any other open one whose description's first line, its Status line (`mentat:pr`), reads `Ready`, `Not reviewed: fast track agreed by the maintainer` or `Not reviewed: last push waived by the maintainer`.
+A pull request is waiting from its "Ready to merge" line until it merges or closes, held or not, read with `gh pr list --state open --limit 1000 --json number,body` in the repository, whatever the tracker: each open one whose Ready line the notes file records as relayed or whose backlog item's merge wait names it (`mentat:backlog` "Marking a wait"), and any other open one whose description's first line, its Status line (`mentat:pr`), reads `Ready` or `Not reviewed: fast track agreed by the maintainer`.
 
 The limit N: read `MENTAT_READY_LIMIT` by name with `printenv MENTAT_READY_LIMIT`, never the whole environment; unset or empty, N is `3`. A value that is not a whole number of 1 or more counts as unset, said once.
 
