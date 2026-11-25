@@ -275,7 +275,14 @@ check "a bad pull request number is a usage error (exit 64)" '[ "$rc" = 64 ] && 
 # Second opinion: every listed, available reviewer, in parallel; 0 with a verdict, 1 with
 # none, 6 with none listed and nothing sent.
 printf 'An idea.\n' >"$root/idea.md"
-opinion() { (cd "$root/work" && git checkout -q main && git pull -q origin main && "$mentat" second-opinion "$root/idea.md" >"$STUB/out" 2>"$STUB/err"); echo $?; }
+# The second opinion's checkout is of main, which has no hooks folder, so this clone's hooks
+# path is an absolute folder whose post-checkout hook leaves a marker; the test's own
+# checkout and pull run it, so the marker is cleared before the second opinion.
+mkdir -p "$root/abs-hooks" && printf '#!/bin/sh\ntouch "$STUB/hook_ran"\n' >"$root/abs-hooks/post-checkout" && chmod +x "$root/abs-hooks/post-checkout"
+opinion() {
+  (cd "$root/work" && git config core.hooksPath "$root/abs-hooks" && git checkout -q main && git pull -q origin main && rm -f "$STUB/hook_ran" &&
+    "$mentat" second-opinion "$root/idea.md" >"$STUB/out" 2>"$STUB/err"); echo $?
+}
 listing "alpha,beta,nope"
 reset; touch "$STUB/expect_alpha" "$STUB/expect_beta"; rc=$(opinion)
 check "second opinion: each listed reviewer gives a verdict, in parallel, in opinion mode (exit 0)" '[ "$rc" = 0 ] && grep -qF -- "- Alpha (" "$STUB/out" && grep -q "^- Beta (.*): SECOND OPINION VERDICT: DO IT$" "$STUB/out" && [ -f "$STUB/alpha.together" ] && [ "$(grep -c " opinion " "$STUB/tool_calls")" = 2 ] && grep -q "An idea." "$STUB/alpha.prompt"'
