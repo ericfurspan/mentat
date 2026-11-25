@@ -790,8 +790,6 @@ not_yet_rewritten="plugins/mentat-lead/skills/grill/CREDITS.md
 plugins/mentat-lead/skills/grill/SKILL.md
 plugins/mentat-lead/skills/orchestrate/SKILL.md
 plugins/mentat-lead/skills/orchestrate/build-sessions.md
-plugins/mentat-lead/skills/retro/CREDITS.md
-plugins/mentat-lead/skills/retro/SKILL.md
 plugins/mentat-linear/skills/linear/SKILL.md
 plugins/mentat-linear/skills/triage/SKILL.md
 rules.md
