@@ -22,8 +22,8 @@ outside_runner() {
   local final
   adapter_go review
   if ! result_line "$(last_line "$reply")"; then
-    # Kept as <name>.partial, printed and read for findings but never posted: the reply
-    # did not end as a review does.
+    # Kept as <name>.partial: printed and read for findings, and posted in its own block
+    # only when it marks one, since the reply did not end as a review does.
     localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ${adapter_roots[@]+"${adapter_roots[@]}"} &&
       cp "$reply" "$res/$name.partial"
     adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")"
@@ -130,12 +130,19 @@ outside_review() {
     for n in $names; do printf -- '- %s: %s\n' "$n" "$(outside_result "$n")"; done
     printf -- '\n- Change reviewed: %s..%s\n- Time limit: %s seconds\n- Time: %s\n' "$mb" "$head" "$REVIEW_TIMEOUT_SECONDS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     for n in $names; do
-      [ -s "$res/$n.reply" ] || continue
-      printf '\n<details><summary>%s</summary>\n\n' "$(adapter_shown "$n")"
-      cat "$res/$n.meta" 2>/dev/null
-      printf -- '\n---\n\n'
-      cat "$res/$n.reply"
-      printf '\n</details>\n'
+      if [ -s "$res/$n.reply" ]; then
+        printf '\n<details><summary>%s</summary>\n\n' "$(adapter_shown "$n")"
+        cat "$res/$n.meta" 2>/dev/null
+        printf -- '\n---\n\n'
+        cat "$res/$n.reply"
+        printf '\n</details>\n'
+      elif [ -s "$res/$n.partial" ] && grep -q -E '\((non-)?blocking\)' "$res/$n.partial"; then
+        # Posted so a session that resumes after the post can still sort its findings;
+        # its row above still says it did not finish.
+        printf '\n<details><summary>%s: the reply has no final REVIEW RESULT line; its findings still need sorting</summary>\n\n' "$(adapter_shown "$n")"
+        cat "$res/$n.partial"
+        printf '\n</details>\n'
+      fi
     done
   } >"$tmp/comment" || not_reviewed "could not write the comment"
   if held=$(held_comment "$(cat "$tmp/comment")" "$repo"); then die "not posted: $held" 9; fi
