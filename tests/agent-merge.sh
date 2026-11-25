@@ -251,6 +251,8 @@ for s in '**Status:** Ready for review' '**Status:** Ready ' '**Status:** In rev
 done
 fresh; pr_set '.body = "## Summary\n\n**Status:** Ready\n"'; run_am
 check "a Status line that is not the first line waits" 'waits "Status line"'
+fresh; pr_set --arg b "**Status:** Ready"$'\n\n'"$(head -c 200000 /dev/zero | tr '\0' x)" '.body = $b'; run_am
+check "a description longer than a pipe buffer still reads the Status line" '[ "$rc" = 0 ] && [ "$out" = "agent merge: on" ]'
 
 # CI on the head.
 fresh; checks failure; run_am

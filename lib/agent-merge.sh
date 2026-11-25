@@ -156,7 +156,7 @@ agent_merge_command() {
   base=$(jq -r '.baseRefName | strings' <<<"$json") || die "could not read pull request #$pr"
   head=$(jq -r '.headRefOid | strings' <<<"$json") || die "could not read pull request #$pr"
   author=$(jq -r '.author.login | strings' <<<"$json") || die "could not read pull request #$pr"
-  first=$(jq -r '.body | strings' <<<"$json" | head -n 1) || die "could not read pull request #$pr"
+  first=$(jq -r '.body | strings | split("\n")[0] // ""' <<<"$json") || die "could not read pull request #$pr"
   [ -n "$head" ] || die "could not read the head of pull request #$pr"
   first=${first%$'\r'}
   [ "$state" = OPEN ] || reasons="$reasons; it is not open"
