@@ -18,7 +18,7 @@ The Inbox is the Triage status, every issue of the project in Triage, with no la
 
 ## Start waits
 
-For `start-waits.md` in `mentat:backlog`'s folder, a start wait is the connector's blocked-by relation from the item to each item it waits on. A blocker is done only in the Done status; Canceled or Duplicate makes the wait dead. When a blocker is marked a duplicate, Linear itself moves its link to the original item, so the wait follows the original.
+For `mentat:backlog` "Blocked-by links", a start wait is the connector's blocked-by relation from the item to each item it waits on. A blocker is done only in the Done status; Canceled or Duplicate makes the wait dead. When a blocker is marked a duplicate, Linear itself moves its link to the original item, so the wait follows the original.
 
 ## Types
 
@@ -40,7 +40,7 @@ The next agreed work, the tracker's order, is the open Todo items without the `W
 
 ## Reading an item
 
-For `item-reads.md` in `mentat:backlog`'s folder: the maintainer is the project's lead, the lead field of the project. List every page of an item's comments and of its `Spec` document's comments ("Where the spec lives"). An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads and the `Spec` document's included. Attachment links in comments are not downloaded. An item's original text is read from its `Original text` document, where it has one.
+For `mentat:backlog` "Reading an item": the maintainer is the project's lead, the lead field of the project. List every page of an item's comments and of its `Spec` document's comments ("Where the spec lives"). An inline comment carries the description text it quotes. A thread is resolved when its top-level comment is resolved. The answer reply goes as one reply per affected thread, on that thread's top-level comment, inline threads and the `Spec` document's included. Attachment links in comments are not downloaded. An item's original text is read from its `Original text` document, where it has one.
 
 ## Where the spec lives
 
@@ -48,7 +48,7 @@ For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of
 
 ## Agent records
 
-For `agent-records.md` in `mentat:backlog`'s folder: edit the item's `Agent records` comment in place with the connector's comment save, given that comment's id, never by posting a new one. Upload a replies file, a second opinion round's or the plan check's, with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned. Read the attachment back from the item.
+For `records.md` in `mentat:backlog`'s folder, "Agent records": edit the item's `Agent records` comment in place with the connector's comment save, given that comment's id, never by posting a new one. Upload a replies file, a second opinion round's or the plan check's, with the connector: call `prepare_attachment_upload` for the item with the file's name, content type and exact size in bytes; send the file from disk to the upload URL it returned with `curl -X PUT --data-binary @<file>` and every signed header it returned, verbatim, within 60 seconds; then call `create_attachment_from_upload` with the asset URL it returned.
 
 ## Branch names
 
@@ -74,6 +74,6 @@ A new project's overview holds only what is unique to it: its short summary is o
 
 1. Create the project as "New project shape" says, with the maintainer as lead and the team's labels ("Labels"), and make sure the team has a started status named In Review.
 2. Move the open issues, holding back any with an open closing pull request or an open blocker (`gh issue view <N> --json blockedBy`) that does not move with it, such as one held back or in another repository.
-3. Before copying each spec, compute the issue's current spec fingerprint as `mentat:backlog` "Agreement" says and compare it with the one the issue records, read as `agent-records.md` in `mentat:backlog`'s folder says. Copy the spec unchanged into the new item's `Spec` document ("Where the spec lives"). Carry the issue's current assumptions, and under `Decisions:` each line of its body's `## Decisions` that records an objection of the maintainer's ("Decision lines" in that file), unchanged and, only when the two fingerprints match and the issue's start wait is not dead (`start-waits.md` in `mentat:backlog`'s folder), its build answer with any `Agreed by default` line, with, as the fingerprint, that of the copied spec as read back from Linear, computed the same way; otherwise no fingerprint or build answer is carried, so the item goes back to planning. What is carried goes in one `Agent records` comment on the new item, always with the `Spec document: <id>` record of a copied spec, the one exception to issue comments staying on the issue. Re-create each blocked-by link between moved issues as the connector's blocked-by relation between their new items.
+3. Before copying each spec, compute the issue's current spec fingerprint as `mentat:backlog` "Agreement" says and compare it with the one the issue records, read as `records.md` in `mentat:backlog`'s folder says. Copy the spec unchanged into the new item's `Spec` document ("Where the spec lives"). Carry the issue's current assumptions, and under `Decisions:` each line of its body's `## Decisions` that records an objection of the maintainer's ("Decision lines" in that file), unchanged and, only when the two fingerprints match and the issue's start wait is not dead (`mentat:backlog` "Blocked-by links"), its build answer with any `Agreed by default` line, with, as the fingerprint, that of the copied spec as read back from Linear, computed the same way; otherwise no fingerprint or build answer is carried, so the item goes back to planning. What is carried goes in one `Agent records` comment on the new item, always with the `Spec document: <id>` record of a copied spec, the one exception to issue comments staying on the issue. Re-create each blocked-by link between moved issues as the connector's blocked-by relation between their new items.
 4. Change the AGENTS.md backlog line to name the project, in a pull request.
 5. Close only the moved issues once that change merges.

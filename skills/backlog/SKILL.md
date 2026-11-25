@@ -1,104 +1,114 @@
 ---
 name: backlog
-description: "Reads or changes the backlog: GitHub issues, or an external backlog outside GitHub that AGENTS.md names. Use before filing, moving or reading a backlog item or issue, and right after the plan check or mentat second-opinion, to record the replies (with an external backlog, in the item's one Agent records comment, edited in place) and show them as replies.md says."
+description: "Reads or changes the backlog: GitHub issues, or an external backlog AGENTS.md names. Use before filing, moving or reading an item, and right after the plan check or mentat second-opinion to record and show the replies."
 user-invocable: false
 ---
 
-With no external backlog, the backlog is GitHub issues: only the stages ("Stages"), item creation, stage moves and fingerprint record ("Agreement"), "Where the spec lives", the item shape as `github.md` gives it, no progress comments on an item (progress is on the pull request once one exists), "Filing", "Titles", "Material assumptions", "Relayed writes", "Start waits", "Reading an item", "Replies in chat", "Waits on the maintainer" and "Tracker: GitHub issues" apply, not the rest of the sections from "Reaching the backlog" to "Plan check record".
-
-In a repository with an external backlog, the backlog lives there, not in GitHub issues, and its item is the only record of a change: the request, the plan, the evidence, the status and the spec. The backlog is private, so it can hold what GitHub should not: planning evidence that may come from private sessions. GitHub holds pull requests only; no issue is opened for agreed work. AGENTS.md names the tracker.
+The backlog is the external one AGENTS.md names, else the repository's GitHub issues. Every section applies to both unless it says otherwise; the tracker's adapter (`mentat-linear:linear`, or `github.md` in this skill's folder) maps each part to its tracker. With an external backlog the item is the change's only record and may hold private evidence; GitHub holds only pull requests. Only the main session touches the backlog. Read `records.md` in this skill's folder before writing a public-safe record or an item's agent records, and again after a compaction.
 
 ## Item shape
 
-Keep an item's description short, so items look alike. It holds only these, in this order:
+An item's description holds only these, in this order:
 
-- The opening sentence: one plain sentence, not a heading, of at most about 25 words. It says what the item is (such as a bug, a proposal, a follow-up or a question) and, from when Claude Code creates the item or the maintainer agrees it, where the work came from: asked by the maintainer in chat, written by the maintainer, found by an agent while building, or proposed by an agent and agreed. It does not restate status or waits, which the tracker's fields show, so a change of status does not rewrite it. It names only three things those fields cannot show: "parked" for an item set aside, that a parked item was agreed ("Stages"), and anything the tracker's adapter says its tracker cannot show (on GitHub issues without stage labels, that the issue waits in the Inbox). Triage rewrites it when the item leaves the Inbox.
-- The wait block ("Marking a wait"), only while steps wait on the maintainer, in the shape "Waits on the maintainer" gives, its steps in full; remove it when the wait ends. Then, on every tracker, a section headed "Decision for the maintainer" while one is open on the item: written when it arises (`mentat:plan` "Decisions"), removed when its answer is recorded (`agent-records.md`). These are the first headings of the description, the wait block first.
-- One `Now:` line, the item's next step: where the item stands and what comes next, replaced in place.
+- An opening sentence, not a heading, of at most about 25 words: what the item is (bug, proposal, follow-up or question) and, once Claude Code creates it or the maintainer agrees it, where the work came from (asked in chat, written by the maintainer, found by an agent, or proposed by an agent and agreed). It names no status the tracker shows; only "parked", that a parked item was agreed, and what the adapter says its tracker cannot show. Triage rewrites it when the item leaves the Inbox.
+- The wait block, as its first heading, only while steps wait on the maintainer; then a "Decision for the maintainer" section while one is open (`mentat:plan` "Decisions").
+- One `Now:` line: where the item stands and its next step, replaced in place.
 - One links line.
 
-The item's decisions lines, any longer current plan and its material assumptions go in its agent records (`agent-records.md`). The tracker's adapter may keep the next step and the decisions lines elsewhere (`github.md`); every reader and writer uses its place. Evidence goes to an attachment or the pull request; a replaced plan is deleted, not posted as a comment. Agents post no progress comments on an item; once a pull request exists, progress is on the pull request.
+The item's decisions lines, any longer current plan and its assumptions go in its agent records (`records.md`); with GitHub issues the body keeps the plan and decisions lines (`github.md`). Evidence goes to an attachment or the pull request; a replaced plan is deleted. Agents post no progress comments; once a pull request exists, progress is on it.
 
 ## Reaching the backlog
 
-Reach the backlog with the tracker's tools, by the name AGENTS.md gives. If the tools are not in the session, tell the maintainer the backlog is not connected in this session and stop planning work there. While the backlog is unreachable, a change that qualifies for a fast track (`mentat:review` "Fast track") may go ahead and is recorded once it is back; everything else stays blocked. Never file an item or a plan on GitHub instead. The builder does not touch the backlog; this happens in the main session.
+With an external backlog, use the tracker's tools by the name AGENTS.md gives. Without them, say the backlog is not connected here and plan no work in it; meanwhile only a fast track (`mentat:review` "Fast track") may go ahead, recorded once it is back. Never file on GitHub instead.
 
 ## Stages
 
-Stages say where an item stands. The tracker's adapter maps each to its own statuses or labels (`mentat-linear:linear`, `github.md`):
-
-- Inbox: undecided, not triaged yet, Claude Code's own suggestions included. An Inbox entry is not an item yet: no type, no item shape, not in the order of agreed work. Triage (`/mentat-linear:triage`, in the `mentat-linear` module, for any tracker) settles it; where that module is off, the maintainer settles an entry in chat with Claude Code, its outcome (accept, close, merge, later) written as the tracker's adapter says for triage outcomes. Accepting it keeps the same entry as the item.
-- Backlog: accepted, not committed. Also an item the maintainer set aside, which says "parked" in its opening sentence; one that was agreed keeps its spec and any wait, says it was agreed, and leaves the order of agreed work ("The order of agreed work"). Also an item holding only a decision for the maintainer, which is not a wait ("Marking a wait").
+- Inbox: undecided, not triaged, Claude Code's own suggestions included; not an item yet (no type, no item shape, not in the order of agreed work). Triage (`/mentat-linear:triage`) settles it, or, where that module is off, the maintainer in chat, its outcome (accept, close, merge, later) written as the adapter says. Accepting keeps the entry as the item.
+- Backlog: accepted, not committed; also a parked item (an agreed one keeps its spec and any wait and leaves the order of agreed work) and an item holding only a decision for the maintainer.
 - Todo: committed, agreed with a spec. Only the maintainer's yes in `mentat:plan`, or `mentat-lead:orchestrate`'s default agreement, commits an item and moves it from Backlog to Todo.
 - In Progress: a branch or pull request exists.
 - Done: ended, as done, canceled or duplicate.
 
 ## Marking a wait
 
-A wait on the maintainer, for agreed work only (an item that is not agreed waits on no one): mark the item as waiting, and put at the top of the description, as its first heading, one saying it waits on the maintainer (the opening sentence of the item shape stays above it), then the steps ("Waits on the maintainer" gives the shape). A decision for the maintainer is not a wait: the tracker's wait mark marks one that blocks an item's work too, on any item, as the tracker's adapter says, and one that does not block gets no mark. When a wait ends or a blocking decision is answered, remove the mark only when no wait or blocking decision remains (with a merge wait, as the tracker's adapter says). A merge wait, with an external backlog only, is the exception: "Ready to merge: #N" (`mentat:review`) marks it as the tracker's adapter says, with no wait block or steps of its own. A wait block already there stays: when #N merges, Claude Code does its steps before marking the item done, except a hand check the spec marks as after the merge, which is the maintainer's and keeps the item open and waiting, not done (`../review/after-ready.md`), until they report each such check's result; the last report, pass or fail, ends that wait and marks the item done, each failed check first filed as a follow-up ("Filing"). The merge wait ends when #N merges or closes, or when work resumes on #N after a hold, as the tracker's adapter says. A review stop waiting on the maintainer's answer (`mentat:review`) also marks the item as waiting, with no wait block, its next step ("Item shape") naming the stop; the maintainer's answer ends it, and the same write replaces that next step with the item's actual one and removes the mark as above.
-
-## The order of agreed work
-
-The tracker's order: the order of agreed work, next first, read as the tracker's adapter says (`mentat-linear:linear` "The order of agreed work", `github.md`). It leaves out parked items.
-
-## Where the spec lives
-
-An item's spec lives where the tracker's adapter says ("Where the spec lives" in `mentat-linear:linear` or `github.md`); every skill that reads, writes or fingerprints a spec takes it from there. It is absent until agreement. Its body is the request that is exported and fingerprinted, and stays byte for byte as agreed: reshaping an item never rewords, retitles or re-spaces it; only a change of scope ("Agreement") updates it. Build readiness handles a mismatch with the recorded fingerprint.
-
-## Agreement
-
-When the maintainer agrees to build something, with either answer to `mentat:plan`'s agreement question, or `mentat-lead:orchestrate` agrees an item by default because nothing was open for the maintainer, do all of this before the branch starts. A chat request has no item yet, so create it first, in Claude Code's own words (with GitHub issues, an issue): committing to Todo always needs an item. Then:
-
-- Write the spec ("Where the spec lives"), as agreed, in this order: one sentence of intent; a numbered list of requirements, each one checkable, in one or two lines, and each may name the entry point it is tested through; and "Out of scope:", what is left alone, in one line or a short list. Scale it to the change: a bug fix is a few lines. Each requirement is a line the requirement table in the pull request's Review details cites by number, and one the maintainer checks by hand says so, and "after the merge" when the change takes effect only once merged. The reviewers `mentat:review` runs review the change against it, and their comments are public, so write it in public-safe words: `records.md` in this skill's folder applies, and it never names the backlog's workspace or item. Private notes are evidence, not requirements. A requirement that cannot be stated in public cannot be reviewed against, so say that to the maintainer, who decides.
-- On an item created here, write the plan check and second opinion records kept for it, with their files, as `agent-records.md` in this skill's folder says.
-- Record the spec's fingerprint. Read the spec back from the tracker, which may re-serialize Markdown, compute the fingerprint of that read-back body as `mentat:review` "Spec" computes it (the same command), never from the text written, and record it with the answer to `mentat:plan`'s agreement question (build now or later), citing the agreement, in the item's agent records (`agent-records.md`); an item agreed by default records `build: now` and the default-agreement line that record gives, never as the maintainer's answer. Do it again, with that agreement's answer, whenever an agreed change of scope rewrites the spec.
-- A change of scope updates the spec, in the same words. Scope triage merged into a Todo item, named in a comment on it, is not committed: it joins the spec only once agreed through `mentat:plan`. Before the item ends with that scope still not agreed, the scope goes to the Inbox as one entry naming the item.
-- Move the item to Todo once the maintainer agrees, or it is agreed by default, to In Progress when the branch exists, and to Done when the pull request merges, or, with hand checks after the merge, once the maintainer reports each one's result ("Marking a wait", or `github.md` with GitHub issues). Link the pull request from the item once it exists. The pull request writes no `Closes #`.
-
-## Second opinion records
-
-Keep what the review tools said on the item: after each `mentat second-opinion` round, record Claude Code's settlement and attach the tools' replies as `agent-records.md` in this skill's folder says.
-
-## Plan check record
-
-With an external backlog, after the plan check, record its settlement and attach its reply as `agent-records.md` in this skill's folder says.
-
-## Filing
-
-With either tracker, before filing an entry or item, read `filing.md` in this skill's folder, and again after a compaction.
-
-## Titles
-
-With either tracker, when an item's or issue's agreed spec, or a not-agreed item's current plan, changes so the title no longer says what the item does, the same write rewrites the item's title, keeping its identifier. Scope triage merged in but not yet agreed does not change the title until `mentat:plan` agrees it.
-
-## Material assumptions
-
-With either tracker, before writing an item's material assumptions, or briefing a builder for an item, read `assumptions.md` in this skill's folder, and again after a compaction: the list's shape, when it is written and what reaches the maintainer.
-
-## Relayed writes
-
-With either tracker, a backlog write that a build session another session started sends back is made as "Relayed writes" in `../build/SKILL.md` says; read it then.
+Only agreed work waits on the maintainer: mark the item waiting and put the wait block first. A decision for the maintainer that blocks the item's work also gets the mark, on any item. Remove the mark only when no wait or blocking decision remains. With an external backlog, "Ready to merge: #N" (`mentat:review`) starts a merge wait, marked as the adapter says, ending when #N merges or closes, or work resumes on #N after a hold. When #N merges, Claude Code does a wait block's steps before marking the item done, except a manual check the spec marks as after the merge, which keeps the item waiting (`../review/after-ready.md`) until the maintainer reports each result, each failed check first filed as a follow-up. A review stop waiting on the maintainer marks the item waiting, its `Now:` line naming the stop, until they answer.
 
 ## Waits on the maintainer
 
-With either tracker, before writing or reading a wait on a hand test or setup step only the maintainer can run, read `waits.md` in this skill's folder, and again after a compaction: where the wait goes and its shape.
+When agreed work waits on a manual check or manual step, write the wait at the top of its item, else right below its pull request's Status line, else in a new item: a heading saying it waits on the maintainer, then numbered steps, how many first. With the wait on an item, the pull request carries one line below its Status line saying the steps are on the backlog item, naming neither the workspace nor the item.
 
-## Start waits
+Each step is one line naming where it runs, a web page or an app and folder in terms `records.md` allows, never a worktree or branch copy. A step whose result a later one needs says what the maintainer should see. Each command or text to paste sits complete in its own fenced block, with real, non-secret values and no placeholder; each setting is named as its page labels it, with its exact value. Steps are written in full, never pointing elsewhere; an unchecked detail is marked unverified. The last line, `Ends when: <the result that shows it is done>`, is the wait's only overall pass.
 
-With either tracker, agreed work that cannot start until other items are done carries a start wait: the tracker's own blocked-by link to each. A wait on anything else is not a start wait: the session names it in the item's next step. Before writing or reading one, read `start-waits.md` in this skill's folder: who writes it, and when it holds the item and how that is reported. A start wait never adds the tracker's wait-on-maintainer mark and never parks the item.
+A manual check's step: when the session can read the check's output and the spec gives a pass condition that needs no taste, the maintainer only runs it and the session judges the output against that condition; otherwise the step says where the output appears, how long it takes and what passing looks like. A visual or subjective check stays the maintainer's to judge.
+
+The last message of the turn that first leaves a wait says the work waits on the maintainer, with the steps in full; so do a started session's message to its starting session, that session's forward of it (`mentat:build` "Started sessions") and an implementation run's final message. Later turns repeat neither unless asked. A value GitHub records may not hold, such as a local path, is stated there in general terms and those messages carry the real command.
+
+## Blocked-by links
+
+Agreed work that cannot start until other items are done carries the tracker's blocked-by link to each, as the adapter says; any other wait, such as on a pull request, is named in the `Now:` line. Agreement writes each link with the agreement, then reads the links back; a link still missing after one retry keeps the item out of Todo and is told to the maintainer. `Now:` writes and triage leave links unchanged.
+
+A session deciding whether an item can start reads each blocker's status, read-only: met when every blocker ended done, and the item starts with no write; unmet while any is open ("waits on <id>"); dead when one ended canceled or duplicate (`/mentat:plan <id>`); unchecked when a read fails ("could not check its wait: <why>"). Any but met holds the item: it is not offered, implemented or named as next, and a session walking the order reports it and goes on.
+
+## The order of agreed work
+
+The tracker's order, next first, read as the adapter says, leaving out parked items.
+
+## Where the spec lives
+
+Where the adapter says; every skill that reads, writes or fingerprints a spec takes it from there. It is absent until agreement, and stays byte for byte as agreed: only an agreed change of scope ("Agreement") updates it.
+
+## Agreement
+
+When the maintainer agrees, with either Agree answer to `mentat:plan`'s agreement question, or `mentat-lead:orchestrate` agrees an item by default, do all of this before its branch is cut. A chat request has no item yet: first create one in Claude Code's words.
+
+- Write the spec: one sentence of intent; numbered requirements, each checkable in one or two lines and each may name the entry point it is tested through; and "Out of scope:". Scale it to the change. The pull request's requirement table cites each by number; one the maintainer checks says so, and "after the merge" when it takes effect only once merged. Reviewers read it in public, so it is public-safe (`records.md`) and names neither the workspace nor the item; a requirement that cannot be public goes to the maintainer.
+- On an item created here, write the plan check and second opinion records kept for it.
+- Record the fingerprint: read the spec back from the tracker, which may re-serialize Markdown, save that body to a temporary file and run `mentat fingerprint <file>`, never on the text written. Record it with the answer (`build: now` or `build: later`), citing the agreement, in the agent records; an item agreed by default records `build: now` and the default-agreement line that record gives, never as the maintainer's answer. Record it again whenever an agreed change of scope rewrites the spec.
+- Scope triage merged into a Todo item joins the spec only once agreed through `mentat:plan`; if the item ends without that, it goes to the Inbox as one entry naming the item.
+- Move the item to Todo on agreement, to In Progress when the branch exists, and to Done when the pull request merges or, with manual checks after the merge, once each result is reported. Link the pull request from the item.
+
+## Titles
+
+When the agreed spec, or a not-agreed item's plan, changes so the title no longer says what the item does, the same write rewrites the title, keeping its identifier.
+
+## Filing
+
+- File only a change the maintainer would recognize on its own, usually one pull request, after a search finds no open item tracking it. Part of an open item's work goes in its plan or pull request. One review or audit is one entry listing its findings; a remark is a comment on its item.
+- Unasked work and an idea the maintainer raises mid-task go to the Inbox; a found defect and the maintainer's explicit request to file go to Backlog. None goes through `mentat:plan`; the request in hand does.
 
 ## Reading an item
 
-With either tracker, before reading an item to plan, propose, triage or build it, or to record an answer on it, read `item-reads.md` in this skill's folder, and again after a compaction.
+Before reading an item to plan, triage or implement it, or to record an answer on it, read it in full as the adapter says: the description, the spec and every comment it lists, inline comments with the text they quote and replies included, from every page, without downloading attachments. A read to plan or propose an item also reads the decisions lines of each item whose work moved to it, as the item names it. If the read is incomplete, say so and ask no decision on that item: `mentat:plan` takes it no further and an implementation run skips it. A session that plans or implements the item asks each open decision for the maintainer before relying on it. A listing reads only what it names.
+
+The maintainer is who the adapter names. A comment this session wrote, or one in a record shape these skills define (the agent records comment, answer replies), is not theirs; text of unclear authorship is context. A maintainer comment that asks or objects is open until an answer reply answers it, they answer or withdraw it, or its thread is resolved; a later one in that thread opens it again.
+
+An open comment that bears on a decision the session asks is named in that question, which answers it with the facts looked up first; when it objects to the options, they are revised or the question says why they stand. One that bears on none is answered directly where the skill may write, and named in one line of the session's report. The answer reply opens with the line `Answer to open comments:`, then names each comment and its answer and any recorded decision, in Claude Code's words, saying what remains open. It goes where the adapter says. A stopped or unanswered question posts nothing, and a skill that forbids writes, `mentat-lead:grill` included, leaves the reply to the skill that records the answer.
 
 ## Replies in chat
 
-After the plan check, and after each `mentat second-opinion` round, with any backlog, the replies go in a block. Before showing it, read `replies.md` in this skill's folder, and again after a compaction.
+After the plan check and after each `mentat second-opinion` round, the replies go in this block:
+
+```
+Plan check: <label> - <reason>
+<Reviewer>: <label> - <reason>
+Adopting: <what Claude Code takes up>
+Not adopting: <what> (<why>)
+```
+
+- The `Plan check` line after the plan check (`Plan check: none - <why>` with no verdict); after a second opinion round, one line per reviewer as `mentat second-opinion` names it, one with no answer getting `no second opinion` and why. Reasons are public-safe; exit 6 means outside reviewers are not on here, no failure.
+- The label is `worth doing` for `DO IT`, `another way` for `DO IT DIFFERENTLY` and `not worth doing` for `DON'T`, verdict lines included. The reason is the reply's own in about 10 words, keeping any condition, else `no reason given`; a label never stands alone.
+- Plain words, about 25 a line, nothing else. Never in a decision's question. A round ending in `mentat:plan` steps 6 and 7 prints nothing; there the maintainer's `Show the full proposal` prints every round's block, each headed `Round <n>` when there was more than one. Elsewhere it goes in chat.
+
+With an external backlog, then record the settlement and attach the replies as `records.md` "Plan check and second opinions" says.
+
+## Forwarded writes
+
+A backlog write that a started implementation session sends back is made as `../build/SKILL.md` "Forwarded writes" says.
 
 ## Tracker: Linear
 
-For a repository whose AGENTS.md names a Linear project: before any Linear action, including creating a project, call the Skill tool with `mentat-linear:linear`, and again after a compaction. It maps the stages and holds the Linear parts of the sections from "Reaching the backlog" to "Second opinion records". When that skill is not available, say the `mentat-linear` module is off, so the backlog is not reachable in this session, and go on as "Reaching the backlog" says.
+Where AGENTS.md names a Linear project, call the Skill tool with `mentat-linear:linear` before any Linear action, and again after a compaction. When it is not available, say the `mentat-linear` module is off and go on as "Reaching the backlog" says.
 
 ## Tracker: GitHub issues
 
-For a repository whose AGENTS.md names no external backlog: its GitHub issues are the backlog. Before any backlog action on its issues, read `github.md` in this skill's folder, and again after a compaction. It maps the stages and the tracker's order.
+Where AGENTS.md names no external backlog, read `github.md` in this skill's folder before any backlog action, and again after a compaction.

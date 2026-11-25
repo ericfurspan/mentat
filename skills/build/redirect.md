@@ -6,7 +6,7 @@ Read this, part of `SKILL.md` in this folder, before its step 2, and for a chat 
 
 A go-ahead here is "Agree and build now" (in a planning session, `../plan/session.md` step 7, or in a chat request) or the maintainer's typed `/mentat:build` with or without ids. Its items are the ids it names, or, for a bare `/mentat:build`, those `SKILL.md` step 2 takes with none. A run a handover or the starting session's command began, or a message asking this session to resume its own work, is not one: it runs as `SKILL.md` "Started sessions" says.
 
-Where it builds is decided before any start wait (`mentat:backlog` "Start waits") is applied, and only a build here applies it. A redirected go-ahead takes an item held by its start wait with the rest, in a planning session (`../plan/session.md` step 7) or a chat request (`../plan/SKILL.md`) alike; the orchestrator holds it by that wait.
+Where it builds is decided before any start wait (`mentat:backlog` "Blocked-by links") is applied, and only a build here applies it. A redirected go-ahead takes an item held by its start wait with the rest, in a planning session (`../plan/session.md` step 7) or a chat request (`../plan/SKILL.md`) alike; the orchestrator holds it by that wait.
 
 ## Where it builds
 
@@ -24,8 +24,8 @@ Read and write only this repository's notes file, orchestrate-notes.md, where `m
 
 A redirected go-ahead builds nothing in this session: no readiness check, quick check, branch or builder. Those run in the build session after the handover, and their questions reach the maintainer through the orchestrator, as for any handover (`SKILL.md` "Started sessions").
 
-1. Read each item's agent records (`../backlog/agent-records.md`). An item with no recorded spec fingerprint is not sent: name it with its `/mentat:plan <id>` command, as `SKILL.md` step 3 does.
-2. Record each other item's agreement with `build: now`, as `mentat:backlog` "Agreement" and `../backlog/agent-records.md` say, changing only the answer: the recorded fingerprint stays as it is, never recomputed here, so the build session's check still finds a changed spec. One agreed for later gets `build: now` in place of `build: later`, citing the typed command as the maintainer's word; one already recorded `build: now` keeps its record.
+1. Read each item's agent records (`../backlog/records.md`). An item with no recorded spec fingerprint is not sent: name it with its `/mentat:plan <id>` command, as `SKILL.md` step 3 does.
+2. Record each other item's agreement with `build: now`, as `mentat:backlog` "Agreement" and `../backlog/records.md` say, changing only the answer: the recorded fingerprint stays as it is, never recomputed here, so the build session's check still finds a changed spec. One agreed for later gets `build: now` in place of `build: later`, citing the typed command as the maintainer's word; one already recorded `build: now` keeps its record.
 3. Send the orchestrator one session message, at the address the host's list shows for it, the redirect: each item and its recorded spec fingerprint, marked as a go-ahead redirected from this session.
 4. Tell the maintainer in one line that those items, by id, went to the orchestrator.
 
