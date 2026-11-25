@@ -1,18 +1,18 @@
 # Mentat rules
 
-The maintainer owns the repository; Claude Code plans and builds; fresh-context Claude reviews.
+The maintainer owns the repository; Claude Code plans and implements; fresh-context Claude reviews.
 
 Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels, templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
 Call `mentat:plan` before giving a view on or suggesting a change.
 
-One builder per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
+One implementer (`mentat:builder`) per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
-After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word relay of it.
+After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word forward of it.
 
-Finish the step in flight first; never interrupt a running builder, review or test run.
+Finish the step in flight first; never interrupt a running implementer, review or test run.
 
 Backlog work follows `mentat:backlog`. GitHub records are public-safe (`mentat:backlog`'s `records.md`): Claude Code's words; no chat quotes, private repository or project names, local paths, account, billing or session details.
 
