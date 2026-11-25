@@ -3,7 +3,7 @@
 # (File-wide: each check is a string evaluated after its case runs.)
 # Behavior tests for `mentat review`, the Claude review,
 # using a real git origin, a stub gh and a stub claude. Prints PASS/FAIL per case;
-# exits 1 on any FAIL. tests/review-codex.sh covers `mentat review --codex`.
+# exits 1 on any FAIL. tests/review-codex.sh covers the Codex adapter through `mentat review --outside`.
 set -uo pipefail
 
 mentat="$(cd "$(dirname "$0")/.." && pwd)/bin/mentat"
