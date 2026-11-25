@@ -127,6 +127,17 @@
 #     (each difference named, with the current status paths on a status change), 2 the line
 #     cannot be parsed or the checkout cannot be read, 64 usage. It says when the snapshot's
 #     checkout was not clean, which makes the check weaker.
+#   mentat worktree cleanup <PR> <branch>  After a merge, in the current repository, follows
+#     "After merge" in skills/build/helpers.md. It reads the pull request once (gh) and,
+#     before changing anything, checks it is MERGED with head branch name <branch>; when the
+#     local branch exists, that its commit is the pull request's head; when a worktree has
+#     the branch, that it is not the checkout this runs in, that no other worktree is
+#     nested under it, and that git status --porcelain --ignored prints nothing in it. Then
+#     git worktree remove (never --force) and git branch -D; never the remote branch.
+#     0 done, or nothing left to remove (said so), 1 the first failed check named (nothing
+#     changed), git refused the removal (worktree and branch kept) or the branch delete
+#     failed after it (the branch left named), 2 the pull request could not be read (gh
+#     failing or signed out, no such number; nothing changed), 64 usage.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -179,5 +190,5 @@ case "${1:-}" in
   check) shift; check "$@" ;;
   fingerprint) shift; fingerprint_command "$@" ;;
   worktree) shift; worktree_command "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>]" 64 ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch>" 64 ;;
 esac

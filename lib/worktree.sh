@@ -2,7 +2,7 @@
 # mentat worktree: the git checks a build makes on branches and worktrees, as
 # skills/build/helpers.md words them. Sourced by bin/mentat.
 
-worktree_usage="usage: mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>]"
+worktree_usage="usage: mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch>"
 
 worktree_command() {
   local sub=${1:-}
@@ -11,6 +11,7 @@ worktree_command() {
     branch) worktree_branch "$@" ;;
     snapshot) worktree_snapshot "$@" ;;
     verify) worktree_verify "$@" ;;
+    cleanup) worktree_cleanup "$@" ;;
     *) die "$worktree_usage" 64 ;;
   esac
 }
@@ -116,4 +117,82 @@ worktree_branch() {
   [ -n "$def" ] || die "origin's default branch could not be found; branch $name not made" 2
   git -C "$top" branch -q --no-track "$name" "refs/remotes/origin/$def" || die "could not make branch $name from origin/$def" 2
   printf 'made branch %s from origin/%s\n' "$name" "$def"
+}
+
+# The physical path of folder $1 (symbolic links resolved), or $1 as given when it cannot
+# be entered, so paths git records and paths the shell reports compare equal.
+wt_phys() { (cd -P "$1" 2>/dev/null && pwd -P) || printf '%s\n' "$1"; }
+
+# mentat worktree cleanup <PR> <branch>: after a merge, removes the worktree on <branch>
+# and then the local branch, as "After merge" in skills/build/helpers.md says, with every
+# check made before anything changes: the pull request is MERGED with head branch name
+# <branch>; when the local branch exists, the pull request's head is its commit; when a
+# worktree has the branch, it is not the checkout this runs in, no other worktree is
+# nested under it, and git status --porcelain --ignored prints nothing in it. The removal
+# is never forced and the remote branch is never touched. 0 done or nothing to remove,
+# 1 the first failed check named (or git refused the removal, or the branch delete failed
+# after it), 2 the pull request could not be read.
+worktree_cleanup() {
+  local pr branch top json state head_name head_oid tip list l path="" wt="" here wt_p q st err
+  case "${1:-}" in '' | *[!0-9]*) die "usage: mentat worktree cleanup <pull request number> <branch>" 64 ;; esac
+  case "${2:-}" in '' | -*) die "usage: mentat worktree cleanup <pull request number> <branch>" 64 ;; esac
+  if [ $# -ne 2 ] || ! git check-ref-format "refs/heads/$2"; then die "usage: mentat worktree cleanup <pull request number> <branch>" 64; fi
+  pr=$1 branch=$2
+  if ! top=$(git rev-parse --show-toplevel 2>/dev/null) || [ -z "$top" ]; then die "not inside a git checkout; nothing changed" 1; fi
+
+  # The pull request: one read. A failed or unusable read is not "not merged".
+  if ! json=$(gh pr view "$pr" --json state,headRefName,headRefOid 2>/dev/null) ||
+    ! state=$(printf '%s' "$json" | jq -er '.state | strings' 2>/dev/null) ||
+    ! head_name=$(printf '%s' "$json" | jq -er '.headRefName | strings' 2>/dev/null) ||
+    ! head_oid=$(printf '%s' "$json" | jq -er '.headRefOid | strings' 2>/dev/null) ||
+    [ -z "$state" ] || [ -z "$head_name" ] || ! wt_hex "$head_oid"; then
+    die "could not read pull request #$pr (gh failed or is signed out, or there is no such pull request); nothing changed" 2
+  fi
+  [ "$state" = MERGED ] || die "pull request #$pr is not merged (its state is $state); nothing changed" 1
+  [ "$head_name" = "$branch" ] || die "pull request #$pr's head branch is $head_name, not $branch; nothing changed" 1
+
+  # The local branch, when it exists, is the pull request's head.
+  if git -C "$top" show-ref --verify --quiet "refs/heads/$branch"; then
+    tip=$(git -C "$top" rev-parse --verify -q "refs/heads/$branch") || die "could not read branch $branch; nothing changed" 1
+    [ "$tip" = "$head_oid" ] || die "pull request #$pr's head is $head_oid, but branch $branch is at $tip; nothing changed" 1
+  else
+    tip=""
+  fi
+
+  # The worktree on the branch, if any, from git's list (a path may hold spaces).
+  list=$(git -C "$top" worktree list --porcelain) || die "could not list the worktrees; nothing changed" 1
+  while IFS= read -r l; do
+    case "$l" in
+      "worktree "*) path=${l#worktree } ;;
+      "branch "*) [ "${l#branch }" != "refs/heads/$branch" ] || wt=$path ;;
+    esac
+  done <<<"$list"
+
+  if [ -z "$tip" ] && [ -z "$wt" ]; then
+    printf 'nothing to remove: branch %s is gone and no worktree has it; pull request #%s merged\n' "$branch" "$pr"
+    return 0
+  fi
+
+  if [ -n "$wt" ]; then
+    wt_p=$(wt_phys "$wt")
+    here=$(wt_phys "$top")
+    [ "$here" != "$wt_p" ] || die "the worktree at $wt on $branch is the checkout this command runs in; nothing changed" 1
+    while IFS= read -r l; do
+      case "$l" in "worktree "*) ;; *) continue ;; esac
+      q=$(wt_phys "${l#worktree }")
+      case "$q" in "$wt_p"/*) die "the worktree at $wt on $branch has another worktree under it: ${l#worktree }; nothing changed" 1 ;; esac
+    done <<<"$list"
+    st=$(git -C "$wt" status --porcelain --ignored 2>/dev/null) || die "could not read the status of the worktree at $wt on $branch; nothing changed" 1
+    [ -z "$st" ] || die "the worktree at $wt on $branch is not clean (git status --porcelain --ignored lists:
+$st
+); nothing changed" 1
+    if ! err=$(git -C "$top" worktree remove "$wt" 2>&1); then
+      die "git refused to remove the worktree at $wt: ${err//$'\n'/ }; kept it and branch $branch" 1
+    fi
+    printf 'removed the worktree at %s\n' "$wt"
+  fi
+  if ! err=$(git -C "$top" branch -D "$branch" 2>&1); then
+    die "could not delete branch $branch: ${err//$'\n'/ }; branch $branch is left" 1
+  fi
+  printf 'deleted branch %s (the remote branch is left alone)\n' "$branch"
 }
