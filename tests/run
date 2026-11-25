@@ -149,7 +149,7 @@ skills/review/SKILL.md|Final check|A session started by another session sends no
 skills/review/SKILL.md|Final check|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
 skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/SKILL.md\` "Final check" says.
 skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
-skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/SKILL.md\` "Final check" gives.
+skills/build/SKILL.md|Started sessions|The forward is the first showing of that Ready line: right after it, the starting session sends the push \`../review/SKILL.md\` "Final check" gives.
 skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
 skills/review/after-ready.md||When the maintainer objects to the item's design, plan or pull request at a hold or a close without merging, the session that hears it writes one decisions line on the item recording each objection
 skills/plan/SKILL.md||When the maintainer objects to the item's design, plan or pull request in their reply to the agreement question or in any talk after it, the session writes one decisions line on the item recording each objection (\`../backlog/records.md\` "Decision lines").
@@ -795,8 +795,6 @@ plugins/mentat-lead/skills/retro/SKILL.md
 plugins/mentat-linear/skills/linear/SKILL.md
 plugins/mentat-linear/skills/triage/SKILL.md
 rules.md
-skills/build/SKILL.md
-skills/build/helpers.md
 skills/build/redirect.md"
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
