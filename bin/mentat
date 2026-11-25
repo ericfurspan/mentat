@@ -105,6 +105,41 @@
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.
 #     0 Mentat can work (warnings printed), 1 it cannot.
+#   mentat fingerprint <file> [<expected>]  Prints the file's spec fingerprint, read as
+#     review --request reads it (the first 12 hex characters of the SHA-256 of its text
+#     without trailing newlines). With <expected>, prints both: 0 they match, 1 they differ.
+#     2 the file is missing, unreadable or blank (no fingerprint printed), 64 usage.
+#   mentat worktree branch <name>  In the current checkout, first checks for a local branch
+#     <name>, then runs git fetch origin, then makes <name> from origin/<default> with no
+#     upstream (the default branch found as mentat reviewers finds it). 0 made, 1 the branch
+#     already exists (nothing fetched), 2 the fetch failed or the default branch could not be
+#     found; no branch is made unless it exits 0. 64 usage.
+#   mentat worktree snapshot [<checkout>]  Prints one line of four space-separated tokens
+#     for the checkout, by default the main checkout (the folder above git's common
+#     directory): "<branch|detached> <HEAD> <clean|dirty> <hash>", the hash the SHA-256 of
+#     git status --porcelain -- ':(exclude).claude/worktrees'. Changes nothing, fetches
+#     nothing. 0 printed, 2 the checkout cannot be read or is on a branch named detached
+#     (which the line cannot tell apart from a detached HEAD), 64 usage.
+#   mentat worktree verify <line> [<checkout>]  Compares the checkout (by default the main
+#     checkout) with a snapshot line by the rule of "Main-checkout check" in
+#     skills/build/helpers.md: unchanged when the branch and status hash are the noted ones
+#     and HEAD is the noted one or moved only forward along origin/<branch> as last fetched
+#     (no fetch); detached at the snapshot, only the same HEAD passes. 0 unchanged, 1 changed
+#     (each difference named, with the current status paths on a status change), 2 the line
+#     cannot be parsed or the checkout cannot be read or is on a branch named detached,
+#     64 usage. It says when the snapshot's checkout was not clean, which makes the check
+#     weaker.
+#   mentat worktree cleanup <PR> <branch>  After a merge, in the current repository, follows
+#     "After merge" in skills/build/helpers.md. It reads the pull request once (gh) and,
+#     before changing anything, checks it is MERGED with head branch name <branch>; when the
+#     local branch exists, that its commit is the pull request's head; when a worktree has
+#     the branch, that it is not the checkout this runs in, that no other worktree is
+#     nested under it, and that git status --porcelain --ignored prints nothing in it. Then
+#     git worktree remove (never --force) and git branch -D; never the remote branch.
+#     0 done, or nothing left to remove (said so), 1 the first failed check named (nothing
+#     changed), git refused the removal (worktree and branch kept) or the branch delete
+#     failed after it (the branch left named), 2 the pull request could not be read (gh
+#     failing or signed out, no such number; nothing changed), 64 usage.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -116,7 +151,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review git-hooks check status; do
+for lib in shared publish review git-hooks check status worktree; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -155,5 +190,7 @@ case "${1:-}" in
   reviewers) shift; reviewers_command "$@" ;;
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check" 64 ;;
+  fingerprint) shift; fingerprint_command "$@" ;;
+  worktree) shift; worktree_command "$@" ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch>" 64 ;;
 esac

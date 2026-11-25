@@ -1,0 +1,3 @@
+# Deterministic git and spec checks live in the mentat command
+
+Skills carried checks that always give the same answer for the same repository state, such as a spec's fingerprint, making a build branch, noting and comparing the main checkout, and removing a merged branch's worktree, as English recipes an agent had to follow step by step. These checks now live in the `mentat` command as tested subcommands (`mentat fingerprint` and `mentat worktree`), and skills call them in place of the recipes as each skill is rewritten, because a tested command gives the same result every run while a recipe depends on each agent reading and following it the same way.

@@ -137,6 +137,19 @@ fresh_stop() {
   die "the checkout is behind origin's default branch $fresh_def: HEAD lacks $fresh_behind $word on it. Update the checkout and run $1 again. This is not a tool failure: do not go on with Claude Code's own view alone." 5
 }
 
+# Prints origin's default branch for the repository at $1: the branch the remote's HEAD
+# names (a network read), else the local refs/remotes/origin/HEAD; prints nothing when
+# neither names one. Used by reviewers_state and mentat worktree branch.
+default_branch() { # $1 top level
+  local def
+  def=$(GIT_TERMINAL_PROMPT=0 git -C "$1" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
+  if [ -z "$def" ]; then
+    def=$(git -C "$1" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
+    def=${def#refs/remotes/origin/}
+  fi
+  printf '%s' "$def"
+}
+
 # Whether outside reviewers (Codex and Grok) are on in the repository at top level $1.
 # Only .claude/settings.json on origin's default branch counts: on when its
 # enabledPlugins["mentat-reviewers@mentat"] is true; off when the file, enabledPlugins or
@@ -152,11 +165,7 @@ reviewers_state() { # $1 top level
   reviewers=unknown reviewers_why="" reviewers_def=""
   if ! command -v jq >/dev/null 2>&1; then reviewers_why="jq is not installed"; return 0; fi
   if ! git -C "$top" remote get-url origin >/dev/null 2>&1; then reviewers_why="the checkout has no origin remote"; return 0; fi
-  reviewers_def=$(GIT_TERMINAL_PROMPT=0 git -C "$top" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]].*#\1#p' | head -n 1)
-  if [ -z "$reviewers_def" ]; then
-    reviewers_def=$(git -C "$top" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null)
-    reviewers_def=${reviewers_def#refs/remotes/origin/}
-  fi
+  reviewers_def=$(default_branch "$top")
   if [ -z "$reviewers_def" ]; then reviewers_why="origin's default branch could not be found"; return 0; fi
   # shellcheck disable=SC2064 # expand now, so the paths are fixed when the trap is set
   trap "git -C $(printf %q "$top") update-ref -d $(printf %q "$ref") >/dev/null 2>&1" EXIT
@@ -414,6 +423,22 @@ read_request() { # $1 pr
 # The fingerprint of agreed request text $1, already read with $(cat ...), which
 # drops trailing newlines: the first 12 hex characters of its SHA-256. Also read by mentat status.
 request_fingerprint() { printf '%s' "$1" | shasum -a 256 | cut -c1-12; }
+# mentat fingerprint <file> [<expected>]: the file read and fingerprinted as read_request
+# does. Prints the fingerprint; with <expected>, prints both and exits 0 on a match, 1
+# otherwise. A missing, unreadable or blank file exits 2 with no fingerprint.
+fingerprint_command() {
+  local file text fp
+  [ $# -eq 1 ] || [ $# -eq 2 ] || die "usage: mentat fingerprint <file> [<expected>]" 64
+  file=$1
+  [ -f "$file" ] && [ -r "$file" ] || die "could not read the file: $file" 2
+  text=$(cat "$file") || die "could not read the file: $file" 2
+  printf '%s' "$text" | grep -q '[^[:space:]]' || die "the file is empty: $file" 2
+  if ! fp=$(request_fingerprint "$text") || [ -z "$fp" ]; then die "could not fingerprint the file: $file" 2; fi
+  if [ $# -eq 1 ]; then printf '%s\n' "$fp"; return 0; fi
+  if [ "$fp" = "$2" ]; then printf 'fingerprint %s, expected %s: match\n' "$fp" "$2"; return 0; fi
+  printf 'fingerprint %s, expected %s: differs\n' "$fp" "$2"
+  return 1
+}
 # What every local review is told besides where to look: the criteria, and then
 # the requirements and the status line. $1 is " and the diff" when the prompt
 # also carries the diff as data.
