@@ -79,10 +79,10 @@ am_protected() {
 # The hook's part. am_hook <command> runs inside hooks/no-merge's check (a subshell that
 # `verdict` ends) with the hook's $input and field. It returns 0 when it decides nothing,
 # and the hook goes on to its own denial; or ends the check with a pass or a deny.
-# The pattern of a gh pr merge command is the hook's own, so that the two agree on what a
-# merge command is (hooks/no-merge and tests/no-merge.sh keep them together).
-am_flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
-am_merge_pattern="(^|[^[:alnum:]_.-])gh${am_flags}[[:space:]]+pr${am_flags}[[:space:]]+merge([[:space:]]|\$)"
+# What a merge command is, is the hook's own pattern (hooks/no-merge builds it, with its
+# flags pattern, and matches it on the text with backslash-newline continuations joined). It
+# is passed in as $2 and $3, so there is one definition and the two cannot disagree. When it
+# is not passed, nothing is allowed.
 # The one allowed form: one optional leading PATH= assignment (unquoted, or in double quotes
 # with no backtick, backslash or parenthesis), then gh pr merge <number> --merge
 # --match-head-commit <40 hex characters>, and nothing else.
@@ -90,11 +90,12 @@ am_path_value='("[^"`\\()]*"|[^[:space:]"`'"'"'\\;&|<>()]+)'
 am_allowed_form="^(PATH=${am_path_value}[[:blank:]]+)?gh[[:blank:]]+pr[[:blank:]]+merge[[:blank:]]+[0-9]+[[:blank:]]+--merge[[:blank:]]+--match-head-commit[[:blank:]]+[0-9a-f]{40}\$"
 am_form_reason="the maintainer merges, except that this repository lets a session merge its own ready pull request with exactly: gh pr merge <number> --merge --match-head-commit <40-hex commit>, run alone (at most one leading PATH= assignment). Any other merge command is denied. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)."
 
-am_hook() { # $1 command
-  local cmd=$1 cwd ref sha
+am_hook() { # $1 command, $2 the hook's merge pattern, $3 the command with continuations joined
+  local cmd=$1 pat=${2-} joined=${3-} cwd ref sha
+  [ -n "$pat" ] || return 0
   # Class h: a command that matches no merge pattern is not this function's business, and
   # nothing below it (git, the settings) is touched.
-  grep -Eq "$am_merge_pattern" <<<"$cmd" || return 0
+  grep -Eq "$pat" <<<"$joined" || return 0
   cwd=$(field '.cwd') || return 0
   [ -n "$cwd" ] || return 0
   ref=$(am_ref "$cwd") || return 0
