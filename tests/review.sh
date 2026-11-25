@@ -87,7 +87,7 @@ for args in "--codex 7" "--grok 7" "--grok --stop 7" "--codex --request f 7" "--
   check "mentat review $args exits 64, posts and reads nothing, and names --outside" '[ "$rc" = 64 ] && [ "$(cat "$STUB/out")" = "mentat: usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" ] && [ ! -f "$STUB/calls" ]'
 done
 # The one time limit, MENTAT_REVIEW_TIMEOUT_SECONDS: a whole number of 1 or more.
-for bad in 0 00 abc -1 1.5 " 5"; do
+for bad in 0 00 abc -1 1.5 " 5" ""; do
   reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=$bad "$mentat" review 7 >"$STUB/out" 2>&1; echo $?)
   check "MENTAT_REVIEW_TIMEOUT_SECONDS=\"$bad\" is a usage error (exit 64) that reads nothing" '[ "$rc" = 64 ] && grep -qxF "mentat: MENTAT_REVIEW_TIMEOUT_SECONDS must be a whole number of 1 or more, not \"$bad\"" "$STUB/out" && [ ! -f "$STUB/calls" ]'
 done

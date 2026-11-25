@@ -5,6 +5,8 @@
 
 # The one time limit for every reviewer, Claude and each outside reviewer alike.
 REVIEW_TIMEOUT_SECONDS="${MENTAT_REVIEW_TIMEOUT_SECONDS:-1800}"
+# Unlike other settings, set but empty is not unset here: review_timeout refuses it.
+[ "${MENTAT_REVIEW_TIMEOUT_SECONDS+set}" != set ] || [ -n "$MENTAT_REVIEW_TIMEOUT_SECONDS" ] || REVIEW_TIMEOUT_SECONDS=""
 # Every command that runs a reviewer calls this first: anything but a whole number of 1
 # or more (leading zeros allowed and dropped) is a usage error.
 review_timeout() {

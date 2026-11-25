@@ -305,7 +305,7 @@ check "MENTAT_GROK_REASONING_EFFORT set but empty gives Grok --reasoning-effort 
 # MENTAT_REVIEW_TIMEOUT_SECONDS is every reviewer's one time limit: anything but a whole
 # number of 1 or more is a usage error before any reviewer starts, and the retired
 # MENTAT_GROK_TIMEOUT_SECONDS changes nothing.
-for v in 0 soon -5 1.5; do
+for v in 0 soon -5 1.5 ""; do
   reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=$v run "$idea")
   check "MENTAT_REVIEW_TIMEOUT_SECONDS=$v is a usage error (exit 64), and no reviewer started" '[ "$rc" = 64 ] && [ "$(cat "$STUB/stderr")" = "mentat: MENTAT_REVIEW_TIMEOUT_SECONDS must be a whole number of 1 or more, not \"$v\"" ] && ! codex_ran && ! grok_ran && [ ! -e "$STUB/args_models" ]'
 done
