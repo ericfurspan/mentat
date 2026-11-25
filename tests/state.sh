@@ -248,6 +248,10 @@ rc=$(st item set WRK-1 --stage pr --pr 12)
 check "4: item set with --pr and stage pr together" '[ "$rc" = 0 ] && [ "$(q ".items[\"WRK-1\"].stage")" = pr ] && [ "$(q ".items[\"WRK-1\"].pr")" = 12 ] && [ "$(q ".items[\"WRK-1\"].session")" = s-1 ]'
 rc=$(st item set WRK-1 --stage ready)
 check "4: stage ready for an item with a PR number recorded" '[ "$rc" = 0 ] && [ "$(q ".items[\"WRK-1\"].stage")" = ready ]'
+for hb in -r -x "--arg"; do
+  rc=$(st item set WRK-1 --held-by "$hb")
+  check "4: held-by text '$hb' that looks like an option is kept as text" '[ "$rc" = 0 ] && [ "$(q ".items[\"WRK-1\"].held_by")" = "$hb" ] && [ "$(q ".items[\"WRK-1\"].stage")" = ready ]'
+done
 for s in held handed confirmed not-taken pr ready merged closed; do st item set "S-$s" --pr 3 --stage "$s" >/dev/null; done
 check "4: every stage is accepted" '[ "$(q "[.items[] | .stage] | unique | length")" = 8 ]'
 rc=$(st item get WRK-1)

@@ -130,11 +130,15 @@ state_item_merge() {
 
 # $1 the item, then pairs of field and value; pr is a number.
 state_op_item_set() {
-  local id=$1 set stage
+  local id=$1 set='{}' stage=""
   shift
-  set=$(jq -cn '[$ARGS.positional | range(0; length; 2) as $i | {key: .[$i], value: (if .[$i] == "pr" then (.[$i + 1] | tonumber) else .[$i + 1] end)}] | from_entries' --args "$@") ||
-    die "could not read the item's fields" 2
-  stage=$(jq -r '.stage // ""' <<<"$set") || die "could not read the item's fields" 2
+  # One pair at a time through --arg, so a value that looks like an option stays a value.
+  while [ $# -ge 2 ]; do
+    set=$(jq -c --arg k "$1" --arg v "$2" '.[$k] = (if $k == "pr" then ($v | tonumber) else $v end)' <<<"$set") ||
+      die "could not read the item's fields" 2
+    [ "$1" != stage ] || stage=$2
+    shift 2
+  done
   if [ "$stage" = pr ] || [ "$stage" = ready ]; then
     state_q -r --arg id "$id" --argjson set "$set" '($set | has("pr")) or ((.items // {})[$id].pr != null)'
     [ "$state_r" = true ] || die "item $id has no PR number, so it cannot be at stage $stage (give --pr); nothing changed" 1
