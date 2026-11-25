@@ -8,7 +8,7 @@ Plans one change with the maintainer, up to their agreement. When the maintainer
 
 A change Claude Code suggests outside the request it is carrying out, or a defect it finds, is filed as `mentat:backlog` "Filing" says.
 
-Nothing is implemented before the maintainer agrees; the one exception is an item `mentat-lead:orchestrate` agrees by default. The plan check's `DO IT` is not agreement. The maintainer agrees once, and agreed work gets no further plan check.
+Nothing is implemented before the maintainer agrees; the one exception is an item `mentat-lead:orchestrate` agrees by default. The plan check's `DO IT` is not agreement. The maintainer agrees once, and agreed work whose spec is unchanged gets no further plan check.
 
 ## Steps
 
@@ -32,7 +32,7 @@ Nothing is implemented before the maintainer agrees; the one exception is an ite
    - `Not now`: commits nothing and opens a talk; once the maintainer says to leave the item, it is not asked again until next planned.
 
    When the maintainer objects to the item's design, plan or pull request in their reply to the agreement question or in any talk after it, the session writes one decisions line on the item recording each objection (`../backlog/agent-records.md` "Decision lines"). A reply with no Agree answer is not agreement.
-8. Record. Only an Agree answer, or `mentat-lead:orchestrate`'s default agreement, writes the spec, records its fingerprint or moves the item, as `mentat:backlog` "Agreement" says, posting the answer reply to the open maintainer comments the agreement question answered (step 4), adding a decisions line for each answer not yet on the item, the standing assumptions (`mentat:backlog` `Material assumptions`), a blocked-by link for each item it waits on (`mentat:backlog` `Start waits`) and any advice against it the maintainer overrode (`mentat:backlog` "Advice against"). The spec carries the decided situations as one numbered requirement, one lettered line per situation, beyond the usual one or two lines. The spec lists a manual check only when the maintainer accepted or asked for one.
+8. Record. Only an Agree answer, or `mentat-lead:orchestrate`'s default agreement, writes the spec, records its fingerprint or moves the item, as `mentat:backlog` "Agreement" says, posting the answer reply (step 4) to the open maintainer comments the agreement question answered, adding a decisions line for each answer not yet on the item, the standing assumptions (`mentat:backlog` `Material assumptions`), a blocked-by link for each item it waits on (`mentat:backlog` `Start waits`) and any advice against it the maintainer overrode (`mentat:backlog` "Advice against"). The spec carries the decided situations as one numbered requirement, one lettered line per situation, beyond the usual one or two lines. The spec lists a manual check only when the maintainer accepted or asked for one.
 
 ## Small requests
 
