@@ -119,7 +119,7 @@ $b|Handing over|A bare "later" or "stop" naming no item answers the question ask
 $b|Sessions|An implementation session is mid-run from its start until it sends its final message (\`mentat:build\` step 8)
 $b|Sessions|When no session is mid-run, a fresh implementation session starts for them
 $b|Holds|A merge passed on to an implementation session waits for its after-merge reply (a \`hold\` note): no session starts and no item joins a run until it arrives
-rules.md||A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to the session that started it, which forwards the maintainer's exact words back.
+rules.md||A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to its starting session (\`mentat:build\` "Started sessions"), which forwards the maintainer's exact words back.
 skills/build/redirect.md|Where it is implemented|Read only this repository's \`mentat state\`.
 skills/build/redirect.md|Where it is implemented|\`mentat state owner\` exits 1, with no running orchestrator recorded: implement here.
 skills/build/redirect.md||When the message cannot be sent, implement nothing, and say in one line which session could not be reached.

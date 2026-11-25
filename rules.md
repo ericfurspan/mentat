@@ -21,7 +21,7 @@ Outcomes, scope, cost and risk are theirs; settle the rest. Read `mentat:plan`'s
 
 After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; a block only they can clear arises (external, irreversible or a credential); or an agreed manual check is due. Log other calls in the pull request and one batch summary.
 
-A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to the session that started it, which forwards the maintainer's exact words back. When the maintainer writes in a started session, it answers them there and records the answer as usual.
+A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to its starting session (`mentat:build` "Started sessions"), which forwards the maintainer's exact words back. When the maintainer writes in a started session, it answers them there and records the answer as usual.
 
 Outside the messages a skill requires, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
 
