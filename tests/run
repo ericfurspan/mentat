@@ -800,9 +800,7 @@ if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$o
 # The list holds the files not yet rewritten to the glossary: the change that rewrites a file
 # removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
 # disk fails. A new file is checked from the start.
-not_yet_rewritten="plugins/mentat-lead/skills/grill/CREDITS.md
-plugins/mentat-lead/skills/grill/SKILL.md
-plugins/mentat-linear/skills/linear/SKILL.md
+not_yet_rewritten="plugins/mentat-linear/skills/linear/SKILL.md
 plugins/mentat-linear/skills/triage/SKILL.md"
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
