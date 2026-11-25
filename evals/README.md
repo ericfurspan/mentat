@@ -30,7 +30,7 @@ claude plugin eval . --ablation none --runs 3 --no-publish --trust-plugin --max-
 
 ## The baseline
 
-`evals/baseline.md` holds the baseline for the suite's four cases, made in this way:
+`evals/baseline.md` holds the baseline for the suite's thirteen cases, made in this way:
 
 1. One run with the no-plugin arm (`--ablation with-without` in place of `--ablation none`). A case that passes without the plugin is dropped, unless the pull request gives a reason to keep it.
 2. Then two runs of the command above on the same commit, Claude Code version, model and judge. A case is steady when its pass count is the same in both runs and at least 2 of 3. Unsteady cases are fixed or dropped before merge.
