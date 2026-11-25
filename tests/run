@@ -172,6 +172,7 @@ skills/plan/SKILL.md|Decisions|and any recommendation against the maintainer's e
 skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
 skills/plan/SKILL.md|Decisions|When the item's pull request merges with that section open, the decision moves to a Backlog item, asked when that item is planned.
 skills/review/after-ready.md||When the maintainer says #N merged, move the decision in any open "Decision for the maintainer" section to a Backlog item (\`mentat:plan\` "Decisions"), do the steps of the item's wait block
+plugins/mentat-linear/skills/linear/SKILL.md|Waits left open|(any open "Decision for the maintainer" moved to a Backlog item, the wait block's steps it does
 $o|Relays|An objection of the maintainer's that this session hears at a hold reaches the build session in their exact words, as any answer to a hold does, and that session records it; one heard at a close without merging this session records as \`after-ready.md\` in \`mentat:review\`'s folder says.
 skills/backlog/item-reads.md|The full read|A read to plan or propose an item also reads the decisions lines of each item whose work moved to it, as the item names it.
 skills/plan/session.md||the decisions line recording the maintainer's objections (\`SKILL.md\` step 7)
