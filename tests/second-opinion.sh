@@ -123,7 +123,7 @@ export PATH="$root/tools/bin:$PATH"
 
 # A local repository at a path with a space, and a subdirectory to run from. Its origin, a
 # local bare repository, turns outside reviewers on in .claude/settings.json on trunk.
-ON='{"enabledPlugins":{"mentat-reviewers@mentat":true}}'
+ON='{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":{"MENTAT_REVIEWERS":"codex,grok"}}'
 "$real_git" init -q --bare -b trunk "$root/my origin.git" || exit 1
 "$real_git" init -q -b trunk "$root/my repo" && cd "$root/my repo" || exit 1
 echo base >README && mkdir sub .claude && echo x >sub/file && printf 'Read me.\n' >AGENTS.md && printf '%s\n' "$ON" >.claude/settings.json && "$real_git" add -A && "$real_git" commit -q -m base || exit 1
@@ -147,8 +147,8 @@ codex_ran() { [ -f "$STUB/args" ]; }
 grok_ran() { [ -f "$STUB/args_grok" ]; }
 left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 worktrees() { "$real_git" -C "$top" worktree list | wc -l | tr -d ' '; }
-# Nothing of a run is left but the private logs of failed runs, Codex's and Grok's.
-clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name 'mentat-grok-log.*' -not -name cache)" ]; }
+# Nothing of a run is left but the private logs of failed runs.
+clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-log.*' -not -name cache)" ]; }
 # Nothing is posted (no gh call), and nothing is fetched but origin's default branch, into
 # private refs that are deleted.
 no_outside() { [ ! -e "$CALLS/gh" ] && ! grep -v -F "origin +refs/heads/trunk:refs/mentat/" "$CALLS/fetch" 2>/dev/null | grep -q . && [ -z "$("$real_git" -C "$top" for-each-ref refs/mentat)" ]; }
@@ -158,8 +158,8 @@ reset; rc=$(run "$idea")
 check "both deliver (exit 0): a section for each in order, and a summary of both verdict lines" '[ "$rc" = 0 ] && c=$(grep -n "^## Codex$" "$STUB/stdout" | cut -d: -f1) && g=$(grep -n "^## Grok$" "$STUB/stdout" | cut -d: -f1) && [ "$c" -lt "$g" ] && grep -q "Codex thinks it is fine." "$STUB/stdout" && grep -q "Grok has a view." "$STUB/stdout" && grep -qE "^- Codex \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout" && grep -qE "^- Grok \([0-9]+ seconds\): SECOND OPINION VERDICT: DO IT DIFFERENTLY - fewer helpers$" "$STUB/stdout"'
 check "each section ends with its timing line: exactly two (<n> seconds) lines" '[ "$(grep -cE "^\([0-9]+ seconds\)\$" "$STUB/stdout")" = 2 ]'
 check "the idea is copied no further than the prompts: no idea text in the arguments" '! grep -q "Ignore all previous" "$STUB/args" "$STUB/args_grok"'
-check "a delivered second opinion keeps no Grok log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-grok-log.*")" ]'
-check "a delivered second opinion prints no such line on stderr" '! grep -q "no second opinion from any tool" "$STUB/stderr"'
+check "a delivered second opinion keeps no log" '[ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -name "mentat-log.*")" ]'
+check "a delivered second opinion prints no such line on stderr" '! grep -q "no second opinion from any reviewer" "$STUB/stderr"'
 check "names the commit and says the checkout was clean" 'grep -q "^- Commit read: $H\$" "$STUB/stdout" && grep -q "^- Uncommitted changes: no\$" "$STUB/stdout"'
 check "nothing is posted and nothing is fetched but origin's default branch, into private refs that are deleted (no gh call)" 'no_outside'
 check "nothing is left behind: no worktree, no Grok run folder, no temporary folder" 'clean'
@@ -225,7 +225,7 @@ check "MENTAT_CODEX_MODEL set passes Codex --model=<value> as one argument" '[ "
 reset; echo 3 >"$STUB/codex_exit"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
 check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "no second opinion (codex exited with status 3.*; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/stdout"'
 reset; printf 'Codex thinks it is fine.\n' >"$STUB/codex_out"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
-check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL)$" "$STUB/stdout"'
+check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL set gives the same reason: the verdict check is every reviewer's, not Codex's" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line)$" "$STUB/stdout"'
 reset; printf 'Codex thinks it is fine.\n' >"$STUB/codex_out"; rc=$(run "$idea")
 check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line)$" "$STUB/stdout" && ! grep -q MENTAT_CODEX_MODEL "$STUB/stdout"'
 reset; touch "$STUB/codex_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
@@ -248,18 +248,24 @@ grok_no_opinion() { # $1 description, $2 expected reason fragment
 }
 reset; echo 3 >"$STUB/grok_exit"; rc=$(run "$idea")
 grok_no_opinion "Grok exiting non-zero" "Grok exited with status 3"
+# The kept log's path is on Grok's local line on stderr, never in the printed result.
 grok_log_kept() { # $1 text the kept log must hold
-  p=$(sed -n "s/.*can read it at \(.*\))\$/\1/p" "$STUB/stdout" | head -n 1); [ -n "$p" ] && [ -f "$p" ] && grep -q "$1" "$p" && case "$p" in "$root"/tmp/mentat-grok-log.*) true ;; *) false ;; esac
+  p=$(sed -n "s/^mentat: grok: .*can read it at \(.*\)\$/\1/p" "$STUB/stderr" | head -n 1); [ -n "$p" ] && [ -f "$p" ] && grep -q "$1" "$p" && case "$p" in "$root"/tmp/mentat-log.grok.*) true ;; *) false ;; esac && ! grep -qF "$p" "$STUB/stdout"
 }
+# Grok's local line on stderr, for the maintainer only, holds $1.
+grok_local() { grep -q "^mentat: grok: .*$1" "$STUB/stderr"; }
 check "it keeps a private copy of Grok's raw log for the maintainer, under the temporary folder" 'grok_log_kept SECRET-LOG-TEXT && ! grep -q "SECRET-LOG-TEXT" "$STUB/stdout" "$STUB/stderr"'
 reset; reply $'Looks fine.\n\nSECOND OPINION VERDICT: DO IT' max_turn_requests; rc=$(run "$idea")
-grok_no_opinion "a stop reason other than end_turn, with a verdict line in its text" "stop reason: max_turn_requests"
+grok_no_opinion "a stop reason other than end_turn, with a verdict line in its text" "Grok did not return a complete review)"
+check "that stop reason is on Grok's local line only" 'grok_local "stop reason: max_turn_requests" && ! grep -q max_turn_requests "$STUB/stdout"'
 reset; reply $'Looks fine.\n\nSECOND OPINION VERDICT: DO IT' future_reason; rc=$(run "$idea")
-grok_no_opinion "an unknown stop reason" "stop reason: future_reason"
+grok_no_opinion "an unknown stop reason" "Grok did not return a complete review)"
+check "that stop reason is on Grok's local line only" 'grok_local "stop reason: future_reason" && ! grep -q future_reason "$STUB/stdout"'
 reset; printf '{"text": "Nothing.\\n\\nSECOND OPINION VERDICT: DO IT' >"$STUB/out_json"; rc=$(run "$idea")
 grok_no_opinion "incomplete JSON whose text holds a verdict line" "complete review"
 reset; echo '{"type":"error","message":"Not signed in. SECRET-LOG-TEXT"}' >"$STUB/out_json"; rc=$(run "$idea")
-grok_no_opinion "an error object with a zero exit" "stop reason: none"
+grok_no_opinion "an error object with a zero exit" "Grok did not return a complete review)"
+check "that has stop reason none on Grok's local line" 'grok_local "stop reason: none"'
 reset; reply "   "; rc=$(run "$idea")
 grok_no_opinion "an empty text" "complete review"
 reset; { cat "$STUB/out_json"; cat "$STUB/out_json"; } >"$STUB/out_json.2"; mv "$STUB/out_json.2" "$STUB/out_json"; rc=$(run "$idea")
@@ -273,10 +279,10 @@ check "a Grok reply that is only a verdict line counts" '[ "$rc" = 0 ] && grep -
 USAGE="Grok refused this run for usage or billing; the maintainer can top up or wait for the usage limit to reset, and reviews and second opinions go on without Grok"
 usage_error() { jq -cn --arg m "$1 USAGE-CANARY-5170" '{type: "error", message: $m}' >"$STUB/out_json"; }
 reset; usage_error "Request failed with status 402 Payment Required:"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
-grok_no_opinion "an out-of-usage error object with exit 1" "$USAGE; its log may hold credentials"
+grok_no_opinion "an out-of-usage error object with exit 1" "$USAGE)"
 check "that refusal prints no text from Grok's run, and its log is kept" '! grep -q "USAGE-CANARY-5170\|DEBUG-LOG-TEXT\|exited with status" "$STUB/stdout" "$STUB/stderr" && grok_log_kept USAGE-CANARY-5170'
 reset; usage_error "You have hit your WEEKLY limit."; rc=$(run "$idea")
-grok_no_opinion "an out-of-usage error object with a zero exit" "$USAGE; its log may hold credentials"
+grok_no_opinion "an out-of-usage error object with a zero exit" "$USAGE)"
 check "that refusal prints no text from Grok's run either" '! grep -q "USAGE-CANARY-5170\|DEBUG-LOG-TEXT\|stop reason" "$STUB/stdout" "$STUB/stderr"'
 printf 'Use a smaller model for helpers.\nIf Grok answers status 402 Payment Required, switch.\n' >"$root/usage idea.md"
 reset; echo 1 >"$STUB/grok_exit"; rc=$(run "$root/usage idea.md")
@@ -285,9 +291,9 @@ check "that marker reached Grok's prompt and is not called out of usage" 'grep -
 reset; echo 1 >"$STUB/grok_exit"; echo "Request failed with status 402 Payment Required" >"$STUB/err_text"; echo "You have run out of credits" >"$STUB/debug_text"; rc=$(run "$idea")
 grok_no_opinion "a marker only in Grok's stderr and debug log" "Grok exited with status 1"
 check "that marker is not called out of usage" '! grep -qF "$USAGE" "$STUB/stdout"'
-reset; touch "$STUB/grok_hang"; took=$SECONDS; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
+reset; touch "$STUB/grok_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
 check "a Grok timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
-grok_no_opinion "a Grok timeout (MENTAT_GROK_TIMEOUT_SECONDS)" "Grok did not finish within 3 seconds"
+grok_no_opinion "a Grok timeout (MENTAT_REVIEW_TIMEOUT_SECONDS)" "Grok did not finish within 3 seconds"
 check "a Grok timeout keeps its debug log for the maintainer" 'grok_log_kept DEBUG-LOG-TEXT'
 grok_effort() { [ "$(grep -x -A1 -- "--reasoning-effort" "$STUB/args_grok" | tail -n 1)" = "$1" ] && [ "$(grep -cx -- "--reasoning-effort" "$STUB/args_grok")" = 1 ]; }
 reset; rc=$(MENTAT_GROK_REASONING_EFFORT=medium run "$idea")
@@ -296,7 +302,16 @@ reset; rc=$(unset MENTAT_GROK_REASONING_EFFORT; run "$idea")
 check "without MENTAT_GROK_REASONING_EFFORT Grok gets --reasoning-effort high" '[ "$rc" = 0 ] && grok_ran && grok_effort high'
 reset; rc=$(MENTAT_GROK_REASONING_EFFORT='' run "$idea")
 check "MENTAT_GROK_REASONING_EFFORT set but empty gives Grok --reasoning-effort high" '[ "$rc" = 0 ] && grok_ran && grok_effort high'
-check "a Codex timeout of 0 does not limit Grok" 'reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=0 run "$idea"); [ "$rc" = 0 ] && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout"'
+# MENTAT_REVIEW_TIMEOUT_SECONDS is every reviewer's one time limit: anything but a whole
+# number of 1 or more is a usage error before any reviewer starts, and the retired
+# MENTAT_GROK_TIMEOUT_SECONDS changes nothing.
+for v in 0 soon -5 1.5; do
+  reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=$v run "$idea")
+  check "MENTAT_REVIEW_TIMEOUT_SECONDS=$v is a usage error (exit 64), and no reviewer started" '[ "$rc" = 64 ] && [ "$(cat "$STUB/stderr")" = "mentat: MENTAT_REVIEW_TIMEOUT_SECONDS must be a whole number of 1 or more, not \"$v\"" ] && ! codex_ran && ! grok_ran && [ ! -e "$STUB/args_models" ]'
+done
+reset; touch "$STUB/grok_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 MENTAT_GROK_TIMEOUT_SECONDS=60 run "$idea"); took=$((SECONDS - took))
+grok_no_opinion "MENTAT_GROK_TIMEOUT_SECONDS set longer than MENTAT_REVIEW_TIMEOUT_SECONDS" "Grok did not finish within 3 seconds"
+check "that Grok was stopped at MENTAT_REVIEW_TIMEOUT_SECONDS, well before the retired setting's 60" '[ "$took" -lt 30 ]'
 reset; rc=$(GROK_HOME="$root/no grok home" run "$idea")
 grok_no_opinion "no Grok sign-in" "Grok is not signed in"
 check "no sign-in means Grok never started" '! grok_ran && [ ! -e "$STUB/args_models" ]'
@@ -306,10 +321,10 @@ check "an expired sign-in means Grok never started, its token is not printed and
 reset; printf '{"https://auth.x.ai::test":{"expires_at":"2099-01-01T00:00:00.000000Z","key":"fake-token"}}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 check "a Grok sign-in with its expiry in the future runs Grok" '[ "$rc" = 0 ] && grok_ran && [ ! -e "$STUB/args_models" ]'
 soon=$(date -u -v+600S +%Y-%m-%dT%H:%M:%S.000000Z)
-reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1800 run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 grok_no_opinion "a Grok sign-in that expires before the time limit would end" "before this run's 1800-second time limit and 5 minutes of setup would end"
 check "that sign-in means Grok never started, its token is not printed and Codex's verdict stays" '! grok_ran && ! grep -q fake-token "$STUB/stdout" "$STUB/stderr" && grep -q "^- Codex ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && [ -f "$STUB/args_models" ]'
-reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
+reset; printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake-token"}}\n' "$soon" >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=60 run "$idea"); printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"
 check "the same sign-in with a 60-second time limit runs Grok" '[ "$rc" = 0 ] && grok_ran && [ ! -e "$STUB/args_models" ]'
 # A sign-in that is expired, or too short for the run, is first refreshed by grok models
 # in the user's own Grok home; the stub's models branch rewrites it only when refresh_to exists.
@@ -317,9 +332,9 @@ set_signin() { printf '{"https://auth.x.ai::test":{"expires_at":"%s","key":"fake
 reset_signin() { printf '{"fake":"credential"}\n' >"$GH_USER/auth.json"; chmod 600 "$GH_USER/auth.json"; }
 refresh_used() { [ "$(cat "$STUB/args_models")" = models ] && [ "$(cat "$STUB/models_home")" = "$GH_REAL" ] && grep -qx "GROK_AUTH_EARLY_INVALIDATION_SECS=2160" "$STUB/env_models" && grep -qx "GROK_HOME=$GH_REAL" "$STUB/env_models" && grep -qx "TMPDIR=$TMPDIR" "$STUB/env_models" && grep -qx "GROK_MEMORY=0" "$STUB/env_models" && ! grep -q "XAI_API_KEY\|MENTAT_CANARY" "$STUB/env_models" && grep -q fake-token-2 "$STUB/auth_copy"; }
 
-reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$idea"); reset_signin
+reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1800 run "$idea"); reset_signin
 check "an expired Grok sign-in is refreshed by grok models in the user's own Grok home, and Grok runs with the refreshed sign-in" '[ "$rc" = 0 ] && grok_ran && refresh_used'
-reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=1800 run "$idea"); reset_signin
+reset; echo 2099-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin "$soon"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1800 run "$idea"); reset_signin
 check "a Grok sign-in that is too short for the time limit is refreshed too, and Grok runs" '[ "$rc" = 0 ] && grok_ran && refresh_used'
 reset; echo 2021-01-01T00:00:00.000000Z >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run "$idea"); reset_signin
 grok_no_opinion "a refresh that does not extend an expired sign-in" "Grok's sign-in expired at 2021-01-01T00:00:00Z"
@@ -327,14 +342,12 @@ check "that refresh was tried, Grok never started and no token is printed" '! gr
 reset; echo garbage >"$STUB/refresh_to"; set_signin 2020-01-01T00:00:00.000000Z; rc=$(run "$idea"); reset_signin
 grok_no_opinion "a sign-in that cannot be read after the refresh" "Grok's sign-in could not be read after Mentat tried to refresh it"
 check "that sign-in means Grok never started and nothing from the file is printed" '! grok_ran && ! grep -q "fake-token\|garbage" "$STUB/stdout" "$STUB/stderr"'
-reset; set_signin "$soon"; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=soon run "$idea"); reset_signin
-grok_no_opinion "a time limit that is not a number" "could not work out when Grok's time limit ends (MENTAT_GROK_TIMEOUT_SECONDS is soon)"
-check "that time limit means Grok never started, without a refresh" '! grok_ran && [ ! -e "$STUB/args_models" ]'
 reset; rm "$GH_USER/auth.json"; rc=$(run "$idea"); reset_signin
 grok_no_opinion "a Grok home with no auth.json" "Grok is not signed in"
 check "no auth.json means Grok never started, without a refresh" '! grok_ran && [ ! -e "$STUB/args_models" ]'
 reset; rc=$(XDG_CACHE_HOME="$root/tmp/cache" run "$idea")
-grok_no_opinion "a cache folder inside a temporary folder" "is inside .*, which the Grok review denies"
+grok_no_opinion "a cache folder inside a temporary folder" "Mentat's cache folder is inside a folder the Grok sandbox denies)"
+check "that names the folder on Grok's local line only" 'grok_local "$root/tmp/cache is inside .*; set XDG_CACHE_HOME" && ! grep -qF "$root/tmp/cache" "$STUB/stdout"'
 rm -rf "$root/nogrok"; mkdir "$root/nogrok"; for t in git jq; do ln -s "$(command -v $t)" "$root/nogrok/$t"; done; ln -s "$root/tools/bin/codex" "$root/nogrok/codex"
 reset; rc=$(PATH="$root/nogrok:/usr/bin:/bin" run "$idea")
 grok_no_opinion "a missing grok" "grok is not installed"
@@ -343,7 +356,7 @@ grok_no_opinion "a missing grok" "grok is not installed"
 reset; echo 1 >"$STUB/codex_exit"; echo 1 >"$STUB/grok_exit"; rc=$(run "$idea")
 check "neither delivering is exit 1, with both no-second-opinion lines on stdout" '[ "$rc" = 1 ] && grep -q "^## Codex$" "$STUB/stdout" && grep -q "^## Grok$" "$STUB/stdout" && [ "$(grep -c "no second opinion (" "$STUB/stdout")" = 4 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (codex exited with status 1" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): no second opinion (Grok exited with status 1" "$STUB/stdout"'
 check "neither delivering still posts nothing and fetches nothing but origin's default branch" 'no_outside'
-check "neither delivering prints one line on stderr saying no tool gave a second opinion" '[ "$(grep -c "^mentat: no second opinion from any tool" "$STUB/stderr")" = 1 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 1 ]'
+check "neither delivering ends stderr with one line saying no reviewer gave a second opinion, after each reviewer's local line" '[ "$(grep -c "^mentat: no second opinion from any reviewer" "$STUB/stderr")" = 1 ] && tail -n 1 "$STUB/stderr" | grep -q "^mentat: no second opinion from any reviewer" && [ "$(grep -c "^mentat: codex: \|^mentat: grok: " "$STUB/stderr")" = 2 ] && [ "$(wc -l <"$STUB/stderr" | tr -d " ")" = 3 ]'
 
 # Cancelling: the parent killed stops both model processes and cleans up.
 reset; touch "$STUB/codex_hang" "$STUB/grok_hang"
@@ -368,19 +381,21 @@ check "INT to its process group stops both model processes within seconds and le
 kill -9 -- "-$wp" 2>/dev/null
 
 # The start sweep (tests/review-local.sh has its full set of cases) runs for second-opinion too.
-mkdir -p "$cache/mentat/grok-opinion.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-opinion.old"
-echo x >"$TMPDIR/mentat-codex-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-codex-log.old"
+mkdir -p "$cache/mentat/run-old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/run-old"
+echo x >"$TMPDIR/mentat-log.codex.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-log.codex.old"
 reset; rc=$(run "$idea")
-check "at start, deletes a Grok run folder older than a day and a kept log older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/grok-opinion.old" ] && [ ! -e "$TMPDIR/mentat-codex-log.old" ]'
-rm -rf "$cache/mentat/grok-opinion.old" "$TMPDIR/mentat-codex-log.old"
+check "at start, deletes a run folder older than a day and a kept log older than seven days" '[ "$rc" = 0 ] && [ ! -e "$cache/mentat/run-old" ] && [ ! -e "$TMPDIR/mentat-log.codex.old" ]'
+rm -rf "$cache/mentat/run-old" "$TMPDIR/mentat-log.codex.old"
 
-# The switch: the checkout goes to Codex and Grok only where outside reviewers are on in
-# .claude/settings.json on origin's default branch, read as review --codex reads it, after
-# the usage and idea-file checks and before the start sweep, the freshness fetch, the export
-# and any tool. Off and unknown each have an origin and a clone of their own; the lone
-# repository has no remote, though its own committed settings turn outside reviewers on.
-OFF_LINE="mentat: no second opinion: outside reviewers are off in this repository (the mentat-reviewers add-on is not on in .claude/settings.json on trunk), so nothing was sent to Codex or Grok"
-unknown_line() { printf 'mentat: no second opinion: outside reviewers are unknown in this repository (%s), so nothing was sent to Codex or Grok; they give one only once it reads as on' "$1"; }
+# The switch: the checkout goes to the listed reviewers only where outside reviewers are on
+# in .claude/settings.json on origin's default branch with at least one name listed, read
+# as review --outside reads it, after the usage and idea-file checks and before the start
+# sweep, the freshness fetch, the export and any tool. Off, unknown and on with none listed
+# each have an origin and a clone of their own; the lone repository has no remote, though
+# its own committed settings turn outside reviewers on.
+OFF_LINE="mentat: no second opinion, nothing was sent: outside reviewers are off in this repository (the mentat-reviewers module is not on in .claude/settings.json on trunk)"
+NONE_LINE="mentat: no second opinion, nothing was sent: outside reviewers are on in this repository, none listed (MENTAT_REVIEWERS in the env of .claude/settings.json on trunk names none)"
+unknown_line() { printf 'mentat: no second opinion, nothing was sent: outside reviewers are unknown in this repository (%s), so none runs' "$1"; }
 gate_repo() { # $1 name, $2 .claude/settings.json on its origin's trunk
   "$real_git" init -q --bare -b trunk "$root/$1 origin.git" && "$real_git" clone -q "$root/my origin.git" "$root/$1 repo" &&
     (cd "$root/$1 repo" && printf '%s' "$2" >.claude/settings.json && "$real_git" commit -qam settings &&
@@ -388,6 +403,7 @@ gate_repo() { # $1 name, $2 .claude/settings.json on its origin's trunk
 }
 gate_repo off '{"enabledPlugins":{"mentat-reviewers@mentat":false}}' || exit 1
 gate_repo unknown '{"enabledPlugins":' || exit 1
+gate_repo none '{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":{"MENTAT_REVIEWERS":" , "}}' || exit 1
 "$real_git" init -q -b trunk "$root/lone repo" && (cd "$root/lone repo" && mkdir sub .claude && echo x >sub/file && printf '%s\n' "$ON" >.claude/settings.json && "$real_git" add -A && "$real_git" commit -q -m base) || exit 1
 gate_run() { (cd "$root/$1 repo/sub" && shift && "$mentat" second-opinion "$@" >"$STUB/stdout" 2>"$STUB/stderr" </dev/null); echo $?; }
 # Exit 6 with the one line $2 on stderr and nothing on stdout. From repository $1 nothing
@@ -396,24 +412,26 @@ gate_run() { (cd "$root/$1 repo/sub" && shift && "$mentat" second-opinion "$@" >
 gate_refused() { # $1 the repository, $2 the one line on stderr
   [ "$rc" = 6 ] && [ "$(cat "$STUB/stderr")" = "$2" ] && [ ! -s "$STUB/stdout" ] && ! codex_ran && ! grok_ran &&
     [ "$(cat "$CALLS/fetch" 2>/dev/null | wc -l | tr -d ' ')" -le 1 ] && [ -z "$("$real_git" -C "$1" for-each-ref refs/mentat)" ] &&
-    [ "$("$real_git" -C "$1" worktree list | wc -l | tr -d ' ')" = 1 ] && [ "$(ls -A "$cache/mentat")" = grok-opinion.old ] &&
-    [ -f "$TMPDIR/mentat-codex-log.old" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-codex-log.*' -not -name 'mentat-grok-log.*' -not -name cache)" ]
+    [ "$("$real_git" -C "$1" worktree list | wc -l | tr -d ' ')" = 1 ] && [ "$(ls -A "$cache/mentat")" = run-old ] &&
+    [ -f "$TMPDIR/mentat-log.codex.old" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-log.*' -not -name cache)" ]
 }
 reset; rc=$(run "$idea")
 check "outside reviewers on in .claude/settings.json on origin's default branch: the switch is read from it before the freshness fetch, and the second opinion runs (exit 0)" '[ "$rc" = 0 ] && codex_ran && grok_ran && grep -q "^- Codex ([0-9]* seconds): SECOND OPINION VERDICT: DO IT$" "$STUB/stdout" && sw=$(grep -n -m 1 -F "origin +refs/heads/trunk:refs/mentat/reviewers-" "$CALLS/fetch" | cut -d: -f1) && fr=$(grep -n -m 1 -F "refs/mentat/fresh-" "$CALLS/fetch" | cut -d: -f1) && [ -n "$sw" ] && [ -n "$fr" ] && [ "$sw" -lt "$fr" ]'
-mkdir -p "$cache/mentat/grok-opinion.old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/grok-opinion.old"
-echo x >"$TMPDIR/mentat-codex-log.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-codex-log.old"
+mkdir -p "$cache/mentat/run-old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/run-old"
+echo x >"$TMPDIR/mentat-log.codex.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-log.codex.old"
 reset; rc=$(gate_run off "$idea")
 check "outside reviewers off: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/off repo" "$OFF_LINE"'
 reset; rc=$(gate_run unknown "$idea")
 check "outside reviewers unknown: no second opinion (exit 6), saying why, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/unknown repo" "$(unknown_line ".claude/settings.json on trunk could not be read as JSON")"'
+reset; rc=$(gate_run none "$idea")
+check "outside reviewers on with none listed: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/none repo" "$NONE_LINE"'
 reset; rc=$(gate_run lone "$idea")
 check "no origin remote, though the checkout's own settings turn outside reviewers on: no second opinion (exit 6), saying why, and nothing fetched or run" 'gate_refused "$root/lone repo" "$(unknown_line "the checkout has no origin remote")" && [ ! -e "$CALLS/fetch" ]'
 reset; rc=$(gate_run off "$root/missing idea.md")
 check "outside reviewers off, a missing idea file is still a usage error (exit 64), found before the switch is read" '[ "$rc" = 64 ] && [ "$(cat "$STUB/stderr")" = "mentat: idea file not found: $root/missing idea.md" ] && [ ! -e "$CALLS/fetch" ]'
 reset; rc=$(gate_run off)
 check "outside reviewers off, no idea file is still a usage error (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat second-opinion" "$STUB/stderr" && [ ! -e "$CALLS/fetch" ]'
-rm -rf "$cache/mentat/grok-opinion.old" "$TMPDIR/mentat-codex-log.old"
+rm -rf "$cache/mentat/run-old" "$TMPDIR/mentat-log.codex.old"
 
 # Usage errors: exactly one existing file.
 reset; rc=$(run)
