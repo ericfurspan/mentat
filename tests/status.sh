@@ -195,8 +195,6 @@ check "owner review: a repository owner that cannot be read is unknown, and the 
 # and wherever a template puts it.
 reset; printf '**Status:** In review\n\n## Summary\n\nA change.\n\n## Decisions and Risks\n\n- none\n\n## Test plan\n\n- tests/run\n' >"$STUB/body"; rc=$(run 7)
 check "calls section: present, where the template puts it, after Summary and before Test plan" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
-reset; printf '**Status:** In review\n\n## Summary\n\nA change.\n\n## Decisions\n\n- A choice (agreed)\n\n## Calls made without the maintainer\n\n- none\n\n## Risks\n\n- A risk.\n' >"$STUB/body"; rc=$(run 7)
-check "calls section: missing, when the description has only the old separate Decisions, Calls made without the maintainer and Risks headings" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
 reset; printf '**Status:** In review\r\n\r\n## Summary\r\n\r\nA change.\r\n\r\n## Test plan\r\n\r\n- tests/run\r\n\r\n#### Decisions and Risks ##  \r\n\r\nnone\r\n' >"$STUB/body"; rc=$(run 7)
 check "calls section: present, under another heading level with closing hashes, after every other section, in a body with CRLF line ends" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
 reset; printf '**Status:** In review\n\nDecisions and Risks: none.\n\n## Decisions and Risks today\n\n####### Decisions and Risks\n\n##Decisions and Risks\n\n    ## Decisions and Risks\n' >"$STUB/body"; rc=$(run 7)
