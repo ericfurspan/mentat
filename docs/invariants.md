@@ -59,7 +59,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| Call `mentat:plan` before giving a view on a change. | `rules.md`, `skills/plan/SKILL.md` | `propose-before-view` |
+| Call `mentat:plan` before giving a view on a change. | `rules.md`, `skills/plan/SKILL.md` | `plan-before-view` |
 | Call `mentat:plan` before suggesting a change. | `rules.md`, `skills/plan/SKILL.md` | review only |
 | Nothing is built before the maintainer's agreement; the one exception is an item `mentat-lead:orchestrate` agrees by default when nothing is open for the maintainer, recorded as agreed by default, never as their answer. | `skills/plan/SKILL.md` opening and step 8, `plugins/mentat-lead/skills/orchestrate/SKILL.md` "Planning", `skills/backlog/SKILL.md` "Agreement", `docs/adr/0002-orchestrator-agrees-by-default.md` | `tests/run` text check; review only |
 | One agreement, after the plan check: the plan check's `DO IT` is not the agreement; the maintainer agrees once, asked after the plan check unless `mentat-lead:orchestrate` agrees by default; agreed work whose spec is unchanged gets no further plan check; a small, clear request (as `skills/plan/SKILL.md` defines it) is agreed from its one-line view with no plan check. | `skills/plan/SKILL.md` opening, step 7 and "Small requests" | review only |
