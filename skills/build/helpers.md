@@ -8,7 +8,7 @@ The implementer is the `mentat:builder` subagent. Right before every call, read 
 
 A brief names the branch, the session's own checkout and the main checkout ("One implementer per branch"), what to change and what to leave alone, how the result will be checked, the test command, and any existing design the change keeps that could affect its goal. A brief for an item carries the item's current assumptions list as given, read from its agent records right before the brief, when one stands (`../backlog/records.md` "Assumptions").
 
-Before fixing a raised problem, check likely related cases in proportion to its scope and report a shared cause when found, keeping the fix within the agreed scope; a fix targets the cause the evidence supports, and with the cause unknown, finding it comes first. A correction during agreed work does not reopen the spec: follow one within the agreed scope at once, and file it only when the maintainer asks. A change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks), goes to the maintainer as one question before that part is implemented.
+Before fixing a raised problem, check likely related cases in proportion to its scope and report a shared cause when found, keeping the fix within the agreed scope; a fix targets the cause the evidence supports, and with the cause unknown, finding it comes first. A correction during agreed work does not reopen the spec: follow one within the agreed scope at once, and file it only when the maintainer asks. A change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks) that the quick check did not settle and log (`SKILL.md` step 5), goes to the maintainer as one question before that part is implemented.
 
 ## Worktree
 
