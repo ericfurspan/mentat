@@ -178,6 +178,7 @@ $o|Relays|An objection of the maintainer's that this session hears at a hold rea
 skills/backlog/item-reads.md|The full read|A read to plan or propose an item also reads the decisions lines of each item whose work moved to it, as the item names it.
 skills/plan/session.md||the decisions line recording the maintainer's objections (\`SKILL.md\` step 7)
 skills/plan/session.md||a fold also writes one on the item it folds into, naming this one, and copies there, unchanged and each as its own decisions line, every decisions line of this item that records a maintainer's objection, so objections survive later folds.
+skills/plan/session.md||State it once, with a few words of why for each, in one line above the first question, which then takes the message form, or in the report.
 plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|and under \`Decisions:\` each line of its body's \`## Decisions\` that records an objection of the maintainer's ("Decision lines" in that file), unchanged
 EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
