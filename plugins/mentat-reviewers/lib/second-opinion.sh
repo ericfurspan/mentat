@@ -40,7 +40,7 @@ opinion_runner() {
   local final
   adapter_go opinion
   final=$(last_line "$reply")
-  opinion_verdict_ok "$final" || adapter_fail "the reply has no final SECOND OPINION VERDICT line"
+  opinion_verdict_ok "$final" || adapter_fail "$(adapter_noted "the reply has no final SECOND OPINION VERDICT line")"
   cp "$reply" "$res/$name.reply" || adapter_fail "could not keep the reply"
   printf '%s\n' "$final" >"$res/$name.final" || adapter_fail "could not keep the final line"
 }

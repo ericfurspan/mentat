@@ -60,6 +60,8 @@ model_chars() { printf '%s' "$1" | tr -cd 'A-Za-z0-9._:/-' | head -c 64; }
 # No validation and no fallback: a failed Codex run names the model asked for. Prints the
 # note a failure reason ends with when MENTAT_CODEX_MODEL is set, else nothing.
 codex_asked_note() { [ -z "$codex_asked" ] || printf '; Codex was asked for model %s with MENTAT_CODEX_MODEL' "$(model_chars "$codex_asked")"; }
+# The same note on the failures the shared code finds: a timeout, no reply, no final line.
+adapter_note() { codex_asked_note; }
 
 # Prints the inline TOML table of Codex's filesystem permissions for a review of
 # directory $1: the checkout, its git directory (outside the checkout for a

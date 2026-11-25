@@ -21,12 +21,12 @@ review_body() {
 outside_runner() {
   local final
   adapter_go review
-  result_line "$(last_line "$reply")" || adapter_fail "$adapter_display's reply has no final REVIEW RESULT line"
+  result_line "$(last_line "$reply")" || adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")"
   reviewer_record "$name" ok
   localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ${adapter_roots[@]+"${adapter_roots[@]}"} ||
     adapter_fail "could not rewrite the paths in $adapter_display's reply" "" none
   final=$(last_line "$reply")
-  result_line "$final" || adapter_fail "$adapter_display's reply has no final REVIEW RESULT line" "" none
+  result_line "$final" || adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")" "" none
   cp "$reply" "$res/$name.reply" || adapter_fail "could not keep the reply" "" none
   if declare -F adapter_meta >/dev/null; then adapter_meta >"$res/$name.meta" 2>/dev/null; fi
   case "$final" in "REVIEW RESULT: INCOMPLETE - "*) adapter_fail "$adapter_display says the review is incomplete" "" none ;; esac

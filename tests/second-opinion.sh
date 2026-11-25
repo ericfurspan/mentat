@@ -225,13 +225,13 @@ check "MENTAT_CODEX_MODEL set passes Codex --model=<value> as one argument" '[ "
 reset; echo 3 >"$STUB/codex_exit"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
 check "a failed Codex run with MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "no second opinion (codex exited with status 3.*; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL" "$STUB/stdout"'
 reset; printf 'Codex thinks it is fine.\n' >"$STUB/codex_out"; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' run "$idea")
-check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL set gives the same reason: the verdict check is every reviewer's, not Codex's" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line)$" "$STUB/stdout"'
+check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL set names the filtered model asked for and the setting" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL)$" "$STUB/stdout"'
 reset; printf 'Codex thinks it is fine.\n' >"$STUB/codex_out"; rc=$(run "$idea")
 check "a Codex reply with no verdict line and MENTAT_CODEX_MODEL unset names no model asked for" '[ "$rc" = 0 ] && grep -q "^- Codex ([0-9]* seconds): no second opinion (the reply has no final SECOND OPINION VERDICT line)$" "$STUB/stdout" && ! grep -q MENTAT_CODEX_MODEL "$STUB/stdout"'
-reset; touch "$STUB/codex_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
+reset; touch "$STUB/codex_hang"; took=$SECONDS; rc=$(MENTAT_CODEX_MODEL='gpt-other-2;x' MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
 # More than the 3-second limit, then the 2 seconds between TERM and KILL.
 check "a Codex timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
-check "a Codex timeout gives no second opinion (exit 0), Grok's result stays, and nothing is left behind" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex did not finish within 3 seconds" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && clean'
+check "a Codex timeout gives no second opinion (exit 0), naming the model asked for, Grok's result stays, and nothing is left behind" '[ "$rc" = 0 ] && grep -q "no second opinion (Codex did not finish within 3 seconds; Codex was asked for model gpt-other-2x with MENTAT_CODEX_MODEL)" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && clean'
 mkdir "$root/nocodex"; for t in git jq; do ln -s "$(command -v $t)" "$root/nocodex/$t"; done; ln -s "$root/tools/bin/grok" "$root/nocodex/grok"
 reset; rc=$(PATH="$root/nocodex:/usr/bin:/bin" run "$idea")
 check "a missing codex gives no second opinion (exit 0)" '[ "$rc" = 0 ] && grep -q "no second opinion (codex is not installed" "$STUB/stdout" && grep -q "^- Grok ([0-9]* seconds): SECOND OPINION VERDICT" "$STUB/stdout" && clean'

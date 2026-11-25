@@ -78,6 +78,13 @@ adapter_fail() { # $1 public reason, $2 local detail, $3 kind, $4 tool text for 
   exit 1
 }
 
+# Prints reason $1 for a failure the shared code finds in a reviewer's run, followed by the
+# adapter's own note when it defines adapter_note (a public-safe text starting "; ").
+adapter_noted() { # $1 reason
+  printf '%s' "$1"
+  if declare -F adapter_note >/dev/null; then adapter_note; fi
+}
+
 # Waits for the reviewer's tool, process $1, under the one time limit for every reviewer,
 # REVIEW_TIMEOUT_SECONDS: past it, the tool is stopped (TERM, then KILL two seconds later)
 # and the reviewer did not finish, with $2 as adapter_fail's local detail. Sets the
@@ -92,7 +99,7 @@ adapter_wait() { # $1 pid, $2 local detail on a timeout
       kill -9 "$1" 2>/dev/null
       wait "$1" 2>/dev/null
       # shellcheck disable=SC2031 # set in this runner by adapter_go
-      adapter_fail "$adapter_display did not finish within $REVIEW_TIMEOUT_SECONDS seconds" "${2:-}"
+      adapter_fail "$(adapter_noted "$adapter_display did not finish within $REVIEW_TIMEOUT_SECONDS seconds")" "${2:-}"
     fi
     sleep 0.1
   done
@@ -118,7 +125,7 @@ adapter_go() { # $1 review or opinion
   work="$res/$name.work" reply="$res/$name.work/reply"
   mkdir "$work" || adapter_fail "could not create a temporary folder" "" none
   adapter_run "$1"
-  [ -s "$reply" ] || adapter_fail "$adapter_display returned no reply"
+  [ -s "$reply" ] || adapter_fail "$(adapter_noted "$adapter_display returned no reply")"
 }
 
 # A runner stopped by its parent stops its tool, and then exits, which runs its EXIT
