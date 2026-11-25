@@ -1,5 +1,5 @@
 ---
-description: "Source: rules.md, after pushing, call mentat:review rather than calling the pull request ready; source incident not yet named."
+description: "Source: rules.md, after pushing, call mentat:review rather than calling the pull request ready; the review loop moved out of the always-loaded rules into a skill, and the review was made to wait for CI so it could run right after the push instead of the agent polling."
 max_turns: 10
 allowed_tools: [Skill, Read]
 ---
