@@ -109,6 +109,11 @@
 #     review --request reads it (the first 12 hex characters of the SHA-256 of its text
 #     without trailing newlines). With <expected>, prints both: 0 they match, 1 they differ.
 #     2 the file is missing, unreadable or blank (no fingerprint printed), 64 usage.
+#   mentat worktree branch <name>  In the current checkout, first checks for a local branch
+#     <name>, then runs git fetch origin, then makes <name> from origin/<default> with no
+#     upstream (the default branch found as mentat reviewers finds it). 0 made, 1 the branch
+#     already exists (nothing fetched), 2 the fetch failed or the default branch could not be
+#     found; no branch is made unless it exits 0. 64 usage.
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -120,7 +125,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review git-hooks check status; do
+for lib in shared publish review git-hooks check status worktree; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -160,5 +165,6 @@ case "${1:-}" in
   second-opinion) shift; handover second-opinion "$@" ;;
   check) shift; check "$@" ;;
   fingerprint) shift; fingerprint_command "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>]" 64 ;;
+  worktree) shift; worktree_command "$@" ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name>" 64 ;;
 esac
