@@ -1,6 +1,6 @@
 # Settings
 
-Every Mentat setting is an environment variable. Set it in the `env` block of Claude Code's settings: your user settings file for your own values, a project's `.claude/settings.json` for a repository's. A setting set but empty counts as unset and uses its default. One is read only from the repository: `MENTAT_REVIEWERS`, from the `env` block of `.claude/settings.json` committed on origin's default branch; your environment, user and local settings and other branches never count for it.
+Every Mentat setting is an environment variable. Set it in the `env` block of Claude Code's settings: your user settings file for your own values, a project's `.claude/settings.json` for a repository's. A setting set but empty counts as unset and uses its default, except `MENTAT_REVIEW_TIMEOUT_SECONDS`, which refuses it. One is read only from the repository: `MENTAT_REVIEWERS`, from the `env` block of `.claude/settings.json` committed on origin's default branch; your environment, user and local settings and other branches never count for it.
 
 A model setting names a model Claude Code accepts; `MENTAT_CODEX_MODEL` names a model Codex accepts. A model outside your plan bills credits or fails.
 
