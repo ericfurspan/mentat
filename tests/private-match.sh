@@ -42,14 +42,38 @@ publish_side() {
     *) echo "inconsistent: status $status, text '$out'" ;;
   esac
 }
-# The hook's reason, or what it wrote on stderr when it let the call through unchecked.
+# The hook scored as Claude Code acts on it: no output or {} is none, and a deny whose
+# reason names a category is that category. What it wrote on stderr when it let the call
+# through unchecked, a failing exit or any other output is not either and fails the row.
 hook_side() {
-  local out
+  local out err status reason
   out=$(jq -n --arg b "$1" '{hook_event_name: "PreToolUse", tool_name: "mcp__github__add_issue_comment",
-    tool_input: {owner: "stubowner", repo: "stubrepo", issue_number: 1, body: $b}}' | "$hook" 2>&1)
-  case "$out" in
-    "" | "{"*) outcome "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty' 2>/dev/null)" ;;
-    *) echo "unchecked: $out" ;;
+    tool_input: {owner: "stubowner", repo: "stubrepo", issue_number: 1, body: $b}}' | "$hook" 2>"$root/hook.err")
+  status=$?
+  err=$(cat "$root/hook.err")
+  if [ -n "$err" ]; then
+    echo "unchecked: $err"
+    return
+  fi
+  if [ "$status" != 0 ]; then
+    echo "inconsistent: exit $status, output '$out'"
+    return
+  fi
+  [ -n "$out" ] || { echo none; return; }
+  reason=$(printf '%s' "$out" | jq -rs 'if length == 1 and .[0] == {} then "pass"
+    elif length == 1 and (.[0] | type) == "object" and .[0].hookSpecificOutput.permissionDecision == "deny"
+      and (.[0].hookSpecificOutput.permissionDecisionReason | type) == "string"
+    then "deny " + .[0].hookSpecificOutput.permissionDecisionReason else empty end' 2>/dev/null)
+  case "$reason" in
+    pass) echo none ;;
+    "deny "*)
+      case "$(outcome "${reason#deny }")" in
+        path) echo path ;;
+        name) echo name ;;
+        *) echo "inconsistent: deny without a known category, output '$out'" ;;
+      esac
+      ;;
+    *) echo "inconsistent: output '$out'" ;;
   esac
 }
 # row <label> <publish expects> <hook expects> <text>
