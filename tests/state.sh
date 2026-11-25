@@ -12,7 +12,7 @@ root=$(mktemp -d) && root=$(cd -P "$root" && pwd -P) || exit 1
 holders=""
 cleanup() {
   local p
-  for p in $holders; do kill -KILL "$p" 2>/dev/null; done
+  for p in $holders; do kill -KILL -- "$p" 2>/dev/null; done
   rm -rf "$root"
 }
 trap cleanup EXIT
@@ -107,9 +107,10 @@ check "2: without lockf, flock -w 10 takes the lock" '[ "$rc" = 0 ] && grep -qF 
 
 # m. The lock held by another command: the write waits, then fails naming the lock (exit 2).
 # The holder is a lockf on the same file, waited for until it holds the lock.
-hold() {
-  /usr/bin/lockf -k "$L" sleep 60 &
-  holder=$! holders="$holders $holder"
+# It runs in its own process group (its pid), so killing the group kills lockf and its command.
+hold() { # $1 seconds to hold
+  perl -e 'setpgrp(0, 0); exec @ARGV or exit 127' /usr/bin/lockf -k "$L" sleep "$1" >/dev/null 2>&1 &
+  holder=$! holders="$holders -$holder"
   local i=0
   while /usr/bin/lockf -s -k -t 0 "$L" true; do
     i=$((i + 1))
@@ -118,7 +119,7 @@ hold() {
   done
 }
 before=$(sum)
-hold || exit 1
+hold 60 || exit 1
 start=$(date +%s)
 rc=$(STATE_LOCK_SECONDS=1 st item set WRK-4 --stage held)
 took=$(($(date +%s) - start))
@@ -127,16 +128,14 @@ rc=$(STATE_LOCK_SECONDS=1 STATE_LOCKF="$root/no-lockf" STATE_FLOCK="$root/flock-
 check "m: lock held under flock: exit 2 naming the lock (not 1), nothing written" '[ "$rc" = 2 ] && grep -qF "$L" "$root/err" && [ "$(sum)" = "$before" ]'
 
 # n. The command holding the lock is killed: the lock is free at once and the write goes on.
-kill -KILL "$holder"
+kill -KILL -- "-$holder"
 wait "$holder" 2>/dev/null
 start=$(date +%s)
 rc=$(st item set WRK-4 --stage held)
 took=$(($(date +%s) - start))
 check "n: holder killed: the next write takes the lock at once" '[ "$rc" = 0 ] && [ "$took" -lt 5 ] && [ "$(q ".items[\"WRK-4\"].stage")" = held ]'
 # And a holder that ends within the wait: the write waits for it and lands.
-/usr/bin/lockf -k "$L" sleep 2 &
-holder=$! holders="$holders $holder"
-while /usr/bin/lockf -s -k -t 0 "$L" true; do sleep 0.1; done
+hold 2 || exit 1
 rc=$(st item set WRK-5 --stage held)
 check "n: a holder that ends within the wait: the write lands (exit 0)" '[ "$rc" = 0 ] && [ "$(q ".items[\"WRK-5\"].stage")" = held ]'
 
@@ -151,7 +150,8 @@ fresh
 pids=""
 i=0
 while [ "$i" -lt 20 ]; do
-  (cd "$R" && "$mentat" state item set "P-$i" --stage held >/dev/null 2>&1) &
+  # A long wait, so a busy machine running every test at once cannot time a writer out.
+  (cd "$R" && STATE_LOCK_SECONDS=120 "$mentat" state item set "P-$i" --stage held >/dev/null 2>&1) &
   pids="$pids $!"
   i=$((i + 1))
 done
