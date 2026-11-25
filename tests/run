@@ -757,11 +757,12 @@ done
 # adapters on stub tools), second-opinion and check behave as specified (stub gh, claude,
 # reviewer tools and gitleaks), and so do the publish check, the merge hook,
 # the contract the merge hook keeps through hooks/lib/verdict.sh, the git hooks, and the
-# public-text module's hook. The marketplace lists the modules and the committed settings turn on
+# public-text module's hook, and the publish check and that hook match the same text alike
+# but for their named differences. The marketplace lists the modules and the committed settings turn on
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/private-match.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -885,7 +886,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/private-match.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else

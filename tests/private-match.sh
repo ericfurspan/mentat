@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# The publish check's matcher (private_text in lib/publish.sh) and the mentat-public-text
+# module's hook, run over the same text with a temporary home and a stub word list. Each
+# row gives the outcome expected from each side: a local path, a private name or none.
+# Rows where the two differ name the deliberate difference; any other drift fails. The
+# hook is run through its MCP route, which passes the text straight to its matcher.
+# Prints PASS/FAIL per row; exits 1 on any FAIL.
+set -uo pipefail
+
+root_dir="$(cd "$(dirname "$0")/.." && pwd)"
+hook="$root_dir/plugins/mentat-public-text/hooks/public-text"
+failures=0
+
+root=$(mktemp -d)
+trap 'rm -rf "$root"' EXIT
+export HOME="$root/stub home"
+mkdir -p "$HOME/.config/mentat"
+printf '# stubcommentword\n\nStubPlainWord\nexact:StubExactWord\n' >"$HOME/.config/mentat/private-words"
+
+# shellcheck source=/dev/null
+. "$root_dir/lib/publish.sh"
+
+# outcome <category>: path, name or none, from a matcher's category text.
+outcome() {
+  case "$1" in
+    "") echo none ;;
+    *"a local path"*) echo path ;;
+    *"a configured private name"*) echo name ;;
+    *) echo "unexpected: $1" ;;
+  esac
+}
+# The publish check acts on private_text's status as well as its text (publish_hit), so
+# a hit is status 0 with a category and none is a failure with no text; any other pair
+# is inconsistent and fails the row.
+publish_side() {
+  local out status kind
+  out=$(private_text "$1")
+  status=$?
+  kind=$(outcome "$out")
+  case "$status:$kind" in
+    0:path | 0:name | [1-9]*:none) echo "$kind" ;;
+    *) echo "inconsistent: status $status, text '$out'" ;;
+  esac
+}
+# The hook scored as Claude Code acts on it: no output or {} is none, and a deny whose
+# reason names a category is that category. What it wrote on stderr when it let the call
+# through unchecked, a failing exit or any other output is not either and fails the row.
+hook_side() {
+  local out err status reason
+  out=$(jq -n --arg b "$1" '{hook_event_name: "PreToolUse", tool_name: "mcp__github__add_issue_comment",
+    tool_input: {owner: "stubowner", repo: "stubrepo", issue_number: 1, body: $b}}' | "$hook" 2>"$root/hook.err")
+  status=$?
+  err=$(cat "$root/hook.err")
+  if [ -n "$err" ]; then
+    echo "unchecked: $err"
+    return
+  fi
+  if [ "$status" != 0 ]; then
+    echo "inconsistent: exit $status, output '$out'"
+    return
+  fi
+  [ -n "$out" ] || { echo none; return; }
+  reason=$(printf '%s' "$out" | jq -rs 'if length == 1 and .[0] == {} then "pass"
+    elif length == 1 and (.[0] | type) == "object" and .[0].hookSpecificOutput.permissionDecision == "deny"
+      and (.[0].hookSpecificOutput.permissionDecisionReason | type) == "string"
+    then "deny " + .[0].hookSpecificOutput.permissionDecisionReason else empty end' 2>/dev/null)
+  case "$reason" in
+    pass) echo none ;;
+    "deny "*)
+      case "$(outcome "${reason#deny }")" in
+        path) echo path ;;
+        name) echo name ;;
+        *) echo "inconsistent: deny without a known category, output '$out'" ;;
+      esac
+      ;;
+    *) echo "inconsistent: output '$out'" ;;
+  esac
+}
+# row <label> <publish expects> <hook expects> <text>
+row() {
+  local p h
+  p=$(publish_side "$4") h=$(hook_side "$4")
+  if [ "$p" = "$2" ] && [ "$h" = "$3" ]; then
+    printf 'PASS: private-match %s\n' "$1"
+  else
+    printf 'FAIL: private-match %s: publish %s (expected %s), hook %s (expected %s)\n' "$1" "$p" "$2" "$h" "$3"
+    failures=$((failures + 1))
+  fi
+}
+
+row "this home as a whole path" path path "notes at $HOME/notes.md"
+row "this home as the whole text" path path "$HOME"
+row "this home in another case" path path "notes at $(printf '%s' "$HOME" | tr '[:lower:]' '[:upper:]')/notes.md"
+row "this home followed by a dash" path path "notes at $HOME-old/notes.md"
+row "this home with more name after it (deliberate: publish matches this home as an unanchored substring, the hook as a bounded path)" path none "notes at ${HOME}x/notes.md"
+row "this home inside a longer path (deliberate: publish matches this home as an unanchored substring, the hook as a bounded path)" path none "notes at /backup$HOME/notes.md"
+row "another user's home (deliberate: publish matches only this machine's home)" none path "notes at /Users/stubperson/notes.md"
+row "another user's Linux home (deliberate: publish matches only this machine's home)" none path "notes at /home/stubperson/notes.md"
+row "a placeholder home" none none "see /Users/you/notes.md and /home/runner/work"
+row "a shared folder" none none "see /Users/Shared/notes.md"
+row "an exact: word in its case" name name "about StubExactWord here"
+row "an exact: word in another case" none none "about stubexactword here"
+row "an exact: word inside a longer word" none none "about StubExactWordy here"
+row "a plain word in its case" name name "about StubPlainWord here"
+row "a plain word in another case" name name "about STUBPLAINWORD here"
+row "a plain word inside a longer word" name name "about xstubplainwordx here"
+row "a word only on a # line" none none "about stubcommentword here"
+row "text with no hit" none none "about nothing here"
+
+[ "$failures" = 0 ]
