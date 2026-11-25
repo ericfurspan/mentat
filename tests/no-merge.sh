@@ -333,7 +333,7 @@ check "with the setting on, still reads nothing from GitHub" '[ ! -f "$STUB/call
 # 6i: on, what the hook denies on the merge hook's wider matching stays denied: the allowed
 # form split by a backslash-newline, with a quoted number, flag or commit, followed by a
 # second command on the next line, and an MCP merge tool.
-bs='\'
+bs=$'\\'
 while IFS= read -r cmd; do
   cmd=${cmd//SHA/$ok}
   cmd=${cmd//BS/$bs}
