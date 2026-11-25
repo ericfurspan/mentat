@@ -2,8 +2,10 @@
 # PreToolUse hook: the maintainer merges. A command that would merge a pull
 # request (gh pr merge, including --auto and quoted, =-joined or continued
 # flags; through gh api, the pulls/N/merge or repos/o/r/merges REST paths or a
-# GraphQL merge, auto-merge or merge-queue mutation) and an MCP merge or
-# auto-merge tool under any server name are denied. It follows the contract in
+# GraphQL merge, auto-merge or merge-queue mutation, also when the call holds
+# one anywhere and hands gh api a variable, substitution, --input or @file, or
+# when a merge path is built from an expansion such as "$p/merge") and an MCP
+# merge or auto-merge tool under any server name are denied. It follows the contract in
 # hooks/lib/verdict.sh, so it fails closed. This is a net for common mistakes,
 # not a security boundary: other routes exist.
 # shellcheck disable=SC2329 # run_hook calls check.
@@ -15,13 +17,13 @@ set -uo pipefail
   exit 0
 }
 
-merge="the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)."
+merge="the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file written in an earlier call (-F or --body-file)."
 # MCP tools that merge or set auto-merge, under any server name. hooks/hooks.json's
 # matcher names the same tools.
 mcp_merge='^mcp__.+__(merge_pull_request|.*auto_merge)$'
 
 check() {
-  local cmd joined flat dq sq word flags api
+  local cmd joined flat dq sq word flags api expansion
   case "$tool" in
     Bash)
       cmd=$(field '.tool_input.command') || verdict deny "no-merge could not read the command, so it blocks this call."
@@ -46,6 +48,16 @@ check() {
       if grep -Eq "${api}pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
       if grep -Eq "${api}repos/[^/[:space:]]+(/[^/[:space:]]+)?/merges([^[:alnum:]_]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
       if grep -Eq "${api}(mergePullRequest|enablePullRequestAutoMerge|mergeBranch|enqueuePullRequest)" <<<"$flat"; then verdict deny "$merge"; fi
+      # gh api may take its query or path from a variable, a substitution, stdin or a
+      # file written in the same call: a merge word anywhere in the call then counts.
+      if grep -Eq "${api}([$]|\`|--input|=[\"']?@)" <<<"$flat" &&
+        grep -Eq "pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)|repos/[^/[:space:]]+(/[^/[:space:]]+)?/merges([^[:alnum:]_]|\$)|mergePullRequest|enablePullRequestAutoMerge|mergeBranch|enqueuePullRequest" <<<"$flat"; then
+        verdict deny "$merge"
+      fi
+      # A merge path built from an expansion: "$p/merge", "${p}/merge", "$p"/merge.
+      # ${...} and $(...) run to the last closer before /merge, so nested ones count.
+      expansion="[$]([[:alnum:]_]+|[{].*[}]|[(].*[)])|\`[^\`]*\`"
+      if grep -Eq "${api}(${expansion})[\"']?/merges?([[:space:]\"'?;&|()<>]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
       verdict pass
       ;;
     *)
