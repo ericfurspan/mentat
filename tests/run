@@ -168,6 +168,7 @@ skills/plan/SKILL.md|Steps|as \`mentat:backlog\` "Agreement" says, posting the a
 skills/plan/SKILL.md|Steps|Settle each point (\`mentat:backlog\` "Replies in chat"); for a situation list, a situation the check names as missing or conflicting, and each situation an adopted change adds, is decided and listed before agreement, with no second check.
 skills/plan/session.md||Write to the backlog only what \`SKILL.md\` records for answers and agreements given here
 skills/plan/session.md||a fold's lines, writes a started session sends back
+skills/plan/session.md||each call the session settles, logged on its item (\`SKILL.md\` "Decisions"), a fold's lines
 $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:plan\` step 7)
 skills/plan/SKILL.md|Decisions|and any recommendation against the maintainer's earlier answers, goals and recorded objections, adopted plan-check points and the plan's answers to objections; correct a conflict or ask it as revisiting, never override it silently.
 skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds; a number no answer has, or one with words naming a different answer, is not-ready; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
