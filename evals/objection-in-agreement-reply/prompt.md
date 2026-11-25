@@ -1,5 +1,5 @@
 ---
-description: "Source: mentat:propose step 4, an objection to the design in the reply to the agreement question is recorded on the item as a decisions line and is not an agreement; an objection given in reply to the agreement question was not recorded on the item."
+description: "Source: mentat:propose step 4, an objection to the design in the reply to the agreement question is recorded on the item as a decisions line and is not an agreement; a review found that an objection made in the talk a reply to the agreement question opens went unrecorded."
 max_turns: 10
 allowed_tools: [Skill, Read]
 ---
