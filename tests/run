@@ -114,7 +114,7 @@ plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer w
 skills/backlog/agent-records.md|The comment|replaces the answer and keeps that line
 skills/backlog/agent-records.md|The comment|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/plan/SKILL.md||Nothing is implemented before the maintainer agrees; the one exception is an item \`mentat-lead:orchestrate\` agrees by default.
-skills/plan/SKILL.md||Only an Agree answer, or \`mentat-lead:orchestrate\`'s default agreement, writes the spec or moves the item
+skills/plan/SKILL.md||Only an Agree answer, or \`mentat-lead:orchestrate\`'s default agreement, writes the spec, records its fingerprint or moves the item
 skills/backlog/SKILL.md|Agreement|an item agreed by default records \`build: now\` and the default-agreement line that record gives, never as the maintainer's answer
 skills/backlog/agent-records.md|The comment|\`Agreed by default: nothing was open for the maintainer\`, never written as the maintainer's answer
 skills/backlog/spec-fixes.md||keeping its agreement citation, its build answer with any default-agreement line, and any earlier fix
