@@ -22,13 +22,9 @@ The first record posts the comment; every later one edits that comment in place,
 
 A chat request has no item yet: keep its plan check and second opinion records, and their files, for "Agreement" in `SKILL.md`, which writes them on the item it creates. If nothing is agreed, nothing is written.
 
-## Older items
-
-An item's first `Agent records` comment carries forward the latest fingerprint and build answer, advice and assumptions list from its older separate comments (`Spec fingerprint: ...`, `Advised against: ...`, `Material assumptions:`). Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records. Older plan check and second opinion comments are not carried and stay on the item as they are.
-
 ## Readers
 
-Every reader takes a record from the `Agent records` comment, else from the older comments as above: build readiness, builder briefs, the review's stop and final check, the record shapes in item reads, and the move to Linear (`../build/SKILL.md` steps 3 and 6, `mentat:plan` steps 6 and 8, `mentat:review` step 4 and "Final check", `../review/stop.md` "Evidence", `../review/after-ready.md`, `item-reads.md`, `assumptions.md`, `mentat-linear:linear` "Moving to Linear").
+Every reader takes a record from the `Agent records` comment: build readiness, builder briefs, the review's stop and final check, the record shapes in item reads, and the move to Linear (`../build/SKILL.md` steps 3 and 6, `mentat:plan` steps 6 and 8, `mentat:review` step 4 and "Final check", `../review/stop.md` "Evidence", `../review/after-ready.md`, `item-reads.md`, `assumptions.md`, `mentat-linear:linear` "Moving to Linear").
 
 ## Decision lines
 
