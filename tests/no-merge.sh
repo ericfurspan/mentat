@@ -70,6 +70,11 @@ p=repos/o/r/pulls/7; gh api -X PUT "$p/merge"
 p=repos/o/r/pulls/7; gh api -X PUT "${p}/merge"
 p=repos/o/r/pulls/7; gh api -X PUT "$p"/merge
 base=repos/o/r; gh api -X POST "$base/merges" -f base=main -f head=feat
+gh api -X PUT "$(cat p.txt)/merge"
+gh api -X PUT "`cat p.txt`/merge"
+gh api "${b}/merges?x=1"
+gh api -X PUT "$(printf '%s' 'repos/o/r/pulls/7)' | tr -d ')')/merge"
+gh api -X PUT "${p:-${fallback}}/merge"
 DENY
 # A merge query or path held in a variable, heredoc or file written earlier in the call.
 mutation='mutation{mergePullRequest(input:{pullRequestId:"X"}){clientMutationId}}'
@@ -128,6 +133,8 @@ gh api repos/o/r/contents/x/merges
 q='query{viewer{login}}'; gh api graphql -f query="$q"
 gh api "repos/$R/pulls/5/commits"
 p=repos/o/r/pulls/7; gh api "$p/mergeable"
+gh api "$(cat p.txt)/mergeable"
+gh api "${p:-x}/mergeable"
 PASS
 # Only a backslash-newline joins lines: a merge word on the next line is another command.
 cmd=$(printf 'gh pr\nmerge 5')
