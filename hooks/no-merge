@@ -18,7 +18,7 @@ set -uo pipefail
 merge="the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)."
 # MCP tools that merge or set auto-merge, under any server name. hooks/hooks.json's
 # matcher names the same tools.
-mcp_merge='^mcp__.+__(merge_pull_request|[a-z_]*auto_merge)$'
+mcp_merge='^mcp__.+__(merge_pull_request|.*auto_merge)$'
 
 check() {
   local cmd joined flat dq sq word flags api

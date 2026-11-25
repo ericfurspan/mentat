@@ -122,6 +122,8 @@ mcp__ccd_pr__set_auto_merge yes deny
 mcp__github__merge_pull_request yes deny
 mcp__plugin_github_github__merge_pull_request yes deny
 mcp__github__enable_auto_merge yes deny
+mcp__github__set_v2_auto_merge yes deny
+mcp__srv__Enable_auto_merge yes deny
 BashOutput no pass
 mcp__github__pull_request_read no pass
 mcp__linear__merge_diff no pass
