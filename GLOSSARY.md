@@ -31,7 +31,6 @@ Avoid: start wait
 To pass a message, answer or write from one session on to another session or to the maintainer, word for word where the sending file says so.
 
 Avoid: relay
-Heading: the section heading "Relays" stays until its file is rewritten; cite it in a code span until then.
 
 ## implement
 
