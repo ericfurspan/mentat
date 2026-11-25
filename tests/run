@@ -157,6 +157,7 @@ $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:
 skills/plan/SKILL.md|Decisions|ask a conflict as revisiting, never override it silently.
 $o|Relays|An objection of the maintainer's that this session hears at a hold reaches the build session in their exact words, as any answer to a hold does, and that session records it; one heard at a close without merging this session records as \`after-ready.md\` in \`mentat:review\`'s folder says.
 skills/backlog/item-reads.md|The full read|A read to plan or propose an item also reads the decisions lines of each item whose work moved to it, as the item names it.
+skills/plan/session.md||the decisions line recording the maintainer's objections (\`SKILL.md\` step 7)
 skills/plan/session.md||a fold also writes one on the item it folds into, naming this one, and copies there, unchanged and each as its own decisions line, every decisions line of this item that records a maintainer's objection, so objections survive later folds.
 plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|and under \`Decisions:\` each line of its body's \`## Decisions\` that records an objection of the maintainer's ("Decision lines" in that file), unchanged
 EOF
