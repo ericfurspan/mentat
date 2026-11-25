@@ -58,7 +58,7 @@ To plan an item in a session it starts, this session adds a `hold` note naming t
 - never calls `mentat:build` and never redirects;
 - ends with one report to this session: every point it asked or that is still open, and the agreed item with its spec fingerprint and, when agreed by default, what its line to the maintainer names ("Messages") but what holds it, or why there is none.
 
-This session then holds and hands over the item as for one planned here, sends the maintainer its line, and clears the `hold` note.
+At its report, this session holds and hands over the item as for one planned here, sends the maintainer its line, and clears the `hold` note. When the host no longer shows the session running and no report came, this session clears the note, tells the maintainer in one line ("Messages") and sends the item back to planning.
 
 ## Messages
 
