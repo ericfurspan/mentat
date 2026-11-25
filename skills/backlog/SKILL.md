@@ -43,7 +43,7 @@ The tracker's order: the order of agreed work, next first, read as the tracker's
 
 ## Where the spec lives
 
-An item's spec lives where the tracker's adapter says ("Where the spec lives" in `mentat-linear:linear` or `github.md`); every skill that reads, writes or fingerprints a spec takes it from there. It is absent until agreement. Its body is the request that is exported and fingerprinted, and stays byte for byte as agreed: reshaping an item never rewords, retitles or re-spaces it; only a change of scope ("Agreement") updates it. Before and after a write that moves it, fingerprint it as "Agreement" says; if the two differ, restore the earlier body before anything relies on it. Build readiness handles a mismatch with the recorded fingerprint.
+An item's spec lives where the tracker's adapter says ("Where the spec lives" in `mentat-linear:linear` or `github.md`); every skill that reads, writes or fingerprints a spec takes it from there. It is absent until agreement. Its body is the request that is exported and fingerprinted, and stays byte for byte as agreed: reshaping an item never rewords, retitles or re-spaces it; only a change of scope ("Agreement") updates it. Build readiness handles a mismatch with the recorded fingerprint.
 
 ## Agreement
 

@@ -18,7 +18,7 @@ A later fingerprint and build answer, assumptions list or plan replaces the earl
 
 ## Writing it
 
-The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. After each write, read the comment back and compare the records' values with what was written (the fingerprint, build answer, any default-agreement line, the spec document id, each assumption and its state, each settlement entry and decisions line, the plan), not their formatting, which the tracker may re-serialize; when a value differs, correct it once and read it again, and if one still differs, stop and tell the maintainer before anything relies on the records.
+The first record posts the comment; every later one edits that comment in place, never posting another: with an external backlog, the tracker's comment edit given the comment's id, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment.
 
 A chat request has no item yet: keep its plan check and second opinion records, and their files, for "Agreement" in `SKILL.md`, which writes them on the item it creates. If nothing is agreed, nothing is written.
 
@@ -46,4 +46,4 @@ With an external backlog, after each `mentat second-opinion` round, its settleme
 
 ## Attached files
 
-Upload each file from disk as the tracker's adapter says (`mentat-linear:linear` "Agent records"), then read the attachment back from the item. If the upload or the read-back fails, the settlement says the reply was not attached, and the file stays where it is.
+Upload each file from disk as the tracker's adapter says (`mentat-linear:linear` "Agent records"), If the upload fails, the settlement says the reply was not attached, and the file stays where it is.
