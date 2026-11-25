@@ -87,8 +87,9 @@ EOF
 done
 
 # An origin with main and pull request 7, whose head changes README and carries a hooks
-# folder whose post-checkout hook leaves a marker. The clone uses that folder as its
-# hooks path, so a checkout that ran the head's hooks would leave the marker.
+# folder whose post-checkout hook leaves a marker. A relative hooks path is read from the
+# checkout git runs in, which is on main, so the clone's hooks path is an absolute folder
+# with the same hook: a checkout that ran any hook would leave the marker.
 git init -q --bare -b main "$root/origin.git"
 git init -q -b main "$root/seed"
 (cd "$root/seed" && echo base >README && mkdir .claude && echo '{}' >.claude/settings.json &&
@@ -99,7 +100,8 @@ git init -q -b main "$root/seed"
 H=$(git -C "$root/seed" rev-parse feature)
 OLD=1111111111111111111111111111111111111111
 git clone -q "$root/origin.git" "$root/work"
-git -C "$root/work" config core.hooksPath .hooks
+mkdir -p "$root/clone-hooks" && printf '#!/bin/sh\ntouch "$STUB/hook_ran"\n' >"$root/clone-hooks/post-checkout" && chmod +x "$root/clone-hooks/post-checkout"
+git -C "$root/work" config core.hooksPath "$root/clone-hooks"
 # settings <json>: main's .claude/settings.json on origin.
 settings() {
   printf '%s\n' "$1" >"$root/seed/.claude/settings.json"
@@ -188,7 +190,7 @@ check "fan-out: each got the review prompt, with the request and the result line
 check "the comment names the head, the spec fingerprint and the list, then one result line each" 'heading "alpha, beta" && row "alpha: findings" && row "beta: no findings"'
 check "the comment folds each reply with the model that ran, and the reply holds no local path" 'grep -qxF "<details><summary>Alpha</summary>" "$STUB/comment" && grep -qxF -- "- Model: alpha-tool-model-1" "$STUB/comment" && grep -qF "README:1 says change (blocking)" "$STUB/comment" && ! grep -qF "$root" "$STUB/comment" && ! grep -qF "/private/var" "$STUB/comment"'
 check "one summary line per reviewer, and each reply printed before them" 'said "alpha: findings" && said "beta: no findings" && grep -qxF "## alpha" "$STUB/out" && said "The outside review posted findings on $H: https://example.test/comment"'
-check "the checkouts run no hook from the pull request head" '[ ! -f "$STUB/hook_ran" ]'
+check "the checkouts run no hook, the clone's or the pull request head's" '[ ! -f "$STUB/hook_ran" ]'
 check "nothing is left behind: no worktree and no private ref" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ] && [ -z "$(git -C "$root/work" for-each-ref refs/mentat)" ]'
 rc=$(cd "$root/work" && "$mentat" status 7 2>&1)
 check "status: each listed reviewer's state on the last head Claude reviewed, from the comment" 'grep -qF "outside: posted on ${H:0:7} (alpha: findings, beta: no findings; spec fingerprint none; reviewers alpha, beta)" <<<"$rc"'
