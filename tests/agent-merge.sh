@@ -358,7 +358,7 @@ crit=$(. "$root/lib/shared.sh" && review_criteria "")
 crit_diff=$(. "$root/lib/shared.sh" && review_criteria " and the diff")
 check "the review criteria ask for the (high risk) mark besides blocking and non-blocking" 'grep -qF "(high risk)" <<<"$crit" && grep -q "(blocking) or (non-blocking)" <<<"$crit"'
 check "the criteria name what makes a change high risk" 'grep -qF "weaken a safety net or a test" <<<"$crit" && grep -qF "expose a credential" <<<"$crit" && grep -qF "lose data" <<<"$crit" && grep -qF "be hard to undo" <<<"$crit"'
-check "the criteria always mark a change that removes or loosens a check of the test command high risk" 'grep -q "[Aa]lways mark (high risk) a change that removes or loosens a check of the repository.s test command" <<<"$crit" && grep -qF "such as tests/run here" <<<"$crit"'
+check "the criteria always mark a change that removes or loosens a check of the test command high risk" 'grep -q "[Aa]lways mark (high risk) a change that removes or loosens a check of the repository.s test command" <<<"$crit" && ! grep -qF "tests/run" <<<"$crit"'
 check "the criteria say such a pull request waits for the maintainer" 'grep -qF "waits for the maintainer" <<<"$crit"'
 check "the criteria are the same text for the diff-carrying reviewers" 'grep -qF "(high risk)" <<<"$crit_diff" && grep -qF "removes or loosens a check" <<<"$crit_diff"'
 
