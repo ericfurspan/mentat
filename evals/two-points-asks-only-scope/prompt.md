@@ -4,9 +4,16 @@ max_turns: 2
 allowed_tools: []
 ---
 
-You are planning item ABC-220 (a nightly export of sales data for the finance team). Two points are open:
+You are planning item ABC-220 (a nightly export of sales data for the finance team). Your notes so far list two open points:
 
-- Finance has asked for refunds to be included too. That roughly doubles the work, about two more days, and needs read access to the payments database, which no export job has had before.
-- The export file could be CSV or a hand-made fixed-width text format. Finance's spreadsheet tool opens CSV directly; the fixed-width format would need a custom parser on their side.
+Refunds
+- Finance has asked for refunds to be included too.
+- Including them: about two more days of work, and the export needs read access to the payments database, which no export job has had before.
+- Leaving them out: the export ships as first planned; finance keeps pulling refunds by hand.
 
-Nothing else is open. You cannot run tools here. Write your next message to me.
+How the export job runs
+- Option A, the app's existing job runner: it already runs three nightly exports, with retries and failure alerts built in. Trade-off: the new job follows the runner's conventions and its code lives inside the app.
+- Option B, a standalone script started by cron: self-contained and easy to read on its own. Trade-off: no retries or failure alerts unless they are written for it, and it is one more way jobs run in this app.
+- Either way the export file finance gets is the same, and the job runs on the server the app already uses, at no extra charge.
+
+You cannot run tools here. Write your next message to me.
