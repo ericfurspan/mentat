@@ -24,7 +24,7 @@ The first record posts the comment; every later one edits it in place, never pos
 
 ## Older items
 
-An item's first `Agent records` comment carries forward the latest fingerprint and build answer and assumptions list from its older separate comments (`Spec fingerprint: ...`, `Material assumptions:`). Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records. Older plan check, second opinion and advice comments are not carried and stay on the item as they are.
+An item's first `Agent records` comment carries forward the latest fingerprint and answer and assumptions list from its older separate comments (`Spec fingerprint: ...`, `Material assumptions:`). Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records. Older plan check, second opinion and advice comments are not carried and stay on the item as they are.
 
 ## Decision lines
 
