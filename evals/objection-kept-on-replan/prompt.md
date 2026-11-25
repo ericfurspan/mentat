@@ -12,4 +12,4 @@ Plan item ABC-140 (send password-reset emails) again. Its first pull request, #2
 
 The code: the app already has a SendFast client, used for the newsletter, so reusing it for reset emails is about a ten-line change. The server also has a local mail relay that is set up but unused; sending through it needs a small new mail module and a message template, about a day of work.
 
-The checkout is current with the default branch. You cannot run commands or reach the tracker here, and the plan check cannot run; only the Skill and Read tools work. State the plan you would put to me for agreement, and what you would tell me about my earlier objection.
+The checkout is current with the default branch. You cannot run commands or reach the tracker here, and the plan check cannot run; only the Skill and Read tools work. State the plan you would put to me for agreement.
