@@ -59,10 +59,12 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 
 | Rule | Source | Check |
 |---|---|---|
-| Call `mentat:propose` before giving a view on or suggesting a change. | `rules.md`, `skills/propose/SKILL.md` | `propose-before-view` |
+| Call `mentat:propose` before giving a view on a change. | `rules.md`, `skills/propose/SKILL.md` | `propose-before-view` |
+| Call `mentat:propose` before suggesting a change. | `rules.md`, `skills/propose/SKILL.md` | review only |
 | Nothing is built before the maintainer's agreement; the one exception is an item `mentat-lead:orchestrate` agrees by default when nothing is open for the maintainer, recorded as agreed by default, never as their answer. | `skills/propose/SKILL.md`, `plugins/mentat-lead/skills/orchestrate/SKILL.md` "Planning", `skills/backlog/SKILL.md` "Agreement", `docs/adr/0002-orchestrator-agrees-by-default.md` | `tests/run` text check; review only |
 | One agreement, after the plan check: the plan check's `DO IT` is not the agreement; the maintainer agrees once, asked after the plan check; agreed work gets no further plan check; a small, clear request (as `skills/propose/SKILL.md` defines it) is agreed from its one-line view with no plan check. | `skills/propose/SKILL.md` opening paragraph "A small, clear request" and step 4, `skills/propose/agreement.md` | review only |
-| A request that changes what an agent is told in `rules.md`, skills, the builder prompt or standing agent instructions is not small and gets the plan check, however short. | `skills/propose/SKILL.md` | `instruction-change-not-small` |
+| A request that changes the meaning of what a repository's `AGENTS.md` tells agents is not small and gets the plan check, however short. | `skills/propose/SKILL.md` | `instruction-change-not-small` |
+| A request that changes the meaning of what an agent is told in Mentat's `rules.md`, skills or builder prompt, or in other standing agent instructions, is not small and gets the plan check, however short. | `skills/propose/SKILL.md` | review only |
 | Objections recorded: an objection in the reply to the agreement question is recorded on the item, and that reply is not an agreement. | `skills/propose/SKILL.md` step 4 | `objection-in-agreement-reply`; `tests/run` text check |
 | Objections recorded: each objection to the design, plan or pull request is recorded as one decisions line on the item, also when made in any talk after the agreement question, at a hold or at a close, and is not an agreement. | `skills/propose/SKILL.md` step 4, `skills/review/after-ready.md`, `skills/backlog/agent-records.md` "Decision lines" | `tests/run` text check; review only |
 | Objections addressed: a later plan names each recorded objection with how it meets it. | `skills/propose/agreement.md` | `objection-kept-on-replan` |
@@ -76,7 +78,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | The main session edits no files. | `rules.md` | `build-main-no-edit` |
 | One builder per pull request, in its worktree. | `rules.md`, `skills/build/helpers.md` "One helper per branch" | `tests/run` (the builder runs in its own worktree); review only |
 | A builder changes neither the main checkout nor the session's own; on any other difference no further builder starts. | `skills/build/helpers.md` "Main-checkout check" | `tests/worktree-check.sh`; review only |
-| The spec fingerprint is checked before a build: an item whose recorded fingerprint differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
+| The spec fingerprint is checked before a build: an item whose recorded fingerprint, or the one a spec fix re-recorded, differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
 | The spec fingerprint is checked before a build: an item with no recorded fingerprint goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | review only |
 | The build run never merges. | `skills/build/SKILL.md` step 6, `agents/builder.md` | review only |
 
