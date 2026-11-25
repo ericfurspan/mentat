@@ -67,6 +67,8 @@ if [ -n "$other" ] && [ -f "$STUB/expect_$other" ]; then
 fi
 [ "$n" = slow ] && { echo $$ >"$STUB/slow.pid"; exec sleep 30; }
 [ -f "$STUB/$n.fails" ] && { echo "fake-token-in-log" >&2; exit 3; }
+# A folder where the path rewrite writes its copy of the reply, so the rewrite fails.
+[ -f "$STUB/$n.block_rewrite" ] && mkdir "$(dirname "$2")/reply.localized"
 if [ -f "$STUB/$n.$1" ]; then cat "$STUB/$n.$1"; exit 0; fi
 if [ "$1" = opinion ]; then printf 'Fine.\n\nSECOND OPINION VERDICT: DO IT\n'; exit 0; fi
 case "$n" in
@@ -212,6 +214,14 @@ reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(r
 check "the second failure in a row tells the maintainer now, keyed by the adapter's name" 'grep -q "^mentat: tell the maintainer now: Beta has failed 2 times in a row (owner/repo#7): beta-tool exited with status 3" "$STUB/err" && [ -f "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" ]'
 rm -f "$STUB/beta.fails"; rm -f "$STUB/comment"; rc=$(run 7)
 check "a checked reply ends the row" '[ "$(tail -n 1 "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" | cut -d" " -f2)" = ok ] && ! grep -q "tell the maintainer" "$STUB/err"'
+# A checked reply whose paths cannot be rewritten: recorded ok, then did not finish, not
+# counted as a failure in a row; so a tool failure after it is the first in a row again.
+reset; touch "$STUB/beta.fails"; run 7 >/dev/null
+rm -f "$STUB/beta.fails" "$STUB/comment"; touch "$STUB/beta.block_rewrite"; rc=$(run 7)
+check "a checked reply whose paths cannot be rewritten is recorded ok, then did not finish, not counted in a row" '[ "$rc" = 2 ] && row "beta: did not finish (could not rewrite the paths in Beta'"'"'s reply)" && [ "$(tail -n 1 "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" | cut -d" " -f2)" = ok ] && ! grep -q "tell the maintainer" "$STUB/err"'
+rm -f "$STUB/beta.block_rewrite" "$STUB/comment"; touch "$STUB/beta.fails"; rc=$(run 7)
+check "a tool failure after a reply whose paths could not be rewritten is the first in a row again, not raised" '[ "$(tail -n 1 "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" | cut -d" " -f2)" = fail ] && ! grep -q "tell the maintainer" "$STUB/err"'
+rm -f "$STUB/beta.fails"
 listing "slow,delta"
 mv "$root/tools/bin/delta-cli" "$root/delta-cli.off"
 reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run 7)
