@@ -29,7 +29,19 @@ outcome() {
     *) echo "unexpected: $1" ;;
   esac
 }
-publish_side() { outcome "$(private_text "$1")"; }
+# The publish check acts on private_text's status as well as its text (publish_hit), so
+# a hit is status 0 with a category and none is a failure with no text; any other pair
+# is inconsistent and fails the row.
+publish_side() {
+  local out status kind
+  out=$(private_text "$1")
+  status=$?
+  kind=$(outcome "$out")
+  case "$status:$kind" in
+    0:path | 0:name | [1-9]*:none) echo "$kind" ;;
+    *) echo "inconsistent: status $status, text '$out'" ;;
+  esac
+}
 # The hook's reason, or what it wrote on stderr when it let the call through unchecked.
 hook_side() {
   local out
