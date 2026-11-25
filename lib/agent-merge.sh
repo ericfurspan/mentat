@@ -123,7 +123,7 @@ am_hook() { # $1 command
 # account; its description's Status line is exactly "**Status:** Ready"; its head's CI
 # passed (no checks waits); the base branch has no merge queue rule; its head changes no
 # protected path; and no Local Claude review or Outside review comment this account posted
-# on #N, on any head, holds "(high risk)". It posts and merges nothing.
+# on #N, on any head, holds a parenthesized mark with "high risk" in any letter case, such as "(high risk)" or "(blocking, high risk)". It posts and merges nothing.
 am_wait_line() { printf 'agent merge: waits for the maintainer (%s)\n' "$1"; }
 agent_merge_command() {
   local pr top def ref repo me json state base author head first reasons="" why rc out risky queue rules
@@ -174,7 +174,7 @@ agent_merge_command() {
   risky=$(gh api --paginate "repos/$repo/issues/$pr/comments" | jq -rs --arg me "$me" '
     [.[][] | select(.user.login == $me)
       | select((.body | split("\n")[0] | sub("\r$"; "")) as $h | ($h | startswith("## Local Claude review of ")) or ($h | startswith("## Outside review of ")))
-      | select(.body | contains("(high risk)"))] | length') || die "could not read the comments on #$pr"
+      | select(.body | test("\\([^()]*high risk[^()]*\\)"; "i"))] | length') || die "could not read the comments on #$pr"
   [ "$risky" = 0 ] || reasons="$reasons; a review marked a change high risk"
   if [ -z "$reasons" ]; then
     # Only a pull request nothing else holds back waits for CI, which can take a while.
