@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # PreToolUse hook: the maintainer merges. A command that would merge a pull
-# request (gh pr merge, including --auto, or the merge API through gh api) and
-# the desktop app's auto-merge tool are denied. It follows the contract in
+# request (gh pr merge, including --auto and quoted, =-joined or continued
+# flags; through gh api, the pulls/N/merge or repos/o/r/merges REST paths or a
+# GraphQL merge, auto-merge or merge-queue mutation) and an MCP merge or
+# auto-merge tool under any server name are denied. It follows the contract in
 # hooks/lib/verdict.sh, so it fails closed. This is a net for common mistakes,
 # not a security boundary: other routes exist.
 # shellcheck disable=SC2329 # run_hook calls check.
@@ -14,25 +16,42 @@ set -uo pipefail
 }
 
 merge="the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)."
+# MCP tools that merge or set auto-merge, under any server name. hooks/hooks.json's
+# matcher names the same tools.
+mcp_merge='^mcp__.+__(merge_pull_request|.*auto_merge)$'
 
 check() {
-  local cmd flags api
+  local cmd joined flat dq sq word flags api
   case "$tool" in
     Bash)
       cmd=$(field '.tool_input.command') || verdict deny "no-merge could not read the command, so it blocks this call."
-      # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
-      flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
+      # A backslash-newline continues a line and, as in bash, is removed outright, even
+      # inside a word; every other newline still ends a command.
+      # awk and tr, not ${cmd//...}, which takes minutes on long input in bash 3.2.
+      joined=$(awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' <<<"$cmd") ||
+        verdict deny "no-merge could not read the command, so it blocks this call."
+      flat=$(tr '\n' ' ' <<<"$joined") || verdict deny "no-merge could not read the command, so it blocks this call."
+      # Flags (and a value each) may sit around "pr": gh -R o/r pr merge. A flag or
+      # value may hold quoted parts: gh -R "o/r" or gh --repo="o r".
+      dq='"[^"]*"'
+      sq="'[^']*'"
+      word="([^[:space:]\"']|$dq|$sq)"
+      flags="([[:space:]]+-$word+([[:space:]]+([^-[:space:]\"']|$dq|$sq)$word*)?)*"
       # A here-string, not a pipe: grep -q stops at the first match, and under pipefail
       # the writer's broken pipe on a long command would fail the test and pass a merge.
-      if grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)" <<<"$cmd"; then
+      if grep -Eq "(^|[^[:alnum:]_.-])gh${flags}[[:space:]]+pr${flags}[[:space:]]+merge([[:space:]]|\$)" <<<"$joined"; then
         verdict deny "$merge"
       fi
-      api='(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*pulls/[^/[:space:]]+/merge([^[:alnum:]_]|$)'
-      if grep -Eq "$api" <<<"$cmd"; then verdict deny "$merge"; fi
+      api='(^|[^[:alnum:]_.-])gh[[:space:]]+api[[:space:]].*'
+      if grep -Eq "${api}pulls/[^/[:space:]]+/merge([^[:alnum:]_]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
+      if grep -Eq "${api}repos/[^/[:space:]]+(/[^/[:space:]]+)?/merges([^[:alnum:]_]|\$)" <<<"$flat"; then verdict deny "$merge"; fi
+      if grep -Eq "${api}(mergePullRequest|enablePullRequestAutoMerge|mergeBranch|enqueuePullRequest)" <<<"$flat"; then verdict deny "$merge"; fi
       verdict pass
       ;;
-    mcp__ccd_pr__set_auto_merge) verdict deny "$merge" ;;
-    *) verdict pass ;;
+    *)
+      if [[ $tool =~ $mcp_merge ]]; then verdict deny "$merge"; fi
+      verdict pass
+      ;;
   esac
 }
 
