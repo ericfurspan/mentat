@@ -392,6 +392,14 @@ check "the own pre-commit hook does not run when Mentat's hook refuses" '[ "$rc"
 reset; stage_clean ownonly; h=$(head_of)
 M commit -q -m "maintainer, own hook only"; rc=$?
 check "the maintainer's git runs the repository's own pre-commit hook alone" '[ "$rc" = 0 ] && [ -e "$STUB/gitdir-commit.args" ] && [ ! -e "$STUB/calls" ] && [ -z "$(cat "$STUB/gitdir-commit.env")" ]'
+# An exported CDPATH does not hide the repository's own hook, which still gets it.
+cp -p "$repo/.git/hooks/pre-commit" "$tmp/pre-commit.keep"
+printf '#!/bin/sh\nprintf "%%s" "${CDPATH-unset}" >"$STUB/own-cdpath"\n' >"$repo/.git/hooks/pre-commit"
+reset; stage_clean cdpath; h=$(head_of)
+(export CDPATH=.; A commit -q -m "with CDPATH"); rc=$?
+check "with CDPATH=. exported, the repository's own pre-commit hook runs and still sees CDPATH" \
+  '[ "$rc" = 0 ] && [ "$(head_of)" != "$h" ] && [ "$(cat "$STUB/own-cdpath" 2>/dev/null)" = . ]'
+mv "$tmp/pre-commit.keep" "$repo/.git/hooks/pre-commit"
 
 # What the own pre-push hook gets through Mentat's hook is what git hands it directly.
 reset; A commit -q --allow-empty -m "to push"
