@@ -56,7 +56,7 @@ Sessions this session started ask the maintainer nothing (`mentat:build` "Starte
 - An answer to a hold, an objection included, reaches the session in the maintainer's exact words, and that session records it.
 - For a backlog write a session sends up (`mentat:build` "Forwarded writes"), read the item's current state and make the write only from the maintainer's own words for that exact change; with none, or any doubt, ask. Keep this session's permission checks and Mentat's prohibitions, and report the verified result back.
 
-When a session's message names an item's pull request, set the item `pr` with it.
+When a session's message names an item's pull request, set an item still at `handed` or `confirmed` to `pr` with it.
 
 ## Redirects
 
