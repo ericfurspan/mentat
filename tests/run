@@ -110,7 +110,7 @@ $o|Notes|the maintainer's word to stop planning, and any to pause new builds, wi
 $b|Build sessions|A build session is mid-run from its start until it sends its final message (\`mentat:build\` step 8)
 $b|Build sessions|When no build session is mid-run, a fresh build session starts for them
 $b|Holds|A merge passed on to a build session waits for its after-merge reply ("After merge"): no build session starts and no item joins a run until it arrives.
-plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line, with,
+plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line and the copied spec's fingerprint
 skills/backlog/records.md|Agent records|replaces the answer and keeps that line
 skills/backlog/records.md|Agent records|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/plan/SKILL.md||Nothing is implemented before the maintainer agrees; the one exception is an item \`mentat-lead:orchestrate\` agrees by default.
