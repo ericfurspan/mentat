@@ -41,7 +41,8 @@ own_hook() {
     IFS= read -r common <"$gitdir/commondir" || common=""
     case "$common" in "") common=$gitdir ;; /*) ;; *) common=$gitdir/$common ;; esac
   else common=$gitdir; fi
-  common=$(cd "$common" 2>/dev/null && pwd -P) || common=$gitdir
+  # An exported CDPATH would make cd print the folder too; the own hook still gets it.
+  common=$(unset CDPATH; cd "$common" 2>/dev/null && pwd -P) || common=$gitdir
   key="$name $common"
   case "$nl${MENTAT_OWN_HOOK:-}$nl" in *"$nl$key$nl"*) exit 0 ;; esac
   # --worktree reads this worktree's config.worktree where extensions.worktreeConfig is

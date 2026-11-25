@@ -16,7 +16,10 @@
 # its parents (--diff-merges=remerge, git 2.36 or later; an older git refuses), and one
 # of three or more parents, which remerge does not show, on its diff from git's own merge
 # of its parents built with git merge-tree where it can, else from its first
-# parent. Other branches and tags pass, force pushes and deletions included. Then it runs the
+# parent. The full messages of the outgoing commits, merges included, and of each pushed
+# annotated tag are scanned too, once for all refs, as text named "commit messages"; a
+# finding, a failed scan or messages git cannot list refuse. Other branches and tags
+# pass, force pushes and deletions included. Then it runs the
 # repository's own pre-push hook (own-hook.sh) with the same arguments and ref lines.
 # Git hooks cannot ask, so each check refuses. This is a net for common mistakes, not a
 # security boundary.
@@ -89,7 +92,7 @@ auto_merge() {
   [ -n "$tree" ] && printf '%s\n' "$tree"
 }
 
-diffs=""
+diffs="" messages=""
 while read -r _ lsha rref rsha <&3; do
   [ -n "$rref" ] || continue
   if [ -n "$empty" ] && [ "${lsha//0/}" != "" ]; then
@@ -112,6 +115,22 @@ while read -r _ lsha rref rsha <&3; do
     --src-prefix=a/ --dst-prefix=b/ --format='commit %H' --stdin --) ||
     refuse "git could not list the outgoing commits of $rref, so they were not scanned for secrets."
   [ -z "$out" ] || diffs+=$out$'\n'
+  # shellcheck disable=SC2086
+  out=$(printf '%s\n' "$lsha" $old $have | git log --format=%B --stdin --) ||
+    refuse "git could not list the messages of the outgoing commits of $rref, so they were not scanned for secrets."
+  [ -z "$out" ] || messages+=$out$'\n'
+  # An annotated tag's message, and that of any tag it names.
+  t=$lsha
+  while :; do
+    type=$(git cat-file -t "$t" 2>/dev/null) ||
+      refuse "git could not read the type of an object pushed to $rref, so its tag message was not scanned for secrets."
+    [ "$type" = tag ] || break
+    out=$(git cat-file tag "$t") ||
+      refuse "git could not list the messages of the tag $rref, so they were not scanned for secrets."
+    messages+=${out#*$'\n\n'}$'\n'
+    # The first header line names the object the tag points to.
+    t=${out%%$'\n'*} t=${t#object }
+  done
   # Remerge shows nothing for a merge of three or more parents, so each is scanned on its
   # diff from git's own merge of its parents, else from its first parent.
   # shellcheck disable=SC2086
@@ -132,6 +151,12 @@ case $? in
   0) ;;
   1) refuse "gitleaks flags a likely secret in the outgoing commits:"$'\n'"$hits"$'\n'"Remove it from the branch's history, or ask the maintainer to push it." ;;
   *) refuse "the secret scan of the outgoing commits could not run (run mentat check)." ;;
+esac
+hits=$(printf '%s' "$messages" | "$scan" --text "commit messages")
+case $? in
+  0) ;;
+  1) refuse "gitleaks flags a likely secret in the messages of the outgoing commits or tags:"$'\n'"$hits"$'\n'"Reword the commit or tag, or ask the maintainer to push it." ;;
+  *) refuse "the secret scan of the outgoing commit and tag messages could not run (run mentat check)." ;;
 esac
 # shellcheck source=/dev/null
 { [ -f "$here/../own-hook.sh" ] && . "$here/../own-hook.sh"; } ||
