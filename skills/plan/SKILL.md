@@ -45,7 +45,7 @@ A chat request's `Agree and build now` goes on in this session, unless `../build
 ## Decisions
 
 - The maintainer decides goals, scope, constraints, irreversible trade-offs, budgets and limits, and which independent work comes first. The session settles the rest, such as approach, code, tests, wording, splitting work and the order of dependent work, and logs each call in the pull request, or on the item when there is none.
-- Check the facts a question rests on first, and its recommended answer against the maintainer's earlier answers, goals and recorded objections; ask a conflict as revisiting, never override it silently.
+- Check the facts a question rests on first, and any recommendation against the maintainer's earlier answers, goals and recorded objections, adopted plan-check points and the plan's answers to objections; correct a conflict or ask it as revisiting, never override it silently.
 - Ask one decision per question, about what they get, pay or risk, explaining any name they may not know, with answers covering the outcomes they might want, the recommended one first, with why.
 - Prompt form, when one sentence says it all: one `AskUserQuestion` prompt of about 25 words, options of about 12, with a not-ready option that records nothing and opens a talk.
 - In chat, name a pull request "PR #N" with its item's id, if any, beside it, and an item by its full id.

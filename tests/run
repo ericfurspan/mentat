@@ -155,7 +155,7 @@ skills/backlog/agent-records.md|Decision lines|each objection its own clause say
 skills/backlog/agent-records.md|Decision lines|With GitHub issues it is in Claude Code's words, as \`records.md\` says.
 skills/plan/SKILL.md||and no objection of the maintainer's recorded for the work (\`../backlog/agent-records.md\` "Decision lines"), such as fixing a typo)
 $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:plan\` step 7)
-skills/plan/SKILL.md|Decisions|ask a conflict as revisiting, never override it silently.
+skills/plan/SKILL.md|Decisions|and any recommendation against the maintainer's earlier answers, goals and recorded objections, adopted plan-check points and the plan's answers to objections; correct a conflict or ask it as revisiting, never override it silently.
 $o|Relays|An objection of the maintainer's that this session hears at a hold reaches the build session in their exact words, as any answer to a hold does, and that session records it; one heard at a close without merging this session records as \`after-ready.md\` in \`mentat:review\`'s folder says.
 skills/backlog/item-reads.md|The full read|A read to plan or propose an item also reads the decisions lines of each item whose work moved to it, as the item names it.
 skills/plan/session.md||the decisions line recording the maintainer's objections (\`SKILL.md\` step 7)
