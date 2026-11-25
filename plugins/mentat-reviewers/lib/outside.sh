@@ -21,7 +21,13 @@ review_body() {
 outside_runner() {
   local final
   adapter_go review
-  result_line "$(last_line "$reply")" || adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")"
+  if ! result_line "$(last_line "$reply")"; then
+    # Kept as <name>.partial, printed and read for findings but never posted: the reply
+    # did not end as a review does.
+    localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ${adapter_roots[@]+"${adapter_roots[@]}"} &&
+      cp "$reply" "$res/$name.partial"
+    adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")"
+  fi
   reviewer_record "$name" ok
   localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ${adapter_roots[@]+"${adapter_roots[@]}"} ||
     adapter_fail "could not rewrite the paths in $adapter_display's reply" "" none
@@ -44,7 +50,7 @@ outside_result() {
 outside_review() {
   local pr repo info head base title body top tmp mb issues request request_fp me lines n result url held now kind sha res_word clean="" any=no
   # shellcheck disable=SC2034 # run_pids is set by adapters_run and read by adapters_cancel
-  local tree data res="" run_pids="" names
+  local tree data res="" run_pids="" names f
   review_args "" "$@"
   case "$pr" in '' | *[!0-9]*) die "$OUTSIDE_USAGE" 64 ;; esac
   review_timeout
@@ -98,17 +104,23 @@ outside_review() {
   # Each reply is printed before the wait for CI, so findings are on hand even when
   # nothing is posted; then one summary line per reviewer.
   for n in $names; do
-    if [ -s "$res/$n.reply" ]; then printf '## %s\n\n' "$n"; cat "$res/$n.reply"; printf '\n'; fi
+    for f in "$res/$n.reply" "$res/$n.partial"; do
+      if [ -s "$f" ]; then printf '## %s\n\n' "$n"; cat "$f"; printf '\n'; fi
+    done
     adapter_local_lines "$n"
   done
-  # A reviewer that did not finish but whose kept reply marks a finding, (blocking) or
-  # (non-blocking) as the review brief asks, counts toward the findings exit: those
-  # findings still need sorting.
+  # A reviewer that did not finish but whose kept reply, or reply with no result line,
+  # marks a finding, (blocking) or (non-blocking) as the review brief asks, counts toward
+  # the findings exit: those findings still need sorting.
   for n in $names; do
     result=$(outside_result "$n")
     printf '%s: %s\n' "$n" "$result"
     [ "$result" != findings ] || any=yes
-    case "$result" in "did not finish"*) grep -q -E '\((non-)?blocking\)' "$res/$n.reply" 2>/dev/null && any=yes ;; esac
+    case "$result" in "did not finish"*)
+      for f in "$res/$n.reply" "$res/$n.partial"; do
+        [ -s "$f" ] && grep -q -E '\((non-)?blocking\)' "$f" && any=yes
+      done ;;
+    esac
   done
   wait_for_ci "$repo" "$head" "" "$pr" "mentat review --outside"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"

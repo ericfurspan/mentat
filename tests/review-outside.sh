@@ -70,6 +70,7 @@ fi
 # A folder where the path rewrite writes its copy of the reply, so the rewrite fails.
 [ -f "$STUB/$n.block_rewrite" ] && mkdir "$(dirname "$2")/reply.localized"
 if [ -f "$STUB/$n.$1" ]; then cat "$STUB/$n.$1"; exit 0; fi
+[ -f "$STUB/$n.no_result" ] && { printf '%s/README:1 says change (blocking)\n' "$(pwd -P)"; exit 0; }
 if [ "$1" = opinion ]; then printf 'Fine.\n\nSECOND OPINION VERDICT: DO IT\n'; exit 0; fi
 case "$n" in
   alpha) printf '%s/README:1 says change (blocking)\n\nREVIEW RESULT: FINDINGS\n' "$(pwd -P)" ;;
@@ -208,6 +209,8 @@ check "an INCOMPLETE reply did not finish, and its reply is still printed and fo
 listing "beta"
 reset; printf 'README:1 says change (blocking)\nCould not read the rest.\n\nREVIEW RESULT: INCOMPLETE - lib could not be read\n' >"$STUB/beta.review"; rc=$(run 7)
 check "an INCOMPLETE reply holding findings did not finish, and the run exits 2 as for findings" '[ "$rc" = 2 ] && posted && row "beta: did not finish (Beta says the review is incomplete)" && grep -qxF "README:1 says change (blocking)" "$STUB/out" && said "The outside review posted findings on $H: https://example.test/comment"'
+reset; touch "$STUB/beta.no_result"; rc=$(run 7)
+check "a reply holding findings with no result line did not finish, is printed with its paths rewritten, not folded, and the run exits 2" '[ "$rc" = 2 ] && posted && row "beta: did not finish (Beta'"'"'s reply has no final REVIEW RESULT line)" && grep -qxF "README:1 says change (blocking)" "$STUB/out" && ! grep -q "<details>" "$STUB/comment"'
 listing "alpha,beta"
 # Failures in a row, keyed by the adapter's name: the second in a row tells the maintainer now.
 reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(run 7)
