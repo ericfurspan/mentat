@@ -27,15 +27,22 @@ printf '[user]\n\tname = t\n\temail = t@t\n[init]\n\tdefaultBranch = main\n[prot
 # ext <path>: a URL for the repository at <path> through git's ext transport.
 ext() { printf 'ext::git %%s %s' "$(printf '%s' "$1" | sed -e 's/%/%%/g' -e 's/ /% /g')"; }
 
-# gitleaks: records its arguments and stdin, prints text that must never reach the
-# output, and writes a JSON report to --report-path. Each stdin line holding
-# stubmatchedtext is a finding of stub-rule. Exits with --exit-code on a finding, else
-# 0. $STUB/error: fails with no report. $STUB/bad_report: a finding with a report that
-# is not JSON.
+# gitleaks: records its arguments in $STUB/calls and each run's stdin in its own file,
+# $STUB/run.<n>.diff for a diff (its first line "diff --git ..." or "commit <id>"), else
+# $STUB/run.<n>.text (a scan --text run, such as commit messages). It prints text that
+# must never reach the output, and writes a JSON report to --report-path. Each stdin
+# line holding stubmatchedtext is a finding of stub-rule. Exits with --exit-code on a
+# finding, else 0. $STUB/error: fails with no report. $STUB/text_error: a text run
+# fails with no report. $STUB/bad_report: a finding with a report that is not JSON.
 cat >"$tmp/bin/gitleaks" <<'STUBEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB/calls"
-cat >"$STUB/stdin"
+n=$(wc -l <"$STUB/calls" | tr -d ' ')
+cat >"$STUB/run.$n"
+kind=text
+head -n 1 "$STUB/run.$n" | grep -qE '^(diff --git |commit [0-9a-f]{40}$)' && kind=diff
+in=$STUB/run.$n.$kind
+mv "$STUB/run.$n" "$in"
 echo "stubgitleaksoutput stubmatchedtext"
 echo "stubgitleaksoutput stubmatchedtext" >&2
 report="" code=1
@@ -47,8 +54,9 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ ! -f "$STUB/error" ] || exit 1
+[ ! -f "$STUB/text_error" ] || [ "$kind" != text ] || exit 1
 if [ -f "$STUB/bad_report" ]; then echo "stubmatchedtext" >"$report"; exit "$code"; fi
-lines=$(grep -an stubmatchedtext "$STUB/stdin" | cut -d: -f1)
+lines=$(grep -an stubmatchedtext "$in" | cut -d: -f1)
 if [ -z "$lines" ]; then echo '[]' >"$report"; exit 0; fi
 printf '%s\n' "$lines" | jq -R 'tonumber | {RuleID: "stub-rule", StartLine: ., File: "", Secret: "stubmatchedtext", Match: "token = stubmatchedtext"}' | jq -s . >"$report"
 exit "$code"
@@ -182,9 +190,50 @@ check "an outgoing commit that adds a secret is refused, naming the file, even i
   '[ "$rc" != 0 ] && [ -z "$(remote_head feat/leak)" ] && grep -qF "stub-rule in leak.txt" "$STUB/out" && no_leak'
 reset; git -C "$repo" checkout -q feat/x
 A push -q origin feat/x:feat/clean; rc=$?
-check "outgoing commits already on the remote are not scanned again" '[ "$rc" = 0 ] && { [ ! -e "$STUB/stdin" ] || ! grep -q "token = stubmatchedtext" "$STUB/stdin"; }'
+check "outgoing commits already on the remote are not scanned again" '[ "$rc" = 0 ] && ! cat "$STUB"/run.*.diff 2>/dev/null | grep -q "token = stubmatchedtext"'
 # A merge commit is scanned on what its resolution changed. g: git for setup, with none of Mentat's hooks.
 g() { git -C "$repo" "$@" >/dev/null 2>&1; }
+# The messages of outgoing commits, merges included, and of pushed annotated tags are
+# scanned once, as text, across all refs.
+printf 'subject\n\ntoken = stubmatchedtext\n' >"$tmp/hit-msg"
+runs() { set -- "$STUB"/run.*."$1"; if [ -e "$1" ]; then echo $#; else echo 0; fi; } # runs <diff|text>: how many
+msg_refused() { # msg_refused <remote ref>: refused for the messages, nothing pushed, no match shown
+  [ "$rc" != 0 ] && ! git --git-dir="$tmp/origin.git" rev-parse -q --verify "$1" >/dev/null &&
+    grep -qF "stub-rule in commit messages" "$STUB/out" && grep -q "Reword the commit or tag" "$STUB/out" && no_leak
+}
+g checkout -q -b feat/msg1 feat/x; g commit -q --allow-empty -F "$tmp/hit-msg"
+reset; A push -q origin feat/msg1; rc=$?
+check "an outgoing commit whose message holds a secret is refused, naming the rule only" 'msg_refused refs/heads/feat/msg1'
+g checkout -q -b feat/msg2a feat/x; g commit -q --allow-empty -m "clean a"
+g checkout -q -b feat/msg2b feat/x; g commit -q --allow-empty -F "$tmp/hit-msg"
+reset; A push -q origin feat/msg2a feat/msg2b; rc=$?
+check "a secret in the message of a commit on the second ref of a push refuses the whole push, scanning the messages once" \
+  'msg_refused refs/heads/feat/msg2b && [ -z "$(remote_head feat/msg2a)" ] && [ "$(runs text)" = 1 ]'
+g checkout -q -b feat/msg3 feat/x; g commit -q --allow-empty -m "clean three"
+g merge --no-ff -F "$tmp/hit-msg" feat/msg2a
+reset; A push -q origin feat/msg3; rc=$?
+check "a secret in the message of an outgoing merge commit is refused" \
+  '[ "$(git -C "$repo" rev-list --parents -n 1 feat/msg3 | wc -w)" -eq 3 ] && msg_refused refs/heads/feat/msg3'
+g checkout -q feat/x; g tag -a -F "$tmp/hit-msg" msg-tag feat/x
+reset; A push -q origin msg-tag; rc=$?
+check "a pushed annotated tag whose message holds a secret is refused" 'msg_refused refs/tags/msg-tag'
+g tag -d msg-tag
+g checkout -q -b feat/msg4 feat/x; g commit -q --allow-empty -m "clean four"
+reset; touch "$STUB/text_error"; A push -q origin feat/msg4; rc=$?
+check "a failing scan of the messages alone refuses the push" \
+  '[ "$rc" != 0 ] && [ -z "$(remote_head feat/msg4)" ] && grep -q "could not run" "$STUB/out" && [ "$(runs diff)" = 1 ] && no_leak'
+# A git that cannot list the messages: the hook run directly, so git's own exec path
+# does not come before the shim on PATH.
+mkdir "$tmp/nomsg"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" != --format=%%B ] || exit 128; done\nexec "%s" "$@"\n' "$(command -v git)" >"$tmp/nomsg/git"
+chmod +x "$tmp/nomsg/git"
+reset; (cd "$repo" && printf 'refs/heads/feat/msg4 %s refs/heads/feat/msg4 %040d\n' "$(git rev-parse feat/msg4)" 0 |
+  PATH="$tmp/nomsg:$PATH" "$mentat_hooks/pre-push" origin "$(ext "$tmp/origin.git")") >"$STUB/out" 2>&1; rc=$?
+check "a failure to list the outgoing messages refuses the push" '[ "$rc" != 0 ] && grep -q "could not list the messages" "$STUB/out" && no_leak'
+reset; A push -q origin feat/msg4; rc=$?
+check "a push with clean messages goes through, its messages scanned" \
+  '[ "$rc" = 0 ] && [ "$(remote_head feat/msg4)" = "$(git -C "$repo" rev-parse feat/msg4)" ] && [ "$(runs text)" = 1 ] && grep -q "clean four" "$STUB"/run.*.text'
+g checkout -q feat/x
 g checkout -q -b feat/m1 feat/x; printf 'x\n' >"$repo/m.txt"; g add m.txt; g commit -q -m "m base"
 g checkout -q -b feat/m2; printf 'two\n' >"$repo/m.txt"; g commit -q -am two
 g checkout -q feat/m1; printf 'one\n' >"$repo/m.txt"; g commit -q -am one
