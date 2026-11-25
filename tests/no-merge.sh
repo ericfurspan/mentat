@@ -329,3 +329,39 @@ nolib() { jq -n --arg d "$onrepo" --arg c "$1" '{tool_name: "Bash", cwd: $d, too
 check "without lib/agent-merge.sh the allowed form is denied as today" '[ "$(nolib "gh pr merge 7 --merge --match-head-commit $ok" | jq -r .hookSpecificOutput.permissionDecisionReason)" = "$today" ]'
 check "without lib/agent-merge.sh other commands pass" '[ "$(nolib "gh pr view 7")" = "{}" ]'
 check "with the setting on, still reads nothing from GitHub" '[ ! -f "$STUB/calls" ]'
+
+# 6i: on, what the hook denies on the merge hook's wider matching stays denied: the allowed
+# form split by a backslash-newline, with a quoted number, flag or commit, followed by a
+# second command on the next line, and an MCP merge tool.
+bs='\'
+while IFS= read -r cmd; do
+  cmd=${cmd//SHA/$ok}
+  cmd=${cmd//BS/$bs}
+  cmd=${cmd//NL/$nl}
+  check "on: still denies a continued or quoted form: ${cmd//$nl/<nl>}" '[ "$(in_decision "$onrepo" "$cmd")" = deny ]'
+done <<'WIDER'
+gh pr merge 7 --merge BSNL--match-head-commit SHA
+gh pr merge 7 BSNL--merge --match-head-commit SHA
+gh pr merge 7 --merge --match-head-commit BSNLSHA
+gh pr merge BSNL7 --merge --match-head-commit SHA
+gh BSNLpr merge 7 --merge --match-head-commit SHA
+gh pr merge 7 --merge --match-head-commit SHA BSNL
+gh pr merge "7" --merge --match-head-commit SHA
+gh pr merge '7' --merge --match-head-commit SHA
+gh pr merge 7 "--merge" --match-head-commit SHA
+gh pr merge 7 '--merge' --match-head-commit SHA
+gh pr merge 7 --merge "--match-head-commit" SHA
+gh pr merge 7 --merge --match-head-commit "SHA"
+gh pr merge 7 --merge --match-head-commit 'SHA'
+gh pr merge 7 --merge --match-head-commit=SHA
+gh pr merge 7 "--merge" --match-head-commit="SHA"
+gh pr merge 7 --merge --match-head-commit SHANLecho hi
+gh pr merge 7 --merge --match-head-commit SHANLgh pr merge 8 --squash
+echo hiNLgh pr merge 7 --merge --match-head-commit SHA
+WIDER
+mcp_out() { jq -n --arg t "$1" --arg d "$onrepo" '{tool_name: $t, cwd: $d, tool_input: {}}' | "$hook"; }
+for mcp in mcp__github__merge_pull_request mcp__ccd_pr__set_auto_merge mcp__example__enable_pr_auto_merge; do
+  check "on: still denies the MCP tool $mcp with today's reason" '[ "$(mcp_out "$mcp" | jq -r .hookSpecificOutput.permissionDecisionReason)" = "$today" ]'
+done
+
+[ "$failures" -eq 0 ]
