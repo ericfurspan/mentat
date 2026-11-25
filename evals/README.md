@@ -46,4 +46,4 @@ For a rewrite stage, compare each steady case at the stage's head with its basel
 - The comparison uses the baseline's Claude Code version, model and judge. When any of them differs, the stage first runs the suite on its base commit in the same sitting and compares against that run instead.
 - A stage that renames something a grader names edits that grader in the same pull request, names the edit, and runs the case on the base commit with the old name and on the head with the new one.
 
-This rule is the default. It is confirmed or tightened from the baseline's numbers before the first rewrite stage, and never changed after a stage's result.
+This rule was confirmed from the committed baseline's numbers before the first rewrite stage: against that baseline every case is 3 of 3 in both runs, so each case keeps its score at 3 of 3, or at 5 of 6 after the 3 more runs; the 2-of-3 branch applies only when a base-commit run replaces the baseline. It is never changed after a stage's result.
