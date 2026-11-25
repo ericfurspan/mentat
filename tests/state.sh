@@ -203,6 +203,10 @@ check "u: orchestrator set over a marked id: the new id with no mark" '[ "$rc" =
 rc=$(st orchestrator set o-3)
 rc2=$(st orchestrator)
 check "u: orchestrator set over an unmarked id: the new id with no mark" '[ "$rc" = 0 ] && out_is "o-3 running"'
+put '{"orchestrator":{"id":"o-3","ended":true,"later":"kept"}}'
+rc=$(st orchestrator set o-4)
+rc2=$(st orchestrator)
+check "1, u: orchestrator set keeps an unknown field inside orchestrator, the new id with no mark" '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && out_is "o-4 running" && [ "$(q .orchestrator.later)" = kept ] && [ "$(q .orchestrator.ended)" = false ]'
 fresh
 before=$(sum)
 rc=$(st orchestrator ended o-1)

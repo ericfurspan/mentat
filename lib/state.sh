@@ -112,7 +112,7 @@ state_locked() {
 }
 
 state_op_orchestrator_set() {
-  state_q -c --arg id "$1" '.orchestrator = {id: $id, ended: false}'
+  state_q -c --arg id "$1" '.orchestrator = ((.orchestrator // {}) + {id: $id, ended: false})'
   state_json=$state_r
   state_out="recorded orchestrator $1"
 }
