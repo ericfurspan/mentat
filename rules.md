@@ -25,7 +25,7 @@ In chat, name a pull request "PR #N" with its item's id, if any, beside it, and 
 
 Hold a recommendation, citing the record it rests on, unless new facts or found errors appear; reverse only after a fresh-context check.
 
-After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; a block only they can clear arises (external, irreversible or a credential); or an agreed manual check is due. Log other calls in the pull request and one batch summary.
+After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; a block only they can clear arises (external, irreversible or a credential); or an agreed manual check is due. Log other calls in the pull request and in one summary to the maintainer: `mentat:build`'s final message in a build run, else the "Ready to merge" message.
 
 Outside the messages a skill requires, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
 
