@@ -40,6 +40,7 @@ line=$(snap "$W"); rc=$?
 check "snapshot of a clean main checkout: exit 0, four tokens, branch, HEAD, clean" '[ "$rc" = 0 ] && printf "%s" "$line" | grep -Eq "$form" &&
   [ "$(printf "%s" "$line" | cut -d " " -f 1-3)" = "main $(head_of) clean" ]'
 check "the linked worktree under .claude/worktrees does not count as a change" '[ "$(printf "%s" "$line" | cut -d " " -f 3)" = clean ]'
+check "snapshot of a clean checkout: the hash is that of empty output" '[ "${line##* }" = "$(printf "" | shasum -a 256 | cut -d " " -f 1)" ]'
 line_l=$(snap "$L"); rc=$?
 check "snapshot from a linked worktree, no checkout named: the main checkout" '[ "$rc" = 0 ] && [ "$line_l" = "$line" ]'
 line_h=$(snap "$W" "$L"); rc=$?
@@ -113,6 +114,7 @@ check "verify, detached at the snapshot, on a branch now: exit 1 naming the bran
 printf 'x\n' >"$W/left over.txt"
 line=$(snap "$W")
 check "snapshot, an untracked file: dirty" '[ "$(printf "%s" "$line" | cut -d " " -f 3)" = dirty ]'
+check "snapshot, dirty: the hash is that of git status --porcelain's exact output" '[ "${line##* }" = "$(git -C "$W" status --porcelain -- ":(exclude).claude/worktrees" | shasum -a 256 | cut -d " " -f 1)" ]'
 rc=$(verify "$W" "$line")
 check "verify, dirty at the snapshot and unchanged: exit 0, says it was not clean" '[ "$rc" = 0 ] && said "not clean"'
 printf 'y\n' >>"$W/left over.txt"

@@ -26,7 +26,8 @@ main_checkout() {
 
 # Reads checkout $1 as the main-checkout check notes it. Sets wt_top, wt_branch (the
 # branch, or detached), wt_head, wt_status (git status --porcelain, without
-# .claude/worktrees), wt_clean (clean or dirty) and wt_hash (the SHA-256 of wt_status).
+# .claude/worktrees, less its final newline), wt_clean (clean or dirty) and wt_hash (the
+# SHA-256 of that command's exact output).
 # Returns 1 when the checkout cannot be read.
 wt_read() { # $1 checkout
   wt_top="" wt_branch="" wt_head="" wt_status="" wt_clean="" wt_hash=""
@@ -34,8 +35,11 @@ wt_read() { # $1 checkout
   if ! wt_top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || [ -z "$wt_top" ]; then return 1; fi
   wt_head=$(git -C "$wt_top" rev-parse --verify -q HEAD) || return 1
   wt_branch=$(git -C "$wt_top" symbolic-ref -q --short HEAD) || wt_branch=detached
-  wt_status=$(git -C "$wt_top" status --porcelain -- ':(exclude).claude/worktrees') || return 1
+  # The x keeps the output's trailing newline, so the hash is of git's exact bytes.
+  wt_status=$(git -C "$wt_top" status --porcelain -- ':(exclude).claude/worktrees' && printf x) || return 1
+  wt_status=${wt_status%x}
   if ! wt_hash=$(printf '%s' "$wt_status" | shasum -a 256 | cut -d ' ' -f 1) || [ ${#wt_hash} != 64 ]; then return 1; fi
+  wt_status=${wt_status%$'\n'}
   wt_clean=clean
   [ -z "$wt_status" ] || wt_clean=dirty
 }
