@@ -12,10 +12,10 @@ Where the repository turns on `MENTAT_AGENT_MERGE` (`docs/settings.md`), the ses
 
 Then run `gh pr merge <N> --merge --match-head-commit <the head's full 40-character commit>` once, as the whole command: no other flag (`--auto` and `--admin` included), no other command beside it. If the hook denies it or it fails, say so in one line, send the Ready line, and stop: the maintainer merges, and the session neither retries nor tries another form.
 
-Merged, #N gets the line "Merged: #N (<item id>)", without the parentheses when #N has no item, in place of the Ready line, and then the steps `after-ready.md` gives for a merged #N. It is no Ready line, so it gets no push.
+Merged, #N gets the line "Merged: #N (<item id>)", without the parentheses when #N has no item, in place of the Ready line; a session no other session started then does the steps `after-ready.md` gives for a merged #N, and a started one does them first and sends the line with its after-merge reply. It is no Ready line, so it gets no push.
 
 In every other case the Ready line goes out as "Final check" gives it, and, when `mentat agent-merge` printed `agent merge: waits for the maintainer (<reasons>)` or failed, with one more sentence, "Waits for the maintainer: <reasons>.", naming the reasons it printed or that it could not be read. With `agent merge: off` it adds nothing. An open manual check (`ready-gate.md`) is no Ready, so nothing merges.
 
 After a compaction or resume between the final check and the merge, run the final check and this again: a #N already merged goes to the merged steps, a closed one to nothing, and a head that moved to a new review (`SKILL.md` step 1).
 
-In a session another session started, the Merged line goes to its starting session with the after-merge reply (`after-ready.md`), in one message. Inside a `mentat:build` run, the merge happens right after the item's final check, and the run goes on as after any merge.
+In a session another session started, the Merged line goes to its starting session with the after-merge reply (`after-ready.md`), in one message, after the steps. Inside a `mentat:build` run, the merge happens right after the item's final check, and the run goes on as after any merge.
