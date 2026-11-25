@@ -2,5 +2,8 @@
   "enabledPlugins": {
     "mentat-reviewers@mentat": true,
     "mentat-public-text@mentat": true
+  },
+  "env": {
+    "MENTAT_REVIEWERS": "codex,grok"
   }
 }
