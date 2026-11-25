@@ -8,6 +8,8 @@
 
 state_usage="usage: mentat state show | mentat state orchestrator [set <id> | ended <id>] | mentat state owner [<item>] | mentat state session add <id> <item>... | mentat state session end <id> | mentat state session list | mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N] [--held-by TEXT] | mentat state item get <id> | mentat state item list [--stage S] | mentat state note add <hold|question> <text> | mentat state note list [<hold|question>] | mentat state note clear <id> | mentat state can-dispatch"
 state_stages="held handed confirmed not-taken pr ready merged closed"
+# The default of MENTAT_READY_LIMIT, named once here so tests/settings.sh reads it.
+state_ready_default=3
 
 # Test-only overrides, which only tests set: STATE_LOCKF and STATE_FLOCK, the lockf and
 # flock to use (a path that is not an executable counts as not found), and
@@ -194,24 +196,21 @@ state_read() {
 # mentat state can-dispatch: waiting pull requests, the limit and how many items may be
 # handed over. 0 when at least 1, 1 when none, 2 when it cannot answer.
 state_can_dispatch() {
-  local limit default=3 prs counts waiting flight list free digits
+  local limit prs counts waiting flight list free digits
   state_read
-  limit=${MENTAT_READY_LIMIT:-}
-  if [ -z "$limit" ]; then
-    limit=$default
+  # Unset or empty reads as the default, which is a valid limit.
+  limit=${MENTAT_READY_LIMIT:-$state_ready_default}
+  digits=$(printf '%s' "$limit" | sed 's/^0*//')
+  case "$limit" in
+    *[!0-9]*) digits="" ;;
+  esac
+  if [ -z "$digits" ]; then
+    printf 'mentat: MENTAT_READY_LIMIT is not a whole number of 1 or more (%s); using %s\n' "$limit" "$state_ready_default" >&2
+    limit=$state_ready_default
+  elif [ ${#digits} -gt 9 ]; then
+    limit=999999999
   else
-    digits=$(printf '%s' "$limit" | sed 's/^0*//')
-    case "$limit" in
-      *[!0-9]*) digits="" ;;
-    esac
-    if [ -z "$digits" ]; then
-      printf 'mentat: MENTAT_READY_LIMIT is not a whole number of 1 or more (%s); using %s\n' "$limit" "$default" >&2
-      limit=$default
-    elif [ ${#digits} -gt 9 ]; then
-      limit=999999999
-    else
-      limit=$digits
-    fi
+    limit=$digits
   fi
   if ! prs=$(gh pr list --state open --limit 1000 --json number,body 2>/dev/null); then
     die "could not read the open pull requests (gh failed or is not signed in); no count" 2
