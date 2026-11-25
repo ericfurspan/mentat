@@ -39,7 +39,7 @@ adapter_available() {
 # The time limit is MENTAT_REVIEW_TIMEOUT_SECONDS, for every reviewer; Grok's own setting
 # is not read any more, and mentat check says so when it is set.
 adapter_notes() {
-  [ -z "${MENTAT_GROK_TIMEOUT_SECONDS:-}" ] ||
+  [ "${MENTAT_GROK_TIMEOUT_SECONDS+set}" != set ] ||
     printf 'MENTAT_GROK_TIMEOUT_SECONDS is set but not read: MENTAT_REVIEW_TIMEOUT_SECONDS is the one time limit for every reviewer\n'
 }
 

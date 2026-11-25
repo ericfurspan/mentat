@@ -74,6 +74,8 @@ chmod +x "$root/bin/gh" "$root/bin/claude" "$root/bin/gitleaks"
 export PATH="$root/bin:$PATH"
 
 export HOME="$root/home"
+# Set, even empty, it adds a warning: only the cases that set it expect one.
+unset MENTAT_GROK_TIMEOUT_SECONDS
 # An installed and current copy of the git hooks, in use for every case but those that change it.
 unset GIT_CONFIG_COUNT
 export MENTAT_GIT_HOOKS_DIR="$root/installed"
@@ -339,6 +341,8 @@ reset; rc=$(tools_run "$root/noreviewers")
 check "off, with codex and grok not installed: no reviewer line and no warning" 'no_tools && [ "$rc" = 0 ] && grep -qxF "$REVIEWERS_OFF_LINE" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (0 warning(s))" ]'
 reset; rc=$(MENTAT_GROK_TIMEOUT_SECONDS=60 tools_run "$root/reviewers")
 check "MENTAT_GROK_TIMEOUT_SECONDS set: one warning says it is not read, though outside reviewers are off" '[ "$rc" = 0 ] && grep -qxF "WARN: MENTAT_GROK_TIMEOUT_SECONDS is set but not read: MENTAT_REVIEW_TIMEOUT_SECONDS is the one time limit for every reviewer" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
+reset; rc=$(MENTAT_GROK_TIMEOUT_SECONDS= tools_run "$root/reviewers")
+check "MENTAT_GROK_TIMEOUT_SECONDS set but empty: the same one warning" '[ "$rc" = 0 ] && grep -qxF "WARN: MENTAT_GROK_TIMEOUT_SECONDS is set but not read: MENTAT_REVIEW_TIMEOUT_SECONDS is the one time limit for every reviewer" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
 origin_has "$LISTED" || exit 1
 reset; rc=$(tools_run "$root/reviewers")
 check "on in main on origin, though the clone's origin/main says off, listing codex and grok, both available: OK lines, no warning, no tool run" '[ "$rc" = 0 ] && grep -qxF "$REVIEWERS_ON_LINE" "$STUB/out" && grep -qx "OK: outside reviewer codex is listed and available" "$STUB/out" && grep -qx "OK: outside reviewer grok is listed and available" "$STUB/out" && [ ! -f "$STUB/tool_calls" ] && [ "$(last)" = "Check OK (0 warning(s))" ] && [ "$(git -C "$root/cwd" cat-file blob refs/remotes/origin/main:.claude/settings.json)" = "$REVIEWERS_OFF" ]'
