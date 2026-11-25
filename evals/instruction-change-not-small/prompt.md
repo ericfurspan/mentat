@@ -1,5 +1,5 @@
 ---
-description: "Source: mentat:propose, a request that changes what an agent is told in standing agent instructions is not small and gets the plan check; a one-line edit to agent instructions was taken down the small-request path."
+description: "Source: mentat:plan, a request that changes what an agent is told in standing agent instructions is not small and gets the plan check; a one-line edit to agent instructions was taken down the small-request path."
 max_turns: 10
 allowed_tools: [Skill]
 ---

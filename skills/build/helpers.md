@@ -46,4 +46,4 @@ Act only on this session's branches as "Recovery" defines them; leave another se
 
 ## A separate session
 
-A build runs in a separate session only as `mentat:propose` "Starting a build" says.
+A build runs in a separate session only as `mentat:plan` "Starting implementation" says.

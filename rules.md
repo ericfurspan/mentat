@@ -4,7 +4,7 @@ The maintainer owns the repository; Claude Code plans and builds; fresh-context 
 
 Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels, templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
-Call `mentat:propose` before giving a view on or suggesting a change.
+Call `mentat:plan` before giving a view on or suggesting a change.
 
 One builder per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
@@ -19,7 +19,7 @@ Backlog work follows `mentat:backlog`. GitHub records are public-safe (`mentat:b
 ## What goes to the maintainer
 Outcomes, scope, cost and risk are theirs; settle the rest.
 
-Read `mentat:propose`'s `decisions.md` before asking or recommending.
+Read `mentat:plan`'s "Decisions" before asking or recommending.
 
 Only the maintainer's own choice or words count as their answer.
 

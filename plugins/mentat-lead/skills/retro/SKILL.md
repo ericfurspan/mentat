@@ -24,4 +24,4 @@ The maintainer wants to know what would have made the session go better. This ru
    - The recommendation: what to change, and where it would go (the file, the check or the hook).
    - Its evidence from the session in one short line: a short quote, a command and its result, or a link. Quotes never include credentials or tokens.
    Leave out a candidate with no evidence. If nothing is worth changing, say so.
-5. Ask each candidate, file or skip, as `decisions.md` in `mentat:propose`'s folder gives, step 4's lines in the question. The next candidate follows the answer. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones in the backlog (the external backlog where there is one, else issues). Nothing is filed without the maintainer's agreement.
+5. Ask each candidate, file or skip, as `mentat:plan` "Decisions" gives, step 4's lines in the question. The next candidate follows the answer. Once the last candidate is answered, the retro is over, and Claude Code files the agreed ones in the backlog (the external backlog where there is one, else issues). Nothing is filed without the maintainer's agreement.

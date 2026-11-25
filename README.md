@@ -45,7 +45,7 @@ Optional modules install as `<module>@mentat`:
 
 Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
 
-- `/mentat:propose [item id]`: plan with you and start building what you commit.
+- `/mentat:plan [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
 
 [`rules.md`](rules.md) holds the core rules, `skills/` each step's detail.
