@@ -184,6 +184,7 @@ plugins/mentat-linear/skills/linear/SKILL.md|Where the spec lives|An item with n
 skills/pr/SKILL.md||(an older issue or item, agreed before the spec had that name and with no numbered list, is read as each requirement it states)
 skills/plan/session.md||the decisions line recording the maintainer's objections (\`SKILL.md\` step 7)
 skills/plan/session.md||a fold also writes one on the item it folds into, naming this one, and copies there, unchanged and each as its own decisions line, every decisions line of this item that records a maintainer's objection, so objections survive later folds.
+skills/plan/session.md||State it once, with a few words of why for each, in one line above the first question, which then takes the message form, or in the report.
 plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|and under \`Decisions:\` each line of its body's \`## Decisions\` that records an objection of the maintainer's ("Decision lines" in that file), unchanged
 EOF
 if ls docs/adr/0002-*.md >/dev/null 2>&1; then
