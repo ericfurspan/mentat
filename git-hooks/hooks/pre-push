@@ -121,7 +121,10 @@ while read -r _ lsha rref rsha <&3; do
   [ -z "$out" ] || messages+=$out$'\n'
   # An annotated tag's message, and that of any tag it names.
   t=$lsha
-  while [ "$(git cat-file -t "$t" 2>/dev/null)" = tag ]; do
+  while :; do
+    type=$(git cat-file -t "$t" 2>/dev/null) ||
+      refuse "git could not read the type of an object pushed to $rref, so its tag message was not scanned for secrets."
+    [ "$type" = tag ] || break
     out=$(git cat-file tag "$t") ||
       refuse "git could not list the messages of the tag $rref, so they were not scanned for secrets."
     messages+=${out#*$'\n\n'}$'\n'

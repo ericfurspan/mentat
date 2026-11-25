@@ -230,6 +230,16 @@ chmod +x "$tmp/nomsg/git"
 reset; (cd "$repo" && printf 'refs/heads/feat/msg4 %s refs/heads/feat/msg4 %040d\n' "$(git rev-parse feat/msg4)" 0 |
   PATH="$tmp/nomsg:$PATH" "$mentat_hooks/pre-push" origin "$(ext "$tmp/origin.git")") >"$STUB/out" 2>&1; rc=$?
 check "a failure to list the outgoing messages refuses the push" '[ "$rc" != 0 ] && grep -q "could not list the messages" "$STUB/out" && no_leak'
+# A git that cannot read the type of a pushed object, so it cannot tell a tag apart.
+mkdir "$tmp/notype"
+printf '#!/usr/bin/env bash\n[ "$1 $2" != "cat-file -t" ] || exit 128\nexec "%s" "$@"\n' "$(command -v git)" >"$tmp/notype/git"
+chmod +x "$tmp/notype/git"
+g tag -a -m "clean tag" type-tag feat/msg4
+reset; (cd "$repo" && printf 'refs/tags/type-tag %s refs/tags/type-tag %040d\n' "$(git rev-parse type-tag)" 0 |
+  PATH="$tmp/notype:$PATH" "$mentat_hooks/pre-push" origin "$(ext "$tmp/origin.git")") >"$STUB/out" 2>&1; rc=$?
+check "a failure to read the type of a pushed object refuses the push" \
+  '[ "$rc" != 0 ] && grep -q "could not read the type of an object pushed to refs/tags/type-tag" "$STUB/out" && no_leak'
+g tag -d type-tag
 reset; A push -q origin feat/msg4; rc=$?
 check "a push with clean messages goes through, its messages scanned" \
   '[ "$rc" = 0 ] && [ "$(remote_head feat/msg4)" = "$(git -C "$repo" rev-parse feat/msg4)" ] && [ "$(runs text)" = 1 ] && grep -q "clean four" "$STUB"/run.*.text'
