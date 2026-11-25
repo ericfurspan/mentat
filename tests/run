@@ -98,9 +98,9 @@ $o|Planning|the session's own advice against the work does not stand
 $o|Planning|an item agreed for later before stays later, asked nothing here
 $o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second opinion that gave no answer and a plan check retried without its model keep the default
 $o|Planning|Typed \`/mentat:plan\` sessions, chat requests and the small-request path are still asked.
-$o|State|This session keeps its state only in \`mentat state\`, the tracker and the host's session list
+$o|State|State lives only in \`mentat state\`, the tracker and the host's session list
 $o|State|their word to pause new handovers, with any end it names; their word to stop planning
-$o|Start|When the host cannot start or message sessions, this session does not record itself as orchestrator.
+$o|Start|A host that cannot start or message sessions: do not record this session as orchestrator.
 $o|Messages|one line per item agreed by default: its plan check verdict, each point not adopted and why, any second opinion that gave no answer, any plan check retried without its model, and what holds it
 $o|Messages|Nothing else: no start summary, no list of what it told, no pull request closed without merge
 $o|Questions|Record it as a \`question\` note whose text starts \`waiting:\`
