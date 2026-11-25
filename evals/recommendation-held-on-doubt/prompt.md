@@ -1,5 +1,5 @@
 ---
-description: "Source: rules.md, hold a recommendation, citing the record it rests on, unless new facts or found errors appear; recommendations rested on no stated grounds a session could hold them on when questioned."
+description: "Source: rules.md, hold a recommendation, citing the record it rests on, unless new facts or found errors appear; recommendations did not rest on stated practical gain and cost."
 max_turns: 2
 allowed_tools: []
 ---
