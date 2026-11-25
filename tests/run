@@ -784,9 +784,7 @@ if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$o
 # The list holds the files not yet rewritten to the glossary: the change that rewrites a file
 # removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
 # disk fails. A new file is checked from the start.
-not_yet_rewritten="agents/builder.md
-agents/plan-checker.md
-plugins/mentat-lead/skills/grill/CREDITS.md
+not_yet_rewritten="plugins/mentat-lead/skills/grill/CREDITS.md
 plugins/mentat-lead/skills/grill/SKILL.md
 plugins/mentat-lead/skills/orchestrate/SKILL.md
 plugins/mentat-lead/skills/orchestrate/build-sessions.md
