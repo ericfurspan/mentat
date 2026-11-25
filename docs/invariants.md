@@ -95,7 +95,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | The SessionStart hook prints `rules.md` unchanged, under Claude Code's cap on a hook's output, and `hooks.json` runs it once. | `hooks/session-start`, `hooks/hooks.json` | `tests/run` (every eval case relies on it; none tests it); review only |
 | At session start, a problem with the installed git hooks prints one PROBLEM line before the rules, to tell the maintainer before anything else. | `hooks/session-start`, `lib/git-hooks.sh` | `tests/git-hooks.sh`, `tests/run`; review only |
 | Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels and templates; neither it nor the maintainer's own instructions loosens "Approval" or "What agents never do". | `rules.md` | `tests/run` text check against `tests/fixtures/rules-safety.md`; review only |
-| After compaction or resume, reload the current skill and `helpers.md`. | `rules.md` | review only |
+| After compaction or resume, reload the current skill and `mentat:build`'s `helpers.md`. | `rules.md` | review only |
 
 ## This repository's own choices
 
