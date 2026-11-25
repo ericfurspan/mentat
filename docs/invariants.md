@@ -53,7 +53,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | Status headings: the description's first line is the Status line, holding only `Ready`, `In review`, `Blocked: <why>` or `Not reviewed: <why>`, rewritten after every push and whenever the review loop stops. | `skills/pr/SKILL.md`, `skills/review/SKILL.md` "When the loop ends" | review only |
 | Status headings: the description keeps its sections (Built with, Summary, Decisions and Risks when they have lines, Calls made without the maintainer, Test plan, Review details), and Calls made without the maintainer is on every pull request, saying none when empty. | `skills/pr/SKILL.md`, `skills/review/ready-gate.md` | `tests/status.sh` (`mentat status` reports a missing calls section); review only |
 | The review comment headings `mentat status` reads are still written as it reads them. | `lib/review.sh`, `lib/status.sh`, `plugins/mentat-reviewers/lib/outside.sh` | `tests/run` heading check, `tests/status.sh`; review only |
-| The spec fingerprint: recorded at agreement from the spec read back from the tracker, recorded again when an agreed scope change rewrites the spec, and re-recorded by a spec fix; each local review records the request's fingerprint, and a local review that did not cover the current spec needs another round (an outside review on an older spec is disclosed instead). | `skills/backlog/SKILL.md` "Agreement", `skills/review/SKILL.md` "Spec" and "Final check" | `tests/fingerprint.sh`, `tests/status.sh`; review only |
+| The spec fingerprint: recorded at agreement from the spec read back from the tracker, recorded again when an agreed scope change rewrites the spec; each local review records the request's fingerprint, and a local review that did not cover the current spec needs another round (an outside review on an older spec is disclosed instead). | `skills/backlog/SKILL.md` "Agreement", `skills/review/SKILL.md` "Spec" and "Final check" | `tests/fingerprint.sh`, `tests/status.sh`; review only |
 
 ### Planning and build
 
@@ -78,7 +78,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | The main session edits no files. | `rules.md` | `build-main-no-edit` |
 | One builder per pull request at a time, in its worktree. | `rules.md`, `skills/build/helpers.md` "One helper per branch" | `tests/run` (the builder runs in its own worktree); review only |
 | A builder changes neither the main checkout nor the session's own: after each builder both are compared with the note taken before its brief, and on any difference other than a `HEAD` moved only forward along origin's copy of its branch, no further builder starts, neither checkout is changed and the maintainer is told. | `skills/build/helpers.md` "Main-checkout check" | `tests/worktree-check.sh`; review only |
-| The spec fingerprint is checked before a build: an item whose recorded fingerprint, or the one a spec fix re-recorded, differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
+| The spec fingerprint is checked before a build: an item whose recorded fingerprint differs from its current spec's goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | `build-changed-spec-to-planning` |
 | The spec fingerprint is checked before a build: an item with no recorded fingerprint goes back to planning. | `skills/build/SKILL.md` steps 3 and 6 | review only |
 | The build run never merges. | `skills/build/SKILL.md` step 6, `agents/builder.md` | review only |
 

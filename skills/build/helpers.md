@@ -10,7 +10,7 @@ Right before every `mentat:builder` call, a build, a CI fix and a review fix ali
 
 Before fixing a raised problem, Claude Code checks likely related cases in proportion to its scope and reports a shared cause when found, keeping the fix within the agreed scope. A fix it recommends targets the cause the evidence supports; when the cause is unknown, it recommends finding the cause first.
 
-A correction during agreed work does not reopen the spec; a change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks), goes to the maintainer as one question before that part is built. An error a spec fix settles, such as one a builder stops on, the build session fixes before the pull request's first review and names after it, as `../backlog/spec-fixes.md` says. Claude Code follows any correction within the agreed scope at once, and files it as an item only when the maintainer asks.
+A correction during agreed work does not reopen the spec; a change of scope, or an outcome the spec leaves open (what the maintainer gets, pays or risks), goes to the maintainer as one question before that part is built. Claude Code follows any correction within the agreed scope at once, and files it as an item only when the maintainer asks.
 
 ## Worktree
 
