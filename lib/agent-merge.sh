@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2016,SC2020
+# (File-wide: the patterns hold $ and backticks in single quotes on purpose.)
 # The one reader of the agent-merge settings, and what a repository that turns them on
 # allows. Sourced by hooks/no-merge (which decides offline, with no gh and no network) and
 # by bin/mentat (`mentat agent-merge`). It only defines functions.

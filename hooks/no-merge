@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # PreToolUse hook: the maintainer merges. A command that would merge a pull
 # request (gh pr merge, including --auto, or the merge API through gh api) and
-# the desktop app's auto-merge tool are denied. It follows the contract in
+# the desktop app's auto-merge tool are denied, except that a repository that turns on
+# MENTAT_AGENT_MERGE lets one command pass (lib/agent-merge.sh). It follows the contract in
 # hooks/lib/verdict.sh, so it fails closed. This is a net for common mistakes,
 # not a security boundary: other routes exist.
 # shellcheck disable=SC2329 # run_hook calls check.
@@ -13,6 +14,11 @@ set -uo pipefail
   exit 0
 }
 
+# lib/agent-merge.sh: with the repository's MENTAT_AGENT_MERGE on, the one allowed merge
+# command passes (am_hook). Without it, or when it fails to load, this hook denies as before.
+# shellcheck source=lib/agent-merge.sh
+. "${0%/*}/../lib/agent-merge.sh" 2>/dev/null || am_hook() { return 0; }
+
 merge="the maintainer merges; agents never merge a pull request or turn on auto-merge. If this command only mentions a merge in its text, such as a commit message or pull request body, pass that text through a file (-F or --body-file)."
 
 check() {
@@ -20,6 +26,7 @@ check() {
   case "$tool" in
     Bash)
       cmd=$(field '.tool_input.command') || verdict deny "no-merge could not read the command, so it blocks this call."
+      am_hook "$cmd" || true
       # Flags (and an unquoted value each) may sit around "pr": gh -R o/r pr merge.
       flags='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]"'"'"'][^[:space:]"'"'"']*)?)*'
       # A here-string, not a pipe: grep -q stops at the first match, and under pipefail
