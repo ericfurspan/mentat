@@ -92,7 +92,7 @@ $o|Planning|when nothing is open, this session agrees it by default: it skips \`
 $o|Planning|the fingerprint recorded with \`build: now\` as agreed by default
 $o|Planning|no decision of the maintainer's was asked while planning the item (a grill, \`mentat:plan\` step 4 or its skeptic's pass)
 $o|Planning|the plan check gave a verdict and neither it nor any second-opinion tool said \`DON'T\`
-$o|Planning|no hand check would be offered; no material assumption stands; no fast track is proposed; no open maintainer comment bears on the agreement
+$o|Planning|no manual check would be offered; no material assumption stands; no fast track is proposed; no open maintainer comment bears on the agreement
 $o|Planning|the session's own advice against building does not stand
 $o|Planning|an item agreed for later before stays later, asked nothing here
 $o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second-opinion tool that gave no answer and a plan check retried without its model keep the default
