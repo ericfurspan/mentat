@@ -174,7 +174,7 @@ agent_merge_command() {
   risky=$(gh api --paginate "repos/$repo/issues/$pr/comments" | jq -rs --arg me "$me" '
     [.[][] | select(.user.login == $me)
       | select((.body | split("\n")[0] | sub("\r$"; "")) as $h | ($h | startswith("## Local Claude review of ")) or ($h | startswith("## Outside review of ")))
-      | select(.body | test("\\([^()]*high risk[^()]*\\)"; "i"))] | length') || die "could not read the comments on #$pr"
+      | select(.body | test("\\([^()]*high[- ]risk[^()]*\\)"; "i"))] | length') || die "could not read the comments on #$pr"
   [ "$risky" = 0 ] || reasons="$reasons; a review marked a change high risk"
   if [ -z "$reasons" ]; then
     # Only a pull request nothing else holds back waits for CI, which can take a while.

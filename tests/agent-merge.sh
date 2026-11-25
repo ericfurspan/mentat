@@ -313,6 +313,10 @@ fresh; comment mentat-bot "$heading
 check "the mark in another letter case waits" 'waits "high risk"'
 fresh; comment mentat-bot "$heading
 
+- (blocking, high-risk) hooks/x:1 a change that loosens a check"; run_am
+check "the hyphenated mark (blocking, high-risk) waits" 'waits "high risk"'
+fresh; comment mentat-bot "$heading
+
 - (blocking) a plain finding
 - (non-blocking) a note"; run_am
 check "a review without the mark does not wait" '[ "$out" = "agent merge: on" ]'
