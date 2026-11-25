@@ -8,7 +8,10 @@ Where the repository turns on `MENTAT_AGENT_MERGE` (`docs/settings.md`), the ses
 - #N is a pull request this session opened;
 - the Ready message would carry none of the sentences "Final check" adds after the first line (a fast track, a weaker review, a removal or reversal of what the maintainer asked for, a blocking finding answered instead of fixed, advice against the item);
 - no `AGENTS.md` that applies keeps this merge for the maintainer;
-- #N's head is the one the review covered: `mentat status <N>` says `head reviewed: yes` for the head `gh pr view <N> --json headRefOid` gives.
+- #N's head is the one the review covered: `mentat status <N>` says `head reviewed: yes` for the head `gh pr view <N> --json headRefOid` gives;
+- no review of #N this session read, posted or not, marked a finding `(high risk)`.
+
+When the session sorts an unposted reply holding a `(high risk)` mark, it records that mark in the description's Review details line for the finding (`mentat:pr`), so the last condition holds after a compaction.
 
 Then run `gh pr merge <N> --merge --match-head-commit <the head's full 40-character commit>` once, as the whole command: no other flag (`--auto` and `--admin` included), no other command beside it. If the hook denies it or it fails, say so in one line, send the Ready line, and stop: the maintainer merges, and the session neither retries nor tries another form.
 
