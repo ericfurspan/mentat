@@ -30,7 +30,7 @@ status_comments() { # $1 repo, $2 pull request, $3 this account's login
 }
 
 # The local rounds in status_comments lines $1: completed Local Claude reviews. An
-# incomplete local review is not a round (skills/review), and a Codex review never is.
+# incomplete local review is not a round (skills/review), and an outside review never is.
 # Sets the caller's rounds (the count), last (the head the last one reviewed) and
 # last_fp (its spec fingerprint). Also read by mentat review.
 status_rounds() {

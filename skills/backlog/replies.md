@@ -4,14 +4,13 @@ After the plan check, and after each `mentat second-opinion` round, with any bac
 
 ```
 Plan check: <label> - <reason>
-Codex: <label> - <reason>
-Grok: <label> - <reason>
+<Reviewer>: <label> - <reason>
 Adopting: <what Claude Code takes up>
 Not adopting: <what> (<why>)
 ```
 
 - The `Plan check` line comes after the plan check; with no verdict it is `Plan check: none - <why>`, in public-safe words, never a log path. The tool lines stay for a second opinion round.
-- One line per tool that ran or was due: Codex, and a Grok line only where `grok` is installed. A tool with no answer gets `no second opinion` and why, in public-safe words, never a log path; when `mentat second-opinion` exits 6 the why is that outside reviewers are not on here, which is not a tool failure and not a block.
+- One line per reviewer `mentat second-opinion` printed, named as it prints it. A reviewer with no answer gets `no second opinion` and why, in public-safe words, never a log path; when `mentat second-opinion` exits 6 the why is that outside reviewers are not on here, which is not a tool failure and not a block.
 - The label is `worth doing` for `DO IT`, `another way` for `DO IT DIFFERENTLY` and `not worth doing` for `DON'T`. The reason is the tool's own, in about 10 words, keeping any condition or required change even if longer: the text after the dash for `DO IT DIFFERENTLY` and `DON'T`, the reply's main point for `DO IT`. With nothing to summarize, the reason is `no reason given`; a label is never shown alone. These rules apply to `PLAN CHECK VERDICT:` lines as to the second opinion's.
 - Plain words, about 25 a line. Leave out an empty line; add nothing else.
 - The block never goes in a decision's question, prompt or message. In `mentat:propose` step 4 it is shown in chat only when the maintainer picks "Show the full proposal"; elsewhere it goes in chat.

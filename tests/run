@@ -480,6 +480,29 @@ else
   pass "no script under lib/ or the reviewers module's lib/ reads FETCH_HEAD"
 fi
 
+# Core names no shipped outside reviewer: each is an adapter of the reviewers module
+# (plugins/mentat-reviewers/adapters/<name>.sh), which core reaches only by the names a
+# repository lists in MENTAT_REVIEWERS. Read: bin/, lib/, hooks/, rules.md, agents/ and
+# skills/ (tracked or new) but skills/review/CREDITS.md, and the core plugin's
+# descriptions, matched as whole words in any case.
+shipped=$(for f in plugins/mentat-reviewers/adapters/*.sh; do [ -f "$f" ] && basename "$f" .sh; done)
+if [ -z "$shipped" ]; then
+  fail "found no shipped outside reviewer under plugins/mentat-reviewers/adapters/"
+else
+  named=""
+  for n in $shipped; do
+    at=$( { git ls-files -z --cached --others --exclude-standard -- bin lib hooks rules.md agents skills ':!skills/review/CREDITS.md' | xargs -0 grep -l -i -w -F -- "$n"
+      jq -r .description .claude-plugin/plugin.json | grep -q -i -w -F -- "$n" && echo .claude-plugin/plugin.json
+      jq -r '.plugins[] | select(.source == "./") | .description' .claude-plugin/marketplace.json | grep -q -i -w -F -- "$n" && echo .claude-plugin/marketplace.json; } | sort -u | tr '\n' ' ')
+    [ -z "$at" ] || named="$named $n (in ${at% })"
+  done
+  if [ -z "$named" ]; then
+    pass "core names no shipped outside reviewer ($(printf '%s' "$shipped" | tr '\n' ' ' | sed 's/ $//'))"
+  else
+    fail "core names a shipped outside reviewer; name it only in the reviewers module or the docs:$named"
+  fi
+fi
+
 # mentat status reads review state from the headings the review commands write. Each heading it
 # matches must still be written as below; a change here also changes lib/status.sh and tests/status.sh.
 status_heading() {
@@ -492,13 +515,8 @@ status_heading() {
 }
 status_heading lib/review.sh "printf '## Local %s review of %s: %s, spec fingerprint %s\n\n' \"\$name\" \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
 status_heading lib/review.sh "review_name_claude() { name=Claude; }"
-status_heading plugins/mentat-reviewers/lib/codex.sh "review_name_codex() { name=Codex; }"
-status_heading plugins/mentat-reviewers/lib/grok.sh "printf '## Local Grok review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review started on \$head\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok review did not finish on \$head: \$1\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "printf '## Local Grok stop review of %s: %s, spec fingerprint %s\n\n' \"\$head\" \"\$(result_word \"\$result\")\" \"\$request_fp\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review started on \$head\""
-status_heading plugins/mentat-reviewers/lib/grok.sh "gh pr comment \"\$pr\" --body \"Grok stop review did not finish on \$head: \$1\""
+status_heading plugins/mentat-reviewers/lib/outside.sh "printf '## Outside review of %s: spec fingerprint %s, reviewers %s\n\n' \"\$head\" \"\$request_fp\" \"\$(printf '%s' \"\$names\" | sed 's/ /, /g')\""
+status_heading plugins/mentat-reviewers/lib/outside.sh "for n in \$names; do printf -- '- %s: %s\n' \"\$n\" \"\$(outside_result \"\$n\")\"; done"
 status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
@@ -730,14 +748,15 @@ for f in skills/*/SKILL.md plugins/*/skills/*/SKILL.md; do
   done <<< "$(grep -o -E "$in_folder" "$f" | tr -d '\`' | sort -u)"
 done
 
-# mentat reviewers, review, review --codex, review --grok, second-opinion and check behave as
-# specified (stub gh, claude, codex, grok and gitleaks), and so do the publish check, the merge hook,
+# mentat reviewers, review, review --outside (with stub adapters, and with the shipped
+# adapters on stub tools), second-opinion and check behave as specified (stub gh, claude,
+# reviewer tools and gitleaks), and so do the publish check, the merge hook,
 # the contract the merge hook keeps through hooks/lib/verdict.sh, the git hooks, and the
 # public-text module's hook. The marketplace lists the modules and the committed settings turn on
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -869,7 +888,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
