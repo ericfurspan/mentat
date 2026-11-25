@@ -95,7 +95,7 @@ Each line gives the rule, the file that holds it today and how it is checked: a 
 | The SessionStart hook prints `rules.md` unchanged, under Claude Code's cap on a hook's output, and `hooks.json` runs it once. | `hooks/session-start`, `hooks/hooks.json` | `tests/run` (every eval case relies on it; none tests it); review only |
 | At session start, a problem with the installed git hooks prints one PROBLEM line before the rules, to tell the maintainer before anything else. | `hooks/session-start`, `lib/git-hooks.sh` | `tests/git-hooks.sh`, `tests/run`; review only |
 | Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels and templates; neither it nor the maintainer's own instructions loosens "Approval" or "What agents never do". | `rules.md` | `tests/run` text check against `tests/fixtures/rules-safety.md`; review only |
-| After a compaction, a skill's supporting files are read again (Claude Code re-attaches the invoked skills themselves). | The "again after a compaction" lines in skill files, such as `skills/build/helpers.md` and `skills/plan/session.md` | review only |
+| After a compaction or a resume, a skill's supporting files are read again as their own lines say (Claude Code re-attaches the invoked skills themselves after a compaction). | The lines in skill files that say to read a file again after a compaction or on a resume, such as `skills/build/helpers.md`, `skills/review/SKILL.md`, `skills/review/stop.md` and `skills/plan/session.md` | review only |
 
 ## This repository's own choices
 
