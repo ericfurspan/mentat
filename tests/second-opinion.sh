@@ -26,7 +26,7 @@ export TMPDIR="$root/tmp" XDG_CACHE_HOME="$cache"
 # A home of its own, so no review tools setting of the user's applies.
 export HOME="$root/home"
 mkdir -p "$HOME"
-unset MENTAT_CODEX_MODEL
+unset MENTAT_CODEX_MODEL MENTAT_REVIEW_TIMEOUT_SECONDS
 real_git=$(command -v git)
 
 # The user's Grok home: a sign-in, and the things that must never reach a run.
