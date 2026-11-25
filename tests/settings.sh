@@ -157,4 +157,15 @@ while IFS= read -r n; do
   fi
 done <<<"$listed"
 
+# A setting the general rule names as refusing an empty value says so in its row.
+refusing=$(grep -oE 'except (`MENTAT_[A-Z0-9_]+`(, | and )?)+, which refuses it' "$doc" | grep -oE 'MENTAT_[A-Z0-9_]+')
+[ -n "$refusing" ] || fail "$doc names no setting as refusing an empty value"
+for n in $refusing; do
+  doc_empty=$(printf '%s\n' "$rows" | grep -E "^\| *\`$n\` *\|" | head -n 1 | awk -F'|' '{ gsub(/^ +| +$/, "", $5); print $5 }')
+  case "$doc_empty" in
+    Refused*) pass "$n refuses an empty value, and its row says so" ;;
+    *) fail "$n refuses an empty value, but its row's empty value is \"$doc_empty\"" ;;
+  esac
+done
+
 [ "$failures" -eq 0 ] || exit 1
