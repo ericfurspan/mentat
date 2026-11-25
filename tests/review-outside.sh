@@ -203,7 +203,7 @@ listing "beta,slow,delta"
 mv "$root/tools/bin/delta-cli" "$root/delta-cli.off"
 reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run 7)
 mv "$root/delta-cli.off" "$root/tools/bin/delta-cli"
-check "did not finish: the others' results stand, nothing blocks (exit 0)" '[ "$rc" = 0 ] && posted && heading "beta, slow, delta" && row "beta: no findings"'
+check "did not finish: the others' results stand, nothing blocks (exit 0), and the run does not say it found nothing" '[ "$rc" = 0 ] && posted && heading "beta, slow, delta" && row "beta: no findings" && said "The outside review found nothing on $H, but not every reviewer finished: https://example.test/comment" && ! said "The outside review found nothing on $H: https://example.test/comment"'
 check "did not finish: a timeout is said in public-safe words, under the one time limit" 'row "slow: did not finish (Slow did not finish within 1 seconds)" && said "slow: did not finish (Slow did not finish within 1 seconds)"'
 check "did not finish: a missing tool is said, naming its command" 'row "delta: did not finish (delta-cli is not installed)" && [ "$(ran delta)" = 0 ]'
 check "did not finish: the timed-out tool was stopped" 'p=$(cat "$STUB/slow.pid"); ! kill -0 "$p" 2>/dev/null'
@@ -257,7 +257,7 @@ listing "slow,delta"
 mv "$root/tools/bin/delta-cli" "$root/delta-cli.off"
 reset; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=1 run 7)
 mv "$root/delta-cli.off" "$root/tools/bin/delta-cli"
-check "no reviewer finishes: still posted, one line each, exit 0" '[ "$rc" = 0 ] && posted && row "slow: did not finish (Slow did not finish within 1 seconds)" && row "delta: did not finish (delta-cli is not installed)"'
+check "no reviewer finishes: still posted, one line each, exit 0, and the run says no reviewer finished, not that it found nothing" '[ "$rc" = 0 ] && posted && row "slow: did not finish (Slow did not finish within 1 seconds)" && row "delta: did not finish (delta-cli is not installed)" && said "The outside review posted on $H, but no reviewer finished: https://example.test/comment" && ! grep -q "found nothing" "$STUB/out"'
 
 # A skipped name is named, and the rest run.
 listing "beta,nope"
