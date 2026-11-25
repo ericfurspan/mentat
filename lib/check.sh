@@ -29,25 +29,32 @@ c_finish() {
   fi
   printf 'Check OK (%d warning(s))\n' "$check_warnings"; exit 0
 }
-# Warns with a count, never a name, for each private repository that is not a whole
-# line of the word list with a leading exact: removed, ignoring case. Blank lines and
-# # lines match no repository name. Success with no output means no private
-# repositories, not a failed lookup. A pipe, not a here-string: bash 3.2 writes a
-# here-string to a temporary file. grep exits 1 when none are missing and above 1 on
-# an error.
+# Warns with a count, never a name, for each private repository the word list does not
+# cover, as the publish check matches it: a repository is covered when it equals a whole
+# line without exact:, ignoring case, or the rest of an exact: line, in that case. Blank
+# lines and # lines cover nothing. Success with no output means no private
+# repositories, not a failed lookup. Pipes, not here-strings: bash 3.2 writes a
+# here-string to a temporary file. grep exits 1 when it keeps no line and above 1 on an
+# error.
 c_word_list_covers_repos() {
-  local names list missing=0 rc=0
+  local names plain exact left="" missing=0 rc=0
   names=$(gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' 2>/dev/null) || rc=2
   if [ "$rc" = 0 ] && [ -n "$names" ]; then
-    list=$(sed 's/^exact://' "$PRIVATE_WORDS" 2>/dev/null) || rc=2
+    plain=$(grep -v -e '^[[:space:]]*$' -e '^#' -e '^exact:' "$PRIVATE_WORDS" 2>/dev/null) || [ $? = 1 ] || rc=2
   fi
   if [ "$rc" = 0 ] && [ -n "$names" ]; then
-    missing=$(printf '%s\n' "$names" | grep -vixF -c -e "$list" 2>/dev/null) || rc=$?
+    exact=$(sed -n 's/^exact:\(..*\)$/\1/p' "$PRIVATE_WORDS" 2>/dev/null) || rc=2
+  fi
+  if [ "$rc" = 0 ] && [ -n "$names" ]; then
+    left=$(printf '%s\n' "$names" | grep -vixF -e "$plain" 2>/dev/null) || [ $? = 1 ] || rc=2
+  fi
+  if [ "$rc" = 0 ] && [ -n "$left" ]; then
+    missing=$(printf '%s\n' "$left" | grep -vxF -c -e "$exact" 2>/dev/null) || rc=$?
   fi
   if [ "$rc" -gt 1 ]; then
     c_warn "could not compare the private word list with your private repositories"
   elif [ "$missing" -gt 0 ]; then
-    c_warn "$missing private repository name(s) are not whole lines of the private word list; to list them, run: gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' | grep -vixF -f <(sed 's/^exact://' ~/.config/mentat/private-words)"
+    c_warn "$missing private repository name(s) are not whole lines of the private word list; to list them, run: gh api -X GET 'user/repos?affiliation=owner,organization_member,collaborator&visibility=private&per_page=100' --paginate --jq '.[].name' | grep -vixF -f <(grep -v -e '^[[:space:]]*\$' -e '^#' -e '^exact:' ~/.config/mentat/private-words) | grep -vxF -f <(sed -n 's/^exact:\(..*\)\$/\1/p' ~/.config/mentat/private-words)"
   else
     c_ok "the private word list has every private repository this account can reach"
   fi
