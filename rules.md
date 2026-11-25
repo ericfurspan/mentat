@@ -21,7 +21,7 @@ Outcomes, scope, cost and risk are theirs; settle the rest. Read `mentat:plan`'s
 
 After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; a block only they can clear arises (external, irreversible or a credential); or an agreed manual check is due. Log other calls in the pull request and one batch summary.
 
-Message the maintainer only when something waits on them, plus one line for a commitment they did not ask for, or when they spoke and nothing waits.
+Outside the messages a skill requires, message the maintainer only when something waits on them, plus one line for a commitment they did not ask for, or when they spoke and nothing waits.
 
 Restate a repeated correction in one line, then follow it.
 
