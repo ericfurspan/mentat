@@ -60,8 +60,7 @@ fi
 # item, owes the maintainer a tell for it, and keeps that tell in its notes file until given; the
 # planning and recording contracts name that default; and planning offers a grill only for two or
 # more open decisions, keeping the offer after the same point is corrected twice; and a new feature
-# or workflow change gets a short sourced survey of established practice before its view. Each Ready
-# message carries a review-depth line, which a build's final message and a starting session's relay keep.
+# or workflow change gets a short sourced survey of established practice before its view.
 # The Ready line starts with an icon that every repeat or relay keeps, and its first showing in the
 # maintainer's chat sends one push, from the starting session and never a started one; holds, blocks
 # and questions get neither. Moving on to the next item to plan proposes an order once and plans through it.
@@ -139,34 +138,22 @@ skills/propose/session.md||then going on to the next without asking which
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/propose/SKILL.md||except on the maintainer's yes to the order question of \`mentat-linear:triage\` "Report", which starts it
 $o|Planning|keeps so a compaction or takeover goes on asking nothing
-skills/review/review-depth.md||Right after the "🔔 Ready to merge: #N (<item id>)" line, the Ready message carries one review-depth line
-skills/review/review-depth.md||\`Review: closely (<reasons>)\`, each reason in a few words, or \`Review: skim (no listed reason for closer review)\`
-skills/review/review-depth.md||The line is a prioritization aid, not a safety assessment; the maintainer still decides how to review and merges every pull request.
-skills/review/review-depth.md||It goes in chat only; the pull request description is unchanged.
-skills/review/review-depth.md||a Risks line, except one only for Grok being unavailable, and except one for a changed agent instruction file whose change alters no guardrail (what an agent may do without the maintainer: merging, pushing, publishing, secrets, approvals, review gates);
-skills/review/review-depth.md||a Decisions line for a call made in the build;
-skills/review/review-depth.md||a Calls made without the maintainer line that files a defect at the round limit or settles a review stop, an extra round or a blocking finding, so a Ready at the round limit with defects filed or stops settled is closely;
-skills/review/review-depth.md||any sentence the Ready message adds, except a weaker review only because Grok is unavailable;
-skills/review/review-depth.md||the agreed spec changed during the build;
-skills/review/review-depth.md||with the reason "not reviewed" for a fast track or "last push not reviewed" for a waived push.
-skills/review/review-depth.md||A "Hold #N" line carries no review-depth line. Each new "Ready to merge: #N", after a hold or more rounds, carries a fresh line recomputed for that head.
-skills/review/SKILL.md|Final check|without the parentheses when #N has no item, then the line \`review-depth.md\` in this skill's folder gives.
-skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, and its \`Review:\` line word for word
-skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included, and its \`Review:\` line word for word, adding none when it has none;
+skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with any limit on how it was reviewed
+skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included; the item's id
 skills/build/SKILL.md|Started sessions|keeping a sentence or line when in doubt whether it is one of them
 skills/review/SKILL.md|Final check|tell the maintainer in chat: a first line "🔔 Ready to merge: #N (<item id>)"
-skills/review/review-depth.md|Push notice|The Ready line starts with "🔔 ", and every repeat or relay of it keeps it word for word, the icon included.
-skills/review/review-depth.md|Push notice|A "Hold #N" line, a Blocked or Not reviewed report and a question get no icon and no push, and the pull request's Status line stays as \`mentat:pr\` gives it.
-skills/review/review-depth.md|Push notice|A session that shows the maintainer a Ready line in its own chat for the first time then sends one push notification, when it has a push-notification tool
-skills/review/review-depth.md|Push notice|naming the repository, the pull request, the item and a few words of its title, in at most about 150 characters.
-skills/review/review-depth.md|Push notice|The line is in chat before the push, and nothing waits on the push.
-skills/review/review-depth.md|Push notice|Ready lines first shown in one turn share one push naming each.
-skills/review/review-depth.md|Push notice|A Ready line for a new head after a hold counts as first shown; one shown again, such as when listing what waits on the maintainer, sends none.
-skills/review/review-depth.md|Push notice|A session started by another session sends none; the starting session that relays the line sends it.
-skills/review/review-depth.md|Push notice|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
-skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/review-depth.md\` "Push notice" says.
+skills/review/SKILL.md|Final check|Push notice: the Ready line starts with "🔔 ", and every repeat or forward of it keeps it word for word, the icon included.
+skills/review/SKILL.md|Final check|A "Hold #N" line, a Blocked or Not reviewed report and a question get no icon and no push, and the pull request's Status line stays as \`mentat:pr\` gives it.
+skills/review/SKILL.md|Final check|A session that shows the maintainer a Ready line in its own chat for the first time then sends one push notification, when it has a push-notification tool
+skills/review/SKILL.md|Final check|The push names the repository, the pull request, the item and a few words of its title, in at most about 150 characters.
+skills/review/SKILL.md|Final check|The line is in chat before the push, and nothing waits on the push.
+skills/review/SKILL.md|Final check|Ready lines first shown in one turn share one push naming each.
+skills/review/SKILL.md|Final check|A Ready line for a new head after a hold counts as first shown; one shown again, such as when listing what waits on the maintainer, sends none.
+skills/review/SKILL.md|Final check|A session started by another session sends none; the starting session that forwards the line sends it.
+skills/review/SKILL.md|Final check|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
+skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/SKILL.md\` "Final check" says.
 skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
-skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/review-depth.md\` "Push notice" gives.
+skills/build/SKILL.md|Started sessions|The relay is the first showing of that Ready line: right after it, the starting session sends the push \`../review/SKILL.md\` "Final check" gives.
 skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
 skills/review/after-ready.md||When the maintainer objects to the item's design, plan or pull request at a hold or a close without merging, the session that hears it writes one decisions line on the item recording each objection
 skills/propose/SKILL.md||When the maintainer objects to the item's design, plan or pull request in their reply to the agreement question or in any talk after it, the session writes one decisions line on the item recording each objection (\`../backlog/agent-records.md\` "Decision lines").
@@ -483,17 +470,18 @@ fi
 # Core names no shipped outside reviewer: each is an adapter of the reviewers module
 # (plugins/mentat-reviewers/adapters/<name>.sh), which core reaches only by the names a
 # repository lists in MENTAT_REVIEWERS. Read: bin/, lib/, hooks/, rules.md, agents/ and
-# skills/ (tracked or new) but skills/review/CREDITS.md, and the core plugin's
-# descriptions, matched as whole words in any case.
+# skills/ (tracked or new), and the core plugin's
+# descriptions, matched in any case with no letter or digit on either side (so MENTAT_<NAME>_MODEL counts).
 shipped=$(for f in plugins/mentat-reviewers/adapters/*.sh; do [ -f "$f" ] && basename "$f" .sh; done)
 if [ -z "$shipped" ]; then
   fail "found no shipped outside reviewer under plugins/mentat-reviewers/adapters/"
 else
   named=""
   for n in $shipped; do
-    at=$( { git ls-files -z --cached --others --exclude-standard -- bin lib hooks rules.md agents skills ':!skills/review/CREDITS.md' | xargs -0 grep -l -i -w -F -- "$n"
-      jq -r .description .claude-plugin/plugin.json | grep -q -i -w -F -- "$n" && echo .claude-plugin/plugin.json
-      jq -r '.plugins[] | select(.source == "./") | .description' .claude-plugin/marketplace.json | grep -q -i -w -F -- "$n" && echo .claude-plugin/marketplace.json; } | sort -u | tr '\n' ' ')
+    pat="(^|[^A-Za-z0-9])$n([^A-Za-z0-9]|\$)"
+    at=$( { git ls-files -z --cached --others --exclude-standard -- bin lib hooks rules.md agents skills | xargs -0 grep -l -i -E -- "$pat"
+      jq -r .description .claude-plugin/plugin.json | grep -q -i -E -- "$pat" && echo .claude-plugin/plugin.json
+      jq -r '.plugins[] | select(.source == "./") | .description' .claude-plugin/marketplace.json | grep -q -i -E -- "$pat" && echo .claude-plugin/marketplace.json; } | sort -u | tr '\n' ' ')
     [ -z "$at" ] || named="$named $n (in ${at% })"
   done
   if [ -z "$named" ]; then
@@ -834,15 +822,7 @@ skills/pr/SKILL.md
 skills/propose/SKILL.md
 skills/propose/agreement.md
 skills/propose/decisions.md
-skills/propose/session.md
-skills/review/CREDITS.md
-skills/review/SKILL.md
-skills/review/after-ready.md
-skills/review/fast-track.md
-skills/review/findings.md
-skills/review/ready-gate.md
-skills/review/review-depth.md
-skills/review/stop.md"
+skills/propose/session.md"
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
   && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
