@@ -162,6 +162,7 @@ skills/plan/SKILL.md|Steps|or on an item its work moved from (\`../backlog/agent
 skills/plan/SKILL.md|Steps|each recorded objection and how the plan meets it or why not;
 skills/plan/SKILL.md|Steps|\`Not now\`: commits nothing and opens a talk
 skills/plan/SKILL.md|Steps|Ask only the maintainer's decisions, as "Decisions" says, and record each answer as a decisions line on the item (\`mentat:backlog\` "Item shape") and post the answer reply to the open maintainer comments it answered (\`mentat:backlog\` "Reading an item").
+skills/plan/SKILL.md|Steps|as \`mentat:backlog\` "Agreement" says, posting the answer reply to the open maintainer comments the agreement question answered (step 4), adding a decisions line for each answer not yet on the item,
 skills/plan/session.md||Write to the backlog only what \`SKILL.md\` records for answers and agreements given here
 skills/plan/session.md||a fold's lines, writes a started session sends back
 $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:plan\` step 7)
