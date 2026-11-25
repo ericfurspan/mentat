@@ -140,6 +140,40 @@
 #     changed), git refused the removal (worktree and branch kept) or the branch delete
 #     failed after it (the branch left named), 2 the pull request could not be read (gh
 #     failing or signed out, no such number; nothing changed), 64 usage.
+#   mentat state ...  The orchestrator's handover state, one JSON store at
+#     <git common dir>/mentat/state.json shared by every worktree (missing reads as empty;
+#     a write keeps fields it does not know). Each write runs under /usr/bin/lockf -k -t 10
+#     on state.lock beside it, else flock -w 10, and renames a temporary file over the store.
+#     Every state command: 1 a definite no or none (or a refusal, nothing changed), 2 it
+#     cannot answer (outside a git repository, the store unreadable, empty, not one JSON
+#     object or a field of the wrong type, naming the file; the lock not free within 10
+#     seconds, naming it; neither lockf nor flock found; gh failing), 64 usage.
+#   mentat state show  Prints the store.
+#   mentat state orchestrator  Prints the recorded orchestrator id and "running" or "ended".
+#     1 none recorded.
+#   mentat state orchestrator set <id>  Records the id with no mark, replacing any earlier
+#     id and its mark.
+#   mentat state orchestrator ended <id>  Marks the recorded id no longer running; 1 when
+#     <id> is not the recorded id (nothing changed).
+#   mentat state owner [<item>]  Prints the recorded orchestrator id, 1 when none or it is
+#     marked ended; with <item>, the item's recorded build session, 1 when none.
+#   mentat state session add <id> <item>...  Records the build session and makes it each
+#     item's session. session end <id> marks it ended (1 unknown). session list prints
+#     "<id> <running|ended> <items>" per session, tab-separated.
+#   mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N]
+#     [--held-by TEXT]  Records the item's fields. Stages: held handed confirmed not-taken
+#     pr ready merged closed; pr or ready with no PR number recorded or given is refused (1).
+#     item get <id> prints it (1 unknown); item list [--stage S] prints "<id> <stage>" per item.
+#   mentat state note add <hold|question> <text>  Records a note and prints its id (never
+#     reused). note list [<kind>] prints "<id> <kind> <open|cleared> <text>" per note, in
+#     order added, cleared ones included. note clear <id>: 1 unknown or already cleared.
+#   mentat state can-dispatch  Reads the open pull requests (gh pr list --state open --limit
+#     1000) and prints the waiting ones (first description line "**Status:** Ready" or
+#     "**Status:** Not reviewed: fast track agreed by the maintainer", or at stage ready),
+#     the items in flight (handed, confirmed, or pr with an open pull request not waiting),
+#     the limit MENTAT_READY_LIMIT (a whole number of 1 or more, else the default, said once
+#     on stderr when set but not one) and how many items may be handed over (the limit less
+#     both, at least 0). 0 when at least 1, 1 when none, 2 gh failed (no count).
 set -uo pipefail
 
 # Find this file's real location through any symlinks (macOS's bash 3.2 and BSD
@@ -151,7 +185,7 @@ while [ -L "$src" ]; do
   case "$src" in /*) ;; *) src="$dir/$src" ;; esac
 done
 root=$(cd -P "$(dirname "$src")/.." && pwd) || exit 1
-for lib in shared publish review git-hooks check status worktree; do
+for lib in shared publish review git-hooks check status worktree state; do
   if [ ! -f "$root/lib/$lib.sh" ]; then
     printf 'mentat: missing %s\n' "$root/lib/$lib.sh" >&2
     exit 1
@@ -192,5 +226,6 @@ case "${1:-}" in
   check) shift; check "$@" ;;
   fingerprint) shift; fingerprint_command "$@" ;;
   worktree) shift; worktree_command "$@" ;;
-  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch>" 64 ;;
+  state) shift; state_command "$@" ;;
+  *) die "usage: mentat review [--codex | --grok [--stop]] [--request <file>] [--require-ci] <pull request number> | mentat ci <pull request number> | mentat status <pull request number> [--request <file>] | mentat reviewers | mentat second-opinion <file> | mentat check | mentat fingerprint <file> [<expected>] | mentat worktree branch <name> | mentat worktree snapshot [<checkout>] | mentat worktree verify <line> [<checkout>] | mentat worktree cleanup <pull request number> <branch> | mentat state show | mentat state orchestrator [set <id> | ended <id>] | mentat state owner [<item>] | mentat state session add <id> <item>... | mentat state session end <id> | mentat state session list | mentat state item set <id> [--fingerprint F] [--stage S] [--session ID] [--pr N] [--held-by TEXT] | mentat state item get <id> | mentat state item list [--stage S] | mentat state note add <hold|question> <text> | mentat state note list [<hold|question>] | mentat state note clear <id> | mentat state can-dispatch" 64 ;;
 esac
