@@ -65,6 +65,11 @@ if [ -n "$other" ] && [ -f "$STUB/expect_$other" ]; then
   i=0; while [ ! -f "$STUB/$other.started" ] && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
   [ -f "$STUB/$other.started" ] && touch "$STUB/$n.together"
 fi
+# Held, slow runs until the test releases it, for at most 10 seconds, then finds nothing.
+if [ "$n" = slow ] && [ -f "$STUB/slow.hold" ]; then
+  i=0; while [ ! -f "$STUB/slow.release" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n'; exit 0
+fi
 [ "$n" = slow ] && { echo $$ >"$STUB/slow.pid"; exec sleep 30; }
 [ -f "$STUB/$n.fails" ] && { echo "fake-token-in-log" >&2; exit 3; }
 # A folder where the path rewrite writes its copy of the reply, so the rewrite fails.
@@ -217,11 +222,16 @@ reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(r
 check "the second failure in a row tells the maintainer now, keyed by the adapter's name" 'grep -q "^mentat: tell the maintainer now: Beta has failed 2 times in a row (owner/repo#7): beta-tool exited with status 3" "$STUB/err" && [ -f "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" ]'
 rm -f "$STUB/beta.fails"; rm -f "$STUB/comment"; rc=$(run 7)
 check "a checked reply ends the row" '[ "$(tail -n 1 "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" | cut -d" " -f2)" = ok ] && ! grep -q "tell the maintainer" "$STUB/err"'
-# A raise is told as soon as its reviewer ends, not after the slowest one: slow is listed
-# first, so a line printed only after every reviewer ends comes after slow's local line.
+# A raise is told as soon as its reviewer ends, not after the slowest one: slow is held
+# until the raise is on stderr, waiting at most 5 seconds for it, and runs 10 at most.
 listing "slow,beta"
-reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=2 run 7)
-check "a reviewer's raise is told while a slower reviewer still runs, once" '[ "$(grep -c "^mentat: tell the maintainer now: Beta has failed 2 times in a row" "$STUB/err")" = 1 ] && [ "$(grep -n -m1 "^mentat: tell the maintainer now: Beta" "$STUB/err" | cut -d: -f1)" -lt "$(grep -n -m1 "^mentat: slow: " "$STUB/err" | cut -d: -f1)" ]'
+reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment" "$STUB/slow.release"; touch "$STUB/slow.hold"
+MENTAT_REVIEW_TIMEOUT_SECONDS=30 run 7 >"$STUB/rc.txt" &
+i=0; while ! grep -q "^mentat: tell the maintainer now: Beta" "$STUB/err" 2>/dev/null && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+grep -q "^mentat: tell the maintainer now: Beta" "$STUB/err" 2>/dev/null && touch "$STUB/raised_while_slow_ran"
+touch "$STUB/slow.release"
+wait "$!"
+check "a reviewer's raise is told while a slower reviewer still runs, once" '[ -f "$STUB/raised_while_slow_ran" ] && [ "$(grep -c "^mentat: tell the maintainer now: Beta has failed 2 times in a row" "$STUB/err")" = 1 ] && grep -qxF "slow: no findings" "$STUB/out"'
 rm -f "$STUB/beta.fails"
 listing "alpha,beta"
 # A checked reply whose paths cannot be rewritten: recorded ok, then did not finish, not
