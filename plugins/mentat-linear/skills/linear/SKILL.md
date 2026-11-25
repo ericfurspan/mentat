@@ -46,7 +46,7 @@ For `mentat:backlog` "Reading an item": the maintainer is the project's lead. Li
 
 ## Where the spec lives
 
-For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of its one issue document titled exactly `Spec`, found in the issue read's document list or, when that lists none (an archived issue), by the `Spec document: <id>` its `Agent records` comment records. With neither, it is a `## Spec` or `## Agreed request` section of the description, with the span `github.md` in `mentat:backlog`'s folder gives; that section stays last, everything else (`Now:`, links) written above it and nothing below. Before creating the document, reuse one already titled `Spec`; two stop the session and go to the maintainer. Creating it records its id in the `Agent records` comment; writing the spec there removes any such section.
+For `mentat:backlog` "Where the spec lives": an item's spec is the whole body of its one issue document titled exactly `Spec`, found in the issue read's document list or, when that lists none (an archived issue), by the `Spec document: <id>` its `Agent records` comment records. With neither, it is a `## Spec` section of the description, with the span `github.md` in `mentat:backlog`'s folder gives; that section stays last, everything else (`Now:`, links) written above it and nothing below. Before creating the document, reuse one already titled `Spec`; two stop the session and go to the maintainer. Creating it records its id in the `Agent records` comment; writing the spec there removes any such section.
 
 ## Agent records
 
