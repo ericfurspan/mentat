@@ -9,7 +9,7 @@ A go-ahead is `Agree and build now`, in a planning session (`../plan/session.md`
 Read only this repository's `mentat state`. To implement here is to go on as `SKILL.md` says or, for a chat request, as `../plan/SKILL.md` says. The first of these that applies decides:
 
 1. A run a handover or the starting session's command began, or a message asking this session to resume its own work, is not redirected: it runs as `SKILL.md` "Started sessions" says.
-2. A session another session started sends the go-ahead to that session, as "Redirecting" says.
+2. A session another session started sends the go-ahead to its starting session (`SKILL.md` "Started sessions"), as "Redirecting" says.
 3. This session is the orchestrator: it hands the items over itself, as `mentat-lead:orchestrate` says.
 4. `mentat state owner <item>` prints this session's id: implement that item here.
 5. `mentat state owner` prints an orchestrator's id. Find it in the host's session list. The host shows it running: redirect the go-ahead. The host shows it ended: run `mentat state orchestrator ended <id>` and implement here. The host cannot say, because the id is missing from its list or the list covers only sessions this one started: ask the maintainer whether it still runs (`mentat:plan` "Decisions"), at most once in this session for each id. A yes redirects; a no marks it ended, as above, and implements here.
