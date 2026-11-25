@@ -161,7 +161,9 @@ run_codex() {
   # ignored, so a Codex without profiles fails closed. The profile denies
   # ~/.gitconfig, so git runs without one.
   # Codex's shell gets only core environment variables, so tokens in the agent's
-  # environment do not reach it.
+  # environment do not reach it. Its git reads no global or system config
+  # (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM), whose aliases, hooks path or helpers
+  # could run programs or read files beyond the change.
   # features.apps=false: the apps feature (the ChatGPT account's GitHub connector) is
   # on by default and --ignore-user-config does not turn it off, so Codex could read
   # GitHub beyond the change.
@@ -169,7 +171,7 @@ run_codex() {
   (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config ${codex_asked:+"--model=$codex_asked"} \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
-    -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null"}' \
+    -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1"}' \
     -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
     -c 'approval_policy="never"' -c "web_search=\"$search\"" -o "$out" - <"$prompt") >"$log" 2>&1 &
   adapter_wait "$!"
