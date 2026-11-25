@@ -263,8 +263,10 @@ check "4: item list --stage lists only that stage" '[ "$rc" = 0 ] && [ "$(cat "$
 rc=$(st item list)
 check "4: item list lists every item" '[ "$rc" = 0 ] && [ "$(grep -c . "$root/out")" = 9 ]'
 before=$(sum)
-rc=$(st item set WRK-1 --stage shipped)
-check "4: unknown stage: usage error naming it, nothing changed" '[ "$rc" = 64 ] && grep -qF shipped "$root/err" && [ "$(sum)" = "$before" ]'
+for s in shipped "held handed" ""; do
+  rc=$(st item set WRK-1 --stage "$s")
+  check "4: unknown stage '$s': usage error naming the stage, nothing changed" '[ "$rc" = 64 ] && grep -qF "unknown stage: $s" "$root/err" && [ "$(sum)" = "$before" ]'
+done
 for f in 0123456789a 0123456789abc 0123456789ag; do
   rc=$(st item set WRK-1 --fingerprint "$f")
   check "4: fingerprint $f, not 12 hex: usage error naming it, nothing changed" '[ "$rc" = 64 ] && grep -qF "$f" "$root/err" && [ "$(sum)" = "$before" ]'

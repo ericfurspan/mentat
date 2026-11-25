@@ -27,7 +27,11 @@ state_usage_die() { die "${1:-$state_usage}" 64; }
 
 # An id, item or session name: not empty and not an option.
 state_name_ok() { case "${1:-}" in '' | -*) return 1 ;; esac; }
-state_stage_ok() { case " $state_stages " in *" ${1:-} "*) [ -n "${1:-}" ] ;; *) return 1 ;; esac; }
+state_stage_ok() {
+  case "${1:-}" in '' | *[!a-z-]*) return 1 ;; esac
+  case " $state_stages " in *" $1 "*) return 0 ;; esac
+  return 1
+}
 state_kind_ok() { [ "${1:-}" = hold ] || [ "${1:-}" = question ]; }
 
 # Sets state_dir, state_file and state_lock from the current repository; exit 2 outside one.
