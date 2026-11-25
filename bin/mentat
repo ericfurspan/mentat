@@ -71,7 +71,8 @@
 #     the repository owner's review, the first that holds: no single owner (an organization
 #     owns the repository), author, approved on head (their latest submitted review),
 #     requested or not requested. Last, the calls section: present when the description has
-#     a heading "Decisions and Risks" at any level, else missing. Either is
+#     a heading "Decisions and Risks", or the older "Calls made without the maintainer",
+#     at any level, else missing. Either is
 #     unknown (<why>) when a read it needs fails, which stops nothing else.
 #     Posts nothing. 0 printed, 1 could not read.
 #   mentat reviewers  Prints whether outside reviewers are on in this repository and which

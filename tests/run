@@ -528,8 +528,8 @@ status_heading lib/shared.sh '"REVIEW RESULT: NO FINDINGS") printf '"'"'no findi
 status_heading lib/shared.sh '"REVIEW RESULT: FINDINGS") printf '"'"'findings'"'"' ;;'
 status_heading lib/shared.sh '"REVIEW RESULT: INCOMPLETE - "*) printf '"'"'incomplete'"'"' ;;'
 # Its calls section is the pull request template's "Decisions and Risks" heading, where the calls
-# made without the maintainer are logged.
-if grep -qxF '## Decisions and Risks' skills/pr/SKILL.md && grep -qF "+Decisions and Risks( +#+)? *\$'" lib/status.sh; then
+# made without the maintainer are logged, or the older heading open pull requests may still have.
+if grep -qxF '## Decisions and Risks' skills/pr/SKILL.md && grep -qF "+(Decisions and Risks|Calls made without the maintainer)( +#+)? *\$'" lib/status.sh; then
   pass "skills/pr/SKILL.md's template writes the Decisions and Risks heading mentat status reads"
 else
   fail "skills/pr/SKILL.md's template must write the heading \"## Decisions and Risks\" that lib/status.sh reads; update lib/status.sh and tests/status.sh with it"
