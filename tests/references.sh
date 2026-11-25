@@ -24,7 +24,7 @@ banned=$(git grep -n -I -F --untracked -e "mentat:$old" -e "skills/$old" -e "$en
 if [ -z "$banned" ]; then
   pass "no file but CHANGELOG.md and docs/adr/ names the old planning skill, its folder or the next-work file"
 else
-  fail "files name the old planning skill, its folder or the next-work file (planning is mentat:plan; the next-work ending is gone):"
+  fail "files name the old planning skill, its folder or the next-work file:"
   printf '%s\n' "$banned"
 fi
 
