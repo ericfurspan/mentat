@@ -275,14 +275,21 @@ reset; mkdir -p "$HOME/.config/mentat"; echo "README:1" >"$HOME/.config/mentat/p
 rm -f "$HOME/.config/mentat/private-words"
 check "a held comment is not posted (exit 9), says where it is kept, and the findings are printed" '[ "$rc" = 9 ] && ! posted && grep -q "^mentat: not posted: the comment holds .*; the maintainer can read it at " "$STUB/err" && grep -qF "README:1 says change (blocking)" "$STUB/out"'
 
-# Only after Claude's latest review of the head found nothing.
+# Only after Claude's latest review of the head completed, with findings or none: a head
+# whose findings were all answered with nothing pushed still gets its outside review.
 listing "alpha"
 reset; echo '[]' >"$STUB/issue_comments.json"; rc=$(run 7)
 check "no Claude review of the head: refused (exit 8), nothing run or posted" '[ "$rc" = 8 ] && ! posted && no_tool_ran && grep -q "Claude has posted no review of $H" "$STUB/err"'
-reset; claude_said "$H" findings; rc=$(run 7)
-check "Claude's latest review of the head has findings: refused (exit 8)" '[ "$rc" = 8 ] && ! posted && no_tool_ran'
-reset; claude_said "$OLD" "no findings"; echo '[]' >"$STUB/issue_comments.json"; claude_said "$OLD" "no findings"; rc=$(run 7)
-check "a clean review of another head does not count (exit 8)" '[ "$rc" = 8 ] && no_tool_ran'
+reset; echo '[]' >"$STUB/issue_comments.json"; claude_said "$H" findings; rc=$(run 7)
+check "Claude's latest review of the head has findings: the reviewers run and the run posts" '[ "$rc" = 2 ] && posted && [ "$(ran alpha)" = 1 ] && heading alpha && row "alpha: findings"'
+reset; echo '[]' >"$STUB/issue_comments.json"; claude_said "$H" incomplete; rc=$(run 7)
+check "Claude's latest review of the head is incomplete: refused (exit 8), nothing run or posted" '[ "$rc" = 8 ] && ! posted && no_tool_ran && grep -q "Claude.s latest review of $H is incomplete" "$STUB/err"'
+reset; claude_said "$H" incomplete; rc=$(run 7)
+check "an incomplete review posted after a completed one on the head: refused (exit 8)" '[ "$rc" = 8 ] && ! posted && no_tool_ran && grep -q "Claude.s latest review of $H is incomplete" "$STUB/err"'
+reset; echo '[]' >"$STUB/issue_comments.json"; claude_said "$H" findings; claude_said "$H" incomplete; rc=$(run 7)
+check "an incomplete review posted after a findings review on the head: refused (exit 8)" '[ "$rc" = 8 ] && ! posted && no_tool_ran && grep -q "Claude.s latest review of $H is incomplete" "$STUB/err"'
+reset; echo '[]' >"$STUB/issue_comments.json"; claude_said "$OLD" "no findings"; rc=$(run 7)
+check "a clean review of another head does not count (exit 8)" '[ "$rc" = 8 ] && ! posted && no_tool_ran && grep -q "Claude has posted no review of $H" "$STUB/err"'
 
 # A changed spec and a changed list on one head: each run posts its own comment, and the
 # latest is the one status reads.
