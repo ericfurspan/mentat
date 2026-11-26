@@ -34,7 +34,8 @@
 #     MENTAT_REVIEWERS, read only from the env of .claude/settings.json on origin's default
 #     branch, as mentat reviewers reads it; unless outside reviewers are on there with a
 #     name listed, it prints why, runs and posts nothing and exits 6. It runs only after
-#     Claude's latest review of that head found nothing: else it runs nothing and exits 8.
+#     Claude's latest review of that head completed, with findings or none: else, with
+#     that review missing or incomplete, it runs nothing and exits 8.
 #     It prints each reviewer's reply and one summary line per reviewer, then waits for CI
 #     and posts one comment naming the head, the spec fingerprint and the list, with each
 #     reviewer's result (findings, no findings, did not finish with a public-safe reason,
@@ -44,7 +45,7 @@
 #     kept log's path, goes to stderr. 0 no reviewer found anything (or none finished),
 #     2 findings, 1 not reviewed (an error, such as a failed post), 3 the head moved, 4 CI
 #     did not pass, 6 outside reviewers are not on here or none is listed, 8 Claude's
-#     latest review of the head is not one that found nothing, 9 the comment held by the
+#     latest review of the head is missing or incomplete, 9 the comment held by the
 #     publish check (kept in a local file).
 #     Both review modes take `--request <file>` and `--require-ci`, after --outside if
 #     given, in any order before the number: `mentat review --request <file> <PR>`. Any

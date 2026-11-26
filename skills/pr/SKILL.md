@@ -65,7 +65,7 @@ A risk line, aiming at about 12 words without dropping what this skill or a revi
 - a changed hook, CI workflow or agent instruction file whose behavior changes, with the reason it deserves a look;
 - anything in the diff beyond the request;
 - a finding left unfixed (not one filed at the round limit), or a blocking finding answered instead of fixed;
-- a review that did not cover the head or the current spec, or a reviewer that was incomplete: a fast track, a head not reviewed, or outside reviewers unknown (`mentat reviewers`); where they are on, an outside review that did not run on the head or ran on an older spec, or a listed reviewer that did not finish (a refusal for usage or billing named only as that reviewer being unavailable, its cause told in chat); never a review by Claude alone where outside reviewers are off;
+- a review that did not cover the head or the current spec, or a reviewer that was incomplete: a fast track, a head not reviewed, or outside reviewers unknown (`mentat reviewers`); where they are on, an outside review of the head that failed or was held, or a listed reviewer that did not finish (a refusal for usage or billing named only as that reviewer being unavailable, its cause told in chat); never a review by Claude alone where outside reviewers are off;
 - a manual check still open.
 
 A decision's safety effect, or another consequence listed above, still gets its own risk line. Leave out a revert that fully undoes the change, and say nothing about hooks, workflows or instruction files when none changed in behavior.

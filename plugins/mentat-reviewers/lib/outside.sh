@@ -68,7 +68,8 @@ outside_review() {
   if ! repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || [ -z "$repo" ]; then
     not_reviewed "could not read the repository with gh"
   fi
-  # Outside reviewers run only on a head Claude's latest review found clean.
+  # Outside reviewers run only on a head Claude's latest review completed on, with findings
+  # or none: the review skill runs them once the sort of those findings leaves nothing to push.
   if ! me=$(gh api user --jq .login) || [ -z "$me" ] || ! lines=$(status_comments "$repo" "$pr" "$me"); then
     not_reviewed "could not read this account's comments on #$pr"
   fi
@@ -76,10 +77,9 @@ outside_review() {
     [ "$kind" = local ] && [ "$sha" = "$head" ] && clean=$res_word
   done <<<"$lines"
   case "$clean" in
-    no-findings) ;;
-    findings) die "not run: Claude's latest review of $head found findings; outside reviewers run only on a head Claude found nothing on" 8 ;;
-    incomplete) die "not run: Claude's latest review of $head is incomplete; outside reviewers run only on a head Claude found nothing on" 8 ;;
-    *) die "not run: Claude has posted no review of $head; outside reviewers run only on a head Claude found nothing on" 8 ;;
+    no-findings | findings) ;;
+    incomplete) die "not run: Claude's latest review of $head is incomplete; outside reviewers run only on a head Claude's latest review completed on" 8 ;;
+    *) die "not run: Claude has posted no review of $head; outside reviewers run only on a head Claude's latest review completed on" 8 ;;
   esac
   title=$(jq -r '.title // ""' <<<"$info")
   body=$(jq -r '.body // ""' <<<"$info")
@@ -126,7 +126,7 @@ outside_review() {
   done
   wait_for_ci "$repo" "$head" "" "$pr" "mentat review --outside"
   now=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || not_reviewed "could not read pull request #$pr"
-  [ "$now" = "$head" ] || die "the head moved from $head; nothing was posted; run mentat review --outside again on the next head Claude finds nothing on" 3
+  [ "$now" = "$head" ] || die "the head moved from $head; nothing was posted; run mentat review --outside again on the next head once Claude has reviewed it" 3
   {
     printf '## Outside review of %s: spec fingerprint %s, reviewers %s\n\n' "$head" "$request_fp" "$(printf '%s' "$names" | sed 's/ /, /g')"
     for n in $names; do printf -- '- %s: %s\n' "$n" "$(outside_result "$n")"; done

@@ -11,7 +11,7 @@ At the end of the round, and on resume while the stop is pending:
 1. Settle on the evidence below: record the stop (below) and go on, with no question, no blocked state and no wait mark. Ask instead only when the findings, or a disproved assumption still open in the item's recorded assumptions, show the goal or a required safeguard cannot be met without a scope change.
 2. To ask: rewrite the Status line with the state `Blocked: reassessing after round <n>` (Skill tool, `mentat:pr`), with an external backlog mark the item as waiting on the answer (`mentat:backlog` "Marking a wait"), and ask the question below. It is the loop's tell-the-maintainer.
 
-Push nothing and commission no fixes until the stop is settled or answered. Fixes, or the final check, follow.
+Push nothing and commission no fixes until the stop is settled or answered. Fixes, or the outside review where `mentat:review` step 3 runs it and then the final check, follow.
 
 ## Evidence
 
@@ -27,7 +27,7 @@ One decision, asked as `rules.md` "What goes to the maintainer" says: go on, shr
 
 ## Round limit
 
-After the last round within the limit (`mentat:review` "Hard stop"), whatever its number, no fix from that round is pushed unless the limit is raised: by the session's extra round below, or by the maintainer.
+After the last round within the limit (`mentat:review` "Hard stop"), whatever its number, no fix from that round is pushed unless the limit is raised: by the session's extra round below, or by the maintainer. Where `mentat:review` step 3 runs the outside review on that round's head, the decision below waits for that run, and "Round limit" applies to both reviews' findings.
 
 The extra round: right after that round, the session raises the limit by one itself and asks nothing when all four hold: (1) something is left to fix or implement, or that round did not finish or did not cover the current spec; (2) Review details record no higher limit (the maintainer's or the session's own; a raise the maintainer made counts as the extra round); (3) all that is left to fix or implement is within the agreed spec (a real defect on a head that could otherwise be Ready included); (4) no finding needs a scope change or shows the goal cannot be met. A last round that did not finish or did not cover the current spec counts as no finding against the goal, so a `Not reviewed` limit gets the extra round too. With fixes, they are then implemented, pushed and reviewed as a normal round (`mentat:review` step 4); with none, the extra round reviews the current head as `mentat:review` step 1 says, against the current spec. A higher limit for one pull request, which the session raises itself or the maintainer names in chat, is written to the description as it is raised, before that round's `mentat:builder` brief or review (Skill tool, `mentat:pr`), as the Review details line for a higher round limit, naming whose it is, the session's own also as a line in Decisions and Risks; it is passed as `MENTAT_REVIEW_ROUNDS` to its `mentat review` and `mentat status` runs and reread from Review details after a compaction or resume.
 

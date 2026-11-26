@@ -192,7 +192,7 @@ stub_reset() {
   echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"}]}' >"$STUB/check_runs.json"
 }
 reset() { stub_reset; rm -f "$cache"/mentat/reviewer-failures-*; }
-# Outside reviewers run only on a head Claude's latest review found nothing on: before each
+# Outside reviewers run only on a head Claude's latest review completed on: before each
 # run, once per case, this account's Local Claude review of the head GitHub reports says so.
 claude_clean() {
   [ -f "$STUB/claude_clean" ] && return 0
