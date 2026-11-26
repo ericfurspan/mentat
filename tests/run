@@ -233,6 +233,37 @@ else
   fail "README.md is $readme_words words, over 500"
 fi
 
+# README.md's Requirements line and lib/check.sh agree on the minimum Claude Code version:
+# c_claude_version passes on the version README.md names and fails one patch below it.
+readme_claude_boundary() (
+  readme_claude=$(awk '/^## Requirements$/ { on = 1; next } on && /^## / { exit } on' README.md |
+    sed -n 's/.*Claude Code \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\) or later.*/\1/p') || exit 1
+  [[ $readme_claude =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+  cv_patch=${readme_claude##*.}
+  [ "$cv_patch" -gt 0 ] || exit 1
+  cv_below="${readme_claude%.*}.$((10#$cv_patch - 1))"
+
+  cv_tmp=$(mktemp -d) || exit 1
+  trap 'rm -rf "$cv_tmp"' EXIT
+  cat >"$cv_tmp/claude" <<'CVEOF' || exit 1
+#!/usr/bin/env bash
+[ "$#" -eq 1 ] && [ "$1" = --version ] || exit 1
+printf '%s (Claude Code)\n' "$STUB_CLAUDE_VERSION"
+CVEOF
+  chmod +x "$cv_tmp/claude" || exit 1
+  cv_run() {
+    PATH="$cv_tmp:$PATH" STUB_CLAUDE_VERSION=$1 bash -c '
+      . lib/check.sh && c_claude_version || exit 2
+      exit "$check_problems"
+    '
+  }
+  cv_out=$(cv_run "$readme_claude") && [[ $cv_out == "OK: Claude Code $readme_claude "* ]] || exit 1
+  cv_out=$(cv_run "$cv_below")
+  [ "$?" -eq 1 ] && [[ $cv_out == "PROBLEM: Claude Code $cv_below "* ]] || exit 1
+  pass "lib/check.sh accepts README.md's Claude Code $readme_claude and rejects $cv_below"
+)
+readme_claude_boundary || fail "README.md must name the minimum Claude Code version accepted by lib/check.sh"
+
 # No tracked text file holds an em dash (U+2014). The check matches its bytes by escape, so this file holds none.
 em_dash=$(printf '\342\200\224')
 em_dash_files=$(git ls-files -z | LC_ALL=C xargs -0 grep -I -l -F -e "$em_dash" --)
@@ -786,7 +817,7 @@ if out=$(tests/references-cases.sh 2>&1); then printf '%s\n' "$out"; else printf
 # the ones used here.
 # They run at once, each into its own file, and print whole in this order.
 if command -v jq >/dev/null 2>&1; then
-  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/public-text.sh tests/private-match.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  behavior=(tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/setup.sh tests/public-text.sh tests/private-match.sh tests/modules.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   outs=$(mktemp -d) || exit 1
   pids=()
   # Background jobs ignore Ctrl-C, and so does all they start. Each script runs in its own
@@ -876,7 +907,7 @@ fi
 
 # Shell scripts pass shellcheck.
 if command -v shellcheck >/dev/null 2>&1; then
-  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/private-match.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/references.sh tests/references-cases.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
+  checked=(tests/run hooks/session-start hooks/lib/*.sh hooks/no-merge git-hooks/scan git-hooks/own-hook.sh git-hooks/hooks/* bin/mentat lib/*.sh plugins/mentat-reviewers/bin/* plugins/mentat-reviewers/lib/*.sh plugins/mentat-reviewers/adapters/*.sh tests/reviewers.sh tests/review.sh tests/review-local.sh tests/review-outside.sh tests/review-codex.sh tests/review-grok.sh tests/second-opinion.sh tests/check.sh tests/hook-contract.sh tests/no-merge.sh tests/publish.sh tests/git-hooks.sh tests/setup.sh plugins/mentat-public-text/hooks/public-text tests/public-text.sh tests/private-match.sh tests/modules.sh tests/settings.sh tests/evals.sh tests/references.sh tests/references-cases.sh tests/glossary-check.sh tests/glossary.sh tests/fingerprint.sh tests/worktree-branch.sh tests/worktree-check.sh tests/worktree-cleanup.sh tests/state.sh)
   if shellcheck "${checked[@]}"; then
     pass "shellcheck ${checked[*]}"
   else
