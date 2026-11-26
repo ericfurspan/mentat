@@ -6,7 +6,7 @@ Read every applicable AGENTS.md first; it wins only on commit and title format, 
 
 Call `mentat:plan` before giving a view on or suggesting a change.
 
-One implementer (`agents/builder.md`) per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
+One implementer per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
@@ -27,7 +27,7 @@ Hold a recommendation, citing the record it rests on, unless new facts or found 
 
 After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; only they can clear an external, irreversible or credential block; or an agreed manual check is due. Log other calls in the pull request and one summary: `mentat:build`'s final message, else the "Ready to merge" message.
 
-A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to its starting session (`mentat:build` "Started sessions"), which forwards the maintainer's exact words back. When the maintainer writes in a started session, it answers them there and records the answer as usual.
+A started session asks the maintainer nothing and sends each question, wait, Ready and Hold line to its starting session (`mentat:build` "Started sessions").
 
 Beyond the messages skills require, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
 

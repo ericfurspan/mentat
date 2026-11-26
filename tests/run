@@ -110,7 +110,7 @@ $o|Questions|Only \`re-ask:\` notes are asked again
 $o|Second opinions|They never ask the maintainer to carry text to another assistant.
 $o|Started planning sessions|never calls \`mentat:build\` and never redirects
 $b|Handing over|agreed by default ("Planning")
-$o|Owner check|at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that \`mentat state owner\` prints this session's id.
+$o|Owner check|Once "Start" step 4 has set this session, except in a turn where the maintainer starts it again, at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that \`mentat state owner\` prints this session's id.
 $o|Owner check|When it prints another id, stop acting as orchestrator, saying so in one line, and plan, ask and hand over nothing more.
 $o|Owner check|When it exits 1 and \`mentat state orchestrator\` shows this session's id ended, run \`mentat state orchestrator set\` with it again.
 $o|Start|after the set, tell that session too that this session is now the orchestrator, so its "Owner check" finds this session's id.
@@ -123,7 +123,7 @@ $b|Handing over|A bare "later" or "stop" naming no item answers the question ask
 $b|Sessions|An implementation session is mid-run from its start until it sends its final message (\`mentat:build\` step 8)
 $b|Sessions|When no session is mid-run, a fresh implementation session starts for them
 $b|Holds|A merge passed on to an implementation session waits for its after-merge reply (a \`hold\` note): no session starts and no item joins a run until it arrives
-rules.md||A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to its starting session (\`mentat:build\` "Started sessions"), which forwards the maintainer's exact words back.
+rules.md||A started session asks the maintainer nothing and sends each question, wait, Ready and Hold line to its starting session (\`mentat:build\` "Started sessions").
 skills/build/redirect.md|Where it is implemented|Read only this repository's \`mentat state\`.
 skills/build/redirect.md|Where it is implemented|\`mentat state owner\` exits 1, with no running orchestrator recorded: implement here.
 skills/build/redirect.md||When the message cannot be sent, implement nothing, and say in one line which session could not be reached.
@@ -336,15 +336,15 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   pass "$f's frontmatter does not set disable-model-invocation"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Claude Code starts Inbox triage only if you ask or take its offer\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Inbox triage, only when asked or its offer is taken\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description says Claude Code starts it only on the maintainer's word"
 else
-  fail "$f's description must say Claude Code starts it only on the maintainer's word (Claude Code starts Inbox triage only if you ask or take its offer.)"
+  fail "$f's description must say Claude Code starts it only on the maintainer's word (Inbox triage, only when asked or its offer is taken.)"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: projects or all, source options, or brainstorm with text or a link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description lists its arguments"
 else
-  fail "$f's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
+  fail "$f's description must list its arguments (Arguments: projects or all, source options, or brainstorm with text or a link.)"
 fi
 
 # The / menu shows descriptions as plain text: no skill's description holds <, > or a backtick, and a menu

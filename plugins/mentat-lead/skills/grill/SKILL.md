@@ -1,6 +1,6 @@
 ---
 name: grill
-description: "Interviewing the maintainer about a plan, decision or idea, one question at a time, until every decision that is theirs is agreed. Use when the maintainer asks to be grilled (\"grill me\"). Claude Code never starts it unasked."
+description: "Interviews the maintainer on a plan, decision or idea, one question at a time, when they ask to be grilled (\"grill me\"); never unasked."
 user-invocable: false
 ---
 

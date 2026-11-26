@@ -1,6 +1,6 @@
 ---
 name: triage
-description: "Claude Code starts Inbox triage only if you ask or take its offer. Arguments: project names or all, source options, or brainstorm with a text or link."
+description: "Inbox triage, only when asked or its offer is taken. Arguments: projects or all, source options, or brainstorm with text or a link."
 argument-hint: "[project ... | all] [reader options] | brainstorm <text or link>"
 ---
 

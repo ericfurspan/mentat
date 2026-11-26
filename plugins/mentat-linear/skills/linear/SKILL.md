@@ -1,6 +1,6 @@
 ---
 name: linear
-description: "Mentat's Linear tracker adapter for mentat:backlog: how Linear holds the stages, waits, order and reads of backlog items."
+description: "Linear adapter for mentat:backlog: how Linear holds stages, waits, order and item reads."
 user-invocable: false
 ---
 
