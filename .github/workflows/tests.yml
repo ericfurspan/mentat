@@ -9,20 +9,68 @@ jobs:
   tests:
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      CLAUDE_CODE_VERSION: 2.1.332
+      CODEX_VERSION: 0.172.0
+      SHELLCHECK_VERSION: 0.11.0
+      SHELLCHECK_SHA256: 56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install tools
+        shell: bash
         run: |
-          brew install shellcheck
-          npm install -g --prefix "$(brew --prefix)" @anthropic-ai/claude-code @openai/codex
+          set -euo pipefail
+          tools="$RUNNER_TEMP/tools"
+          dl=$(mktemp -d)
+          trap 'rm -rf "$dl"' EXIT
+          mkdir -p "$tools/bin"
+
+          npm install -g --prefix "$tools" "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" "@openai/codex@${CODEX_VERSION}"
+
+          sc_archive="shellcheck-v${SHELLCHECK_VERSION}.darwin.aarch64.tar.xz"
+          curl -fsSL --proto '=https' --tlsv1.2 --retry 3 \
+            -o "$dl/$sc_archive" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${sc_archive}"
+          (cd "$dl" && printf '%s  %s\n' "$SHELLCHECK_SHA256" "$sc_archive" | shasum -a 256 -c -)
+          tar -xf "$dl/$sc_archive" -C "$dl"
+          install -m 0755 "$dl/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$tools/bin/shellcheck"
+
+          gl_archive="gitleaks_${GITLEAKS_VERSION}_darwin_arm64.tar.gz"
+          curl -fsSL --proto '=https' --tlsv1.2 --retry 3 \
+            -o "$dl/$gl_archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${gl_archive}"
+          (cd "$dl" && printf '%s  %s\n' "$GITLEAKS_SHA256" "$gl_archive" | shasum -a 256 -c -)
+          tar -xf "$dl/$gl_archive" -C "$dl"
+          install -m 0755 "$dl/gitleaks" "$tools/bin/gitleaks"
+
+          printf '%s\n' "$tools/bin" >>"$GITHUB_PATH"
       - name: Tool versions
+        shell: bash
         run: |
-          which codex claude shellcheck jq
-          codex --version
-          claude --version
-          shellcheck --version
+          set -euo pipefail
+          which codex claude shellcheck gitleaks jq
+          claude_out=$(claude --version)
+          codex_out=$(codex --version)
+          shellcheck_out=$(shellcheck --version)
+          gitleaks_out=$(gitleaks version)
+          printf '%s\n' "$claude_out" "$codex_out" "$shellcheck_out" "gitleaks $gitleaks_out"
           jq --version
+
+          bad=0
+          check_ver() {
+            if [ "$2" != "$3" ]; then
+              printf 'expected %s %s, got %s\n' "$1" "$3" "$2" >&2
+              bad=1
+            fi
+          }
+          check_ver claude "$(printf '%s\n' "$claude_out" | awk '{print $1; exit}')" "$CLAUDE_CODE_VERSION"
+          check_ver codex "$(printf '%s\n' "$codex_out" | awk '$1 == "codex-cli" {print $2; exit}')" "$CODEX_VERSION"
+          check_ver shellcheck "$(printf '%s\n' "$shellcheck_out" | awk '$1 == "version:" {print $2; exit}')" "$SHELLCHECK_VERSION"
+          check_ver gitleaks "$(printf '%s\n' "$gitleaks_out" | tr -d '[:space:]')" "$GITLEAKS_VERSION"
+          [ "$bad" -eq 0 ]
       - name: Run the test suite
         run: tests/run

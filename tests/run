@@ -894,8 +894,9 @@ else
   fail "claude not installed, the plugin manifests not validated"
 fi
 
-# The CI workflow declares permissions and pins every action to a commit (a
-# check of form, not of least privilege).
+# The CI workflow declares permissions, pins every action to a commit, and pins
+# each installed tool (exact npm version for claude-code and codex; version and
+# SHA-256 checksum for shellcheck and gitleaks, with no brew install).
 workflow=.github/workflows/tests.yml
 if [ -f "$workflow" ] && grep -q '^permissions:' "$workflow" \
   && ! grep -E '^[[:space:]-]*uses:' "$workflow" \
@@ -903,6 +904,44 @@ if [ -f "$workflow" ] && grep -q '^permissions:' "$workflow" \
   pass "$workflow declares permissions and pins every action to a commit"
 else
   fail "$workflow must exist, declare explicit permissions, and pin every action to a 40-hex commit (uses: owner/repo@<sha>)"
+fi
+# Check the pin declarations and the install commands that consume them. Match
+# whole lines so a commented-out command or an ignored checksum failure fails.
+wf_lines=''
+if [ -f "$workflow" ]; then
+  wf_lines=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$workflow") || exit 1
+fi
+wf_version='[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?'
+wf_pin() { grep -Eq "^$1: $2$" <<< "$wf_lines"; }
+wf_archive_pinned() {
+  local tool=$1 archive=$2 verify
+  # shellcheck disable=SC2016
+  printf -v verify '(cd "$dl" && printf '\''%%s  %%s\\n'\'' "$%s_SHA256" "$%s" | shasum -a 256 -c -)' "$tool" "$archive"
+  wf_pin "${tool}_VERSION" "$wf_version" && wf_pin "${tool}_SHA256" '[0-9a-f]{64}' \
+    && grep -Fxq "$verify" <<< "$wf_lines"
+}
+if [ -f "$workflow" ] && ! grep -Ev '^[[:space:]]*#' "$workflow" | grep -Eq '(^|[^A-Za-z0-9_-])brew([^A-Za-z0-9_-]|$)'; then
+  pass "$workflow installs tools without brew"
+else
+  fail "$workflow must not use brew to install tools"
+fi
+# shellcheck disable=SC2016
+wf_npm_install='npm install -g --prefix "$tools" "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" "@openai/codex@${CODEX_VERSION}"'
+if wf_pin CLAUDE_CODE_VERSION "$wf_version" && wf_pin CODEX_VERSION "$wf_version" \
+  && [ "$(awk '!/^#/ && /@anthropic-ai\/claude-code|@openai\/codex/' <<< "$wf_lines")" = "$wf_npm_install" ]; then
+  pass "$workflow installs @anthropic-ai/claude-code and @openai/codex at exact npm versions"
+else
+  fail "$workflow must install @anthropic-ai/claude-code and @openai/codex at exact npm versions"
+fi
+if wf_archive_pinned SHELLCHECK sc_archive; then
+  pass "$workflow pins shellcheck with a version and SHA-256 checksum"
+else
+  fail "$workflow must pin shellcheck with a version and 64-hex SHA-256 checksum verified by shasum -a 256 -c"
+fi
+if wf_archive_pinned GITLEAKS gl_archive; then
+  pass "$workflow pins gitleaks with a version and SHA-256 checksum"
+else
+  fail "$workflow must pin gitleaks with a version and 64-hex SHA-256 checksum verified by shasum -a 256 -c"
 fi
 
 # Shell scripts pass shellcheck.
