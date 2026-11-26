@@ -13,6 +13,12 @@ PRIVATE_WORDS="$HOME/.config/mentat/private-words"
 # lines, lines starting with # and a line that is only exact: are skipped. A missing
 # or unreadable list counts as empty. Here-strings, not pipes: under pipefail,
 # grep -q stopping early on long text would read as no hit.
+# For local paths it matches only this machine's home, ignoring case, as a substring
+# anywhere in the text. It differs from the mentat-public-text hook's matcher in two
+# ways, on purpose: it does not take the hook's rule for other users' home folders,
+# accepting that gap so a review reply is not held where it cannot be reworded and
+# retried, and its home match is unanchored where the hook's is a bounded path.
+# tests/private-match.sh runs both over the same text.
 private_text() {
   local words exact
   if grep -aiqF -e "$HOME" <<<"$1"; then printf 'a local path'; return 0; fi

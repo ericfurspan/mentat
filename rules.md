@@ -10,7 +10,9 @@ One implementer (`agents/builder.md`) per pull request, in its worktree; the mai
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
-After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word forward of it.
+After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word forward of it; about any other pull request, say what it waits on.
+
+After compaction or resume, reload the current skill and `mentat:build`'s `helpers.md`.
 
 Finish the step in flight first; never interrupt a running implementer, review or test run.
 
@@ -19,11 +21,15 @@ Backlog work follows `mentat:backlog`. GitHub records are public-safe (`mentat:b
 ## What goes to the maintainer
 Outcomes, scope, cost and risk are theirs; settle the rest. Read `mentat:plan`'s "Decisions" before asking or recommending. Only the maintainer's own choice or words count as their answer.
 
-After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; a block only they can clear arises (external, irreversible or a credential); or an agreed manual check is due. Log other calls in the pull request and one batch summary.
+In chat, name a pull request "PR #N" with its item's id, if any, and an item by its full id.
+
+Hold a recommendation, citing the record it rests on, unless new facts or found errors appear; reverse only after a fresh-context check.
+
+After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; only they can clear an external, irreversible or credential block; or an agreed manual check is due. Log other calls in the pull request and one summary: `mentat:build`'s final message, else the "Ready to merge" message.
 
 A session another session started asks the maintainer nothing: it sends each question, wait, Ready and Hold line to its starting session (`mentat:build` "Started sessions"), which forwards the maintainer's exact words back. When the maintainer writes in a started session, it answers them there and records the answer as usual.
 
-Outside the messages a skill requires, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
+Beyond the messages skills require, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
 
 Restate a repeated correction in one line, then follow it.
 

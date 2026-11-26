@@ -1,6 +1,6 @@
 # Records
 
-Read this before writing a record on GitHub (an issue, a pull request, a comment), one these skills call public-safe, or an item's agent records, and again after a compaction.
+Read this before writing a record on GitHub (an issue, a pull request, a comment), one these skills call public-safe, or an item's agent records, and again after a compaction or a resume.
 
 ## Public records
 
@@ -20,7 +20,11 @@ An item keeps its agent records in one comment whose first line is `Agent record
 
 A later fingerprint and answer, assumptions list or plan replaces the earlier one in place; settlements and decisions lines add one entry each. With GitHub issues the comment holds no settlements, decisions or plan: the issue keeps its plan and decisions in its body (`github.md`).
 
-The first record posts the comment; every later one edits it in place, never posting another: with an external backlog, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. A chat request has no item yet: keep its plan check and second opinion records, and their files, for `SKILL.md` "Agreement", which writes them on the item it creates; if nothing is agreed, nothing is written. Every reader takes a record from this comment.
+The first record posts the comment; every later one edits it in place, never posting another: with an external backlog, as its adapter says (`mentat-linear:linear` "Agent records"); with GitHub issues, `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`, the file holding the whole new comment. A chat request has no item yet: keep its plan check and second opinion records, and their files, for `SKILL.md` "Agreement", which writes them on the item it creates; if nothing is agreed, nothing is written. Every reader takes a record from this comment, else from the older comments as "Older items" says.
+
+## Older items
+
+An item's first `Agent records` comment carries forward the latest fingerprint and answer and assumptions list from its older separate comments (`Spec fingerprint: ...`, `Material assumptions:`). Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records. Older plan check, second opinion and advice comments are not carried and stay on the item as they are.
 
 ## Decision lines
 

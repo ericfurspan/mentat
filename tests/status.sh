@@ -191,10 +191,17 @@ reset; touch "$STUB/no_owner"; rc=$(run 7)
 check "owner review: a repository owner that cannot be read is unknown, and the rest of the line is as it was (exit 0)" '[ "$rc" = 0 ] && line "$NONE, owner review: unknown (could not read the repository owner), calls section: missing"'
 
 # The calls section field, last on the line: whether the description has a Markdown heading
-# "Decisions and Risks", where the calls made without the maintainer are logged, at any level
+# "Decisions and Risks", where the calls made without the maintainer are logged, or the older
+# "Calls made without the maintainer" an open pull request may still have, at any level
 # and wherever a template puts it.
 reset; printf '**Status:** In review\n\n## Summary\n\nA change.\n\n## Decisions and Risks\n\n- none\n\n## Test plan\n\n- tests/run\n' >"$STUB/body"; rc=$(run 7)
 check "calls section: present, where the template puts it, after Summary and before Test plan" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
+reset; printf '**Status:** In review\n\n## Summary\n\nA change.\n\n## Decisions\n\n- A choice (agreed)\n\n## Calls made without the maintainer\n\n- none\n\n## Risks\n\n- A risk.\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: present, when the description has the older separate Decisions, Calls made without the maintainer and Risks headings" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
+reset; printf '**Status:** In review\r\n\r\n## Summary\r\n\r\nA change.\r\n\r\n### Calls made without the maintainer ###\r\n\r\nnone\r\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: present, under the older heading alone, at another level with closing hashes, in a body with CRLF line ends" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
+reset; printf '**Status:** In review\n\nCalls made without the maintainer: none.\n\n## Calls made without the maintainer today\n\n```\n## Calls made without the maintainer\n```\n\n## Decisions\n\n## Risks\n\n- A risk.\n' >"$STUB/body"; rc=$(run 7)
+check "calls section: missing, when the older words are only in prose, a longer heading or a fence, beside only Decisions and Risks headings" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: missing"'
 reset; printf '**Status:** In review\r\n\r\n## Summary\r\n\r\nA change.\r\n\r\n## Test plan\r\n\r\n- tests/run\r\n\r\n#### Decisions and Risks ##  \r\n\r\nnone\r\n' >"$STUB/body"; rc=$(run 7)
 check "calls section: present, under another heading level with closing hashes, after every other section, in a body with CRLF line ends" '[ "$rc" = 0 ] && line "$NONE, owner review: not requested, calls section: present"'
 reset; printf '**Status:** In review\n\nDecisions and Risks: none.\n\n## Decisions and Risks today\n\n####### Decisions and Risks\n\n##Decisions and Risks\n\n    ## Decisions and Risks\n' >"$STUB/body"; rc=$(run 7)

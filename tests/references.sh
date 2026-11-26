@@ -8,10 +8,11 @@
 # A file a skill file (SKILL.md, a supporting file or CREDITS.md, module skills included), rules.md
 # or AGENTS.md names in backticks exists: `name.md` or `../<skill>/name.md` relative to a skill
 # file's folder, or at the repository root, such as rules.md; `name.md` in `mentat:<skill>`'s folder
-# (or a module's skill) and `mentat:<skill>`'s `name.md` in that skill's folder; and, in rules.md and
-# AGENTS.md, a path from the repository root such as `skills/backlog/records.md`. File names may hold
-# capitals, such as `../build/SKILL.md`; `NNNN-slug.md`, the shape of a decision record not yet
-# written, is skipped.
+# (or a module's skill) and `mentat:<skill>`'s `name.md` in that skill's folder; and a path from the
+# repository root such as `skills/backlog/records.md`, except one in a CREDITS.md in parentheses
+# right after a link, which cites the linked repository. File names may hold capitals and underscores,
+# such as `../build/SKILL.md`; `NNNN-slug.md`, the shape of a decision record not yet written, is skipped.
+# tests/references-cases.sh runs it on invented skill files.
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
@@ -35,7 +36,7 @@ skill_path() {
     *) printf 'plugins/%s/skills/%s/%s\n' "${1%%:*}" "${1#*:}" "$2" ;;
   esac
 }
-name='[A-Za-z][A-Za-z0-9-]*\.md'
+name='[A-Za-z][A-Za-z0-9_-]*\.md'
 in_folder="\`$name\` in \`mentat(-[a-z-]+)?:[a-z-]+\`'s folder"
 owners_file="\`mentat(-[a-z-]+)?:[a-z-]+\`'s \`$name\`"
 files=$( { printf '%s\n' rules.md AGENTS.md; git ls-files --cached --others --exclude-standard -- 'skills/*.md' 'plugins/*/skills/*.md'; } | sort -u)
@@ -79,7 +80,12 @@ while IFS= read -r f; do
       fail "$f names $owner's $file, but $path is missing"
     fi
   done <<<"$(grep -o -E "$owners_file" "$f" | tr -d '\`' | sort -u)"
-  [ "$dir" = . ] || continue
+  # A path from the repository root. In a CREDITS.md, one in parentheses right after a link
+  # cites the linked repository, so it is left out.
+  cited='s/^$//'
+  case $f in
+    *CREDITS.md) cited="s/\]\(https?:\/\/[^)]*\) \(\`[^\`]*\`\)//g" ;;
+  esac
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
     if [ -f "$ref" ]; then
@@ -87,7 +93,7 @@ while IFS= read -r f; do
     else
       fail "$f names $ref, but it is missing"
     fi
-  done <<<"$(grep -o -E "\`[a-z][a-z0-9._-]*(/[A-Za-z0-9._-]+)+\.md\`" "$f" | tr -d '\`' | sort -u)"
+  done <<<"$(sed -E "$cited" "$f" | grep -o -E "\`[a-z][a-z0-9._-]*(/[A-Za-z0-9._-]+)+\.md\`" | tr -d '\`' | sort -u)"
 done <<<"$files"
 
 if [ "$failures" -gt 0 ]; then
