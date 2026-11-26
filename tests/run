@@ -130,11 +130,15 @@ skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
 skills/pr/SKILL.md||(agreed | agreed by default | made without the maintainer)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
 skills/plan/session.md||settling its questions, except one waiting as step 3 says, before going on to the next without asking
-skills/plan/session.md||each item before any whose decisions hang on it; an order the maintainer gave is followed instead, a decision in it that hangs on one still open on a later item waiting until that one is answered.
+skills/plan/session.md||each item before any whose decisions hang on it; an order the maintainer gave is followed instead.
+skills/plan/session.md||A decision that hangs on one still open, on any item, waits until that one is answered, then is asked at once; its item stops before the plan check (\`SKILL.md\` step 6) until then, and step 7 reports a blocker outside the session as its open decision.
+skills/plan/SKILL.md|Decisions|The turn carries nothing else but a report a rule or skill requires then, above the labeled lines, one line for a failure still blocking work and the planning order (\`session.md\` step 3).
 skills/plan/session.md||and again after a compaction or a resume, then go on with the items not yet planned, in the stated order, skipping those it committed, closed or folded, or that the maintainer left after "Not now".
 skills/plan/session.md||An item not yet agreed, an agreed one whose recorded fingerprint is missing or differs from its current spec's, or one taking in scope that still needs agreement, such as an item another is folded into, goes through \`SKILL.md\` steps 2 to 8; any other agreed item gets only steps 2 and 4, the skeptic's pass and its open maintainer decisions asked and recorded, with no plan check, agreement question or spec.
 skills/plan/session.md||on an item left with an open decision, and its removal once none is open.
-skills/plan/session.md||none already answered except a skeptic's-pass finding with new evidence, asked once as revisiting (\`SKILL.md\` step 2),
+skills/plan/session.md||none already answered except one with new evidence that changes its outcome, premise or likelihood, such as a skeptic's-pass finding (\`SKILL.md\` step 2) or a changed answer it rests on, asked once as revisiting,
+skills/plan/session.md||with \`Agree and build now\`, in the order step 3 followed,
+rules.md|What goes to the maintainer|After agreement, stop for the maintainer only when:
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/plan/SKILL.md||or says yes to the order question of \`mentat-linear:triage\` "Report", read \`session.md\`
 skills/plan/SKILL.md||When Claude Code calls this skill itself to give a view on or suggest a change, other than on that triage yes, it plans one change and starts no planning session; when a rule or skill sends it here only for "Decisions", its "Recommendations" included, it applies that section and runs none of the steps.
