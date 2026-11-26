@@ -191,6 +191,7 @@ skills/backlog/SKILL.md|Reading an item|A read to plan an item also reads the de
 skills/backlog/SKILL.md|Reading an item|and the older spec fingerprint, advice, assumptions list, second-opinion settlement and plan check record comments and an older comment copying a hand-made item's original text), is not theirs;
 skills/backlog/records.md|Agent records|Every reader takes a record from this comment, else from the older comments as "Older items" says.
 skills/backlog/records.md|Older items|Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records.
+skills/backlog/records.md|Reply block|A round ending in \`mentat:plan\` steps 6 and 7 prints nothing; there the maintainer's \`Show the full proposal\` prints every round's block
 skills/backlog/github.md||An issue agreed before the spec had that name keeps its \`## Agreed request\` heading and body, and every reader accepts either heading.
 plugins/mentat-linear/skills/linear/SKILL.md|Where the spec lives|An item with no \`Spec\` document and no recorded id reads a \`## Spec\` or \`## Agreed request\` section in its description instead,
 skills/pr/SKILL.md||(an older issue or item, agreed before the spec had that name and with no numbered list, is read as each requirement it states)
