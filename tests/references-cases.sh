@@ -72,6 +72,12 @@ put "$r" skills/sample/CREDITS.md 'Adapted from [sample/skills](https://example.
 run_check "$r"
 expect "a CREDITS.md path naming a missing file here fails" 1 "FAIL: references skills/sample/CREDITS.md names skills/other/CREDITS.md, but it is missing"
 
+# A file name with an underscore is checked too: a missing one fails.
+r=$(repo) || exit 1
+put "$r" skills/sample/SKILL.md 'Read `../backlog/agent_records.md` first.'
+run_check "$r"
+expect "a relative path to a missing file whose name holds an underscore fails" 1 "FAIL: references skills/sample/SKILL.md names ../backlog/agent_records.md, but skills/sample/../backlog/agent_records.md is missing"
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi
