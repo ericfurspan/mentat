@@ -6,7 +6,7 @@ Read this, part of `SKILL.md` in this folder, at "Start" and again after a compa
 
 A held item has the go-ahead to implement and is not handed over yet: agreed with `Agree and build now`, agreed by default ("Planning"), given the maintainer's later word, or redirected here ("Redirects"). Its stage is `held`, its `--held-by` saying what holds it. At "Start", and before the closing message of each turn with a held item, hand over each free item, checking in this order:
 
-1. `mentat state owner` prints this session's id. When it prints another id, stop acting as orchestrator, saying so in one line. When it exits 1 and `mentat state orchestrator` shows this session's id ended, run `mentat state orchestrator set` with it again.
+1. "Owner check", run again here, leaves this session the orchestrator.
 2. No pause holds new handovers: a `hold` note with the maintainer's word to pause, until their word to resume or the end it names. An end this session cannot check, or one that can no longer come, stands until their word.
 3. The item's blocked-by links are met (`mentat:backlog` "Blocked-by links").
 4. No hold in "Holds" stands.
