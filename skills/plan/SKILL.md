@@ -8,7 +8,7 @@ Plans one change with the maintainer, up to their agreement. When the maintainer
 
 A change Claude Code suggests outside the request it is carrying out, or a defect it finds, is filed as `mentat:backlog` "Filing" says.
 
-Nothing is implemented before the maintainer agrees; the one exception is an item `mentat-lead:orchestrate` agrees by default. The plan check's `DO IT` is not agreement. The maintainer agrees once, and agreed work whose spec is unchanged gets no further plan check.
+Nothing is implemented before the maintainer agrees; the one exception is an item `mentat-lead:orchestrate` agrees by default. The plan check's `DO IT` is not agreement. The maintainer agrees once, and agreed work whose spec is unchanged and that takes in no scope still needing agreement, such as scope triage merged into it, gets no further plan check.
 
 ## Steps
 
@@ -32,7 +32,7 @@ Nothing is implemented before the maintainer agrees; the one exception is an ite
    - `Not now`: commits nothing and opens a talk; once the maintainer says to leave the item, it is not asked again until next planned.
 
    When the maintainer objects to the item's design, plan or pull request in their reply to the agreement question or in any talk after it, the session writes one decisions line on the item recording each objection (`../backlog/agent-records.md` "Decision lines"). A reply with no Agree answer is not agreement.
-8. Record. Only an Agree answer, or `mentat-lead:orchestrate`'s default agreement, writes the spec, records its fingerprint or moves the item, as `mentat:backlog` "Agreement" says, posting the answer reply (step 4) to the open maintainer comments the agreement question answered, adding a decisions line for each answer not yet on the item, the standing assumptions (`mentat:backlog` `Material assumptions`), a blocked-by link for each item it waits on (`mentat:backlog` `Start waits`) and any advice against it the maintainer overrode (`mentat:backlog` "Advice against"). The spec carries the decided situations as one numbered requirement, one lettered line per situation, beyond the usual one or two lines. The spec lists a manual check only when the maintainer accepted or asked for one, and a fast track, with its reason, only when they agreed to one.
+8. Record. Only an Agree answer, or `mentat-lead:orchestrate`'s default agreement, writes the spec, records its fingerprint or moves the item, as `mentat:backlog` "Agreement" says, posting the answer reply (step 4) to the open maintainer comments the agreement question answered, adding a decisions line for each answer and objection not yet on the item, the standing assumptions (`mentat:backlog` `Material assumptions`), a blocked-by link for each item it waits on (`mentat:backlog` `Start waits`) and any advice against it the maintainer overrode (`mentat:backlog` "Advice against"). The spec carries the decided situations as one numbered requirement, one lettered line per situation, beyond the usual one or two lines. The spec lists a manual check only when the maintainer accepted or asked for one, and a fast track, with its reason, only when they agreed to one.
 
 ## Small requests
 
@@ -50,7 +50,7 @@ A chat request's `Agree and build now` goes on in this session, unless `../build
 - Ask one decision per question, about what they get, pay or risk, explaining any name they may not know, with answers covering the outcomes they might want, the recommended one first, with why.
 - Prompt form, when one sentence says it all: one `AskUserQuestion` prompt of about 25 words, options of about 12, with a not-ready option that records nothing and opens a talk. Nothing they must read goes in text before it in the same turn; a question resting on such text, the view (step 3) included, takes the message form with it inside.
 - Message form, when they need more: at most about 150 words in short labeled lines (what they get, what it costs or risks, why the first answer), then the question and its answers numbered from 1; no other list in it is numbered (use bullets or letters). The turn carries nothing else but one line for a failure still blocking work and the planning order (`session.md` step 3).
-- A named or numbered answer chooses it, with any condition it adds; a number no answer has, or one with words naming a different answer, is not-ready; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready. Only the maintainer's own choice or words count as their answer.
+- A named or numbered answer chooses it, with any condition it adds, except one deciding a later close, cancel or raise, whose question is asked when it comes due; a number no answer has, or one with words naming a different answer, is not-ready; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready. Only the maintainer's own choice or words count as their answer.
 - A decision of theirs that blocks no current work goes in its item's "Decision for the maintainer" section (`mentat:backlog` "Item shape"), asked when the item is next planned; one still open when the item's pull request passes the ready gate (`mentat:review`), or raised after that, goes to a Backlog item instead, asked when that item is planned.
 
 ### Recommendations

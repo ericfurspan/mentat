@@ -114,6 +114,9 @@ plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer w
 skills/backlog/agent-records.md|The comment|replaces the answer and keeps that line
 skills/backlog/agent-records.md|The comment|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/plan/SKILL.md||Nothing is implemented before the maintainer agrees; the one exception is an item \`mentat-lead:orchestrate\` agrees by default.
+skills/plan/SKILL.md||The maintainer agrees once, and agreed work whose spec is unchanged and that takes in no scope still needing agreement, such as scope triage merged into it, gets no further plan check.
+docs/invariants.md||agreed work whose spec is unchanged and that takes in no scope still needing agreement, such as scope triage merged into it, gets no further plan check;
+skills/backlog/replies.md||In \`mentat:plan\` steps 6 and 7 it is shown in chat only when the maintainer picks "Show the full proposal"; elsewhere it goes in chat.
 skills/plan/SKILL.md||Only an Agree answer, or \`mentat-lead:orchestrate\`'s default agreement, writes the spec, records its fingerprint or moves the item
 skills/backlog/SKILL.md|Agreement|an item agreed by default records \`build: now\` and the default-agreement line that record gives, never as the maintainer's answer
 skills/backlog/agent-records.md|The comment|\`Agreed by default: nothing was open for the maintainer\`, never written as the maintainer's answer
@@ -128,7 +131,8 @@ skills/backlog/SKILL.md|Stages|Only the maintainer's yes in \`mentat:plan\`, or 
 skills/pr/SKILL.md||an "agreed" or "agreed by default" mark matches the spec
 skills/pr/SKILL.md||(agreed | agreed by default | made in the build)
 skills/pr/SKILL.md||"agreed by default" when the item's agent records hold the default-agreement line
-skills/plan/session.md||settling its questions before going on to the next without asking
+skills/plan/session.md||settling its questions, except one waiting as step 3 says, before going on to the next without asking
+skills/plan/session.md||each item before any whose decisions hang on it; an order the maintainer gave is followed instead, a decision in it that hangs on one still open on a later item waiting until that one is answered.
 skills/plan/session.md||and again after a compaction or a resume, then go on with the items not yet planned, in the stated order, skipping those it committed, closed or folded, or that the maintainer left after "Not now".
 skills/plan/session.md||An item not yet agreed, an agreed one whose recorded fingerprint is missing or differs from its current spec's, or one taking in scope that still needs agreement, such as an item another is folded into, goes through \`SKILL.md\` steps 2 to 8; any other agreed item gets only steps 2 and 4, the skeptic's pass and its open maintainer decisions asked and recorded, with no plan check, agreement question or spec.
 skills/plan/session.md||on an item left with an open decision, and its removal once none is open.
@@ -167,14 +171,14 @@ skills/plan/SKILL.md|Steps|each recorded objection and how the plan meets it or 
 skills/plan/SKILL.md|Steps|\`Not now\`: commits nothing and opens a talk
 skills/plan/SKILL.md|Steps|or it adopts a \`DON'T\`; else \`Agree and build now\` where the maintainer wants it implemented in this session, else \`Agree, build later\`):
 skills/plan/SKILL.md|Steps|Ask only the maintainer's decisions, as "Decisions" says, and record each answer as a decisions line on the item (\`mentat:backlog\` "Item shape"), at step 8 when the request has none yet, and post the answer reply to the open maintainer comments it answered (\`mentat:backlog\` "Reading an item").
-skills/plan/SKILL.md|Steps|as \`mentat:backlog\` "Agreement" says, posting the answer reply (step 4) to the open maintainer comments the agreement question answered, adding a decisions line for each answer not yet on the item,
+skills/plan/SKILL.md|Steps|as \`mentat:backlog\` "Agreement" says, posting the answer reply (step 4) to the open maintainer comments the agreement question answered, adding a decisions line for each answer and objection not yet on the item,
 skills/plan/SKILL.md|Steps|Settle each point (\`mentat:backlog\` "Replies in chat"); for a situation list, a situation the check names as missing or conflicting, and each situation an adopted change adds, is decided and listed before agreement, with no second check.
 skills/plan/session.md||Write to the backlog only what \`SKILL.md\` records for answers and agreements given here
 skills/plan/session.md||a fold's lines, writes a started session sends back
 skills/plan/session.md||each call the session settles, logged on its item (\`SKILL.md\` "Decisions"), a fold's lines
 $o|Planning|no objection of the maintainer's is recorded for the work (\`mentat:plan\` step 7)
 skills/plan/SKILL.md|Decisions|and any recommendation against the maintainer's earlier answers, goals and recorded objections, adopted plan-check points and the plan's answers to objections; correct a conflict or ask it as revisiting, never override it silently.
-skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds; a number no answer has, or one with words naming a different answer, is not-ready; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
+skills/plan/SKILL.md|Decisions|A named or numbered answer chooses it, with any condition it adds, except one deciding a later close, cancel or raise, whose question is asked when it comes due; a number no answer has, or one with words naming a different answer, is not-ready; a plain yes chooses the first; a reply the asking file defines as an answer is that answer; any other reply is not-ready.
 skills/plan/SKILL.md|Decisions|one still open when the item's pull request passes the ready gate (\`mentat:review\`), or raised after that, goes to a Backlog item instead
 skills/plan/SKILL.md|Decisions|Nothing they must read goes in text before it in the same turn; a question resting on such text, the view (step 3) included, takes the message form with it inside.
 skills/review/ready-gate.md||Otherwise, move each decision in any open "Decision for the maintainer" section to a Backlog item
