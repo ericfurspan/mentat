@@ -62,6 +62,7 @@ printf '%s\n' "$lines" | jq -R 'tonumber | {RuleID: "stub-rule", StartLine: ., F
 exit "$code"
 STUBEOF
 chmod +x "$tmp/bin/gitleaks"
+live_path=$PATH
 export PATH="$tmp/bin:$PATH"
 mentat_hooks="$root/git-hooks/hooks"
 
@@ -643,5 +644,61 @@ cp "$root/hooks/session-start" "$tmp/plugin/hooks/"; cp "$root/rules.md" "$tmp/p
 "$tmp/plugin/hooks/session-start" >"$STUB/start" 2>&1; rc=$?
 check "session start: a check that cannot run says so, then prints rules.md" \
   '[ "$rc" = 0 ] && [ "$(head -n 1 "$STUB/start")" = "Mentat PROBLEM: the installed git hooks could not be checked. Tell the maintainer before anything else, and run mentat check." ] && tail -n +3 "$STUB/start" | cmp -s - "$root/rules.md"'
+
+# Use the original PATH and a fresh repository to exercise real default rules.
+# Build an invented GitHub PAT at runtime so the source stays clean.
+if ! live_gitleaks=$(PATH="$live_path" type -P gitleaks); then
+  if [ "${CI+x}" = x ]; then
+    printf 'FAIL: git-hooks live gitleaks check: real gitleaks is not on PATH\n'
+    failures=$((failures + 1))
+  else
+    printf 'SKIP: git-hooks live gitleaks check: real gitleaks is not on PATH\n'
+  fi
+else
+  unset GITLEAKS_CONFIG GITLEAKS_CONFIG_TOML
+  case "$live_gitleaks" in
+    /*) ;;
+    *) live_dir=$(cd "$(dirname "$live_gitleaks")" && pwd -P) || exit 1
+       live_path="$live_dir:$live_path" ;;
+  esac
+  live_tok="gh"
+  live_tok="${live_tok}p_"
+  for _p in 9kQ7 mX2v R4L8 nT5p W3zB 6yH9 jC2f D8M4 sV7q; do
+    live_tok="${live_tok}${_p}"
+  done
+  live_repo="$tmp/live repo"
+  git init -q "$live_repo" && git -C "$live_repo" commit -q --allow-empty -m "init" || exit 1
+  in=$live_repo
+  live_h=$(head_of) || exit 1
+
+  rm -f "$STUB/calls" || exit 1
+  printf 'line one\nval = %s\n' "$live_tok" >"$live_repo/live hit.txt" &&
+    git -C "$live_repo" add "live hit.txt" || exit 1
+  PATH="$live_path" A commit -q -m "add live secret"; rc=$?
+  check "live gitleaks: pre-commit refuses a staged invented secret, naming the file and never printing the secret" \
+    '[ "$rc" != 0 ] && [ ! -e "$STUB/calls" ] && [ "$(head_of)" = "$live_h" ] && grep -q "commit refused" "$STUB/out" && grep -Fxq "github-pat in live hit.txt" "$STUB/out" && ! grep -qF -- "$live_tok" "$STUB/out"'
+
+  rm -f "$STUB/calls" || exit 1
+  git -C "$live_repo" reset -q --hard "$live_h" &&
+    printf 'plain non-empty content\n' >"$live_repo/live clean.txt" &&
+    git -C "$live_repo" add "live clean.txt" || exit 1
+  PATH="$live_path" A commit -q -m "add live clean"; rc=$?
+  check "live gitleaks: pre-commit passes a non-empty clean staged file" \
+    '[ "$rc" = 0 ] && [ ! -e "$STUB/calls" ] && [ "$(git -C "$live_repo" show "HEAD:live clean.txt")" = "plain non-empty content" ]'
+
+  live_scan() (
+    cd "$live_repo" || exit 2
+    PATH="$live_path" "$root/git-hooks/scan" --text "commit messages"
+  )
+  rm -f "$STUB/calls" || exit 1
+  printf 'subject\n\nval = %s\n' "$live_tok" | live_scan >"$STUB/out" 2>&1; rc=$?
+  check "live gitleaks: scan --text refuses an invented secret, naming the label and never printing the secret" \
+    '[ "$rc" = 1 ] && [ ! -e "$STUB/calls" ] && grep -Fxq "github-pat in commit messages" "$STUB/out" && ! grep -qF -- "$live_tok" "$STUB/out"'
+
+  rm -f "$STUB/calls" || exit 1
+  printf 'subject\n\nplain clean message\n' | live_scan >"$STUB/out" 2>&1; rc=$?
+  check "live gitleaks: scan --text passes clean text" \
+    '[ "$rc" = 0 ] && [ ! -e "$STUB/calls" ] && [ ! -s "$STUB/out" ]'
+fi
 
 [ "$failures" -eq 0 ]

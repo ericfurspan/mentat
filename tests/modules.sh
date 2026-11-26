@@ -22,12 +22,15 @@ check "the marketplace lists exactly the core plugin and the four modules" \
   '[ "$(jq -r "[.plugins[].name] | sort | join(\" \")" "$market")" = "mentat mentat-lead mentat-linear mentat-public-text mentat-reviewers" ]'
 check "the core plugin is served from the repository root" \
   '[ "$(jq -r ".plugins[] | select(.name == \"mentat\") | .source" "$market")" = ./ ]'
+check ".claude-plugin/plugin.json parses" 'jq -e "type == \"object\"" .claude-plugin/plugin.json >/dev/null'
+check ".claude-plugin/plugin.json sets license to MIT" '[ "$(jq -r ".license // empty" .claude-plugin/plugin.json)" = MIT ]'
 
 words=0
 for m in $modules; do
   manifest=plugins/$m/.claude-plugin/plugin.json
   check "$manifest parses" 'jq -e "type == \"object\"" "$manifest" >/dev/null'
   check "$manifest is named $m" '[ "$(jq -r ".name" "$manifest")" = "$m" ]'
+  check "$manifest sets license to MIT" '[ "$(jq -r ".license // empty" "$manifest")" = MIT ]'
   check "the marketplace serves $m from ./plugins/$m" \
     '[ "$(jq -r --arg m "$m" ".plugins[] | select(.name == \$m) | .source" "$market")" = "./plugins/$m" ]'
   check "the marketplace entry for $m has the manifest's description" \
