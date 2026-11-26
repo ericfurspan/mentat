@@ -10,8 +10,8 @@
 # file's folder, or at the repository root, such as rules.md; `name.md` in `mentat:<skill>`'s folder
 # (or a module's skill) and `mentat:<skill>`'s `name.md` in that skill's folder; and a path from the
 # repository root such as `skills/backlog/records.md`, except one in a CREDITS.md in parentheses
-# right after a link, which cites the linked repository. File names may hold capitals, such as
-# `../build/SKILL.md`; `NNNN-slug.md`, the shape of a decision record not yet written, is skipped.
+# right after a link, which cites the linked repository. File names may hold capitals and underscores,
+# such as `../build/SKILL.md`; `NNNN-slug.md`, the shape of a decision record not yet written, is skipped.
 # tests/references-cases.sh runs it on invented skill files.
 set -uo pipefail
 
@@ -36,7 +36,7 @@ skill_path() {
     *) printf 'plugins/%s/skills/%s/%s\n' "${1%%:*}" "${1#*:}" "$2" ;;
   esac
 }
-name='[A-Za-z][A-Za-z0-9-]*\.md'
+name='[A-Za-z][A-Za-z0-9_-]*\.md'
 in_folder="\`$name\` in \`mentat(-[a-z-]+)?:[a-z-]+\`'s folder"
 owners_file="\`mentat(-[a-z-]+)?:[a-z-]+\`'s \`$name\`"
 files=$( { printf '%s\n' rules.md AGENTS.md; git ls-files --cached --others --exclude-standard -- 'skills/*.md' 'plugins/*/skills/*.md'; } | sort -u)
