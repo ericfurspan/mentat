@@ -15,9 +15,9 @@ Claude Code plans, builds and reviews each change; you decide what gets built an
 
 ## Requirements
 
-- macOS, with Claude Code, `git`, `jq`, and `gh` signed in.
-- For `mentat-reviewers`: each listed reviewer's command, signed in: the Codex CLI, outside the home folder; Grok Build (`grok login`).
-- For the git hooks: `gitleaks`.
+- macOS, with Claude Code 2.1.295 or later, `git`, `jq`, and `gh` signed in.
+- For `mentat-reviewers`: each listed reviewer's command, signed in: the Codex CLI, [outside the home folder](docs/setup.md#codex-outside-the-home-folder); Grok Build (`grok login`).
+- For the git hooks: `gitleaks` ([setup](docs/setup.md#git-hooks)).
 
 ## Install
 
@@ -29,7 +29,7 @@ claude plugin install mentat --marketplace ericfurspan/mentat --scope project
 
 This writes `.claude/settings.json`, turning Mentat on for everyone there (`--scope local`: only you; `--scope user`: every folder).
 
-- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>`.
+- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>` (and re-copy [git hooks](docs/setup.md#git-hooks) if used).
 - Remove: `claude plugin uninstall mentat@mentat --scope <install scope>`.
 
 Where pull requests need approval, give the agent its own GitHub account.
@@ -70,7 +70,7 @@ Breaking: `mentat-reviewers` needs a list: `"env": {"MENTAT_REVIEWERS": "codex,g
 
 ## Git hooks
 
-The hooks in `git-hooks/` refuse likely secrets and non-local default-branch pushes, then run the repository's own except `reference-transaction` and `post-index-change`. Both guards hold only where agents' `core.hooksPath` in `GIT_CONFIG_*` names a copy; `mentat check` reports their state.
+The hooks in `git-hooks/` refuse likely secrets and non-local default-branch pushes, then run repository hooks ([setup](docs/setup.md#git-hooks)). `mentat check` reports their state.
 
 ## Credits
 
