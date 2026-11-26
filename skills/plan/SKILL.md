@@ -4,7 +4,7 @@ description: "Use before a view on or suggesting a change, and on resuming one. 
 argument-hint: "[item id]"
 ---
 
-Plans one change with the maintainer, up to their agreement. When the maintainer types `/mentat:plan` with no argument or one item id (one word shaped like an id, such as `ABC-12`), or says yes to the order question of `mentat-linear:triage` "Report", read `session.md` in this skill's folder, and again after a compaction or a resume, and follow it; other text after the command is the request. When Claude Code calls this skill itself, with or without an item id, other than on that triage yes, it plans one change and starts no planning session.
+Plans one change with the maintainer, up to their agreement. When the maintainer types `/mentat:plan` with no argument or one item id (one word shaped like an id, such as `ABC-12`), or says yes to the order question of `mentat-linear:triage` "Report", read `session.md` in this skill's folder, and again after a compaction or a resume, and follow it; other text after the command is the request. When Claude Code calls this skill itself to give a view on or suggest a change, other than on that triage yes, it plans one change and starts no planning session; when a rule or skill sends it here only for "Decisions", its "Recommendations" included, it applies that section and runs none of the steps.
 
 A change Claude Code suggests outside the request it is carrying out, or a defect it finds, is filed as `mentat:backlog` "Filing" says.
 

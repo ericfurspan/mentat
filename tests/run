@@ -135,6 +135,7 @@ skills/plan/session.md||on an item left with an open decision, and its removal o
 skills/plan/session.md||none already answered except a skeptic's-pass finding with new evidence, asked once as revisiting (\`SKILL.md\` step 2),
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/plan/SKILL.md||or says yes to the order question of \`mentat-linear:triage\` "Report", read \`session.md\`
+skills/plan/SKILL.md||When Claude Code calls this skill itself to give a view on or suggest a change, other than on that triage yes, it plans one change and starts no planning session; when a rule or skill sends it here only for "Decisions", its "Recommendations" included, it applies that section and runs none of the steps.
 $o|Planning|keeps so a compaction or takeover goes on asking nothing
 skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with the sentences \`mentat:review\` "Final check" adds after it)
 skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included; the item's id
