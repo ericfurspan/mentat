@@ -39,7 +39,7 @@ A wait on a manual check or manual step goes at the top of its item, else right 
 
 Each step is written as `records.md` "Wait steps" says. A manual check's step: when the session can read the check's output and the spec gives a pass condition that needs no taste, the maintainer only runs it and the session judges the output against that condition; otherwise the step says where the output appears, how long it takes and what passing looks like. A visual or subjective check stays the maintainer's to judge.
 
-The steps go in full in the last message of the turn that first leaves the wait, saying the work waits on the maintainer, and likewise in a started session's message to its starting session, that session's forward of it (`mentat:build` "Started sessions") and an implementation run's final message; later turns repeat them only when asked. GitHub records: `github.md`.
+The steps go in full in the last message of the turn that first leaves the wait, saying the work waits on the maintainer, and likewise in a started session's message to its starting session and an implementation run's final message; later turns repeat them only when asked. GitHub records: `github.md`.
 
 ## Blocked-by links
 
@@ -88,7 +88,7 @@ After the plan check and after each `mentat second-opinion` round, show the repl
 
 ## Forwarded writes
 
-A backlog write a started implementation session sends back is made as `../build/SKILL.md` "Forwarded writes" says.
+A backlog write a started implementation session sends back is made by its starting session, as `mentat-lead:orchestrate` says.
 
 ## Tracker: Linear
 

@@ -1,20 +1,20 @@
 # Mentat rules
 
-The maintainer owns the repository; Claude Code plans and builds; fresh-context Claude reviews.
+The maintainer owns the repository; Claude Code plans and implements; fresh-context Claude reviews.
 
 Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels, templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
 Call `mentat:plan` before giving a view on or suggesting a change.
 
-One builder per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
+One implementer per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
 `mentat:pr` writes the description; after pushing, call `mentat:review`.
 
-After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word relay of it; about any other pull request, say what it waits on.
+After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word forward of it; about any other pull request, say what it waits on.
 
 After compaction or resume, reload the current skill and `mentat:build`'s `helpers.md`.
 
-Finish the step in flight first; never interrupt a running builder, review or test run.
+Finish the step in flight first; never interrupt a running implementer, review or test run.
 
 Backlog work follows `mentat:backlog`. GitHub records are public-safe (`mentat:backlog`'s `records.md`): Claude Code's words; no chat quotes, private repository or project names, local paths, account, billing or session details.
 
@@ -26,6 +26,8 @@ In chat, name a pull request "PR #N" with its item's id, if any, and an item by 
 Hold a recommendation, citing the record it rests on, unless new facts or found errors appear; reverse only after a fresh-context check.
 
 After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; only they can clear an external, irreversible or credential block; or an agreed manual check is due. Log other calls in the pull request and one summary: `mentat:build`'s final message, else the "Ready to merge" message.
+
+A started session asks the maintainer nothing and sends each question, wait, Ready and Hold line to its starting session (`mentat:build` "Started sessions").
 
 Beyond the messages skills require, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
 

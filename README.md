@@ -39,11 +39,13 @@ Optional modules install as `<module>@mentat`:
 - `mentat-reviewers`: outside reviewers; Codex and Grok ship.
 - `mentat-public-text`: blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`.
 - `mentat-linear`: the Linear adapter, and any backlog's Inbox triage: `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`.
-- `mentat-lead`: grill, an interview on open decisions, `/mentat-lead:retro`, improvements from a session, and `/mentat-lead:orchestrate`, which plans work and hands each batch to a fresh build session.
+- `mentat-lead`: grill, an interview on open decisions, and `/mentat-lead:orchestrate`, the one session you talk to, handing work to fresh sessions.
+
+Breaking: orchestrate-notes.md is not read (move live entries into `mentat state`); retro is removed.
 
 ## Usage
 
-Ask for a change in chat; Mentat runs the workflow. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
+Ask for a change in chat. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
 
 - `/mentat:plan [item id]`: plan with you and start building what you commit.
 - `/mentat:build [item id ...]`: build committed items, one pull request each.
@@ -58,9 +60,9 @@ Mentat reads from AGENTS.md:
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
-[docs/settings.md](docs/settings.md) lists every setting, with its default and where to set it.
+[docs/settings.md](docs/settings.md) lists every setting, its default and where to set it.
 
-Moving a backlog to Linear is manual: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
+Moving a backlog to Linear: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
 
 ## Review tools
 
@@ -72,4 +74,4 @@ The hooks in `git-hooks/` refuse likely secrets and non-local default-branch pus
 
 ## Credits
 
-Skills' `CREDITS.md` files credit their sources, and only some hold third-party licenses.
+Skills' `CREDITS.md` files credit their sources; some hold third-party licenses.

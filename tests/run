@@ -57,13 +57,14 @@ fi
 # ## section that must hold the text (empty for the whole file) and the text, separated by |, which
 # only the text may hold (a tab would not do: read merges an empty field between two tabs).
 # The orchestrator agrees an item by default when nothing is open, holds or hands it over like any
-# item, owes the maintainer a tell for it, and keeps that tell in its notes file until given; the
-# planning and recording contracts name that default; and a new feature or workflow change gets a
-# short sourced survey of established practice before its view.
-# The Ready line starts with an icon that every repeat or relay keeps, and its first showing in the
+# item and sends the maintainer one line for it; the planning and recording contracts name that
+# default; and a new feature or workflow change gets a short sourced survey of established practice
+# before its view. The orchestrator is the one session the maintainer talks to: a started session
+# asks them nothing, and the orchestrator keeps its state, questions included, in mentat state.
+# The Ready line starts with an icon that every repeat or forward keeps, and its first showing in the
 # maintainer's chat sends one push, from the starting session and never a started one; holds, blocks
 # and questions get neither. Moving on to the next item to plan proposes an order once and plans through it.
-# The orchestrator starts a fresh build session when none is mid-run, and holds every item while an
+# The orchestrator starts a fresh implementation session when none is mid-run, and holds every item while an
 # after-merge reply is pending. A pull request body goes to gh from a file. The maintainer's
 # objection to an item's design, plan or pull request is recorded as a decisions line, and a later
 # plan lists and answers each one and is asked, not agreed by default or as a small request.
@@ -88,29 +89,46 @@ while IFS='|' read -r f section want; do
     fail "$where must say: $want"
   fi
 done <<EOF
-$o|Planning|when nothing is open, this session agrees it by default: it skips \`mentat:plan\`'s agreement question and treats the item as agreed with "Agree and build now"
+$o|Planning|when nothing is open, this session agrees it by default: it skips \`mentat:plan\`'s agreement question and treats the item as agreed with \`Agree and build now\`.
 $o|Planning|the fingerprint recorded with \`build: now\` as agreed by default
 $o|Planning|no decision of the maintainer's was asked while planning the item (a grill, \`mentat:plan\` step 4 or its skeptic's pass)
-$o|Planning|the plan check gave a verdict and neither it nor any second-opinion tool said \`DON'T\`
-$o|Planning|no manual check would be offered; no material assumption stands; no fast track is proposed; no open maintainer comment bears on the agreement
-$o|Planning|the session's own advice against building does not stand
+$o|Planning|the plan check gave a verdict and neither it nor any second opinion said \`DON'T\`
+$o|Planning|no manual check would be offered; no assumption stands; no fast track is proposed; no open maintainer comment bears on the agreement
+$o|Planning|the session's own advice against the work does not stand
 $o|Planning|an item agreed for later before stays later, asked nothing here
-$o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second-opinion tool that gave no answer and a plan check retried without its model keep the default
+$o|Planning|Points of a \`DO IT DIFFERENTLY\` not adopted, a second opinion that gave no answer and a plan check retried without its model keep the default
 $o|Planning|Typed \`/mentat:plan\` sessions, chat requests and the small-request path are still asked.
-$o|Handing over|agreed by default ("Planning")
-$o|Handing over|the "Pause" count or the maintainer's word to pause new builds (below)
-$o|Handing over|The maintainer's explicit word to pause new builds, recorded in the notes file in their words with any end it names, holds new handovers and new build sessions until their word to resume or until that end comes
-$o|Handing over|The maintainer's "later", "stop", "not now" or like word naming a held item records \`build: later\`
-$o|Handing over|This rule stops no item handed over or started
-$o|Handing over|A bare "later" or "stop" naming no item answers the question asked last
-$o|Relays|in "Start" (a closed pull request), in "After merge" (no session will take the steps), and the default-agreement tell
-$o|Relays|with the plan check's verdict, each point not adopted and why, the unchecked situations that adopted changes added, any second-opinion tool that gave no answer and any plan check retried without its model
-$o|Notes|each tell owed ("Relays"), the default-agreement tell included, until given
-$o|Notes|the maintainer's word to stop planning, and any to pause new builds, with its end ("Handing over")
-$b|Build sessions|A build session is mid-run from its start until it sends its final message (\`mentat:build\` step 8)
-$b|Build sessions|When no build session is mid-run, a fresh build session starts for them
-$b|Holds|A merge passed on to a build session waits for its after-merge reply ("After merge"): no build session starts and no item joins a run until it arrives.
-plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|its build answer with any \`Agreed by default\` line and the copied spec's fingerprint
+$o|State|State lives only in \`mentat state\`, the tracker and the host's session list
+$o|State|their word to pause new handovers, with any end it names; their word to stop planning
+$o|Start|A host that cannot start or message sessions: do not record this session as orchestrator.
+$o|Messages|one line per item agreed by default: its plan check verdict, each point not adopted and why, any second opinion that gave no answer, any plan check retried without its model, and what holds it
+$o|Messages|Nothing else: no start summary, no list of what it told, no pull request closed without merge
+$o|Questions|Record it as a \`question\` note whose text starts \`waiting:\`
+$o|Questions|A message owed while a question is open is sent at once, short, its first line saying what it is.
+$o|Questions|add the new one first, then clear the old one, so an interruption leaves a duplicate, never a lost question
+$o|Questions|Only \`re-ask:\` notes are asked again
+$o|Second opinions|They never ask the maintainer to carry text to another assistant.
+$o|Started planning sessions|never calls \`mentat:build\` and never redirects
+$b|Handing over|agreed by default ("Planning")
+$o|Owner check|Once "Start" step 4 has set this session, except in a turn where the maintainer starts it again, at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that \`mentat state owner\` prints this session's id.
+$o|Owner check|When it prints another id, stop acting as orchestrator, saying so in one line, and plan, ask and hand over nothing more.
+$o|Owner check|When it exits 1 and \`mentat state orchestrator\` shows this session's id ended, run \`mentat state orchestrator set\` with it again.
+$o|Start|after the set, tell that session too that this session is now the orchestrator, so its "Owner check" finds this session's id.
+$b|Handing over|1. "Owner check", run again here, leaves this session the orchestrator.
+$b|Handing over|\`mentat state can-dispatch\` exits 0: hand over at most the count it prints.
+$b|Handing over|Their explicit word to pause new handovers is a \`hold\` note in their words, with any end it names.
+$b|Handing over|Their "later", "stop", "not now" or like word naming a held item records \`build: later\`
+$b|Handing over|This rule stops no item handed over or started
+$b|Handing over|A bare "later" or "stop" naming no item answers the question asked last
+$b|Sessions|An implementation session is mid-run from its start until it sends its final message (\`mentat:build\` step 8)
+$b|Sessions|When no session is mid-run, a fresh implementation session starts for them
+$b|Holds|A merge passed on to an implementation session waits for its after-merge reply (a \`hold\` note): no session starts and no item joins a run until it arrives
+rules.md||A started session asks the maintainer nothing and sends each question, wait, Ready and Hold line to its starting session (\`mentat:build\` "Started sessions").
+skills/build/redirect.md|Where it is implemented|Read only this repository's \`mentat state\`.
+skills/build/redirect.md|Where it is implemented|\`mentat state owner\` exits 1, with no running orchestrator recorded: implement here.
+skills/build/redirect.md||When the message cannot be sent, implement nothing, and say in one line which session could not be reached.
+plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|Carry its agreement answer (\`build: now\` or \`build: later\`) with any \`Agreed by default\` line only when the two fingerprints match
+plugins/mentat-linear/skills/linear/SKILL.md|Moving to Linear|with the copied spec's fingerprint (\`mentat:backlog\` "Agreement")
 skills/backlog/records.md|Agent records|replaces the answer and keeps that line
 skills/backlog/records.md|Agent records|the maintainer's Agree answer that re-records the fingerprint removes it
 skills/plan/SKILL.md||Nothing is implemented before the maintainer agrees; the one exception is an item \`mentat-lead:orchestrate\` agrees by default.
@@ -142,10 +160,10 @@ rules.md|What goes to the maintainer|After agreement, stop for the maintainer on
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/plan/SKILL.md||or says yes to the order question of \`mentat-linear:triage\` "Report", read \`session.md\`
 skills/plan/SKILL.md||When Claude Code calls this skill itself to give a view on or suggest a change, other than on that triage yes, it plans one change and starts no planning session; when a rule or skill sends it here only for "Decisions", its "Recommendations" included, it applies that section and runs none of the steps.
-$o|Planning|keeps so a compaction or takeover goes on asking nothing
+$o|Planning|so a compaction or takeover goes on asking nothing
 skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with the sentences \`mentat:review\` "Final check" adds after it)
-skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included; the item's id
-skills/build/SKILL.md|Started sessions|keeping a sentence or line when in doubt whether it is one of them
+$b|Forwarding|the "🔔 Ready to merge: #N" line, icon included; the item's id
+$b|Forwarding|keeping a sentence or line when in doubt whether it is one of them
 skills/review/SKILL.md|Final check|tell the maintainer in chat: a first line "🔔 Ready to merge: #N (<item id>)"
 skills/review/SKILL.md|Final check|Push notice: the Ready line starts with "🔔 ", and every repeat or forward of it keeps it word for word, the icon included.
 skills/review/SKILL.md|Final check|A "Hold #N" line, a Blocked or Not reviewed report and a question get no icon and no push, and the pull request's Status line stays as \`mentat:pr\` gives it.
@@ -158,7 +176,7 @@ skills/review/SKILL.md|Final check|A session started by another session sends no
 skills/review/SKILL.md|Final check|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
 skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/SKILL.md\` "Final check" says.
 skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
-skills/build/SKILL.md|Started sessions|The forward is the first showing of that Ready line: right after it, the starting session sends the push \`../review/SKILL.md\` "Final check" gives.
+$b|Forwarding|The forward is the first showing of that Ready line: right after it, this session sends the push \`mentat:review\` "Final check" gives.
 skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
 skills/pr/SKILL.md||Decisions and Risks always goes under its own \`## Decisions and Risks\` heading, whatever risk or decision section the template has, since \`mentat status\` reads that heading;
 skills/review/after-ready.md||When the maintainer objects to the item's design, plan or pull request at a hold or a close without merging, the session that hears it writes one decisions line on the item recording each objection
@@ -186,14 +204,15 @@ skills/plan/SKILL.md|Decisions|one still open when the item's pull request passe
 skills/plan/SKILL.md|Decisions|Nothing they must read goes in text before it in the same turn; a question resting on such text, the view (step 3) included, takes the message form with it inside.
 skills/review/ready-gate.md||Otherwise, move each decision in any open "Decision for the maintainer" section to a Backlog item
 skills/review/ready-gate.md||a write that fails twice does not hold back the Ready line, and the Ready message then adds a sentence quoting each such decision word for word as not moved
-$o|Relays|An objection of the maintainer's that this session hears at a hold reaches the build session in their exact words, as any answer to a hold does, and that session records it; one heard at a close without merging this session records as \`after-ready.md\` in \`mentat:review\`'s folder says.
+$b|Forwarding|An answer to a hold, an objection included, reaches the session in the maintainer's exact words, and that session records it.
+$b|Closed|An objection the maintainer states at the close is recorded as a decisions line
 skills/backlog/SKILL.md|Reading an item|A read to plan an item also reads the decisions lines of each item whose work moved to it, as the item names it.
 skills/backlog/SKILL.md|Reading an item|and the older spec fingerprint, advice, assumptions list, second-opinion settlement and plan check record comments and an older comment copying a hand-made item's original text), is not theirs;
 skills/backlog/records.md|Agent records|Every reader takes a record from this comment, else from the older comments as "Older items" says.
 skills/backlog/records.md|Older items|Until it exists, those older comments count, the latest of each standing; once it exists, only it counts for these records.
 skills/backlog/records.md|Reply block|A round ending in \`mentat:plan\` steps 6 and 7 prints nothing; there the maintainer's \`Show the full proposal\` prints every round's block
 skills/backlog/github.md||An issue agreed before the spec had that name keeps its \`## Agreed request\` heading and body, and every reader accepts either heading.
-plugins/mentat-linear/skills/linear/SKILL.md|Where the spec lives|An item with no \`Spec\` document and no recorded id reads a \`## Spec\` or \`## Agreed request\` section in its description instead,
+plugins/mentat-linear/skills/linear/SKILL.md|Where the spec lives|With neither, it is a \`## Spec\` or \`## Agreed request\` section of the description,
 skills/pr/SKILL.md||(an older issue or item, agreed before the spec had that name and with no numbered list, is read as each requirement it states)
 skills/plan/session.md||the decisions line recording the maintainer's objections (\`SKILL.md\` step 7)
 skills/plan/session.md||a fold also writes one on the item it folds into, naming this one, and copies there, unchanged and each as its own decisions line, every decisions line of this item that records a maintainer's objection, so objections survive later folds.
@@ -317,15 +336,15 @@ if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 
 else
   pass "$f's frontmatter does not set disable-model-invocation"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Claude Code starts Inbox triage only if you ask or take its offer\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Inbox triage, only when asked or its offer is taken\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description says Claude Code starts it only on the maintainer's word"
 else
-  fail "$f's description must say Claude Code starts it only on the maintainer's word (Claude Code starts Inbox triage only if you ask or take its offer.)"
+  fail "$f's description must say Claude Code starts it only on the maintainer's word (Inbox triage, only when asked or its offer is taken.)"
 fi
-if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: project names or all, source options, or brainstorm with a text or link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
+if awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit 1 } NR > 1 && /^description: / && /Arguments: projects or all, source options, or brainstorm with text or a link\./ { found = 1; exit 0 } END { exit !found }' "$f"; then
   pass "$f's description lists its arguments"
 else
-  fail "$f's description must list its arguments (Arguments: project names or all, source options, or brainstorm with a text or link.)"
+  fail "$f's description must list its arguments (Arguments: projects or all, source options, or brainstorm with text or a link.)"
 fi
 
 # The / menu shows descriptions as plain text: no skill's description holds <, > or a backtick, and a menu
@@ -808,25 +827,13 @@ if out=$(tests/settings.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' 
 # Each behavior eval case under evals/ has a prompt and at least one grader (tests/evals.sh; no model calls).
 if out=$(tests/evals.sh 2>&1); then printf '%s\n' "$out"; else printf '%s\n' "$out"; fail tests/evals.sh; fi
 
-# GLOSSARY.md parses, and every tracked rule, skill (module skills included) and agent file not
-# listed below uses no word an entry's Avoid line names (tests/glossary-check.sh says the format
-# and what is skipped). Its PASS lines count flagged ambiguous words and sentences over 20 words.
-# The list holds the files not yet rewritten to the glossary: the change that rewrites a file
-# removes it, nothing adds to it, and a listed file that is no longer tracked or no longer on
-# disk fails. A new file is checked from the start.
-not_yet_rewritten="plugins/mentat-lead/skills/grill/CREDITS.md
-plugins/mentat-lead/skills/grill/SKILL.md
-plugins/mentat-lead/skills/orchestrate/SKILL.md
-plugins/mentat-lead/skills/orchestrate/build-sessions.md
-plugins/mentat-lead/skills/retro/CREDITS.md
-plugins/mentat-lead/skills/retro/SKILL.md
-plugins/mentat-linear/skills/linear/SKILL.md
-plugins/mentat-linear/skills/triage/SKILL.md
-rules.md
-skills/build/redirect.md"
+# GLOSSARY.md parses, and every tracked rule, skill (module skills included) and agent file
+# uses no word an entry's Avoid line names (tests/glossary-check.sh says the format and what is
+# skipped). Its PASS lines count flagged ambiguous words and sentences over 20 words. Every file
+# is rewritten to the glossary, so the check's list of files not yet rewritten is empty.
 lists=$(mktemp -d) || exit 1
 if git ls-files -- rules.md agents skills 'plugins/*/skills/*' >"$lists/covered" \
-  && printf '%s\n' "$not_yet_rewritten" >"$lists/listed"; then
+  && : >"$lists/listed"; then
   if out=$(tests/glossary-check.sh GLOSSARY.md "$lists/covered" "$lists/listed" 2>&1); then
     printf '%s\n' "$out"
   else
