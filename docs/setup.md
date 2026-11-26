@@ -62,4 +62,4 @@ The hooks are nets for mistakes by agents' `git` only, not a security boundary, 
    rm -rf "$HOME/.config/mentat/git-hooks"
    ```
 
-   Then repeat the copy command from step 2.
+   Then repeat the copy command from step 2 in a new Claude Code session started after the update, since a running session's `mentat` still points at the old version.
