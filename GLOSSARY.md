@@ -25,14 +25,13 @@ Machine-read name: the record line `Material assumptions:` keeps its form.
 The tracker's own link from an agreed item to each item it waits on before it can start. Other waits keep the word "wait".
 
 Avoid: start wait
-Machine-read name: `skills/backlog/start-waits.md`.
 
 ## forward
 
 To pass a message, answer or write from one session on to another session or to the maintainer, word for word where the sending file says so.
 
 Avoid: relay
-Heading: the section headings "Relays" and "Relayed writes" stay until their files are rewritten; cite them in a code span until then.
+Heading: the section heading "Relays" stays until its file is rewritten; cite it in a code span until then.
 
 ## implement
 
@@ -40,7 +39,7 @@ To carry out an agreed item: make its change, test it, get it reviewed and open 
 
 Avoid: build, built
 Machine-read name: `mentat:build`, typed as `/mentat:build`, and the agent records line `build: now`.
-Heading: the description's `Built with` list and its `Builder` line, the answer `Agree and build now` and the mark `made in the build` stay until their files are rewritten; cite them in a code span until then.
+Heading: the answer `Agree and build now` stays until its file is rewritten; cite it in a code span until then.
 
 ## implementation session
 
@@ -51,7 +50,7 @@ Machine-read name: `mentat:build`, typed as `/mentat:build`, and `plugins/mentat
 
 ## implementer
 
-The subagent that edits, tests and commits one change in its own worktree; `mentat:build` also calls one implementer per branch a helper until it is rewritten.
+The subagent that edits, tests and commits one change in its own worktree.
 
 Avoid: builder
 Machine-read name: `mentat:builder`, `MENTAT_BUILDER_MODEL` and `skills/build/helpers.md`.

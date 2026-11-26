@@ -3,9 +3,10 @@
 
 # Status prints one line of a pull request's review state, read from the comments
 # the review commands post (lib/review.sh, and the reviewers module's outside review),
-# the owner's review and whether the description has the section for calls made without
-# the maintainer. It posts, edits and pushes nothing. Only comments by the account gh is
-# signed in as count: anyone who can comment could post the same text.
+# the owner's review and whether the description has the "Decisions and Risks" section,
+# where the calls made without the maintainer are logged, or its older "Calls made without
+# the maintainer" heading. It posts, edits and pushes nothing. Only comments by the account
+# gh is signed in as count: anyone who can comment could post the same text.
 # tests/run fails when a comment heading these match changes where it is written.
 
 # One line per review comment by $3 on pull request $2 of repository $1, oldest
@@ -70,11 +71,13 @@ status_owner_review() {
   if [ "$requested" = true ]; then echo requested; else echo "not requested"; fi
 }
 
-# Whether the description of pull request $1 has the "Calls made without the maintainer"
-# section (skills/pr/SKILL.md): "present" when some line of it, CR stripped, is a Markdown
-# ATX heading with that text at any level, wherever a template puts it, else "missing". A
-# read that fails gives "unknown (<why>)" and stops nothing. No test pins that heading's
-# text in the skill: a change to it there also changes it here.
+# Whether the description of pull request $1 has the "Decisions and Risks" section
+# (skills/pr/SKILL.md), where the calls made without the maintainer are logged: "present"
+# when some line of it, CR stripped, is a Markdown ATX heading with that text, or with the
+# older "Calls made without the maintainer" that pull requests opened before it still have,
+# at any level, wherever a template puts it, else "missing". A read that fails gives
+# "unknown (<why>)" and stops nothing. tests/run checks the skill's template still writes
+# that heading.
 status_calls_section() {
   local body cr=$'\r'
   if ! body=$(gh pr view "$1" --json body --jq .body); then
@@ -99,7 +102,7 @@ status_calls_section() {
         print
       } else if (c == fc && run(s, c) >= fn) fc = ""
     }' <<<"$body")
-  if grep -Eq '^#{1,6} +Calls made without the maintainer( +#+)? *$' <<<"$body"; then echo present; else echo missing; fi
+  if grep -Eq '^#{1,6} +(Decisions and Risks|Calls made without the maintainer)( +#+)? *$' <<<"$body"; then echo present; else echo missing; fi
 }
 
 status() {
