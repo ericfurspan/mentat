@@ -24,7 +24,7 @@ Sign in with `codex login`.
 
 The hooks in `git-hooks/` refuse likely secrets (in staged changes, outgoing commits and commit or tag messages) and non-local default-branch pushes (and the first branch pushed to a remote with none), then run the repository's own hooks except `reference-transaction` and `post-index-change`.
 
-These settings apply to agents' `git` and take precedence over global `core.hooksPath`. Mentat still chains to the repository's own hooks.
+The hooks are nets for mistakes by agents' `git` only, not a security boundary, and your own `git` outside Claude Code is unchanged. For agents' `git`, your global `core.hooksPath` no longer runs; after Mentat's checks, only the repository's own hooks run (its local `core.hooksPath`, else `.git/hooks`).
 
 1. Install `gitleaks` and `jq`:
 
@@ -32,12 +32,12 @@ These settings apply to agents' `git` and take precedence over global `core.hook
    brew install gitleaks jq
    ```
 
-2. Find the installed plugin's `git-hooks/` folder beside its `bin/` and copy it to a new absolute path outside any repository. Run this in the Claude Code session using the plugin's `mentat` on `PATH`:
+2. Find the installed plugin's `git-hooks/` folder beside its `bin/` and copy it to a new absolute path outside any repository. Run this in the Claude Code session using the plugin's `mentat` on `PATH`; it prints the folder it copies from:
 
    ```bash
    dest="$HOME/.config/mentat/git-hooks"
    src=$(mentat_bin=$(command -v mentat) && CDPATH='' cd -P "${mentat_bin%/*}/.." && pwd -P)/git-hooks &&
-     mkdir -p "${dest%/*}" && cp -Rp "$src" "$dest"
+     printf '%s\n' "$src" && mkdir -p "${dest%/*}" && cp -Rp "$src" "$dest"
    ```
 
 3. Add the Git entries to the existing `"env"` block in Claude Code's user settings (`~/.claude/settings.json`) or its git-ignored local settings (`.claude/settings.local.json`). Keep the machine-specific path out of committed project settings (`.claude/settings.json`). Keep existing entries, set `GIT_CONFIG_KEY_<n>` to `core.hooksPath` and `GIT_CONFIG_VALUE_<n>` to the absolute `<copy>/hooks` path, and raise `GIT_CONFIG_COUNT` from `<n>` to `<n> + 1`. With no existing entries, use index `0` and a count of `"1"`. This example keeps an existing index-`0` entry and adds index `1`:
