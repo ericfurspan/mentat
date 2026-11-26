@@ -134,6 +134,7 @@ skills/plan/session.md||on an item left with an open decision, and its removal o
 skills/plan/session.md||none already answered except a skeptic's-pass finding with new evidence, asked once as revisiting (\`SKILL.md\` step 2),
 plugins/mentat-linear/skills/triage/SKILL.md|Report|answered "Plan them in this order" (recommended) or "Not now"
 skills/plan/SKILL.md||or says yes to the order question of \`mentat-linear:triage\` "Report", read \`session.md\`
+skills/plan/SKILL.md||When Claude Code calls this skill itself to give a view on or suggest a change, other than on that triage yes, it plans one change and starts no planning session; when a rule or skill sends it here only for "Decisions", its "Recommendations" included, it applies that section and runs none of the steps.
 $o|Planning|keeps so a compaction or takeover goes on asking nothing
 skills/build/SKILL.md||what to merge (each item's "🔔 Ready to merge: #N" line, icon included, with the sentences \`mentat:review\` "Final check" adds after it)
 skills/build/SKILL.md|Started sessions|the "🔔 Ready to merge: #N" line, icon included; the item's id
@@ -160,7 +161,7 @@ skills/backlog/records.md|Decision lines|With GitHub issues it is in Claude Code
 skills/plan/SKILL.md||and no objection of the maintainer's recorded for the work (\`../backlog/records.md\` "Decision lines"), such as fixing a typo)
 skills/plan/SKILL.md|Small requests|gets steps 1 and 2 and a one-line view
 skills/plan/SKILL.md|Small requests|a one-line view with any manual-check offer or fast track (step 5)
-skills/plan/SKILL.md|Small requests|answered \`Agree and build now\`, \`Agree, build later\` or \`Not now\`, the first as step 7 orders them, and recorded as step 8 says.
+skills/plan/SKILL.md|Small requests|answered \`Agree and build now\`, \`Agree, build later\` or \`Not now\`, ordered and any objection recorded as step 7 says, and the agreement recorded as step 8 says.
 skills/plan/SKILL.md|Steps|or on an item its work moved from (\`../backlog/records.md\` "Decision lines"), with how the plan meets it or why not.
 skills/plan/SKILL.md|Steps|each recorded objection and how the plan meets it or why not;
 skills/plan/SKILL.md|Steps|\`Not now\`: commits nothing and opens a talk

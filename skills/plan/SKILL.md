@@ -4,7 +4,7 @@ description: "Use before a view on or suggesting a change, and on resuming one. 
 argument-hint: "[item id]"
 ---
 
-Plans one change with the maintainer, up to their agreement. When the maintainer types `/mentat:plan` with no argument or one item id (one word shaped like an id, such as `ABC-12`), or says yes to the order question of `mentat-linear:triage` "Report", read `session.md` in this skill's folder, and again after a compaction or a resume, and follow it; other text after the command is the request. When Claude Code calls this skill itself, with or without an item id, other than on that triage yes, it plans one change and starts no planning session.
+Plans one change with the maintainer, up to their agreement. When the maintainer types `/mentat:plan` with no argument or one item id (one word shaped like an id, such as `ABC-12`), or says yes to the order question of `mentat-linear:triage` "Report", read `session.md` in this skill's folder, and again after a compaction or a resume, and follow it; other text after the command is the request. When Claude Code calls this skill itself to give a view on or suggest a change, other than on that triage yes, it plans one change and starts no planning session; when a rule or skill sends it here only for "Decisions", its "Recommendations" included, it applies that section and runs none of the steps.
 
 A change Claude Code suggests outside the request it is carrying out, or a defect it finds, is filed as `mentat:backlog` "Filing" says.
 
@@ -36,7 +36,7 @@ Nothing is implemented before the maintainer agrees; the one exception is an ite
 
 ## Small requests
 
-A small, clear request (one line, nothing for the maintainer to decide, no assumption, failure requirement or situation, no open maintainer comment in its item's full read, and no objection of the maintainer's recorded for the work (`../backlog/records.md` "Decision lines"), such as fixing a typo) gets steps 1 and 2 and a one-line view with any manual-check offer or fast track (step 5), answered `Agree and build now`, `Agree, build later` or `Not now`, the first as step 7 orders them, and recorded as step 8 says. A request that changes the meaning of what an agent is told in Mentat's `rules.md`, skills or implementer prompt, or in a repository's `AGENTS.md` or other standing agent instructions, is not small and gets the plan check, however short.
+A small, clear request (one line, nothing for the maintainer to decide, no assumption, failure requirement or situation, no open maintainer comment in its item's full read, and no objection of the maintainer's recorded for the work (`../backlog/records.md` "Decision lines"), such as fixing a typo) gets steps 1 and 2 and a one-line view with any manual-check offer or fast track (step 5), answered `Agree and build now`, `Agree, build later` or `Not now`, ordered and any objection recorded as step 7 says, and the agreement recorded as step 8 says. A request that changes the meaning of what an agent is told in Mentat's `rules.md`, skills or implementer prompt, or in a repository's `AGENTS.md` or other standing agent instructions, is not small and gets the plan check, however short.
 
 ## Starting implementation
 
