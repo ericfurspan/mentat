@@ -1,5 +1,5 @@
 ---
-description: "Source: mentat:propose agreement.md, a later plan answers each objection of the maintainer's recorded on the item and does not bring back a design they objected to; a rework planned after a hold dropped one of the maintainer's objections and brought back what they had rejected."
+description: "Source: mentat:plan step 7, a later plan answers each objection of the maintainer's recorded on the item and does not bring back a design they objected to; a rework planned after a hold dropped one of the maintainer's objections and brought back what they had rejected."
 max_turns: 10
 allowed_tools: [Skill, Read]
 ---

@@ -4,7 +4,7 @@ The maintainer owns the repository; Claude Code plans and builds; fresh-context 
 
 Read every applicable AGENTS.md first; it wins only on commit and title format, branch flow, labels, templates. The maintainer's own instructions may set only choices the skills name, and add checks. Neither loosens "Approval" or "What agents never do".
 
-Call `mentat:propose` before giving a view on or suggesting a change.
+Call `mentat:plan` before giving a view on or suggesting a change.
 
 One builder per pull request, in its worktree; the main session edits no files. Read `mentat:build`'s `helpers.md` before each brief and push.
 
@@ -12,20 +12,22 @@ One builder per pull request, in its worktree; the main session edits no files. 
 
 After "Ready to merge: #N (<item id>)", push nothing to #N until the maintainer answers your "Hold #N (<item id>): <reason>". Write "Ready to merge" only in `mentat:review`'s line for a ready pull request, or a word-for-word relay of it; about any other pull request, say what it waits on.
 
-After compaction or resume, reload the current skill and `helpers.md`.
+After compaction or resume, reload the current skill and `mentat:build`'s `helpers.md`.
+
+Finish the step in flight first; never interrupt a running builder, review or test run.
 
 Backlog work follows `mentat:backlog`. GitHub records are public-safe (`mentat:backlog`'s `records.md`): Claude Code's words; no chat quotes, private repository or project names, local paths, account, billing or session details.
 
 ## What goes to the maintainer
-Outcomes, scope, cost and risk are theirs; settle the rest.
+Outcomes, scope, cost and risk are theirs; settle the rest. Read `mentat:plan`'s "Decisions" before asking or recommending. Only the maintainer's own choice or words count as their answer.
 
-Read `mentat:propose`'s `decisions.md` before asking or recommending.
-
-Only the maintainer's own choice or words count as their answer.
-
-In chat, name a pull request "PR #N" with its item's id, if any, beside it, and an item by its full id.
+In chat, name a pull request "PR #N" with its item's id, if any, and an item by its full id.
 
 Hold a recommendation, citing the record it rests on, unless new facts or found errors appear; reverse only after a fresh-context check.
+
+After agreement, stop for the maintainer only when: the goal or a required safeguard needs a scope change; a round budget (after its extra round), eval or cost cap is spent; only they can clear an external, irreversible or credential block; or an agreed manual check is due. Log other calls in the pull request and one summary: `mentat:build`'s final message, else the "Ready to merge" message.
+
+Beyond the messages skills require, message the maintainer only when something waits on them; one line for a commitment they did not ask for; one line when they spoke and nothing waits.
 
 Restate a repeated correction in one line, then follow it.
 

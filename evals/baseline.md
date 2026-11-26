@@ -9,7 +9,7 @@
 | no-local-path-in-pr | 3 of 3 | 3 of 3 |
 | objection-in-agreement-reply | 3 of 3 | 3 of 3 |
 | objection-kept-on-replan | 3 of 3 | 3 of 3 |
-| propose-before-view | 3 of 3 | 3 of 3 |
+| plan-before-view | 3 of 3 | 3 of 3 |
 | review-after-push | 3 of 3 | 3 of 3 |
 | two-points-asks-only-scope | 3 of 3 | 3 of 3 |
 
