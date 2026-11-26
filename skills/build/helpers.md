@@ -24,7 +24,7 @@ A round is finished only when its report says the brief's work is done and commi
 
 ## Main-checkout check
 
-Before each brief, run `mentat worktree snapshot` for the main checkout, and `mentat worktree snapshot <checkout>` for the session's own when it is another directory, and keep each line; on exit 2, start no implementer and tell the maintainer what it printed. After the implementer reports, run `mentat worktree verify "<line>" [<checkout>]` with each, the line quoted as one argument. Exit 0: unchanged (the branch and status are the noted ones, and `HEAD` is the noted one or moved only forward along origin's copy of the branch as last fetched); when it says the snapshot's checkout was not clean, the run's final message says the check was weaker. Exit 1 or 2: start no further implementer, change nothing in either checkout, and tell the maintainer the paths and what it printed. The check does not see writes to ignored paths.
+Before each brief, run `mentat worktree snapshot` for the main checkout, and `mentat worktree snapshot <checkout>` for the session's own when it is another directory, and keep each line; on exit 2 or 64, start no implementer and tell the maintainer what it printed. After the implementer reports, run `mentat worktree verify "<line>" [<checkout>]` with each, the line quoted as one argument. Exit 0: unchanged (the branch and status are the noted ones, and `HEAD` is the noted one or moved only forward along origin's copy of the branch as last fetched); when it says the snapshot's checkout was not clean, the run's final message says the check was weaker. Exit 1, 2 or 64: start no further implementer, change nothing in either checkout, and tell the maintainer the paths and what it printed. The check does not see writes to ignored paths.
 
 ## Testing
 
@@ -42,7 +42,7 @@ An implementer's worktree is unfinished when it has uncommitted changes or commi
 
 ## After merge
 
-When the maintainer says #N merged, or the recovery read finds it merged, run `mentat worktree cleanup <N> <branch>` for this session's branch only, never another session's. It checks the pull request merged with that head before changing anything, then removes a clean worktree on the branch and deletes the local branch, leaving the remote branch. Exit 0: done, or nothing was left. Exit 1: keep what it names (a failed check, a refused removal or a failed delete) and list the worktree and branch for the maintainer. Exit 2: the pull request could not be read; change nothing and say so. A branch whose pull request closed without merging is kept and listed until the maintainer says to drop it.
+When the maintainer says #N merged, or the recovery read finds it merged, run `mentat worktree cleanup <N> <branch>` for this session's branch only, never another session's. It checks the pull request merged with that head before changing anything, then removes a clean worktree on the branch and deletes the local branch, leaving the remote branch. Exit 0: done, or nothing was left. Exit 1: keep what it names (a failed check, a refused removal or a failed delete) and list the worktree and branch for the maintainer. Exit 2 (the pull request could not be read) or 64 (a usage error): change nothing and say so. A branch whose pull request closed without merging is kept and listed until the maintainer says to drop it.
 
 ## A separate session
 
