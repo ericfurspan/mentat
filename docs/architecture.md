@@ -14,7 +14,7 @@
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit, and, with `mentat-reviewers`, the outside reviewers the repository lists. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit, and, with `mentat-reviewers`, the outside reviewers the repository lists once a head has nothing left to fix. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
 
 ## Code and prompts
 

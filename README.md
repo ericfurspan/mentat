@@ -22,18 +22,18 @@ Left alone, AI agents drift from your request, review their own work and merge m
 
 - Orchestrator (`mentat-lead`): the one session you talk to (`/mentat-lead:orchestrate`), handing agreed items to implementation sessions.
 - Implementation session: implements agreed items, one pull request each.
-- Handover: an item passed on with its spec's fingerprint, taken only if unchanged.
+- Handover: an item passed with its spec's fingerprint, taken only if unchanged.
 - Grill (`mentat-lead`): an interview on your open decisions.
 - Plan check: a fresh agent checks most plans before agreement.
-- Fast track: changes that cannot alter what code does or agents are told skip review, if you agree.
-- Review rounds: fresh Claude reviews each head, up to a round limit, then outside reviewers (`mentat-reviewers`).
+- Fast track: changes that cannot alter code behavior or agents' instructions skip review, if you agree.
+- Review rounds: fresh Claude reviews each head, up to a round limit; outside reviewers (`mentat-reviewers`) review heads left with nothing to fix.
 - Safety nets: a hook blocks agents' merges; [opt-in](docs/setup.md#git-hooks) git hooks refuse likely secrets and non-local default-branch pushes. `mentat-public-text` blocks GitHub text holding a home path or private word.
 
 [How it works](docs/architecture.md).
 
 ## Requirements
 
-- macOS, with Claude Code 2.1.295 or later, `git`, `jq`, and `gh` signed in.
+- macOS, Claude Code 2.1.295 or later, `git`, `jq`, and `gh` signed in.
 - For `mentat-reviewers`: each listed reviewer's command, signed in: the Codex CLI, [outside the home folder](docs/setup.md#codex-outside-the-home-folder); Grok Build (`grok login`).
 - For the git hooks: `gitleaks` ([setup](docs/setup.md#git-hooks)).
 
@@ -47,7 +47,7 @@ claude plugin install mentat --marketplace ericfurspan/mentat --scope project
 
 This writes `.claude/settings.json`, turning Mentat on for everyone there (`--scope local`: only you; `--scope user`: every folder).
 
-- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>` (and re-copy [git hooks](docs/setup.md#git-hooks) if used).
+- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>` (re-copy [git hooks](docs/setup.md#git-hooks) if used).
 - Remove: `claude plugin uninstall mentat@mentat --scope <install scope>`.
 
 Where pull requests need approval, give the agent its own GitHub account.
