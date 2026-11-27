@@ -340,6 +340,7 @@ check "limits Codex's shell to core environment variables and no user or system 
 check "the profile reads the main checkout's git directory, which a worktree's .git points to" '[ "$rc" = 0 ] && case "$gitdir" in */work/.git) true ;; *) false ;; esac && grep -qF "\"$gitdir\"=\"read\"" "$STUB/args" && ! grep -q -- "--sandbox" "$STUB/args"'
 check "denies /var/tmp and turns the apps feature off for reviews too" 'grep -qF "\"/var/tmp\"=\"deny\"" "$STUB/args" && grep -qF "\"/private/var/tmp\"=\"deny\"" "$STUB/args" && grep -qx "features.apps=false" "$STUB/args"'
 check "denies credential files inside the checkout for reviews too" 'grep -qF "\"**/.env\"=\"deny\"" "$STUB/args" && grep -qx "permissions.mentat-review.filesystem.glob_scan_max_depth=8" "$STUB/args"'
+check "loads no Codex rules files for reviews, so none can allow a command outside the profile" 'grep -qx -- --ignore-rules "$STUB/args"'
 check "removes its worktree" '[ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ]'
 
 # Where codex is installed: the profile reads the install prefix of the codex that
@@ -699,7 +700,7 @@ check "never runs claude" '[ ! -e "$root/claude_called" ]'
 
 # Live sandbox check. Replays the -c settings the review passed to the stub through the
 # real `codex sandbox` (no model call) and runs shell probes against the review
-# worktree. It does not prove that `codex exec --ignore-user-config --strict-config`
+# worktree. It does not prove that `codex exec --ignore-user-config --ignore-rules --strict-config`
 # behaves the same, and it says nothing about Linux or model-backed behavior.
 # A control that cannot run (a missing tool, or the outer sandbox of an agent session
 # blocking one) fails, like a probe that is broken (the launcher failed).
@@ -709,7 +710,7 @@ live_fail() {
   failures=$((failures + 1))
 }
 live_run() {
-  local d self real_codex="" outside port="" i probes=0 bad=0 kind want got name detail
+  local d self real_codex="" help first found="" outside port="" i probes=0 bad=0 kind want got name detail
   # The real Codex: on PATH, outside the stub directory.
   local IFS=:
   # shellcheck disable=SC2086 # split PATH on colons
@@ -718,6 +719,15 @@ live_run() {
   done
   IFS=$' \t\n'
   [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
+  # Every Codex run passes --ignore-rules; a Codex without it would fail every review.
+  help=$("$real_codex" exec --help 2>/dev/null) || { live_fail "codex exec --help failed"; return 0; }
+  # Matches the option name exactly, so a renamed flag such as --ignore-rules-files does not pass.
+  while read -r first _; do
+    [ "$first" = --ignore-rules ] && { found=1; break; }
+  done <<EOF
+$help
+EOF
+  [ -n "$found" ] || { live_fail "codex exec --help does not list --ignore-rules, which every Codex run passes"; return 0; }
   # Controls that need no worktree.
   case "$(cd -P "$root" && pwd -P)" in
     /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies; $outside_note"; return 0 ;;

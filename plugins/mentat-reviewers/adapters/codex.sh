@@ -160,6 +160,9 @@ run_codex() {
   # the user's own. --strict-config makes unknown settings fail instead of being
   # ignored, so a Codex without profiles fails closed. The profile denies
   # ~/.gitconfig, so git runs without one.
+  # --ignore-rules skips the user's and project's execpolicy .rules files, which could
+  # allow a command to run outside the profile; --ignore-user-config skips only
+  # config.toml.
   # Codex's shell gets only core environment variables, so tokens in the agent's
   # environment do not reach it. Its git reads no global or system config
   # (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM), whose aliases, hooks path or helpers
@@ -168,7 +171,7 @@ run_codex() {
   # on by default and --ignore-user-config does not turn it off, so Codex could read
   # GitHub beyond the change.
   # MENTAT_CODEX_MODEL, when set, is passed as one --model argument, never as config text.
-  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --strict-config ${codex_asked:+"--model=$codex_asked"} \
+  (cd "$dir" && exec codex exec --ephemeral --ignore-user-config --ignore-rules --strict-config ${codex_asked:+"--model=$codex_asked"} \
     -c 'default_permissions="mentat-review"' -c "permissions.mentat-review.filesystem=$filesystem" \
     -c "permissions.mentat-review.filesystem.glob_scan_max_depth=$GLOB_DEPTH" \
     -c 'features.apps=false' -c 'shell_environment_policy.inherit="core"' -c 'shell_environment_policy.set={GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1"}' \
