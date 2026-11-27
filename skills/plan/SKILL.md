@@ -40,7 +40,7 @@ A small, clear request (one line, nothing for the maintainer to decide, no assum
 
 ## Starting implementation
 
-A chat request's `Agree and build now` goes on in this session, unless `../build/redirect.md` applies: an implementer per pull request, briefed as `../build/helpers.md` "Briefs" says, then `mentat:review`; an item held by its blocked-by link waits, named in the reply. A planning session calls the Skill tool with `mentat:build` and its items' ids. Work moves to its own session only when the maintainer asks, or when this session says why the queue is too long for it: one fenced line gives the full `/mentat:build <ids>` command to run in a new session in a fresh worktree. An item agreed for later starts only when the maintainer types `/mentat:build`.
+A chat request's `Agree and build now` goes on in this session, unless `../build/redirect.md` applies: an implementer per pull request, briefed as `../build/helpers.md` "Briefs" says, then `mentat:review`; an item held by its blocked-by link waits, named in the reply. A planning session calls the Skill tool with `mentat:build` and its items' ids. Work moves to its own session only when the maintainer asks, or when this session says why the queue is too long for it: one fenced line gives the full `/mentat:build <ids>` command to run in a new session of this repository. An item agreed for later starts only when the maintainer types `/mentat:build`.
 
 ## Decisions
 
