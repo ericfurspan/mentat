@@ -14,7 +14,7 @@
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs the outside reviewers the repository lists once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
 
 ## Code and prompts
 
@@ -65,7 +65,7 @@ Replace `-h` with `-l` and drop the final `wc` to list a commit's files.
 
 Part of the drop is text that moved into the `mentat` command ([decision record 0005](adr/0005-deterministic-checks-live-in-the-mentat-command.md)), and not all of it comes from the rewrite stages.
 
-These counts measure text size, not behavior. They are not the session-start budget `tests/run` checks (`word_budget`), which counts only what every session loads: `rules.md` and the skill and agent descriptions that load.
+These counts measure text size, not behavior. They are not the session-start budget `tests/run` checks (`word_budget`), which counts what loads with every module on: `rules.md` and the skill and agent descriptions that load.
 
 ## Behavior evals
 
