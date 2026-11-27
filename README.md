@@ -59,7 +59,7 @@ Optional modules install as `<module>@mentat`: `mentat-reviewers`, `mentat-publi
 
 Ask for a change in chat. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to implement now or later.
 
-- `/mentat:plan [item id]`: plan together and start implementing what you commit.
+- `/mentat:plan [item id]`: plan together; agreeing to implement now starts it.
 - `/mentat:build [item id ...]`: implement committed items.
 
 [`rules.md`](rules.md) holds the core rules, `skills/` each step's detail.

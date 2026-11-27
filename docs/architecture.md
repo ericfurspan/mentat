@@ -18,7 +18,7 @@ You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, u
 
 ## Code and prompts
 
-Code enforces these:
+Code enforces these, among others:
 
 - `hooks/no-merge` denies `gh pr merge`, merges and auto-merge through `gh api`, and MCP merge tools, and denies when it cannot decide.
 - The git hooks, where set up, refuse a staged or pushed likely secret and a push that updates a non-local remote's default branch.
@@ -26,7 +26,7 @@ Code enforces these:
 - `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, waits for CI on the head before it posts, refuses a round past `MENTAT_REVIEW_ROUNDS` and runs a publish check before it posts.
 - `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
 
-Everything else is prompts: `rules.md`, the skills and the agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file that holds it and how it is checked.
+Prompts carry the workflow: `rules.md`, the skills and the agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file that holds it and how it is checked.
 
 The hooks are nets for mistakes, not security boundaries: another command form can get past them.
 
