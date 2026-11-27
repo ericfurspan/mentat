@@ -27,7 +27,7 @@ Left alone, AI agents drift from your request, review their own work and merge m
 - Plan check: a fresh agent checks most plans before agreement.
 - Fast track: changes that cannot alter what code does or agents are told skip review, if you agree.
 - Review rounds: fresh Claude reviews each head, up to a round limit, then outside reviewers (`mentat-reviewers`).
-- Safety nets: a hook blocks agents' merges; git hooks ([setup](docs/setup.md#git-hooks)) refuse likely secrets and non-local default-branch pushes. `mentat-public-text` blocks GitHub text holding a home path or private word.
+- Safety nets: a hook blocks agents' merges; [opt-in](docs/setup.md#git-hooks) git hooks refuse likely secrets and non-local default-branch pushes. `mentat-public-text` blocks GitHub text holding a home path or private word.
 
 [How it works](docs/architecture.md).
 
