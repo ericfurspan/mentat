@@ -16,7 +16,7 @@ Mentat is a Claude Code plugin for building software with multiple AI agents.
 
 ## Why
 
-Left alone, AI agents drift from your request, review their own work and merge mistakes. With Mentat you plan with Claude and agree each spec, fresh reviewers check the work, and only you merge.
+Left alone, AI agents drift from your request, review their own work and merge mistakes. With Mentat, work follows a spec you plan with Claude, fresh reviewers check it, and only you merge.
 
 ## Main ideas
 
