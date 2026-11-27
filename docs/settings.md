@@ -32,7 +32,7 @@ These are not environment variables:
 
 Mentat reads from a repository's `AGENTS.md`:
 
-- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; else GitHub issues)
+- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; with no such line, the backlog is GitHub issues)
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
