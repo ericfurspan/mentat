@@ -18,7 +18,7 @@ You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, u
 
 ## Code and prompts
 
-Code enforces these, whatever an agent reads:
+Code enforces these:
 
 - `hooks/no-merge` denies `gh pr merge`, merges and auto-merge through `gh api`, and MCP merge tools, and denies when it cannot decide.
 - The git hooks, where set up, refuse a staged or pushed likely secret and a push that updates a non-local remote's default branch.
@@ -26,13 +26,13 @@ Code enforces these, whatever an agent reads:
 - `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, waits for CI on the head before it posts, refuses a round past `MENTAT_REVIEW_ROUNDS` and runs a publish check before it posts.
 - `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
 
-Everything else is prompts: `rules.md`, the skills and the agent files tell agents when to plan, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file that holds it and how it is checked.
+Everything else is prompts: `rules.md`, the skills and the agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file that holds it and how it is checked.
 
 The hooks are nets for mistakes, not security boundaries: another command form can get past them.
 
 ## Prompt size
 
-Measured 2026-11-27: the words in Mentat's prompt files before the 1.0 rewrite and at this page's base. The files are `rules.md`, every `.md` file under `agents/`, `skills/` and `plugins/*/skills/`, leaving out `CREDITS.md`. In git pathspecs, `*` also matches `/`, so `skills/*.md` takes every subfolder. Run in a clone, for each commit:
+Measured 2026-11-27: the words in Mentat's prompt files before the 1.0 rewrite and at this page's base. The files are `rules.md`, every `.md` file under `agents/`, `skills/` and `plugins/*/skills/`, leaving out `CREDITS.md`. In git pathspecs, `*` also matches `/`, so `skills/*.md` takes every subfolder. Run from the root of a clone, for each commit:
 
 ```bash
 git grep -h -I -e '' <commit> -- rules.md 'agents/*.md' 'skills/*.md' 'plugins/*/skills/*.md' ':(exclude)*CREDITS.md' | wc -w
@@ -40,7 +40,7 @@ git grep -h -I -e '' <commit> -- rules.md 'agents/*.md' 'skills/*.md' 'plugins/*
 
 | Commit | What it includes | Files | Words |
 | --- | --- | --- | --- |
-| `bada73e` | The last merge before the rewrite (#530). | 36 | 40014 |
+| `bada73e` | No rewrite stage: the last merge before #531 (#530). | 36 | 40014 |
 | `6608a62` | All eight rewrite stages: #531 fingerprint and worktree checks into the `mentat` command; #533 the orchestrator's state store into it; #532 behavior evals; #534 the invariant checklist; #536 outside reviewers behind one adapter, review skill short; #546 `/mentat:plan` and `rules.md` short; #538 implement, backlog, pr and agent prompts short; #540 the orchestrator and Linear modules. Also the other merges from #531 on (#535, #539, #542, #543, #545 and #547 to #553). | 22 | 28235 |
 
 The two file sets differ: the planning skill was renamed to `skills/plan`, several backlog and review files are gone, and the retro skill was removed. Part of the drop is text that moved into the `mentat` command ([decision record 0005](adr/0005-deterministic-checks-live-in-the-mentat-command.md)), and not all of it comes from the rewrite stages.
