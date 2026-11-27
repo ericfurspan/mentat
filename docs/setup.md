@@ -4,6 +4,8 @@ Extra setup for the optional Codex outside reviewer (`mentat-reviewers`) and the
 
 ## Codex outside the home folder
 
+The Codex reviewer needs a Codex CLI whose `codex exec` accepts `--ignore-rules`, such as 0.172.0, the version CI tests. With a Codex whose `codex exec --help` does not list the flag, every Codex run fails, so upgrade it.
+
 Install the Codex CLI into a prefix outside `$HOME`, such as Homebrew's:
 
 ```bash
