@@ -10,6 +10,7 @@
 # default as that value in backticks. A setting with no such default in code is listed in
 # words: one read by `printenv <name>` as "The <definition> definition's own model.", the
 # definition being the agents/ file its reading line names; any other as off ("Off...").
+# The MENTAT_REVIEWERS row names the reviewers the mentat-reviewers module's adapter files ship.
 # Prints PASS/FAIL per check; exits 1 on any FAIL.
 # shellcheck disable=SC2016
 # (File-wide: backticks and $ in single quotes are literal on purpose.)
@@ -167,5 +168,21 @@ for n in $refusing; do
     *) fail "$n refuses an empty value, but its row's empty value is \"$doc_empty\"" ;;
   esac
 done
+
+# The MENTAT_REVIEWERS row names the reviewers the mentat-reviewers module ships, one per
+# adapter file, in one phrase: "Ships: `<name>`, `<name>`."
+shipped=$(for f in plugins/mentat-reviewers/adapters/*.sh; do [ -f "$f" ] && basename "$f" .sh; done | sort)
+reviewers_row=$(printf '%s\n' "$rows" | grep -E '^\| *`MENTAT_REVIEWERS` *\|' | head -n 1)
+ships=$(printf '%s\n' "$reviewers_row" | grep -oE 'Ships: `[a-z0-9-]+`(, `[a-z0-9-]+`)*\.' | head -n 1)
+listed_reviewers=$(printf '%s\n' "$ships" | grep -oE '`[a-z0-9-]+`' | tr -d '`' | sort)
+if [ -z "$shipped" ]; then
+  fail "found no shipped outside reviewer under plugins/mentat-reviewers/adapters/"
+elif [ -z "$ships" ]; then
+  fail "MENTAT_REVIEWERS's row in $doc has no \"Ships: \`<name>\`, \`<name>\`.\" phrase; the module ships: $(printf '%s' "$shipped" | tr '\n' ' ')"
+elif [ "$listed_reviewers" = "$shipped" ]; then
+  pass "MENTAT_REVIEWERS's row names the reviewers the module ships ($(printf '%s' "$shipped" | tr '\n' ' ' | sed 's/ $//'))"
+else
+  fail "MENTAT_REVIEWERS's row names \"$(printf '%s' "$listed_reviewers" | tr '\n' ' ' | sed 's/ $//')\", but the module ships \"$(printf '%s' "$shipped" | tr '\n' ' ' | sed 's/ $//')\""
+fi
 
 [ "$failures" -eq 0 ] || exit 1
