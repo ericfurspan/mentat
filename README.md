@@ -22,7 +22,7 @@ Left alone, AI agents drift from your request, review their own work and merge m
 
 - Orchestrator (`mentat-lead`): the one session you talk to (`/mentat-lead:orchestrate`), handing agreed items to implementation sessions.
 - Implementation session: implements agreed items, one pull request each.
-- Handover: an item passed with its spec's fingerprint, taken only if unchanged.
+- Handover (`mentat-lead`): an item passed with its spec's fingerprint, taken only if unchanged.
 - Grill (`mentat-lead`): an interview on your open decisions.
 - Plan check: a fresh agent checks most plans before agreement.
 - Fast track: changes that cannot alter code behavior or agents' instructions skip review, if you agree.
