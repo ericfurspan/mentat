@@ -66,7 +66,7 @@ Ask for a change in chat. Work goes Inbox, Backlog, Todo; agreeing to an item's 
 
 ## Configuration
 
-[docs/settings.md](docs/settings.md) lists [the AGENTS.md lines Mentat reads](docs/settings.md#agentsmd-lines), every setting and [breaking changes](docs/settings.md#breaking-changes).
+[docs/settings.md](docs/settings.md) lists [the AGENTS.md lines Mentat reads](docs/settings.md#agentsmd-lines), every setting, review tools included, and [breaking changes](docs/settings.md#breaking-changes).
 
 ## Credits
 

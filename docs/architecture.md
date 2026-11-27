@@ -4,17 +4,17 @@
 
 ## Parts
 
-- `rules.md`: the core rules, which `hooks/session-start` prints into every session.
+- `rules.md`: the core rules, which `hooks/session-start` prints into sessions where Mentat is on.
 - `skills/`: one skill per workflow step: `plan`, `backlog`, `build`, `pr` and `review`.
 - `agents/`: the implementer (`builder.md`) and the plan checker (`plan-checker.md`).
 - `hooks/`: the session-start hook and the merge hook (`no-merge`).
-- `git-hooks/`: the git hooks for agents' `git`, which you set up yourself ([setup](setup.md#git-hooks)).
-- `bin/mentat` and `lib/`: the `mentat` command, which runs reviews and holds the checks that give the same answer every time.
+- `git-hooks/`: the git hooks for agents' `git`, which you set up ([setup](setup.md#git-hooks)).
+- `bin/mentat` and `lib/`: the `mentat` command, which runs reviews and holds the checks that always give the same answer.
 - `plugins/`: the optional modules: `mentat-reviewers`, `mentat-public-text`, `mentat-linear` and `mentat-lead`.
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except on a fast track you agreed, runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
 
 ## Code and prompts
 
@@ -26,13 +26,13 @@ Code enforces these, among others:
 - `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, refuses a round past `MENTAT_REVIEW_ROUNDS`, and before posting waits for any CI on the head and runs a publish check.
 - `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and check worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
 
-Prompts carry the workflow: `rules.md`, the skills and the agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file that holds it and how it is checked.
+Prompts carry the workflow: `rules.md`, the skills and agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file holding it and how it is checked.
 
 The hooks are nets for mistakes, not security boundaries: another command form can get past them.
 
 ## Prompt size
 
-Measured 2026-11-27: the words in Mentat's prompt files before the 1.0 rewrite and at this page's base. The files are `rules.md`, every `.md` file under `agents/`, `skills/` and `plugins/*/skills/`, leaving out `CREDITS.md`. Run from the root of a clone, for each commit:
+Measured 2026-11-27: the words in Mentat's prompt files before the 1.0 rewrite and at this page's base. The files: `rules.md`, every `.md` file under `agents/`, `skills/` and `plugins/*/skills/`, except `CREDITS.md`. Run from a clone's root, for each commit:
 
 ```bash
 git grep -h -I -e '' <commit> -- rules.md 'agents/*.md' 'skills/*.md' 'plugins/*/skills/*.md' ':(exclude)*CREDITS.md' | wc -w
@@ -63,7 +63,7 @@ skills/{backlog/{agent-records,assumptions,filing,item-reads,replies,spec-fixes,
 
 Replace `-h` with `-l` and drop the final `wc` to list a commit's files.
 
-Part of the drop is text that moved into the `mentat` command ([decision record 0005](adr/0005-deterministic-checks-live-in-the-mentat-command.md)), and not all of it comes from the rewrite stages.
+Part of the drop is text moved into the `mentat` command ([decision record 0005](adr/0005-deterministic-checks-live-in-the-mentat-command.md)), and not all of it comes from the rewrite stages.
 
 These counts measure text size, not behavior. They are not the session-start budget `tests/run` checks (`word_budget`), which counts what loads with every module on: `rules.md` and the skill and agent descriptions that load.
 

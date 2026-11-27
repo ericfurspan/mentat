@@ -17,9 +17,7 @@ The review model settings, `MENTAT_REVIEW_MODEL` and `MENTAT_FIRST_REVIEW_MODEL`
 | `MENTAT_BUILDER_MODEL` | The model of every builder run: a build, a CI fix and a review fix. A short Claude Code model name, such as `opus`. | The builder definition's own model. | The default. |
 | `MENTAT_READY_LIMIT` | The open pull requests with a "Ready to merge" line at which `/mentat-lead:orchestrate` hands over no more items; a whole number of 1 or more. | `3` | The default. |
 
-`MENTAT_GROK_TIMEOUT_SECONDS`, Grok's own time limit before, is no longer read: `MENTAT_REVIEW_TIMEOUT_SECONDS` is the one limit, and `mentat check` says so while it is set.
-
-`mentat second-opinion` runs the `MENTAT_REVIEWERS` list on an idea.
+`mentat second-opinion` runs every listed, available reviewer on an idea.
 
 ## Other choices
 
@@ -32,7 +30,7 @@ These are not environment variables:
 
 Mentat reads from a repository's `AGENTS.md`:
 
-- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; with no such line, the backlog is GitHub issues)
+- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; when `AGENTS.md` names no external backlog, the backlog is GitHub issues)
 - The one test command: ``The one test command is `<command>`.``
 - A `## Code Review Rules` section, the rules reviewers apply.
 
@@ -46,3 +44,4 @@ Moving a backlog to Linear: [steps](../plugins/mentat-linear/skills/linear/SKILL
 
 - orchestrate-notes.md is not read (move live entries into `mentat state`); retro is removed.
 - `mentat-reviewers` needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's `.claude/settings.json`.
+- `MENTAT_GROK_TIMEOUT_SECONDS`, Grok's own time limit before, is not read: `MENTAT_REVIEW_TIMEOUT_SECONDS` is the one limit, and `mentat check` says so while it is set.
