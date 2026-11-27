@@ -7,22 +7,22 @@
 - `rules.md`: the core rules, which `hooks/session-start` prints into sessions where Mentat is on.
 - `skills/`: one skill per workflow step: `plan`, `backlog`, `build`, `pr` and `review`.
 - `agents/`: the implementer (`builder.md`) and the plan checker (`plan-checker.md`).
-- `hooks/`: the session-start hook and the merge hook (`no-merge`).
-- `git-hooks/`: the git hooks for agents' `git`, which you set up ([setup](setup.md#git-hooks)).
-- `bin/mentat` and `lib/`: the `mentat` command, which runs reviews and holds the checks that always give the same answer.
+- `hooks/`: the session-start and merge (`no-merge`) hooks.
+- `git-hooks/`: opt-in git hooks for agents' `git` ([setup](setup.md#git-hooks)).
+- `bin/mentat` and `lib/`: the `mentat` command, which runs reviews and the checks that always give the same answer.
 - `plugins/`: the optional modules: `mentat-reviewers`, `mentat-public-text`, `mentat-linear` and `mentat-lead`.
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except on a fast track you agreed, runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except on a fast track you agreed, runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers` on in committed settings, `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line; you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and, where its host can start and message sessions, it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
 
 ## Code and prompts
 
 Code enforces these, among others:
 
 - `hooks/no-merge` denies `gh pr merge`, merges and auto-merge through `gh api`, and MCP merge tools, and denies when it cannot decide.
-- The git hooks, where set up, refuse a staged or pushed likely secret and a push that updates a non-local remote's default branch.
-- The `mentat-public-text` hook denies a listed `gh` or GitHub MCP write whose text holds a private word or a home path.
+- The git hooks, where set up, refuse a staged or pushed likely secret and a push updating a non-local remote's default branch.
+- The `mentat-public-text` hook denies a listed `gh` or GitHub MCP write holding a private word or home path.
 - `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, refuses a round past `MENTAT_REVIEW_ROUNDS`, and before posting waits for any CI on the head and runs a publish check.
 - `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and check worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
 
