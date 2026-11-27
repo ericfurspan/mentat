@@ -710,7 +710,7 @@ live_fail() {
   failures=$((failures + 1))
 }
 live_run() {
-  local d self real_codex="" outside port="" i probes=0 bad=0 kind want got name detail
+  local d self real_codex="" help first found="" outside port="" i probes=0 bad=0 kind want got name detail
   # The real Codex: on PATH, outside the stub directory.
   local IFS=:
   # shellcheck disable=SC2086 # split PATH on colons
@@ -720,8 +720,14 @@ live_run() {
   IFS=$' \t\n'
   [ -n "$real_codex" ] || { live_fail "codex is not installed"; return 0; }
   # Every Codex run passes --ignore-rules; a Codex without it would fail every review.
-  # Codex rejects an unknown flag even before --help, so this runs no model.
-  "$real_codex" exec --ignore-rules --help >/dev/null 2>&1 || { live_fail "codex exec does not accept --ignore-rules, which every Codex run passes"; return 0; }
+  help=$("$real_codex" exec --help 2>/dev/null) || { live_fail "codex exec --help failed"; return 0; }
+  # Matches the option name exactly, so a renamed flag such as --ignore-rules-files does not pass.
+  while read -r first _; do
+    [ "$first" = --ignore-rules ] && { found=1; break; }
+  done <<EOF
+$help
+EOF
+  [ -n "$found" ] || { live_fail "codex exec --help does not list --ignore-rules, which every Codex run passes"; return 0; }
   # Controls that need no worktree.
   case "$(cd -P "$root" && pwd -P)" in
     /tmp/* | /private/tmp/* | /var/tmp/* | /private/var/tmp/*) live_fail "the test's temporary directory is under /tmp, which the profile denies; $outside_note"; return 0 ;;
