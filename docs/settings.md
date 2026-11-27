@@ -19,6 +19,8 @@ The review model settings, `MENTAT_REVIEW_MODEL` and `MENTAT_FIRST_REVIEW_MODEL`
 
 `MENTAT_GROK_TIMEOUT_SECONDS`, Grok's own time limit before, is no longer read: `MENTAT_REVIEW_TIMEOUT_SECONDS` is the one limit, and `mentat check` says so while it is set.
 
+`mentat second-opinion` runs the `MENTAT_REVIEWERS` list on an idea.
+
 ## Other choices
 
 These are not environment variables:
