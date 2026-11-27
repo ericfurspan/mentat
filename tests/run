@@ -110,7 +110,7 @@ $o|Questions|Only \`re-ask:\` notes are asked again
 $o|Second opinions|They never ask the maintainer to carry text to another assistant.
 $o|Started planning sessions|never calls \`mentat:build\` and never redirects
 $b|Handing over|agreed by default ("Planning")
-$o|Owner check|Once "Start" step 4 has set this session, except in a turn where the maintainer starts it again, at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that \`mentat state owner\` prints this session's id.
+$o|Owner check|Once "Start" step 4 has set this session, except in a turn where the maintainer runs \`/mentat-lead:orchestrate\` in this session, at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that \`mentat state owner\` prints this session's id.
 $o|Owner check|When it prints another id, stop acting as orchestrator, saying so in one line, and plan, ask and hand over nothing more.
 $o|Owner check|When it exits 1 and \`mentat state orchestrator\` shows this session's id ended, run \`mentat state orchestrator set\` with it again.
 $o|Start|after the set, tell that session too that this session is now the orchestrator, so its "Owner check" finds this session's id.
