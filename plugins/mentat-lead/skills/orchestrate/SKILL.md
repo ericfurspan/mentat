@@ -18,7 +18,7 @@ State lives only in `mentat state`, the tracker and the host's session list, so 
 
 ## Owner check
 
-Once "Start" step 4 has set this session, except in a turn where the maintainer starts it again, at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that `mentat state owner` prints this session's id. When it prints another id, stop acting as orchestrator, saying so in one line, and plan, ask and hand over nothing more. When it exits 1 and `mentat state orchestrator` shows this session's id ended, run `mentat state orchestrator set` with it again.
+Once "Start" step 4 has set this session, except in a turn where the maintainer runs `/mentat-lead:orchestrate` in this session, at the start of each turn, with or without a held item, and on any session message saying another session is now the orchestrator, before any handover, new implementation or planning session, or question to the maintainer, check that `mentat state owner` prints this session's id. When it prints another id, stop acting as orchestrator, saying so in one line, and plan, ask and hand over nothing more. When it exits 1 and `mentat state orchestrator` shows this session's id ended, run `mentat state orchestrator set` with it again.
 
 ## Start
 
