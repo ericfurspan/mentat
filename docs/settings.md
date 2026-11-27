@@ -25,4 +25,22 @@ These are not environment variables:
 
 - `~/.config/mentat/warn-kept-branches`: when this file exists, `mentat check` warns if the repository keeps head branches after merge.
 - `~/.config/mentat/private-words`: the private word list, one word per line. The publish check `mentat review` runs before it posts, and the `mentat-public-text` module's hook, refuse text that holds one; `mentat check` warns when the list misses a private repository you can reach.
-- The lines Mentat reads from a repository's `AGENTS.md`: see the README's [Configuration](../README.md#configuration).
+
+## AGENTS.md lines
+
+Mentat reads from a repository's `AGENTS.md`:
+
+- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; else GitHub issues)
+- The one test command: ``The one test command is `<command>`.``
+- A `## Code Review Rules` section, the rules reviewers apply.
+
+Moving a backlog to Linear: [steps](../plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
+
+## Module commands
+
+- `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`: any backlog's Inbox triage (`mentat-linear`).
+
+## Breaking changes
+
+- orchestrate-notes.md is not read (move live entries into `mentat state`); retro is removed.
+- `mentat-reviewers` needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's `.claude/settings.json`.
