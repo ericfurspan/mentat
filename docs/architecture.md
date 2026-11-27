@@ -14,7 +14,7 @@
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs the outside reviewers the repository lists once a head has nothing left to fix. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers`, `mentat review --outside` runs the outside reviewers the repository lists once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line, and you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not as your answer.
 
 ## Code and prompts
 
@@ -23,8 +23,8 @@ Code enforces these, among others:
 - `hooks/no-merge` denies `gh pr merge`, merges and auto-merge through `gh api`, and MCP merge tools, and denies when it cannot decide.
 - The git hooks, where set up, refuse a staged or pushed likely secret and a push that updates a non-local remote's default branch.
 - The `mentat-public-text` hook denies a listed `gh` or GitHub MCP write whose text holds a private word or a home path.
-- `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, waits for CI on the head before it posts, refuses a round past `MENTAT_REVIEW_ROUNDS` and runs a publish check before it posts.
-- `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
+- `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, refuses a round past `MENTAT_REVIEW_ROUNDS`, and before posting waits for any CI on the head and runs a publish check.
+- `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and check worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
 
 Prompts carry the workflow: `rules.md`, the skills and the agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file that holds it and how it is checked.
 
@@ -54,7 +54,14 @@ plugins/mentat-lead/skills/{grill/SKILL,orchestrate/SKILL,orchestrate/build-sess
 plugins/mentat-linear/skills/{linear,triage}/SKILL.md
 ```
 
-`bada73e` has these but not `skills/plan/`, plus 16: the planning skill's older folder, more backlog and review files and the retro skill. Replace `-h` with `-l` and drop the final `wc` to list a commit's files.
+`bada73e` has these except `skills/plan/`'s two, plus four in the planning skill's older folder, another backlog file and these 11:
+
+```text
+plugins/mentat-lead/skills/retro/SKILL.md
+skills/{backlog/{agent-records,assumptions,filing,item-reads,replies,spec-fixes,start-waits,waits},review/{fast-track,review-depth}}.md
+```
+
+Replace `-h` with `-l` and drop the final `wc` to list a commit's files.
 
 Part of the drop is text that moved into the `mentat` command ([decision record 0005](adr/0005-deterministic-checks-live-in-the-mentat-command.md)), and not all of it comes from the rewrite stages.
 
