@@ -249,7 +249,7 @@ wp=$!
 for _ in $(seq 100); do [ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && break; sleep 0.1; done
 check "both tools are running before the cancel, and a worktree is registered" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && [ "$(worktrees)" = 2 ]'
 took=$SECONDS; kill -TERM "$wp"; wait "$wp"; rc=$?; took=$((SECONDS - took))
-check "cancelling exits 143, stops both model processes and removes the worktree, the run folder and the temporary folders" '[ "$rc" = 143 ] && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && clean'
+check "cancelling exits 143, stops both model processes and removes the worktree and the temporary folders" '[ "$rc" = 143 ] && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && clean'
 check "cancelling finishes well before the hung tools would end on their own (under 10 seconds against their 30)" '[ "$took" -lt 10 ]'
 for pidf in codex_pid other_pid; do [ ! -f "$STUB/$pidf" ] || kill -9 "$(cat "$STUB/$pidf")" 2>/dev/null; done
 # INT to its whole process group (Ctrl-C), with default INT handling (a job this script
@@ -261,7 +261,7 @@ for _ in $(seq 100); do [ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && 
 before=$(worktrees) took=$SECONDS; kill -INT -- "-$wp"; wait "$wp"
 for _ in $(seq 50); do kill -0 -- "-$wp" 2>/dev/null || break; sleep 0.1; done
 took=$((SECONDS - took))
-check "INT to its process group stops both model processes within seconds and leaves no process, worktree, run folder or temporary folder" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$wp" 2>/dev/null && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && clean'
+check "INT to its process group stops both model processes within seconds and leaves no process, worktree or temporary folder" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$wp" 2>/dev/null && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && clean'
 kill -9 -- "-$wp" 2>/dev/null
 
 # The start sweep (tests/review-local.sh has its full set of cases) runs for second-opinion too.
