@@ -25,8 +25,8 @@ Left alone, AI agents drift from requests, review their own work and merge mista
 - Handover (`mentat-lead`): an item with its spec's fingerprint, taken only if unchanged.
 - Grill (`mentat-lead`): an interview on your open decisions.
 - Plan check: a fresh agent checks most plans before agreement.
-- Fast track: changes that cannot alter code behavior or agents' instructions skip review, if you agree.
-- Review rounds: fresh Claude reviews each head, up to a limit; outside reviewers (`mentat-reviewers`) review heads with nothing left to push.
+- [Fast track](skills/review/SKILL.md#fast-track): if you agree, only a diff that clearly cannot alter code behavior or agents' instructions skips review.
+- Review rounds: fresh Claude reviews each head, within a limit; outside reviewers (`mentat-reviewers`) review heads with nothing left to push.
 - Safety nets: a hook blocks agents' merges; [opt-in](docs/setup.md#git-hooks) git hooks refuse likely secrets and non-local default-branch pushes. `mentat-public-text` blocks listed GitHub writes holding home paths or private words.
 - `mentat-linear`: the Linear adapter and any backlog's Inbox triage ([`/mentat-linear:triage`](docs/settings.md#module-commands)).
 
@@ -40,7 +40,7 @@ Left alone, AI agents drift from requests, review their own work and merge mista
 
 ## Install
 
-In each repository:
+Per repository:
 
 ```bash
 claude plugin install mentat --marketplace ericfurspan/mentat --scope project
@@ -51,7 +51,7 @@ This writes `.claude/settings.json`, turning Mentat on for everyone there (`--sc
 - Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install-scope>` (re-copy any [git hooks](docs/setup.md#git-hooks)).
 - Remove: `claude plugin uninstall mentat@mentat --scope <install-scope>`.
 
-Where pull requests need approval, give the agent its own GitHub account.
+Where pull requests need approval, give the agent a separate GitHub account.
 
 Optional modules install as `<module>@mentat`: `mentat-reviewers`, `mentat-public-text`, `mentat-lead` and `mentat-linear`.
 
@@ -62,7 +62,7 @@ Ask for a change in chat; agreeing to its spec commits it to Todo, [to implement
 - `/mentat:plan [item id]`: plan an item together.
 - `/mentat:build [item id ...]`: implement committed items.
 
-[`rules.md`](rules.md) holds the core rules, `skills/` step details.
+[`rules.md`](rules.md) holds core rules, `skills/` step details.
 
 ## Configuration
 

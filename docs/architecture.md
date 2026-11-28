@@ -6,15 +6,15 @@
 
 - `rules.md`: the core rules, which `hooks/session-start` prints into sessions where Mentat is on.
 - `skills/`: one skill per workflow step: `plan`, `backlog`, `build`, `pr` and `review`.
-- `agents/`: the implementer (`builder.md`) and the plan checker (`plan-checker.md`).
-- `hooks/`: the session-start and merge (`no-merge`) hooks.
+- `agents/`: implementer (`builder.md`) and plan checker (`plan-checker.md`).
+- `hooks/`: session-start and merge (`no-merge`) hooks.
 - `git-hooks/`: opt-in git hooks for agents' `git` ([setup](setup.md#git-hooks)).
-- `bin/mentat` and `lib/`: the `mentat` command, which runs reviews and the checks that always give the same answer.
-- `plugins/`: the optional modules: `mentat-reviewers`, `mentat-public-text`, `mentat-linear` and `mentat-lead`.
+- `bin/mentat` and `lib/`: the `mentat` command, which runs reviews and checks that always give the same answer.
+- `plugins/`: optional modules: `mentat-reviewers`, `mentat-public-text`, `mentat-linear` and `mentat-lead`.
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except on a fast track you agreed, runs review rounds: `mentat review` runs fresh-context Claude on each head, up to the round limit; with `mentat-reviewers` on in [committed settings](settings.md), `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed or answered. A ready pull request gets a "Ready to merge" line; you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and, where its host can start and message sessions, it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except on a fast track you agreed, runs review rounds: `mentat review` runs fresh-context Claude on each head, within the round limit; with `mentat-reviewers` on in [committed settings](settings.md), `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed, answered or, at the round limit, filed for follow-up. A ready pull request gets a "Ready to merge" line; you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and, where its host can start and message sessions, it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
 
 ## Code and prompts
 
@@ -26,7 +26,7 @@ Code enforces these, among others:
 - `mentat review` runs Claude headless in a temporary worktree of the head with read tools only, refuses a round past `MENTAT_REVIEW_ROUNDS`, and before posting waits for any CI on the head and runs a publish check.
 - `mentat fingerprint`, `mentat worktree` and `mentat state` compute spec fingerprints, make and check branches and check worktrees, and keep the orchestrator's state; `mentat check` reports the setup.
 
-Prompts carry the workflow: `rules.md`, the skills and agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file holding it and how it is checked.
+Prompts carry the workflow: `rules.md`, skills and agent files tell agents when a plan comes first, what goes to you, how to sort findings and when a pull request is ready. [invariants.md](invariants.md) lists each guardrail and rule, the file holding it and how it is checked.
 
 The hooks are nets for mistakes, not security boundaries: another command form can get past them.
 
