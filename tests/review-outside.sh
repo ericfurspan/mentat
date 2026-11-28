@@ -259,12 +259,14 @@ cancel() { # $1 signal, $2 group or pid
   for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
   took=$((SECONDS - took))
 }
-# Stopped by the signal: an exit status above 128.
+# Stopped by the signal: an exit status above 128. mktemp -d may ignore TMPDIR (macOS's
+# does), so the run folder is checked by its path: the folder holding the checkout, tree.
 stopped() {
   [ "$ready" = yes ] && [ "$before" -ge 2 ] && [ "$crc" -gt 128 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null &&
     ! kill -0 "$(cat "$STUB/alpha.pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/beta.pid")" 2>/dev/null &&
     [ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ] && [ -z "$(git -C "$root/work" for-each-ref refs/mentat)" ] &&
-    a=$(cat "$STUB/alpha.dir") && b=$(cat "$STUB/beta.dir") && [ -n "$a" ] && [ -n "$b" ] && [ ! -e "$a" ] && [ ! -e "$b" ] && [ -z "$(ls -A "$TMPDIR")" ] && ! posted
+    a=$(cat "$STUB/alpha.dir") && b=$(cat "$STUB/beta.dir") && [ -n "$a" ] && [ -n "$b" ] && [ ! -e "$a" ] && [ ! -e "$b" ] &&
+    [ "${a##*/}" = tree ] && [ "${b##*/}" = tree ] && [ ! -e "${a%/tree}" ] && [ ! -e "${b%/tree}" ] && [ -z "$(ls -A "$TMPDIR")" ] && ! posted
 }
 reset; touch "$STUB/alpha.hang" "$STUB/beta.hang"; cancel INT group
 check "INT to its process group while two reviewers run stops both, posts nothing and leaves nothing behind" 'stopped'

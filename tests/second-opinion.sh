@@ -126,7 +126,17 @@ other_ran() { [ -f "$STUB/cwd_other" ]; }
 left_over() { ls -A "$cache/mentat" 2>/dev/null; }
 worktrees() { "$real_git" -C "$top" worktree list | wc -l | tr -d ' '; }
 # Nothing of a run is left but the private logs of failed runs.
-clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-log.*')" ]; }
+clean() { [ "$(worktrees)" = 1 ] && [ ! -d "$top/.git/worktrees" ] && [ -z "$(left_over)" ] && [ -z "$(find "$root/tmp" -mindepth 1 -maxdepth 1 -not -name 'mentat-log.*')" ] && run_folders_gone; }
+# mktemp -d may ignore TMPDIR (macOS's does), so the run folder is found from the checkout
+# each tool ran in, its folder tree: for each tool that ran, the folder holding it is gone.
+run_folders_gone() {
+  local f d
+  for f in "$STUB/cwd" "$STUB/cwd_other"; do
+    [ -f "$f" ] || continue
+    d=$(cat "$f") && [ "${d##*/}" = tree ] && [ ! -e "${d%/tree}" ] || return 1
+  done
+}
+both_ran_in() { [ -s "$STUB/cwd" ] && [ -s "$STUB/cwd_other" ]; }
 # Nothing is posted (no gh call), and nothing is fetched but origin's default branch, into
 # private refs that are deleted.
 no_outside() { [ ! -e "$CALLS/gh" ] && ! grep -v -F "origin +refs/heads/trunk:refs/mentat/" "$CALLS/fetch" 2>/dev/null | grep -q . && [ -z "$("$real_git" -C "$top" for-each-ref refs/mentat)" ]; }
@@ -249,7 +259,7 @@ wp=$!
 for _ in $(seq 100); do [ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && break; sleep 0.1; done
 check "both tools are running before the cancel, and a worktree is registered" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && [ "$(worktrees)" = 2 ]'
 took=$SECONDS; kill -TERM "$wp"; wait "$wp"; rc=$?; took=$((SECONDS - took))
-check "cancelling exits 143, stops both model processes and removes the worktree and the temporary folders" '[ "$rc" = 143 ] && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && clean'
+check "cancelling exits 143, stops both model processes and removes the worktree and the temporary folders" '[ "$rc" = 143 ] && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && both_ran_in && clean'
 check "cancelling finishes well before the hung tools would end on their own (under 10 seconds against their 30)" '[ "$took" -lt 10 ]'
 for pidf in codex_pid other_pid; do [ ! -f "$STUB/$pidf" ] || kill -9 "$(cat "$STUB/$pidf")" 2>/dev/null; done
 # INT to its whole process group (Ctrl-C), with default INT handling (a job this script
@@ -261,7 +271,7 @@ for _ in $(seq 100); do [ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && 
 before=$(worktrees) took=$SECONDS; kill -INT -- "-$wp"; wait "$wp"
 for _ in $(seq 50); do kill -0 -- "-$wp" 2>/dev/null || break; sleep 0.1; done
 took=$((SECONDS - took))
-check "INT to its process group stops both model processes within seconds and leaves no process, worktree or temporary folder" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$wp" 2>/dev/null && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && clean'
+check "INT to its process group stops both model processes within seconds and leaves no process, worktree or temporary folder" '[ -f "$STUB/codex_pid" ] && [ -f "$STUB/other_pid" ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$wp" 2>/dev/null && ! kill -0 "$(cat "$STUB/codex_pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null && both_ran_in && clean'
 kill -9 -- "-$wp" 2>/dev/null
 
 # The start sweep (tests/review-local.sh has its full set of cases) runs for second-opinion too.
