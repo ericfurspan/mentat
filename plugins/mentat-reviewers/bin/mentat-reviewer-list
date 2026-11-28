@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mentat-reviewer-list [--notes] <name>...: for mentat reviewers and mentat check, one line
+# mentat-reviewer-list <name>...: for mentat reviewers and mentat check, one line
 # per name on whether this module ships it and its offline check passes, as adapter_list
 # in lib/adapter.sh prints them. Runs no reviewer. 0 printed, 64 usage.
 set -uo pipefail

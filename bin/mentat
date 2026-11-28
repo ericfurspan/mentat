@@ -12,13 +12,11 @@
 #     A comment that holds a local path or a private name, in a public repository, is
 #     kept in a local file and not posted (exit 1).
 #     Each reviewer's failures in a row on this machine (its tool failing, timing out or
-#     giving no usable reply or result line, and a sign-in refusal) are kept in
-#     reviewer-failures-<name> in Mentat's cache folder (XDG_CACHE_HOME, else ~/.cache),
-#     the name being claude or the outside reviewer's; a checked reply ends the row. A
-#     sign-in refusal, a refusal for usage or billing when no earlier failure in the row
-#     was one (once per row of failures in this machine's record, not per outage), and any
-#     other failure from the second in a row, also print one line starting "mentat: tell
-#     the maintainer now:" with the reviewer, the count, the pull requests and the reason.
+#     giving no usable reply or result line) are kept in reviewer-failures-<name> in
+#     Mentat's cache folder (XDG_CACHE_HOME, else ~/.cache), the name being claude or the
+#     outside reviewer's; a checked reply ends the row. A failure from the second in a row
+#     also prints one line starting "mentat: tell the maintainer now:" with the reviewer,
+#     the count, the pull requests and the reason.
 #     Claude runs in a fresh context, with read tools only, at --effort high, on
 #     MENTAT_REVIEW_MODEL, or, with MENTAT_FIRST_REVIEW_MODEL set, on that model while the pull request has no local round (as mentat status counts them), and,
 #     when Claude reports that no model ran, once more on the review default if that is
@@ -108,8 +106,7 @@
 #     the merge hook and the review need; prints the Mentat modules installed, whether
 #     outside reviewers are on here as mentat reviewers reads it, and each listed reviewer
 #     and whether it is available, and warns when outside reviewers are unknown, on with
-#     none listed or on with a listed one not available or skipped, when the module notes a
-#     setting it no longer reads, when agents' git does not use the git hooks, the private word list is unreadable, the
+#     none listed or on with a listed one not available or skipped, when agents' git does not use the git hooks, the private word list is unreadable, the
 #     list misses a private repository this account can reach, by count only, the Mentat
 #     plugin is installed at different versions, or, with ~/.config/mentat/warn-kept-branches
 #     present, the repository keeps head branches after merge.

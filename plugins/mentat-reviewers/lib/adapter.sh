@@ -5,18 +5,12 @@
 # subshell, never in the command's own shell, and sets or defines:
 #   adapter_display     the name people read.
 #   adapter_available   an offline check that starts no reviewer and reads no network:
-#                       returns 0, or sets adapter_why (public-safe words) and returns 1;
-#                       adapter_kind=always also counts it as a failure in a row that is
-#                       raised every time (a sign-in refusal).
+#                       returns 0, or sets adapter_why (public-safe words) and returns 1.
 #   adapter_run MODE    runs the reviewer read-only, MODE review (no web search) or opinion
 #                       (web search allowed), and writes its whole reply to $reply. It
 #                       waits on its tool with adapter_wait and reports a failure with
 #                       adapter_fail, which exits.
 #   adapter_meta        optional: prints the record's lines on the tool and the model that ran.
-#   adapter_roots       optional array: more temporary folders whose paths are rewritten
-#                       out of a review reply, beside the checkout and the data folder.
-#   adapter_notes       optional: prints lines for mentat check, such as a setting it no
-#                       longer reads.
 # The run gives the adapter: name, adapter_mode, top (the repository), head (the commit
 # read), tree (a checkout of head, made with the repository's hooks off), work (an empty
 # folder of the adapter's own) and reply; for a review also pr, repo, mb (the merge
@@ -31,11 +25,9 @@
 adapter_shipped() { [ -f "$module/adapters/$1.sh" ]; }
 
 # mentat-reviewer-list: one line per name, "available <name>", "unavailable <name> <why>"
-# or "skipped <name> <why>", from each adapter's offline check; with --notes first, also
-# "note <text>" for each line a shipped adapter's adapter_notes prints.
+# or "skipped <name> <why>", from each adapter's offline check.
 adapter_list() {
-  local n f notes=no
-  [ "${1:-}" != --notes ] || { notes=yes; shift; }
+  local n
   for n in "$@"; do
     if ! adapter_shipped "$n"; then printf 'skipped %s the mentat-reviewers module has no such reviewer\n' "$n"; continue; fi
     (
@@ -47,27 +39,18 @@ adapter_list() {
       else printf 'unavailable %s %s\n' "$n" "${adapter_why:-its check failed}"; fi
     )
   done
-  [ "$notes" = yes ] || return 0
-  for f in "$module"/adapters/*.sh; do
-    [ -f "$f" ] || continue
-    (
-      # shellcheck source=/dev/null
-      . "$f" >/dev/null 2>&1 || exit 0
-      if declare -F adapter_notes >/dev/null; then adapter_notes | sed 's/^/note /'; fi
-    )
-  done
 }
 
 # Ends a runner: the reviewer did not finish, for reason $1, which is posted and so names
 # no local path and holds no tool output. $2, optional, is what only the maintainer reads,
 # such as where a kept log is. $3: empty, a failure of the reviewer's own that counts in
-# its failures in a row; usage or always, the same, raised as reviewer_failed says; none,
-# not counted. Only a review counts; a second opinion never does.
-adapter_fail() { # $1 public reason, $2 local detail, $3 kind
+# its failures in a row (lib/shared.sh reviewer_failed); none, not counted. Only a review
+# counts; a second opinion never does.
+adapter_fail() { # $1 public reason, $2 local detail, $3 empty or none
   review_raise=""
   if [ "${adapter_mode:-}" = review ] && [ "${3:-}" != none ]; then
     # shellcheck disable=SC2031 # set in this runner by adapter_go
-    reviewer_failed "$name" "${adapter_display:-$name}" "${3:-}"
+    reviewer_failed "$name" "${adapter_display:-$name}"
   fi
   printf '%s\n' "$(printf '%s' "$1" | tr '\n' ' ')" >"$res/$name.why"
   [ -z "${2:-}" ] || printf '%s\n' "$(printf '%s' "$2" | tr '\n' ' ')" >"$res/$name.local"
@@ -109,8 +92,7 @@ adapter_wait() { # $1 pid, $2 local detail on a timeout
 # $reply. A name the module does not ship is skipped; one whose offline check fails did
 # not finish.
 adapter_go() { # $1 review or opinion
-  # shellcheck disable=SC2034 # adapter_roots is set by the adapter and read by outside_runner
-  adapter_mode=$1 adapter_display=$name adapter_why="" adapter_kind=none adapter_roots=()
+  adapter_mode=$1 adapter_display=$name adapter_why=""
   if ! adapter_shipped "$name"; then
     printf 'the mentat-reviewers module has no such reviewer\n' >"$res/$name.skipped"
     exit 0
@@ -118,7 +100,7 @@ adapter_go() { # $1 review or opinion
   # shellcheck source=/dev/null
   . "$module/adapters/$name.sh" || adapter_fail "the mentat-reviewers module could not load it" "" none
   printf '%s\n' "$adapter_display" >"$res/$name.display"
-  adapter_available || adapter_fail "${adapter_why:-its check failed}" "" "$adapter_kind"
+  adapter_available || adapter_fail "${adapter_why:-its check failed}" "" none
   work="$res/$name.work" reply="$res/$name.work/reply"
   mkdir "$work" || adapter_fail "could not create a temporary folder" "" none
   adapter_run "$1"
