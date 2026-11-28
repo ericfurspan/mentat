@@ -404,6 +404,8 @@ check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted finding
 check "a FINDINGS reply's result line says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- (blocking) README:1 wrong text"'
 reset; printf 'REVIEW RESULT: NO FINDINGS\n\n- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "the result comes from the reply's final line only" '[ "$rc" = 2 ] && heading findings none && fold_shape "REVIEW RESULT: FINDINGS"'
+reset; printf 'REVIEW RESULT: NO FINDINGS\n\nBut actually there is a problem.\n' >"$STUB/reply"; rc=$(run)
+check "a result line followed by prose is no final result line: did not finish, posted" '[ "$rc" = 0 ] && grep -qxF "codex: $NO_RESULT_ROW" "$STUB/out" && heading "$NO_RESULT_ROW"'
 
 # Codex runs in a temporary checkout and may cite files by its absolute path, as created or
 # resolved. The posted comment holds neither, and links the file at the reviewed commit.
