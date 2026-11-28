@@ -38,7 +38,7 @@ MENTAT_CI_GRACE_SECONDS only tests set it, to shorten the wait for CI to start
 MENTAT_GROK_TIMEOUT_SECONDS a retired setting: the Grok adapter looks at it only so mentat check can say it is no longer read"
 internal_names=$(printf '%s\n' "$internal" | cut -d' ' -f1)
 
-# The code: scripts, hooks, skills, agents and rules, tracked or new, never tests, docs or the changelog.
+# The code: scripts, hooks, skills, agents and rules, tracked or new, never tests or docs.
 code_files=$(git ls-files --cached --others --exclude-standard -- bin lib hooks git-hooks plugins skills agents rules.md | sort -u)
 if [ -z "$code_files" ]; then
   fail "found no code files to scan"

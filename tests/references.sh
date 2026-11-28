@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Names and file references in the instruction text. Prints PASS/FAIL lines; exits 1 on any FAIL.
 #
-# Planning is mentat:plan, with no alias: no file but CHANGELOG.md and the decision records in
-# docs/adr/ names the old planning skill or its folder, or the next-work file.
+# Planning is mentat:plan, with no alias: no file but the decision records in docs/adr/ names the
+# old planning skill or its folder, or the next-work file.
 # The names are built from pieces, so this file holds none of them.
 #
 # A file a skill file (SKILL.md, a supporting file or CREDITS.md, module skills included), rules.md
@@ -21,9 +21,9 @@ pass() { printf 'PASS: references %s\n' "$1"; }
 fail() { printf 'FAIL: references %s\n' "$1"; failures=$((failures + 1)); }
 
 old=propose ending=next-work
-banned=$(git grep -n -I -F --untracked -e "mentat:$old" -e "skills/$old" -e "$ending.md" -- . ':!CHANGELOG.md' ':!docs/adr/')
+banned=$(git grep -n -I -F --untracked -e "mentat:$old" -e "skills/$old" -e "$ending.md" -- . ':!docs/adr/')
 if [ -z "$banned" ]; then
-  pass "no file but CHANGELOG.md and docs/adr/ names the old planning skill, its folder or the next-work file"
+  pass "no file but docs/adr/ names the old planning skill, its folder or the next-work file"
 else
   fail "files name the old planning skill, its folder or the next-work file:"
   printf '%s\n' "$banned"

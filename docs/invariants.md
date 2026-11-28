@@ -111,7 +111,6 @@ From `AGENTS.md`; Mentat inherits them here like any other repository's choices,
 | The agent account cannot approve its own pull requests. | `AGENTS.md` | review only |
 | Scripts are plain bash that also runs on macOS's bash 3.2. | `AGENTS.md` | review only |
 | A setting the user switches keeps the same key in every configuration; only its value changes. | `AGENTS.md` | review only |
-| Only a release pull request edits `CHANGELOG.md`; the maintainer merges it and creates the tag, and a session never does either. | `AGENTS.md` | `tests/run` (format line and `[Unreleased]` section only); review only |
 | A hard-to-reverse choice, surprising without context and a real trade-off, gets a decision record in `docs/adr/` in the same pull request; one that reverses a record adds a new one and marks the old one superseded. | `AGENTS.md` | review only |
 | After the maintainer merges a pull request here, the session runs the plugin and module update commands. | `AGENTS.md` | review only |
 | Working files go in `work/`, which git ignores. | `AGENTS.md` | review only |

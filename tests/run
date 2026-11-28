@@ -277,18 +277,6 @@ else
   printf '%s\n' "$em_dash_files"
 fi
 
-# CHANGELOG.md keeps Keep a Changelog 1.1.0's format line and an [Unreleased] section.
-if grep -qxF 'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).' CHANGELOG.md; then
-  pass "CHANGELOG.md says its format is based on Keep a Changelog 1.1.0"
-else
-  fail "CHANGELOG.md must say its format is based on Keep a Changelog 1.1.0"
-fi
-if grep -qxF '## [Unreleased]' CHANGELOG.md; then
-  pass "CHANGELOG.md has an ## [Unreleased] heading"
-else
-  fail "CHANGELOG.md must have an ## [Unreleased] heading"
-fi
-
 # One word budget keeps small the text Claude Code loads into every session with every module on,
 # counted by wc -w on exactly what loads: rules.md, which hooks/session-start prints; the description
 # of every core and module skill whose frontmatter does not set disable-model-invocation: true (such a
