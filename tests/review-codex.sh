@@ -614,15 +614,15 @@ interrupt() { # $1 model or ci, $2 signal, $3 group or pid
   for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
   took=$((SECONDS - took))
 }
-gone() { [ "$ready" = yes ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ "$(worktrees)" = 1 ] && [ -s "$STUB/tree" ] && [ ! -e "$(cat "$STUB/tree")" ]; }
+gone() { [ "$ready" = yes ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ "$(worktrees)" = 1 ] && [ -s "$STUB/tree" ] && [ ! -e "$(cat "$STUB/tree")" ] && ! posted; }
 reset; touch "$STUB/hang"; interrupt model INT group
-check "INT to its process group while Codex runs stops Codex and removes the worktree within seconds" 'gone'
+check "INT to its process group while Codex runs stops Codex, posts nothing and removes the worktree within seconds" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci INT group
-check "INT to its process group during the wait for CI leaves no process and removes the worktree within seconds" 'gone'
+check "INT to its process group during the wait for CI leaves no process, posts nothing and removes the worktree within seconds" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
-check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
+check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process, posts nothing and removes the worktree" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 
 # Codex's failures in a row are kept in its own record, keyed by the adapter's name; from the
