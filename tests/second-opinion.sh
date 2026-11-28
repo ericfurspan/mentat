@@ -270,7 +270,7 @@ rm -rf "$cache/mentat/run-old" "$TMPDIR/mentat-log.codex.old"
 # The switch: the checkout goes to the listed reviewers only where outside reviewers are on
 # in .claude/settings.json on origin's default branch with at least one name listed, read
 # as review --outside reads it, after the usage and idea-file checks and before the start
-# sweep, the freshness fetch, the export and any tool. Off, unknown and on with none listed
+# sweep, the freshness fetch, the checkout and any tool. Off, unknown and on with none listed
 # each have an origin and a clone of their own; the lone repository has no remote, though
 # its own committed settings turn outside reviewers on.
 OFF_LINE="mentat: no second opinion, nothing was sent: outside reviewers are off in this repository (the mentat-reviewers module is not on in .claude/settings.json on trunk)"
@@ -300,11 +300,11 @@ check "outside reviewers on in .claude/settings.json on origin's default branch:
 mkdir -p "$cache/mentat/run-old" && touch -t "$(date -v-1445M +%Y%m%d%H%M.%S)" "$cache/mentat/run-old"
 echo x >"$TMPDIR/mentat-log.codex.old" && touch -t "$(date -v-10085M +%Y%m%d%H%M.%S)" "$TMPDIR/mentat-log.codex.old"
 reset; rc=$(gate_run off "$idea")
-check "outside reviewers off: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/off repo" "$OFF_LINE"'
+check "outside reviewers off: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, checked out or run" 'gate_refused "$root/off repo" "$OFF_LINE"'
 reset; rc=$(gate_run unknown "$idea")
-check "outside reviewers unknown: no second opinion (exit 6), saying why, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/unknown repo" "$(unknown_line ".claude/settings.json on trunk could not be read as JSON")"'
+check "outside reviewers unknown: no second opinion (exit 6), saying why, and nothing swept, fetched for freshness, checked out or run" 'gate_refused "$root/unknown repo" "$(unknown_line ".claude/settings.json on trunk could not be read as JSON")"'
 reset; rc=$(gate_run none "$idea")
-check "outside reviewers on with none listed: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, exported or run" 'gate_refused "$root/none repo" "$NONE_LINE"'
+check "outside reviewers on with none listed: no second opinion (exit 6), saying so, and nothing swept, fetched for freshness, checked out or run" 'gate_refused "$root/none repo" "$NONE_LINE"'
 reset; rc=$(gate_run lone "$idea")
 check "no origin remote, though the checkout's own settings turn outside reviewers on: no second opinion (exit 6), saying why, and nothing fetched or run" 'gate_refused "$root/lone repo" "$(unknown_line "the checkout has no origin remote")" && [ ! -e "$CALLS/fetch" ]'
 reset; rc=$(gate_run off "$root/missing idea.md")

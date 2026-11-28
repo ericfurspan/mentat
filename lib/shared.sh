@@ -514,7 +514,7 @@ review_criteria() {
   printf 'If every item is met and checkable, say so in one line. When neither is given, do not invent criteria and skip this list.\n\n'
 }
 # Rewrites the reply in $1 so that it holds no machine-local path:
-# a path inside a temporary checkout or export of the reviewed commit (the roots
+# a path inside a temporary checkout of the reviewed commit (the roots
 # $4..., each also in its resolved form, since /var is /private/var on macOS)
 # becomes its repository-relative path, and a markdown link to such a path becomes
 # a link to that file at commit $3 of repository $2 (owner/name) on GitHub, with
