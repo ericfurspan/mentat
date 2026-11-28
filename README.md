@@ -11,17 +11,36 @@
 
 Mentat is a Claude Code plugin for building software with multiple AI agents.
 
-Claude Code plans, builds and reviews each change; you decide what gets built and merge every pull request. With `mentat-reviewers` on, the outside reviewers a repository lists review each head once Claude's findings on it leave nothing to fix. A hook blocks an agent's merge; where set up, git hooks refuse its default-branch pushes and likely secrets.
+<!-- flow picture -->
+<!-- demo -->
+
+## Why
+
+Left alone, AI agents drift from requests, review their own work and merge mistakes. With Mentat, work follows a spec you plan with Claude, fresh reviewers check it, and only you merge.
+
+## Main ideas
+
+- Orchestrator (`mentat-lead`): the one session you talk to (`/mentat-lead:orchestrate`), handing agreed items to implementation sessions where its host can start and message them.
+- Implementation session: one pull request per agreed item.
+- Handover (`mentat-lead`): an item with its spec's fingerprint, taken only if unchanged.
+- Grill (`mentat-lead`): an interview on your open decisions.
+- Plan check: a fresh agent checks most plans before agreement.
+- [Fast track](skills/review/SKILL.md#fast-track): if you agree, only a diff that clearly cannot alter code behavior or agents' instructions skips review.
+- Review rounds: fresh Claude reviews each head, within a limit; outside reviewers (`mentat-reviewers`) review heads with nothing left to push.
+- Safety nets: a hook blocks agents' merges; [opt-in](docs/setup.md#git-hooks) git hooks refuse likely secrets and non-local default-branch pushes. `mentat-public-text` blocks listed GitHub writes holding home paths or private words.
+- `mentat-linear`: the Linear adapter and any backlog's Inbox triage ([`/mentat-linear:triage`](docs/settings.md#module-commands)).
+
+[Architecture](docs/architecture.md).
 
 ## Requirements
 
-- macOS, with Claude Code 2.1.295 or later, `git`, `jq`, and `gh` signed in.
-- For `mentat-reviewers`: each listed reviewer's command, signed in: the Codex CLI, [outside the home folder](docs/setup.md#codex-outside-the-home-folder); Grok Build (`grok login`).
+- macOS, Claude Code 2.1.295 or later, `git`, `jq`, and `gh` signed in.
+- For `mentat-reviewers`: each listed reviewer's command, signed in: Codex CLI, [outside the home folder](docs/setup.md#codex-outside-the-home-folder); Grok Build (`grok login`).
 - For the git hooks: `gitleaks` ([setup](docs/setup.md#git-hooks)).
 
 ## Install
 
-In each repository:
+Per repository:
 
 ```bash
 claude plugin install mentat --marketplace ericfurspan/mentat --scope project
@@ -29,49 +48,26 @@ claude plugin install mentat --marketplace ericfurspan/mentat --scope project
 
 This writes `.claude/settings.json`, turning Mentat on for everyone there (`--scope local`: only you; `--scope user`: every folder).
 
-- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install scope>` (and re-copy [git hooks](docs/setup.md#git-hooks) if used).
-- Remove: `claude plugin uninstall mentat@mentat --scope <install scope>`.
+- Update: `claude plugin marketplace update mentat`, then `claude plugin update mentat@mentat --scope <install-scope>` (re-copy any [git hooks](docs/setup.md#git-hooks)).
+- Remove: `claude plugin uninstall mentat@mentat --scope <install-scope>`.
 
-Where pull requests need approval, give the agent its own GitHub account.
+Where pull requests need approval, give the agent a separate GitHub account.
 
-Optional modules install as `<module>@mentat`:
-
-- `mentat-reviewers`: outside reviewers; Codex and Grok ship.
-- `mentat-public-text`: blocks GitHub text holding a home path or a word from `~/.config/mentat/private-words`.
-- `mentat-linear`: the Linear adapter, and any backlog's Inbox triage: `/mentat-linear:triage [project ... | all] | brainstorm <text or link>`.
-- `mentat-lead`: grill, an interview on open decisions, and `/mentat-lead:orchestrate`, the one session you talk to, handing work to fresh sessions.
-
-Breaking: orchestrate-notes.md is not read (move live entries into `mentat state`); retro is removed.
+Optional modules install as `<module>@mentat`: `mentat-reviewers`, `mentat-public-text`, `mentat-lead` and `mentat-linear`.
 
 ## Usage
 
-Ask for a change in chat. Work goes Inbox, Backlog, Todo; agreeing to an item's spec commits it, to build now or later. Commands:
+Ask for a change in chat; agreeing to its spec commits it to Todo, [to implement now or later](skills/plan/SKILL.md#starting-implementation). Filed ideas wait in Inbox or Backlog.
 
-- `/mentat:plan [item id]`: plan with you and start building what you commit.
-- `/mentat:build [item id ...]`: build committed items, one pull request each.
+- `/mentat:plan [item id]`: plan an item together.
+- `/mentat:build [item id ...]`: implement committed items.
 
-[`rules.md`](rules.md) holds the core rules, `skills/` each step's detail.
+[`rules.md`](rules.md) holds core rules, `skills/` step details.
 
 ## Configuration
 
-Mentat reads from AGENTS.md:
-
-- Where the backlog lives: ``The external backlog is the Linear project `<name>`, in team `<team>`.`` (needs `mentat-linear`; else GitHub issues)
-- The one test command: ``The one test command is `<command>`.``
-- A `## Code Review Rules` section, the rules reviewers apply.
-
-[docs/settings.md](docs/settings.md) lists every setting, its default and where to set it.
-
-Moving a backlog to Linear: [steps](plugins/mentat-linear/skills/linear/SKILL.md#moving-to-linear).
-
-## Review tools
-
-Breaking: `mentat-reviewers` needs a list: `"env": {"MENTAT_REVIEWERS": "codex,grok"}`, read only from the default branch's `.claude/settings.json`. `MENTAT_REVIEW_TIMEOUT_SECONDS` (1800; a whole number from 1, never empty) limits every reviewer; `mentat check` warns while the unread `MENTAT_GROK_TIMEOUT_SECONDS` is set. `mentat second-opinion` runs the list on an idea.
-
-## Git hooks
-
-The hooks in `git-hooks/` refuse likely secrets and non-local default-branch pushes, then run repository hooks ([setup](docs/setup.md#git-hooks)). `mentat check` reports their state.
+[docs/settings.md](docs/settings.md) lists [the AGENTS.md lines Mentat reads](docs/settings.md#agentsmd-lines), every setting, review tools included, and [breaking changes](docs/settings.md#breaking-changes).
 
 ## Credits
 
-Skills' `CREDITS.md` files credit their sources; some hold third-party licenses.
+Skills' `CREDITS.md` files credit sources; some hold third-party licenses.

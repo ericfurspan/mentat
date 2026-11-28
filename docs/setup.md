@@ -42,7 +42,7 @@ The hooks are nets for mistakes by agents' `git` only, not a security boundary, 
      printf '%s\n' "$src" && mkdir -p "${dest%/*}" && cp -Rp "$src" "$dest"
    ```
 
-3. Add the Git entries to the existing `"env"` block in Claude Code's user settings (`~/.claude/settings.json`) or its git-ignored local settings (`.claude/settings.local.json`). Keep the machine-specific path out of committed project settings (`.claude/settings.json`). Keep existing entries, set `GIT_CONFIG_KEY_<n>` to `core.hooksPath` and `GIT_CONFIG_VALUE_<n>` to the absolute `<copy>/hooks` path, and raise `GIT_CONFIG_COUNT` from `<n>` to `<n> + 1`. With no existing entries, use index `0` and a count of `"1"`. This example keeps an existing index-`0` entry and adds index `1`:
+3. Add the Git entries to the existing `"env"` block in Claude Code's user settings (`~/.claude/settings.json`) or its git-ignored local settings (`.claude/settings.local.json`). Keep the machine-specific path out of committed project settings (`.claude/settings.json`). Keep existing entries, set `GIT_CONFIG_KEY_<n>` to `core.hooksPath` and `GIT_CONFIG_VALUE_<n>` to the absolute `<copy>/hooks` path, and raise `GIT_CONFIG_COUNT` from `<n>` to `<n> + 1`. With no existing entries, use index `0` and a count of `"1"`. Mentat's entry must be the last `core.hooksPath` among the `GIT_CONFIG_*` entries (the highest index), which adding it at index `<n>` and raising the count gives. This example keeps an existing index-`0` entry and adds index `1`:
 
    ```json
    {
@@ -56,7 +56,14 @@ The hooks are nets for mistakes by agents' `git` only, not a security boundary, 
    }
    ```
 
-4. Start a new Claude Code session and run `mentat check`. It reports that the git hooks in `<copy>` are installed and current.
+4. Start a new Claude Code session, where agents' `git` runs with these entries, and run in it:
+
+   ```bash
+   git config core.hooksPath
+   mentat check
+   ```
+
+   `git config` prints the path git uses, which should be the copy's `hooks` path. `mentat check` reports the guards' state, including that the git hooks in `<copy>` are installed and current.
 
 5. After updating the Mentat plugin, remove the old copy before repeating step 2. Use the same destination for both commands so `cp` does not nest a new `git-hooks/` inside the old copy:
 
