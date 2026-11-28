@@ -644,6 +644,10 @@ stub_reset; rc=$(run 7)
 check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
 check "a Codex failure after a checked reply is not raised" '[ "$rc" = 0 ] && [ -z "$(raised)" ]'
+stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
+check "a checked Codex reply ends its run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && ! posted && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
+check "a Codex failure after that checked reply is the first in a row: recorded, not raised" '[ "$rc" = 0 ] && [ -z "$(raised)" ] && [ "$(tail -n 2 "$REC" | cut -d" " -f2,3 | tr "\n" " ")" = "ok owner/repo#7 fail owner/repo#7 " ]'
 reset
 
 # At start, reviewers' run folders older than a day, and kept logs and held comments older
