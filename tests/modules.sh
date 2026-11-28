@@ -98,12 +98,9 @@ out=$(PATH="$sys" bin/mentat second-opinion 2>&1); rc=$?
 check "with none on PATH, this checkout's mentat-second-opinion runs" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat second-opinion <file>" ]'
 out=$(PATH="$sys" bin/mentat review --outside --stop 7 2>&1); rc=$?
 check "with none on PATH, this checkout's entry reads review --outside --stop 7 as a usage error" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" ]'
-# The modes one outside reviewer ran by are gone: each is a usage error that starts nothing.
-for args in "--codex 7" "--grok 7" "--grok --stop 7"; do
-  # shellcheck disable=SC2086 # the words are the arguments
-  out=$(PATH="$tmp/stubs:$sys" "$core/bin/mentat" review $args 2>&1); rc=$?
-  check "review $args exits 64 with the usage line, which names --outside, and hands nothing over" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" ]'
-done
+# The mode one outside reviewer ran by is gone: it is a usage error that starts nothing.
+out=$(PATH="$tmp/stubs:$sys" "$core/bin/mentat" review --codex 7 2>&1); rc=$?
+check "review --codex 7 exits 64 with the usage line, which names --outside, and hands nothing over" '[ "$rc" = 64 ] && [ "$out" = "mentat: usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" ]'
 
 # With neither: the copy of core without the module folder, and nothing on PATH.
 for args in "second-opinion a" "review --outside 7"; do

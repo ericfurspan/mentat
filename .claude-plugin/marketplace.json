@@ -11,7 +11,7 @@
     {
       "name": "mentat-reviewers",
       "source": "./plugins/mentat-reviewers",
-      "description": "Mentat module: turned on in a repository's committed settings, it runs the outside reviewers the repository lists (Codex and Grok ship), together on a head once Claude has reviewed it (mentat review --outside), plus their second opinion on an idea (mentat second-opinion)."
+      "description": "Mentat module: turned on in a repository's committed settings, it runs the outside reviewers the repository lists (Codex ships), together on a head once Claude has reviewed it (mentat review --outside), plus their second opinion on an idea (mentat second-opinion)."
     },
     {
       "name": "mentat-linear",

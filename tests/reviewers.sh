@@ -25,14 +25,10 @@ printf '%s\n' "$*" >>"$STUB/gh_calls"
 exit 99
 STUBEOF
 chmod +x "$root/bin/gh"
-# The shipped reviewers' tools: a codex that is installed, and a grok that is installed with no
-# sign-in in its home, so the list reads the same on any machine. Neither may run.
-for t in codex grok; do
-  printf '#!/bin/sh\necho "%s $*" >>"$STUB/tool_calls"\nexit 99\n' "$t" >"$root/bin/$t"
-  chmod +x "$root/bin/$t"
-done
-mkdir -p "$root/grok home"
-export GROK_HOME="$root/grok home"
+# The shipped reviewer's tool: a codex that is installed, so the list reads the same on any
+# machine. It may not run.
+printf '#!/bin/sh\necho "codex $*" >>"$STUB/tool_calls"\nexit 99\n' >"$root/bin/codex"
+chmod +x "$root/bin/codex"
 unset MENTAT_REVIEWERS
 export PATH="$root/bin:$PATH"
 
@@ -184,23 +180,21 @@ listing() { # $1 what main's settings hold, $2 the settings, $3 the whole output
   check "$1" 'said_lines "$want"'
 }
 on_with() { printf '{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":%s}' "$1"; }
-NOGROK="grok: not available (Grok is not signed in: there is no auth.json in its home (run grok login))"
-listing "list codex,grok: each listed reviewer and whether it is available" "$(on_with '{"MENTAT_REVIEWERS":"codex,grok"}')" "reviewers: on
-codex: available
-$NOGROK"
-listing "list separated by spaces, tabs and a newline, in another order: the order given" "$(on_with '{"MENTAT_REVIEWERS":" grok\t codex\n"}')" "reviewers: on
-$NOGROK
+listing "list codex: the listed reviewer and whether it is available" "$(on_with '{"MENTAT_REVIEWERS":"codex"}')" "reviewers: on
 codex: available"
-listing "a name listed twice is counted once" "$(on_with '{"MENTAT_REVIEWERS":"codex, codex grok,codex"}')" "reviewers: on
+listing "list separated by spaces, tabs and a newline, in another order: the order given" "$(on_with '{"MENTAT_REVIEWERS":" other-9\t codex\n"}')" "reviewers: on
+other-9: skipped (the mentat-reviewers module has no such reviewer)
+codex: available"
+listing "a name listed twice is counted once" "$(on_with '{"MENTAT_REVIEWERS":"codex, codex other-9,codex"}')" "reviewers: on
 codex: available
-$NOGROK"
+other-9: skipped (the mentat-reviewers module has no such reviewer)"
 listing "a name the module does not ship is skipped and named; the rest are listed" "$(on_with '{"MENTAT_REVIEWERS":"codex,other-9"}')" "reviewers: on
 codex: available
 other-9: skipped (the mentat-reviewers module has no such reviewer)"
 listing "the env object with no MENTAT_REVIEWERS: on, none listed" "$(on_with '{"OTHER":"codex"}')" "reviewers: on, none listed"
 listing "an empty list: on, none listed" "$(on_with '{"MENTAT_REVIEWERS":""}')" "reviewers: on, none listed"
 listing "a list of only commas and whitespace: on, none listed" "$(on_with '{"MENTAT_REVIEWERS":" ,, \t,"}')" "reviewers: on, none listed"
-listing "a name with an uppercase letter: unknown, naming the problem" "$(on_with '{"MENTAT_REVIEWERS":"codex,Grok"}')" "reviewers: unknown - MENTAT_REVIEWERS in $F holds a name with characters other than lowercase letters, digits and hyphens"
+listing "a name with an uppercase letter: unknown, naming the problem" "$(on_with '{"MENTAT_REVIEWERS":"codex,Other"}')" "reviewers: unknown - MENTAT_REVIEWERS in $F holds a name with characters other than lowercase letters, digits and hyphens"
 listing "a name with an underscore: unknown" "$(on_with '{"MENTAT_REVIEWERS":"co_dex"}')" "reviewers: unknown - MENTAT_REVIEWERS in $F holds a name with characters other than lowercase letters, digits and hyphens"
 listing "a list that is not a string: unknown" "$(on_with '{"MENTAT_REVIEWERS":["codex"]}')" "reviewers: unknown - MENTAT_REVIEWERS in $F is not a string"
 listing "a null list: unknown" "$(on_with '{"MENTAT_REVIEWERS":null}')" "reviewers: unknown - MENTAT_REVIEWERS in $F is not a string"
@@ -219,7 +213,7 @@ rc=$(run)
 git -C "$W" checkout -q -- .claude/settings.json; rm "$W/.claude/settings.local.json" "$HOME/.claude/settings.json"
 check "a list in local settings, user settings and the working tree is not read" 'said_lines "reviewers: on, none listed"'
 main_has "$(on_with '{"MENTAT_REVIEWERS":"codex"}')"
-(cd "$SEED" && git checkout -q -b listing && printf '%s' "$(on_with '{"MENTAT_REVIEWERS":"grok"}')" >.claude/settings.json && git commit -qam grok && git push -q origin listing && git checkout -q main) || exit 1
+(cd "$SEED" && git checkout -q -b listing && printf '%s' "$(on_with '{"MENTAT_REVIEWERS":"other-9"}')" >.claude/settings.json && git commit -qam other && git push -q origin listing && git checkout -q main) || exit 1
 git -C "$W" fetch -q origin && git -C "$W" checkout -q -b listing origin/listing || exit 1
 rc=$(run)
 git -C "$W" checkout -q main || exit 1

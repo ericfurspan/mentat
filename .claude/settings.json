@@ -4,6 +4,6 @@
     "mentat-public-text@mentat": true
   },
   "env": {
-    "MENTAT_REVIEWERS": "codex,grok"
+    "MENTAT_REVIEWERS": "codex"
   }
 }

@@ -651,19 +651,19 @@ reset
 ago() { touch -h -t "$(date -v-"$1"M +%Y%m%d%H%M.%S)" "$2"; } # $1 minutes ago, $2 path
 c="$XDG_CACHE_HOME/mentat" elsewhere="$root/elsewhere"
 mkdir -p "$c" "$elsewhere/dir" && echo keep >"$elsewhere/dir/f" && echo keep >"$elsewhere/file"
-for d in run-grok.old run-other.old run-grok.new runx-grok; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
-ln -s "$elsewhere/dir" "$c/run-grok.link"
-for f in mentat-log.codex.old mentat-log.grok.old mentat-held-comment.old mentat-log.codex.new mentat-logs; do echo x >"$TMPDIR/$f"; done
-ln -s "$elsewhere/file" "$TMPDIR/mentat-log.grok.link"
-for p in run-grok.old run-other.old; do ago 1445 "$c/$p"; done
-ago 1435 "$c/run-grok.new"
-for p in "$c/runx-grok" "$c/run-grok.link" "$elsewhere/dir"; do ago 2880 "$p"; done
-for p in mentat-log.codex.old mentat-log.grok.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
+for d in run-stopped.old run-other.old run-stopped.new runx-stopped; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
+ln -s "$elsewhere/dir" "$c/run-stopped.link"
+for f in mentat-log.codex.old mentat-log.other.old mentat-held-comment.old mentat-log.codex.new mentat-logs; do echo x >"$TMPDIR/$f"; done
+ln -s "$elsewhere/file" "$TMPDIR/mentat-log.other.link"
+for p in run-stopped.old run-other.old; do ago 1445 "$c/$p"; done
+ago 1435 "$c/run-stopped.new"
+for p in "$c/runx-stopped" "$c/run-stopped.link" "$elsewhere/dir"; do ago 2880 "$p"; done
+for p in mentat-log.codex.old mentat-log.other.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
 ago 10075 "$TMPDIR/mentat-log.codex.new"
-for p in "$TMPDIR/mentat-logs" "$TMPDIR/mentat-log.grok.link" "$elsewhere/file"; do ago 20160 "$p"; done
+for p in "$TMPDIR/mentat-logs" "$TMPDIR/mentat-log.other.link" "$elsewhere/file"; do ago 20160 "$p"; done
 reset; rc=$(run)
-check "at start, deletes run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/run-grok.old" ] && [ ! -e "$c/run-other.old" ] && [ ! -e "$TMPDIR/mentat-log.codex.old" ] && [ ! -e "$TMPDIR/mentat-log.grok.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
-check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/run-grok.new/f" ] && [ -f "$c/runx-grok/f" ] && [ -L "$c/run-grok.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-log.codex.new" ] && [ -f "$TMPDIR/mentat-logs" ] && [ -L "$TMPDIR/mentat-log.grok.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
+check "at start, deletes run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/run-stopped.old" ] && [ ! -e "$c/run-other.old" ] && [ ! -e "$TMPDIR/mentat-log.codex.old" ] && [ ! -e "$TMPDIR/mentat-log.other.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
+check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/run-stopped.new/f" ] && [ -f "$c/runx-stopped/f" ] && [ -L "$c/run-stopped.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-log.codex.new" ] && [ -f "$TMPDIR/mentat-logs" ] && [ -L "$TMPDIR/mentat-log.other.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
 rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
 
 # Outside reviewers off, or unknown, on main: refused (exit 6) before anything else. Each

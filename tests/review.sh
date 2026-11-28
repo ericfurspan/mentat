@@ -80,7 +80,7 @@ rc=$("$mentat" review 7 --outside >"$STUB/out" 2>&1; echo $?)
 check "an argument after the number is a usage error, not ignored (exit 64)" '[ "$rc" = 64 ] && grep -qF "usage: mentat review [--outside] [--request <file>] [--require-ci] <pull request number>" "$STUB/out"'
 # A reviewer's own mode is gone: every outside reviewer runs with --outside. Each such
 # flag exits 64 before reading anything, with the usage line, which names --outside.
-for args in "--codex 7" "--grok 7" "--grok --stop 7" "--codex --request f 7" "--stop 7" "--request f --outside 7"; do
+for args in "--codex 7" "--codex --request f 7" "--stop 7" "--request f --outside 7"; do
   reset
   # shellcheck disable=SC2086 # split on purpose
   rc=$("$mentat" review $args >"$STUB/out" 2>&1; echo $?)
