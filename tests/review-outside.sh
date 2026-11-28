@@ -47,7 +47,8 @@ stub_adapter beta Beta beta-tool
 stub_adapter slow Slow slow-tool
 stub_adapter delta Delta delta-cli
 
-# The tools: each records its run (name, mode, folder, head and hooks marker), then replies
+# The tools: each records its run (name, mode, folder, head and hooks marker) and, on a
+# line of its own in $STUB/<name>.dir, the folder it ran in, then replies
 # as $STUB/<name>.<mode> says, else its default. alpha and beta each wait, briefly, for the
 # other to start, and record whether it did, so a run one after the other is told apart.
 for t in alpha-tool:alpha beta-tool:beta slow-tool:slow delta-cli:delta; do
@@ -58,6 +59,7 @@ n=$n
 EOF
   cat >>"$root/tools/bin/$tool" <<'EOF'
 printf '%s %s %s %s\n' "$n" "$1" "$(pwd -P)" "$(git rev-parse HEAD 2>/dev/null)" >>"$STUB/tool_calls"
+pwd -P >"$STUB/$n.dir"
 cp "$2" "$STUB/$n.prompt"
 touch "$STUB/$n.started"
 case "$n" in alpha) other=beta ;; beta) other=alpha ;; *) other="" ;; esac
@@ -262,7 +264,7 @@ stopped() {
   [ "$ready" = yes ] && [ "$before" -ge 2 ] && [ "$crc" -gt 128 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null &&
     ! kill -0 "$(cat "$STUB/alpha.pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/beta.pid")" 2>/dev/null &&
     [ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ] && [ -z "$(git -C "$root/work" for-each-ref refs/mentat)" ] &&
-    t=$(cut -d" " -f3 "$STUB/tool_calls" | head -n 1) && [ -n "$t" ] && [ ! -e "$t" ] && [ -z "$(ls -A "$TMPDIR")" ] && ! posted
+    a=$(cat "$STUB/alpha.dir") && b=$(cat "$STUB/beta.dir") && [ -n "$a" ] && [ -n "$b" ] && [ ! -e "$a" ] && [ ! -e "$b" ] && [ -z "$(ls -A "$TMPDIR")" ] && ! posted
 }
 reset; touch "$STUB/alpha.hang" "$STUB/beta.hang"; cancel INT group
 check "INT to its process group while two reviewers run stops both, posts nothing and leaves nothing behind" 'stopped'
