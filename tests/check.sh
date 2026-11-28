@@ -369,6 +369,8 @@ check "the outside reviewers line prints though check stops at the gh sign-in" '
 origin_has '{"enabledPlugins":{"mentat-reviewers@mentat":true},"env":{"MENTAT_REVIEWERS":"codex other-9"}}' || exit 1
 reset; rc=$(tools_run "$root/reviewers")
 check "on, listing a name the module does not ship: one warning names it as skipped and why; the rest are checked" '[ "$rc" = 0 ] && grep -qx "OK: outside reviewer codex is listed and available" "$STUB/out" && grep -qx "WARN: outside reviewer other-9 is listed but skipped: the mentat-reviewers module has no such reviewer" "$STUB/out" && [ "$(last)" = "Check OK (1 warning(s))" ]'
+reset; rc=$(tools_run "$root/noreviewers")
+check "on, listing codex not installed and a name the module does not ship: one warning each, both counted, still exit 0" '[ "$rc" = 0 ] && grep -qx "WARN: outside reviewer codex is listed but not available: codex is not installed; it will not finish here" "$STUB/out" && grep -qx "WARN: outside reviewer other-9 is listed but skipped: the mentat-reviewers module has no such reviewer" "$STUB/out" && [ "$(last)" = "Check OK (2 warning(s))" ]'
 origin_has "$REVIEWERS_ON" || exit 1
 reset; rc=$(tools_run "$root/reviewers")
 check "on, none listed: one warning says so and that none will run" '[ "$rc" = 0 ] && grep -qxF "WARN: outside reviewers are on here, none listed: MENTAT_REVIEWERS in the env of .claude/settings.json on main names none, so none will run" "$STUB/out" && no_reviewer_lines && [ "$(last)" = "Check OK (1 warning(s))" ]'
