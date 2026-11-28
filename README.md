@@ -35,7 +35,7 @@ Left alone, AI agents drift from requests, review their own work and merge mista
 ## Requirements
 
 - macOS, Claude Code 2.1.295 or later, `git`, `jq`, and `gh` signed in.
-- For `mentat-reviewers`: each listed reviewer's command, signed in: Codex CLI, [outside the home folder](docs/setup.md#codex-outside-the-home-folder); Grok Build (`grok login`).
+- For `mentat-reviewers`: each listed reviewer's command, signed in: Codex CLI, [outside the home folder](docs/setup.md#codex-outside-the-home-folder).
 - For the git hooks: `gitleaks` ([setup](docs/setup.md#git-hooks)).
 
 ## Install

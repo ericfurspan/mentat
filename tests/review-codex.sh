@@ -404,6 +404,8 @@ check "findings exit 2 and are posted" '[ "$rc" = 2 ] && grep -q "posted finding
 check "a FINDINGS reply's result line says findings, and its findings are inside the fold" 'heading findings none && fold_shape "REVIEW RESULT: FINDINGS" && folded | grep -qx -- "- (blocking) README:1 wrong text"'
 reset; printf 'REVIEW RESULT: NO FINDINGS\n\n- (blocking) README:1 wrong text\n\nREVIEW RESULT: FINDINGS\n' >"$STUB/reply"; rc=$(run)
 check "the result comes from the reply's final line only" '[ "$rc" = 2 ] && heading findings none && fold_shape "REVIEW RESULT: FINDINGS"'
+reset; printf 'REVIEW RESULT: NO FINDINGS\n\nBut actually there is a problem.\n' >"$STUB/reply"; rc=$(run)
+check "a result line followed by prose is no final result line: did not finish, posted" '[ "$rc" = 0 ] && grep -qxF "codex: $NO_RESULT_ROW" "$STUB/out" && heading "$NO_RESULT_ROW"'
 
 # Codex runs in a temporary checkout and may cite files by its absolute path, as created or
 # resolved. The posted comment holds neither, and links the file at the reviewed commit.
@@ -614,15 +616,15 @@ interrupt() { # $1 model or ci, $2 signal, $3 group or pid
   for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
   took=$((SECONDS - took))
 }
-gone() { [ "$ready" = yes ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ "$(worktrees)" = 1 ] && [ -s "$STUB/tree" ] && [ ! -e "$(cat "$STUB/tree")" ]; }
+gone() { [ "$ready" = yes ] && [ "$before" = 2 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null && { [ ! -f "$STUB/model_pid" ] || ! kill -0 "$(cat "$STUB/model_pid")" 2>/dev/null; } && [ "$(worktrees)" = 1 ] && [ -s "$STUB/tree" ] && [ ! -e "$(cat "$STUB/tree")" ] && ! posted; }
 reset; touch "$STUB/hang"; interrupt model INT group
-check "INT to its process group while Codex runs stops Codex and removes the worktree within seconds" 'gone'
+check "INT to its process group while Codex runs stops Codex, posts nothing and removes the worktree within seconds" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci INT group
-check "INT to its process group during the wait for CI leaves no process and removes the worktree within seconds" 'gone'
+check "INT to its process group during the wait for CI leaves no process, posts nothing and removes the worktree within seconds" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 reset; runs in_progress null >"$STUB/check_runs.json"; interrupt ci TERM pid
-check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process and removes the worktree" 'gone'
+check "TERM to mentat alone during the wait for CI does not wait out the pause, leaves no process, posts nothing and removes the worktree" 'gone'
 kill -9 -- "-$ip" 2>/dev/null
 
 # Codex's failures in a row are kept in its own record, keyed by the adapter's name; from the
@@ -644,6 +646,10 @@ stub_reset; rc=$(run 7)
 check "a checked Codex reply ends its run of failures" '[ "$rc" = 0 ] && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
 stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
 check "a Codex failure after a checked reply is not raised" '[ "$rc" = 0 ] && [ -z "$(raised)" ]'
+stub_reset; runs completed '"failure"' >"$STUB/check_runs.json"; rc=$(run 7)
+check "a checked Codex reply ends its run of failures, even when CI then fails and nothing is posted" '[ "$rc" = 4 ] && ! posted && [ "$(tail -n 1 "$REC" | cut -d" " -f2,3)" = "ok owner/repo#7" ]'
+stub_reset; printf 'Looks fine to me.\n' >"$STUB/reply"; rc=$(run 7)
+check "a Codex failure after that checked reply is the first in a row: recorded, not raised" '[ "$rc" = 0 ] && [ -z "$(raised)" ] && [ "$(tail -n 2 "$REC" | cut -d" " -f2,3 | tr "\n" " ")" = "ok owner/repo#7 fail owner/repo#7 " ]'
 reset
 
 # At start, reviewers' run folders older than a day, and kept logs and held comments older
@@ -651,19 +657,19 @@ reset
 ago() { touch -h -t "$(date -v-"$1"M +%Y%m%d%H%M.%S)" "$2"; } # $1 minutes ago, $2 path
 c="$XDG_CACHE_HOME/mentat" elsewhere="$root/elsewhere"
 mkdir -p "$c" "$elsewhere/dir" && echo keep >"$elsewhere/dir/f" && echo keep >"$elsewhere/file"
-for d in run-grok.old run-other.old run-grok.new runx-grok; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
-ln -s "$elsewhere/dir" "$c/run-grok.link"
-for f in mentat-log.codex.old mentat-log.grok.old mentat-held-comment.old mentat-log.codex.new mentat-logs; do echo x >"$TMPDIR/$f"; done
-ln -s "$elsewhere/file" "$TMPDIR/mentat-log.grok.link"
-for p in run-grok.old run-other.old; do ago 1445 "$c/$p"; done
-ago 1435 "$c/run-grok.new"
-for p in "$c/runx-grok" "$c/run-grok.link" "$elsewhere/dir"; do ago 2880 "$p"; done
-for p in mentat-log.codex.old mentat-log.grok.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
+for d in run-stopped.old run-other.old run-stopped.new runx-stopped; do mkdir "$c/$d" && echo x >"$c/$d/f"; done
+ln -s "$elsewhere/dir" "$c/run-stopped.link"
+for f in mentat-log.codex.old mentat-log.other.old mentat-held-comment.old mentat-log.codex.new mentat-logs; do echo x >"$TMPDIR/$f"; done
+ln -s "$elsewhere/file" "$TMPDIR/mentat-log.other.link"
+for p in run-stopped.old run-other.old; do ago 1445 "$c/$p"; done
+ago 1435 "$c/run-stopped.new"
+for p in "$c/runx-stopped" "$c/run-stopped.link" "$elsewhere/dir"; do ago 2880 "$p"; done
+for p in mentat-log.codex.old mentat-log.other.old mentat-held-comment.old; do ago 10085 "$TMPDIR/$p"; done
 ago 10075 "$TMPDIR/mentat-log.codex.new"
-for p in "$TMPDIR/mentat-logs" "$TMPDIR/mentat-log.grok.link" "$elsewhere/file"; do ago 20160 "$p"; done
+for p in "$TMPDIR/mentat-logs" "$TMPDIR/mentat-log.other.link" "$elsewhere/file"; do ago 20160 "$p"; done
 reset; rc=$(run)
-check "at start, deletes run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/run-grok.old" ] && [ ! -e "$c/run-other.old" ] && [ ! -e "$TMPDIR/mentat-log.codex.old" ] && [ ! -e "$TMPDIR/mentat-log.grok.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
-check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/run-grok.new/f" ] && [ -f "$c/runx-grok/f" ] && [ -L "$c/run-grok.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-log.codex.new" ] && [ -f "$TMPDIR/mentat-logs" ] && [ -L "$TMPDIR/mentat-log.grok.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
+check "at start, deletes run folders older than a day and kept logs and held comments older than seven days" '[ "$rc" = 0 ] && [ ! -e "$c/run-stopped.old" ] && [ ! -e "$c/run-other.old" ] && [ ! -e "$TMPDIR/mentat-log.codex.old" ] && [ ! -e "$TMPDIR/mentat-log.other.old" ] && [ ! -e "$TMPDIR/mentat-held-comment.old" ]'
+check "at start, keeps ones inside those limits, similar names, and symlinks named like them with their targets" '[ -f "$c/run-stopped.new/f" ] && [ -f "$c/runx-stopped/f" ] && [ -L "$c/run-stopped.link" ] && [ "$(cat "$elsewhere/dir/f")" = keep ] && [ -f "$TMPDIR/mentat-log.codex.new" ] && [ -f "$TMPDIR/mentat-logs" ] && [ -L "$TMPDIR/mentat-log.other.link" ] && [ "$(cat "$elsewhere/file")" = keep ]'
 rm -rf "$c" "$elsewhere" "$TMPDIR"/mentat-*
 
 # Outside reviewers off, or unknown, on main: refused (exit 6) before anything else. Each

@@ -7,9 +7,9 @@
 OUTSIDE_USAGE="usage: mentat review --outside [--request <file>] [--require-ci] <pull request number>"
 
 # The prompt every review gets after where to look: the criteria, the requirements and
-# the result line. $1 is review_criteria's (" and the diff" when the prompt carries the diff).
+# the result line.
 review_body() {
-  review_criteria "$1"
+  review_criteria
   review_requirements "$issues" "$title" "$body" "$request"
   review_result_line
 }
@@ -24,12 +24,12 @@ outside_runner() {
   if ! result_line "$(last_line "$reply")"; then
     # Kept as <name>.partial: printed and read for findings, and posted in its own block
     # only when it marks one, since the reply did not end as a review does.
-    localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ${adapter_roots[@]+"${adapter_roots[@]}"} &&
+    localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" &&
       cp "$reply" "$res/$name.partial"
     adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")"
   fi
   reviewer_record "$name" ok
-  localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ${adapter_roots[@]+"${adapter_roots[@]}"} ||
+  localize_review_paths "$reply" "$repo" "$head" "$tree" "$data" ||
     adapter_fail "could not rewrite the paths in $adapter_display's reply" "" none
   final=$(last_line "$reply")
   result_line "$final" || adapter_fail "$(adapter_noted "$adapter_display's reply has no final REVIEW RESULT line")" "" none

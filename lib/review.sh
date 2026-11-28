@@ -253,7 +253,7 @@ review_local() {
 
   {
     "review_prep_$reviewer"
-    review_criteria ""
+    review_criteria
     review_requirements "$issues" "$title" "$body" "$request"
     review_result_line
   } >"$tmp/prompt" || not_reviewed "could not write the prompt"

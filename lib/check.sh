@@ -143,8 +143,7 @@ c_claude_version() {
 }
 # Whether outside reviewers are on here (reviewers_state in lib/shared.sh), then each listed
 # reviewer from the module's offline check (reviewers_listing): a listed one that is not
-# available or skipped is a warning, as is on with none listed. Then the module's notes,
-# such as a setting it no longer reads, each a warning. No reviewer runs.
+# available or skipped is a warning, as is on with none listed. No reviewer runs.
 # shellcheck disable=SC2154 # reviewers, reviewers_list, reviewers_why, reviewers_def and reviewers_lines are set by the functions called
 c_reviewers() {
   local l state rest n why
@@ -156,7 +155,7 @@ c_reviewers() {
     off) c_ok "outside reviewers are off here (mentat-reviewers is not on in .claude/settings.json on $reviewers_def)" ;;
     *) c_warn "outside reviewers are unknown here: $reviewers_why; none will run" ;;
   esac
-  reviewers_listing --notes
+  reviewers_listing
   while IFS= read -r l; do
     [ -n "$l" ] || continue
     state=${l%% *} rest=${l#* } n=${rest%% *} why=${rest#* }
@@ -164,7 +163,6 @@ c_reviewers() {
       available) c_ok "outside reviewer $n is listed and available" ;;
       unavailable) c_warn "outside reviewer $n is listed but not available: $why; it will not finish here" ;;
       skipped) c_warn "outside reviewer $n is listed but skipped: $why" ;;
-      note) c_warn "$rest" ;;
     esac
   done < <(printf '%s\n' "$reviewers_lines")
 }

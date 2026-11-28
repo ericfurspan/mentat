@@ -25,7 +25,7 @@ adapter_run() {
     if [ "$1" = review ]; then
       printf 'Review pull request #%s. The working directory is a checkout of its head, commit %s. ' "$pr" "$head"
       printf 'Review the change from %s to %s (run: git diff %s %s). Do not modify files.\n\n' "$mb" "$head" "$mb" "$head"
-      review_body ""
+      review_body
     else
       search=cached
       printf 'The working directory is a detached git worktree at commit %s; read-only commands are allowed.\n\n' "$head"

@@ -34,7 +34,7 @@ stub_adapter() {
 adapter_display=@DISPLAY@
 adapter_available() { command -v @TOOL@ >/dev/null 2>&1 && return 0; adapter_why="@TOOL@ is not installed"; return 1; }
 adapter_run() {
-  { printf 'mode %s, head %s\n' "$1" "$head"; if [ "$1" = review ]; then review_body ""; else cat "$res/body"; fi; } >"$work/prompt" || adapter_fail "could not write the prompt" "" none
+  { printf 'mode %s, head %s\n' "$1" "$head"; if [ "$1" = review ]; then review_body; else cat "$res/body"; fi; } >"$work/prompt" || adapter_fail "could not write the prompt" "" none
   (cd "$tree" && exec @TOOL@ "$1" "$work/prompt") >"$reply" 2>"$work/err" </dev/null &
   adapter_wait "$!" "the log is kept at $work/err"
   [ "$adapter_rc" -eq 0 ] || adapter_fail "@TOOL@ exited with status $adapter_rc" "its log may hold credentials; the maintainer can read it at $work/err"
@@ -47,7 +47,8 @@ stub_adapter beta Beta beta-tool
 stub_adapter slow Slow slow-tool
 stub_adapter delta Delta delta-cli
 
-# The tools: each records its run (name, mode, folder, head and hooks marker), then replies
+# The tools: each records its run (name, mode, folder, head and hooks marker) and, on a
+# line of its own in $STUB/<name>.dir, the folder it ran in, then replies
 # as $STUB/<name>.<mode> says, else its default. alpha and beta each wait, briefly, for the
 # other to start, and record whether it did, so a run one after the other is told apart.
 for t in alpha-tool:alpha beta-tool:beta slow-tool:slow delta-cli:delta; do
@@ -58,6 +59,7 @@ n=$n
 EOF
   cat >>"$root/tools/bin/$tool" <<'EOF'
 printf '%s %s %s %s\n' "$n" "$1" "$(pwd -P)" "$(git rev-parse HEAD 2>/dev/null)" >>"$STUB/tool_calls"
+pwd -P >"$STUB/$n.dir"
 cp "$2" "$STUB/$n.prompt"
 touch "$STUB/$n.started"
 case "$n" in alpha) other=beta ;; beta) other=alpha ;; *) other="" ;; esac
@@ -71,6 +73,8 @@ if [ "$n" = slow ] && [ -f "$STUB/slow.hold" ]; then
   printf 'Nothing to flag.\n\nREVIEW RESULT: NO FINDINGS\n'; exit 0
 fi
 [ "$n" = slow ] && { echo $$ >"$STUB/slow.pid"; exec sleep 30; }
+# Hung, any tool records its process and never finishes on its own.
+[ -f "$STUB/$n.hang" ] && { echo $$ >"$STUB/$n.pid"; exec sleep 30; }
 [ -f "$STUB/$n.fails" ] && { echo "fake-token-in-log" >&2; exit 3; }
 # A folder where the path rewrite writes its copy of the reply, so the rewrite fails.
 [ -f "$STUB/$n.block_rewrite" ] && mkdir "$(dirname "$2")/reply.localized"
@@ -233,6 +237,43 @@ reset; touch "$STUB/beta.fails"; run 7 >/dev/null; rm -f "$STUB/comment"; rc=$(r
 check "the second failure in a row tells the maintainer now, keyed by the adapter's name" 'grep -q "^mentat: tell the maintainer now: Beta has failed 2 times in a row (owner/repo#7): beta-tool exited with status 3" "$STUB/err" && [ -f "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" ]'
 rm -f "$STUB/beta.fails"; rm -f "$STUB/comment"; rc=$(run 7)
 check "a checked reply ends the row" '[ "$(tail -n 1 "$XDG_CACHE_HOME/mentat/reviewer-failures-beta" | cut -d" " -f2)" = ok ] && ! grep -q "tell the maintainer" "$STUB/err"'
+# A cancel while two reviewers run: mentat in its own process group with default INT
+# handling (a job this script starts in the background ignores INT), signalled once both
+# hung tools have started. Within seconds every tool is stopped and nothing is left: no
+# process in its group, no worktree, no private ref, no checkout, no temporary folder.
+listing "alpha,beta"
+cancel() { # $1 signal, $2 group or pid
+  local i
+  (
+    cd "$root/work" || exit 1
+    exec perl -e '$SIG{INT} = "DEFAULT"; setpgrp(0, 0); exec @ARGV or die' -- "$mentat" review --outside 7 >"$STUB/out" 2>"$STUB/err"
+  ) &
+  ip=$! ready=no
+  for i in $(seq 100); do
+    if [ -s "$STUB/alpha.pid" ] && [ -s "$STUB/beta.pid" ]; then ready=yes; break; fi
+    sleep 0.1
+  done
+  before=$(git -C "$root/work" worktree list | wc -l | tr -d ' ') took=$SECONDS
+  if [ "$2" = group ]; then kill -"$1" -- "-$ip"; else kill -"$1" "$ip"; fi
+  wait "$ip"; crc=$?
+  for i in $(seq 50); do kill -0 -- "-$ip" 2>/dev/null || break; sleep 0.1; done
+  took=$((SECONDS - took))
+}
+# Stopped by the signal: an exit status above 128. mktemp -d may ignore TMPDIR (macOS's
+# does), so the run folder is checked by its path: the folder holding the checkout, tree.
+stopped() {
+  [ "$ready" = yes ] && [ "$before" -ge 2 ] && [ "$crc" -gt 128 ] && [ "$took" -lt 10 ] && ! kill -0 -- "-$ip" 2>/dev/null &&
+    ! kill -0 "$(cat "$STUB/alpha.pid")" 2>/dev/null && ! kill -0 "$(cat "$STUB/beta.pid")" 2>/dev/null &&
+    [ "$(git -C "$root/work" worktree list | wc -l | tr -d " ")" = 1 ] && [ -z "$(git -C "$root/work" for-each-ref refs/mentat)" ] &&
+    a=$(cat "$STUB/alpha.dir") && b=$(cat "$STUB/beta.dir") && [ -n "$a" ] && [ -n "$b" ] && [ ! -e "$a" ] && [ ! -e "$b" ] &&
+    [ "${a##*/}" = tree ] && [ "${b##*/}" = tree ] && [ ! -e "${a%/tree}" ] && [ ! -e "${b%/tree}" ] && [ -z "$(ls -A "$TMPDIR")" ] && ! posted
+}
+reset; touch "$STUB/alpha.hang" "$STUB/beta.hang"; cancel INT group
+check "INT to its process group while two reviewers run stops both, posts nothing and leaves nothing behind" 'stopped'
+kill -9 -- "-$ip" 2>/dev/null
+reset; touch "$STUB/alpha.hang" "$STUB/beta.hang"; cancel TERM pid
+check "TERM to mentat alone while two reviewers run stops both, posts nothing and leaves nothing behind" 'stopped'
+kill -9 -- "-$ip" 2>/dev/null
 # A raise is told as soon as its reviewer ends, not after the slowest one: slow is held
 # until the raise is on stderr, waiting at most 5 seconds for it, and runs 10 at most.
 listing "slow,beta"

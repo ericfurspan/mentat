@@ -34,8 +34,7 @@ MENTAT_ROOTS lib/shared.sh sets it for the awk program it runs
 MENTAT_REVIEW_MODEL_DEFAULT lib/review.sh assigns it, as the one place the review default is named
 MENTAT_REVIEW_INTERVAL_SECONDS only tests set it, to shorten how often a review polls CI
 MENTAT_CI_TIMEOUT_SECONDS only tests set it, to shorten the wait for CI
-MENTAT_CI_GRACE_SECONDS only tests set it, to shorten the wait for CI to start
-MENTAT_GROK_TIMEOUT_SECONDS a retired setting: the Grok adapter looks at it only so mentat check can say it is no longer read"
+MENTAT_CI_GRACE_SECONDS only tests set it, to shorten the wait for CI to start"
 internal_names=$(printf '%s\n' "$internal" | cut -d' ' -f1)
 
 # The code: scripts, hooks, skills, agents and rules, tracked or new, never tests or docs.
