@@ -68,7 +68,8 @@ fi
 # after-merge reply is pending. A pull request body goes to gh from a file. The maintainer's
 # objection to an item's design, plan or pull request is recorded as a decisions line, and a later
 # plan lists and answers each one and is asked, not agreed by default or as a small request. A build
-# run resumes its held items when the maintainer says in that session that what they waited on merged.
+# run resumes its held items when the maintainer says in that session that what they waited on merged
+# and the after-merge steps read it merged.
 o=plugins/mentat-lead/skills/orchestrate/SKILL.md
 b=plugins/mentat-lead/skills/orchestrate/build-sessions.md
 while IFS='|' read -r f section want; do
@@ -176,7 +177,7 @@ skills/review/SKILL.md|Final check|A Ready line for a new head after a hold coun
 skills/review/SKILL.md|Final check|A session started by another session sends none; the starting session that forwards the line sends it.
 skills/review/SKILL.md|Final check|With no such tool, or when the push is not sent, fails or is refused, go on: no retry, no report.
 skills/build/SKILL.md||This message is the first showing of its Ready lines: right after it, a session no other session started sends their one push as \`../review/SKILL.md\` "Final check" says.
-skills/build/SKILL.md|Held items|the run resumes step 6 for its held items, in queue order, with step 6's re-checks.
+skills/build/SKILL.md|Held items|When the maintainer says in this session that a pull request one waits on merged, and \`../review/after-ready.md\` has read it merged and done its after-merge steps, the run resumes step 6 for its held items, in queue order, with step 6's re-checks.
 skills/build/SKILL.md|Started sessions|A session started by another session asks the maintainer nothing and sends no push:
 $b|Forwarding|The forward is the first showing of that Ready line: right after it, this session sends the push \`mentat:review\` "Final check" gives.
 skills/pr/SKILL.md||Pass the body to \`gh pr create\` and \`gh pr edit\` with \`--body-file\`, naming a file written in an earlier call.
