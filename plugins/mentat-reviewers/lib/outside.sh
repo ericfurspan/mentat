@@ -7,9 +7,9 @@
 OUTSIDE_USAGE="usage: mentat review --outside [--request <file>] [--require-ci] <pull request number>"
 
 # The prompt every review gets after where to look: the criteria, the requirements and
-# the result line. $1 is review_criteria's (" and the diff" when the prompt carries the diff).
+# the result line.
 review_body() {
-  review_criteria "$1"
+  review_criteria
   review_requirements "$issues" "$title" "$body" "$request"
   review_result_line
 }

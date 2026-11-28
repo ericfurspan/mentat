@@ -34,7 +34,7 @@ stub_adapter() {
 adapter_display=@DISPLAY@
 adapter_available() { command -v @TOOL@ >/dev/null 2>&1 && return 0; adapter_why="@TOOL@ is not installed"; return 1; }
 adapter_run() {
-  { printf 'mode %s, head %s\n' "$1" "$head"; if [ "$1" = review ]; then review_body ""; else cat "$res/body"; fi; } >"$work/prompt" || adapter_fail "could not write the prompt" "" none
+  { printf 'mode %s, head %s\n' "$1" "$head"; if [ "$1" = review ]; then review_body; else cat "$res/body"; fi; } >"$work/prompt" || adapter_fail "could not write the prompt" "" none
   (cd "$tree" && exec @TOOL@ "$1" "$work/prompt") >"$reply" 2>"$work/err" </dev/null &
   adapter_wait "$!" "the log is kept at $work/err"
   [ "$adapter_rc" -eq 0 ] || adapter_fail "@TOOL@ exited with status $adapter_rc" "its log may hold credentials; the maintainer can read it at $work/err"
