@@ -220,8 +220,10 @@ other_no_opinion "a reply without a verdict line" "the reply has no final SECOND
 reset; printf "SECOND OPINION VERDICT: DON'T - nope\n" >"$STUB/other_out"; rc=$(run "$idea")
 check "a reply that is only a verdict line counts" '[ "$rc" = 0 ] && grep -q "^- Other ([0-9]* seconds): SECOND OPINION VERDICT: DON.T - nope$" "$STUB/stdout"'
 reset; touch "$STUB/other_hang"; took=$SECONDS; rc=$(MENTAT_REVIEW_TIMEOUT_SECONDS=3 run "$idea"); took=$((SECONDS - took))
-# More than the 3-second limit, then the 2 seconds between TERM and KILL.
+# More than the 3-second limit, then the 2 seconds between TERM and KILL; well under the
+# 30 seconds the hung tool would take to end by itself.
 check "the second reviewer's timeout fires no sooner than its limit" '[ "$took" -ge 5 ]'
+check "the second reviewer's timeout stops the tool instead of waiting for it to end" '[ "$took" -lt 20 ]'
 other_no_opinion "a timeout (MENTAT_REVIEW_TIMEOUT_SECONDS)" "Other did not finish within 3 seconds)"
 check "the timed-out tool was stopped" '! kill -0 "$(cat "$STUB/other_pid")" 2>/dev/null'
 # MENTAT_REVIEW_TIMEOUT_SECONDS is every reviewer's one time limit: anything but a whole
