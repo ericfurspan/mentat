@@ -4,7 +4,7 @@
 
 ## Parts
 
-- `rules.md`: the core rules, which `hooks/session-start` prints into sessions where Mentat is on.
+- `rules.md`: core rules, which `hooks/session-start` prints into sessions where Mentat is on.
 - `skills/`: one skill per workflow step: `plan`, `backlog`, `build`, `pr` and `review`.
 - `agents/`: implementer (`builder.md`) and plan checker (`plan-checker.md`).
 - `hooks/`: session-start and merge (`no-merge`) hooks.
@@ -14,7 +14,7 @@
 
 ## The loop
 
-You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except on a fast track you agreed, runs review rounds: `mentat review` runs fresh-context Claude on each head, within the round limit; with `mentat-reviewers` on in [committed settings](settings.md), `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed, answered or, at the round limit, filed for follow-up. A ready pull request gets a "Ready to merge" line; you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and, where its host can start and message sessions, it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
+You plan a change with Claude (`/mentat:plan`). A fresh agent checks the plan, unless the request is small and clear, and you agree once; the spec goes on the item. An implementation session gives each item an implementer in its own worktree, opens one pull request per item and, except where an agreed [fast track](../skills/review/SKILL.md#fast-track)'s diff qualifies, runs review rounds: `mentat review` runs fresh-context Claude on each head, within the round limit; with `mentat-reviewers` on in [committed settings](settings.md), `mentat review --outside` runs every listed, available outside reviewer once a head has nothing left to push. Each finding is fixed, answered or, at the round limit, filed for follow-up. A ready pull request gets a "Ready to merge" line; you merge it. With `mentat-lead`, the orchestrator is the one session you talk to: you plan with it, and, where its host can start and message sessions, it hands agreed items to implementation sessions. It may agree to an item by default when nothing on it is open for you, and records it as agreed by default, not your answer.
 
 ## Code and prompts
 
